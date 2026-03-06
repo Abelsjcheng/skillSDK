@@ -37,18 +37,41 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
+/**
+ * Skill SDK 核心类，提供技能执行、会话管理、消息发送等核心功能
+ * 采用单例模式设计，确保全局唯一实例
+ * 
+ * @author OpenCode Team
+ * @version 1.0.0
+ * @since 2026-03-06
+ */
 public class SkillSDK {
+    // 单例实例
     private static SkillSDK instance;
+    // SDK配置信息
     private final SkillSDKConfig config;
+    // 服务端API调用服务
     private final SkillApiService apiService;
+    // WebSocket连接管理器
     private final SkillWebSocketManager wsManager;
+    // 线程池，用于执行后台任务
     private final ExecutorService executorService;
+    // 主线程Handler，用于将回调切换到主线程
     private final Handler mainHandler;
+    // 会话缓存，存储活跃会话
     private final Map<String, SkillSession> sessionCache;
+    // 会话状态回调映射表
     private final Map<String, List<SessionStatusCallback>> statusCallbacks;
+    // 会话状态映射表，存储每个会话的当前状态
     private final Map<String, String> sessionStatusMap;
+    // 小程序状态回调
     private SkillWecodeStatusCallback wecodeStatusCallback;
 
+    /**
+     * 私有构造方法，用于创建SkillSDK实例
+     * 
+     * @param config SDK配置信息
+     */
     private SkillSDK(SkillSDKConfig config) {
         this.config = config;
         this.executorService = Executors.newCachedThreadPool();
@@ -73,12 +96,23 @@ public class SkillSDK {
         this.wsManager = new SkillWebSocketManager(config.getWsBaseUrl(), okHttpClient);
     }
 
+    /**
+     * 初始化SkillSDK，创建单例实例
+     * 
+     * @param config SDK配置信息
+     */
     public static synchronized void initialize(SkillSDKConfig config) {
         if (instance == null) {
             instance = new SkillSDK(config);
         }
     }
 
+    /**
+     * 获取SkillSDK单例实例
+     * 
+     * @return SkillSDK实例
+     * @throws IllegalStateException 如果SDK未初始化
+     */
     public static synchronized SkillSDK getInstance() {
         if (instance == null) {
             throw new IllegalStateException("SkillSDK not initialized. Call initialize() first.");
@@ -86,6 +120,9 @@ public class SkillSDK {
         return instance;
     }
 
+    /**
+     * 销毁SkillSDK实例，释放资源
+     */
     public static synchronized void destroy() {
         if (instance != null) {
             instance.cleanup();

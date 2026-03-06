@@ -3,6 +3,12 @@
 //  SkillSDK
 //
 //  Skill SDK 主接口实现
+//  提供技能执行、会话管理、消息发送等核心功能
+//  采用单例模式设计，确保全局唯一实例
+//
+//  @author OpenCode Team
+//  @version 1.0.0
+//  @since 2026-03-06
 //
 
 #import "SkillSDK.h"
@@ -29,14 +35,23 @@
 
 @interface SkillSDK ()
 
+// 会话管理器，负责会话的创建、管理和销毁
 @property (nonatomic, strong) SkillSessionManager *sessionManager;
+// 会话状态回调映射表，存储每个会话的状态回调
 @property (nonatomic, strong) NSMutableDictionary<NSString *, SkillSessionStatusCallback> *sessionStatusCallbacks;
+// 小程序状态回调，接收小程序状态变化通知
 @property (nonatomic, copy) SkillWecodeStatusCallback wecodeStatusCallback;
 
 @end
 
 @implementation SkillSDK
 
+/**
+ * 获取SkillSDK单例实例
+ * 采用dispatch_once确保线程安全和唯一实例
+ * 
+ * @return SkillSDK单例实例
+ */
 + (instancetype)sharedSDK {
     static SkillSDK *instance = nil;
     static dispatch_once_t onceToken;
@@ -61,6 +76,16 @@
                       webSocketHost:config.webSocketHost];
 }
 
+/**
+ * 执行技能，创建会话并发送用户消息
+ * 
+ * @param imChatId IM聊天ID
+ * @param userId 用户ID
+ * @param skillContent 用户输入的技能指令内容
+ * @param agentId PCAgent ID，可选
+ * @param title 会话标题，可选
+ * @param handler 完成回调，返回执行结果或错误信息
+ */
 - (void)executeSkillWithImChatId:(NSString *)imChatId
                           userId:(NSString *)userId
                     skillContent:(NSString *)skillContent
@@ -68,8 +93,10 @@
                            title:(nullable NSString *)title
                completionHandler:(void(^)(SkillExecuteSkillResult * _Nullable result, NSError * _Nullable error))handler {
     
+    // 获取HTTP客户端实例
     SkillHTTPClient *httpClient = self.sessionManager.httpClient;
     
+    // 准备创建会话请求参数
     NSInteger userIdInt = [userId integerValue];
     NSDictionary *body = @{
         @"userId": @(userIdInt),
@@ -77,6 +104,7 @@
         @"imChatId": imChatId
     };
     
+    // 构建可变请求体，处理可选参数
     NSMutableDictionary *mutableBody = [body mutableCopy];
     if (agentId) {
         mutableBody[@"agentId"] = agentId;
