@@ -61,6 +61,29 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
    - 调用 `POST /api/skill/sessions/{sessionId}/messages`
    - 请求体: `{ "content": skillContent }`
 
+4. **WebSocket消息回调机制**：
+   - WebSocket连接建立后，服务端会立即开始推送AI响应流
+   - 所有通过 `registerSessionListener` 注册的监听器会实时接收消息
+   - 消息类型包括：
+     - `delta`: AI生成的增量内容
+     - `done`: AI处理完成，包含token用量统计
+     - `error`: 处理错误
+     - `agent_offline`: Agent离线
+     - `agent_online`: Agent上线
+   - 示例消息格式：
+     ```json
+     {
+       "type": "delta",
+       "seq": 1,
+       "content": "好的，我来分析一下登录模块的代码..."
+     }
+     ```
+
+5. **时序安全保障**：
+   - 如果 `registerSessionListener` 在 `executeSkill` 之前调用，监听器会被暂存
+   - WebSocket连接建立后，暂存的监听器会自动生效
+   - 确保不会因调用时序问题遗漏任何消息
+
 ---
 
 ## 2. 关闭技能接口
@@ -454,16 +477,129 @@ getSessionMessage(sessionId: string, page?: number, size?: number): Promise<Page
 
 ---
 
-## 9. 发送消息接口
+## 9. 注册会话监听器接口
 
 ### 接口说明
 
-发送用户输入的内容，触发会话的持续回答，用于多轮对话场景。同时注册消息监听器，持续获取服务端推送的回答内容。该接口会先发送消息到服务端，然后通过WebSocket接收AI的流式响应。
+注册会话监听器，用于接收WebSocket推送的AI响应流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器，SDK会确保不会因调用时序问题遗漏消息。
 
 ### 接口名
 
 ```typescript
-sendMessage(sessionId: string, content: string, onMessage: (message: StreamMessage) => void): Promise<boolean>
+registerSessionListener(sessionId: string, listener: SessionListener): void
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| onMessage | function | 是 | 消息回调函数，接收AI响应流 |
+| onError | function | 否 | 错误回调函数，接收错误信息 |
+| onClose | function | 否 | 连接关闭回调函数 |
+
+
+### SessionListener 类型定义
+
+```typescript
+interface SessionListener {
+  onMessage: (message: StreamMessage) => void;
+  onError?: (error: SessionError) => void;
+  onClose?: (reason: string) => void;
+}
+```
+
+### SessionError 类型定义
+
+```typescript
+interface SessionError {
+  code: string;
+  message: string;
+  timestamp: number;
+}
+```
+
+### 实现方法
+
+1. **回调注册机制**：
+   - SDK内部维护每个会话的监听器列表
+   - 支持多个监听器同时注册同一会话
+   - 回调注册是幂等的，重复注册不会产生副作用
+
+2. **时序安全保障**：
+   - 如果WebSocket连接已建立，新注册的监听器会立即开始接收后续消息
+   - 如果WebSocket尚未建立，监听器会被暂存，连接建立后自动生效
+   - SDK保证回调注册与WebSocket连接建立的时序无关
+
+3. **连接管理**：
+   - 首次注册监听器时，如果WebSocket未连接，自动建立连接
+   - 多个监听器共享同一个WebSocket连接
+   - 当会话无剩余监听器时，可选择断开WebSocket连接（可配置）
+
+4. **事件分发**：
+   - WebSocket收到消息后，调用所有监听器的 `onMessage` 回调
+   - 连接错误时，调用所有监听器的 `onError` 回调
+   - 连接关闭时，调用所有监听器的 `onClose` 回调
+
+
+### 注意事项
+
+- 回调注册是异步安全的，可在任何时机调用
+- 建议在小程序 `onShow` 生命周期中注册监听器
+- 移除监听器需调用 `unregisterSessionListener(sessionId, listener)`
+
+---
+
+## 10. 移除会话监听器接口
+
+### 接口说明
+
+移除已注册的会话监听器。当监听器不再需要接收消息时调用，例如小程序关闭或切换页面时。
+
+### 接口名
+
+```typescript
+unregisterSessionListener(sessionId: string, listener: SessionListener): void
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| listener | object | 是 | 要移除的监听器对象 |
+
+### 实现方法
+
+1. 从会话的监听器列表中移除指定的监听器
+2. 如果移除后该会话无剩余监听器，且配置为自动断开，则关闭WebSocket连接
+
+### 使用场景
+
+```typescript
+// 小程序页面销毁时移除监听
+onUnmounted(() => {
+  unregisterSessionListener(sessionId, sessionListener);
+});
+```
+
+### 注意事项
+
+- 移除的监听器必须是之前通过 `registerSessionListener` 注册的同一个监听器对象
+- 建议保存监听器对象引用以便后续移除
+
+---
+
+## 11. 发送消息内容接口
+
+### 接口说明
+
+发送用户输入的内容，触发会话的持续回答，用于多轮对话场景。该接口会先发送消息到服务端，然后通过WebSocket接收AI的流式响应。
+
+### 接口名
+
+```typescript
+sendMessage(sessionId: string, content: string): Promise<boolean>
 ```
 
 ### 入参
@@ -472,7 +608,6 @@ sendMessage(sessionId: string, content: string, onMessage: (message: StreamMessa
 |--------|------|------|------|
 | sessionId | string | 是 | 会话ID |
 | content | string | 是 | 用户输入的消息内容 |
-| onMessage | function | 是 | 消息监听回调函数，持续接收服务端推送的回答内容 |
 
 ### 出参
 
@@ -555,7 +690,7 @@ sendMessage(sessionId: string, content: string, onMessage: (message: StreamMessa
 
 ---
 
-## 10. 权限确认接口
+## 12. 权限确认接口
 
 ### 接口说明
 
@@ -614,7 +749,7 @@ replyPermission(sessionId: string, permissionId: string, approved: boolean): Pro
 
 ---
 
-## 11. 小程序控制接口
+## 13. 小程序控制接口
 
 ### 接口说明
 
@@ -658,10 +793,21 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
 | 关闭小程序 | `controlSkillWeCode(close)` + `closeSkill` | 完全释放资源 |
 | 最小化小程序 | `controlSkillWeCode(minimize)` | 保持会话，可恢复 |
 | 停止AI生成 | `stopSkill` | 仅停止流式推送，不改变小程序状态 |
+| 注册会话监听 | `registerSessionListener` | 小程序打开后注册监听器 |
+| 移除会话监听 | `unregisterSessionListener` | 小程序关闭时移除监听器 |
+| 发送消息 | `sendMessageContent` | 发送新消息触发AI处理 |
 
 ## 数据类型定义
 
-### SessionStatus
+  ### SessionListener
+
+  | 字段 | 类型 | 必填 | 说明 |
+  |------|------|------|------|
+  | onMessage | function | 是 | 消息回调函数，接收AI响应流 |
+  | onError | function | 否 | 错误回调函数，接收错误信息 |
+  | onClose | function | 否 | 连接关闭回调函数 |
+
+  ### SessionStatus
 
 | 枚举值 | 说明 |
 |--------|------|
