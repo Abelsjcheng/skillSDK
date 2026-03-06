@@ -34,6 +34,14 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
 |--------|------|------|
 | sessionId | string | 会话ID，用于后续对该会话进行操作 |
 
+### 出参示例
+
+```json
+{
+  "sessionId": 42,
+}
+```
+
 ### 实现方法
 
 1. 调用服务端REST API创建会话：
@@ -92,7 +100,7 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
 ### 接口名
 
 ```typescript
-closeSkill(sessionId: string): Promise<boolean>
+closeSkill(sessionId: string): Promise<CloseSkillResult>
 ```
 
 ### 入参
@@ -105,7 +113,25 @@ closeSkill(sessionId: string): Promise<boolean>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| success | boolean | 关闭是否成功 |
+| status | string | 关闭状态：success（成功）、failed（失败） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "status": "success"
+}
+```
+
+失败时：
+
+```json
+{
+  "status": "failed",
+}
+```
 
 ### 实现方法
 
@@ -142,7 +168,7 @@ closeSkill(sessionId: string): Promise<boolean>
 ### 接口名
 
 ```typescript
-stopSkill(sessionId: string): Promise<boolean>
+stopSkill(sessionId: string): Promise<StopSkillResult>
 ```
 
 ### 入参
@@ -155,7 +181,25 @@ stopSkill(sessionId: string): Promise<boolean>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| success | boolean | 停止操作是否成功 |
+| status | string | 停止状态：success（成功）、failed（失败） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "status": "success"
+}
+```
+
+失败时：
+
+```json
+{
+  "status": "failed",
+}
+```
 
 ### 实现方法
 
@@ -202,6 +246,21 @@ onSessionStatus(sessionId: string, callback: (status: SessionStatus) => void): v
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | status | SessionStatus | 会话状态，枚举值：executing（执行中）、stopped（停止）、completed（完成） |
+
+### 出参示例
+
+回调函数接收的状态参数示例：
+
+```typescript
+// 执行中状态
+SessionStatus.EXECUTING  // "executing"
+
+// 停止状态
+SessionStatus.STOPPED    // "stopped"
+
+// 完成状态
+SessionStatus.COMPLETED  // "completed"
+```
 
 ### 实现方法
 
@@ -277,6 +336,18 @@ onSkillWecodeStatus(callback: (status: SkillWecodeStatus) => void): void
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | status | SkillWecodeStatus | 小程序状态，枚举值：closed（关闭）、minimized（缩小） |
+
+### 出参示例
+
+回调函数接收的状态参数示例：
+
+```typescript
+// 关闭状态
+SkillWecodeStatus.CLOSED      // "closed"
+
+// 最小化状态
+SkillWecodeStatus.MINIMIZED   // "minimized"
+```
 
 ### 实现方法
 
