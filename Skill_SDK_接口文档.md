@@ -522,7 +522,6 @@ regenerateAnswer(params: RegenerateAnswerParams): Promise<AnswerResult>
 ### 注意事项
 
 - 该接口需要确保WebSocket流式连接已建立
-- 重新生成会消耗新的token配额
 - 适用于AI回答不完整或不满意的情况
 
 ### 调用示例
@@ -668,6 +667,8 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<ChatMessa
 
 ### 实现方法
 
+#### 1. 获取历史消息（服务端持久化数据）
+
 调用服务端REST API查询消息历史：
 - **URL**: `GET /api/skill/sessions/{sessionId}/messages?page=0&size=50`
 - **响应**:
@@ -701,6 +702,111 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<ChatMessa
     "size": 50
   }
   ```
+
+#### 2. 合并正在流式传输中的消息内容
+
+当AI正在流式返回内容但尚未完成时，需要将本地缓存的增量内容与历史消息合并：
+
+**2.1 本地增量消息缓存机制**
+
+SDK内部维护一个增量消息缓存，用于存储WebSocket接收的`delta`类型消息：
+
+**2.2 缓存更新逻辑**
+
+收到增量消息时，更新缓存：
+
+**2.3 消息合并逻辑**
+
+调用 `getSessionMessage` 时，SDK执行以下步骤：
+Step 1: 获取服务端历史消息
+Step 2: 获取本地流式消息缓存
+Step 3: 判断是否需要合并
+  检查历史消息中是否已包含该消息（避免重复）
+  构造流式消息对象
+  追加到消息列表末尾
+Step 4: 如果流式消息已完成但未同步到服务端，也需合并
+
+#### 3. 数据流图示
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    getSessionMessage 调用流程                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────────┐    ┌──────────────────┐                  │
+│  │  REST API 调用   │    │  本地缓存查询    │                  │
+│  │  历史消息列表    │    │  流式消息缓存    │                  │
+│  └────────┬─────────┘    └────────┬─────────┘                  │
+│           │                       │                            │
+│           │   ┌───────────────────┘                            │
+│           │   │                                                │
+│           ▼   ▼                                                │
+│      ┌─────────────┐                                           │
+│      │  消息合并   │ ◄─── 检查 isStreaming 状态                │
+│      │  去重处理   │ ◄─── 检查 messageId 是否已存在            │
+│      └──────┬──────┘                                           │
+│             │                                                  │
+│             ▼                                                  │
+│      ┌─────────────┐                                           │
+│      │  返回结果   │                                           │
+│      │  历史消息   │                                           │
+│      │  + 流式消息 │（如果正在传输中）                         │
+│      └─────────────┘                                           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 4. 返回结果示例
+
+**场景：AI正在流式返回内容时调用**
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "sessionId": 42,
+      "seq": 1,
+      "role": "USER",
+      "content": "请帮我重构登录模块",
+      "contentType": "MARKDOWN",
+      "createdAt": "2026-03-06T10:30:00",
+      "meta": null
+    },
+    {
+      "id": 2,
+      "sessionId": 42,
+      "seq": 2,
+      "role": "ASSISTANT",
+      "content": "好的，我来分析一下登录模块的代码...",
+      "contentType": "MARKDOWN",
+      "createdAt": "2026-03-06T10:30:05",
+      "meta": "{\"usage\":{\"inputTokens\":150,\"outputTokens\":320}}"
+    },
+    {
+      "id": "streaming-42",
+      "sessionId": 42,
+      "seq": 15,
+      "role": "ASSISTANT",
+      "content": "根据分析，登录模块存在以下问题：\n1. 密码校验逻辑分散\n2. 缺少输入验证...",
+      "contentType": "MARKDOWN",
+      "createdAt": "2026-03-06T10:35:00",
+      "meta": "{\"isStreaming\":true}"
+    }
+  ],
+  "totalElements": 3,
+  "totalPages": 1,
+  "number": 0,
+  "size": 50
+}
+```
+
+#### 5. 注意事项
+
+- 流式消息的 `id` 在未完成时为临时ID（如 `streaming-{sessionId}`），完成后替换为服务端返回的真实ID
+- 流式消息的 `meta` 字段包含 `isStreaming` 标识，前端可据此显示加载状态
+- 合并逻辑会自动去重，避免消息重复显示
+- 如果会话已关闭或无流式消息缓存，仅返回服务端历史消息
 
 ### 错误处理
 
