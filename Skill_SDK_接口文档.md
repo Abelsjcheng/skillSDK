@@ -33,9 +33,6 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | sessionId | string | 会话ID，用于后续对该会话进行操作 |
-| status | SessionStatus | 会话状态 |
-| toolSessionId | string | OpenCode工具会话ID（由AI-Gateway返回） |
-| createdAt | number | 创建时间戳 |
 
 ### 实现方法
 
