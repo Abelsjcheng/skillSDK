@@ -15,7 +15,7 @@
 ### 接口名
 
 ```typescript
-executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: number, title?: string): Promise<SkillSession>
+executeSkill(params: ExecuteSkillParams): Promise<SkillSession>
 ```
 
 ### 入参
@@ -23,22 +23,30 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | imChatId | string | 是 | IM聊天ID |
+| skillDefinitionId | number | 是 | 技能定义 ID |
 | userId | string | 是 | 用户ID |
 | agentId | number | 否 | PCAgent ID，提供时将触发 AI-Gateway 创建 OpenCode 会话 |
-| title | string | 否 | 会话标题 |
 | skillContent | string | 是 | 用户输入的Skill指令内容，即用户发起技能请求的输入 |
 
 ### 出参
 
+返回 `SkillSession` 对象，包含以下字段：
+
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | sessionId | string | 会话ID，用于后续对该会话进行操作 |
+| status | string | 会话状态：ACTIVE（活跃）、IDLE（空闲）、CLOSED（已关闭） |
+| createdAt | string | 创建时间 |
+| lastActiveAt | string | 最后活跃时间 |
 
 ### 出参示例
 
 ```json
 {
   "sessionId": 42,
+  "status": "ACTIVE",
+  "createdAt": "2026-03-06T10:30:00",
+  "lastActiveAt": "2026-03-06T10:30:00"
 }
 ```
 
@@ -89,6 +97,26 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
    - WebSocket连接建立后，暂存的监听器会自动生效
    - 确保不会因调用时序问题遗漏任何消息
 
+### 调用示例
+
+```typescript
+try {
+  const session = await executeSkill({
+    imChatId: 'chat-789',
+    skillDefinitionId: 1,
+    userId: 'user-1001',
+    skillContent: '请帮我重构登录模块',
+    agentId: 99,           // 可选
+  });
+  
+  console.log('会话创建成功:', session.sessionId);
+  console.log('会话状态:', session.status);
+} catch (error) {
+  console.error('执行技能失败:', error.message);
+  // 错误处理：会话创建失败、网络错误等
+}
+```
+
 ---
 
 ## 2. 关闭技能接口
@@ -100,7 +128,7 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
 ### 接口名
 
 ```typescript
-closeSkill(sessionId: string): Promise<CloseSkillResult>
+closeSkill(params: CloseSkillParams): Promise<CloseSkillResult>
 ```
 
 ### 入参
@@ -122,14 +150,6 @@ closeSkill(sessionId: string): Promise<CloseSkillResult>
 ```json
 {
   "status": "success"
-}
-```
-
-失败时：
-
-```json
-{
-  "status": "failed",
 }
 ```
 
@@ -157,6 +177,21 @@ closeSkill(sessionId: string): Promise<CloseSkillResult>
 | 404 | Not Found | 会话不存在 |
 | 409 | Conflict | 会话已关闭 |
 
+### 调用示例
+
+```typescript
+try {
+  const result = await closeSkill({ sessionId: '42' });
+  
+  if (result.status === 'success') {
+    console.log('会话关闭成功');
+  }
+} catch (error) {
+  console.error('关闭会话失败:', error.message);
+  // 错误处理：会话不存在、会话已关闭、网络错误等
+}
+```
+
 ---
 
 ## 3. 停止技能接口
@@ -168,7 +203,7 @@ closeSkill(sessionId: string): Promise<CloseSkillResult>
 ### 接口名
 
 ```typescript
-stopSkill(sessionId: string): Promise<StopSkillResult>
+stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 ```
 
 ### 入参
@@ -193,13 +228,6 @@ stopSkill(sessionId: string): Promise<StopSkillResult>
 }
 ```
 
-失败时：
-
-```json
-{
-  "status": "failed",
-}
-```
 
 ### 实现方法
 
@@ -220,18 +248,38 @@ stopSkill(sessionId: string): Promise<StopSkillResult>
 | 后续操作 | 可发送新消息继续对话 | 会话不可恢复 |
 | WebSocket | 断开但不删除订阅 | 断开连接 |
 
+### 调用示例
+
+```typescript
+try {
+  const result = await stopSkill({ sessionId: '42' });
+  
+  if (result.status === 'success') {
+    console.log('会话已停止，可继续发送消息');
+  }
+} catch (error) {
+  console.error('停止会话失败:', error.message);
+  // 错误处理：会话不存在、网络错误等
+}
+```
+
 ---
 
-## 4. 会话状态回调接口
+## 4. 会话状态变更回调接口
 
 ### 接口说明
 
-获取会话状态的实时回调，包括执行中、停止、完成三种状态。通过注册回调函数的方式获取状态变化通知。该回调基于WebSocket连接，当服务端推送消息时，会附带当前会话状态。
+监听会话消息状态变更的回调接口，包括执行中、停止、完成三种状态。通过注册回调函数的方式获取状态变化通知。
+
+**重要说明**：
+- 调用该接口**不会创建WebSocket连接**
+- 该接口基于已创建的WebSocket会话连接，监听WebSocket消息
+- 根据消息类型来更新会话状态并触发回调
 
 ### 接口名
 
 ```typescript
-onSessionStatus(sessionId: string, callback: (status: SessionStatus) => void): void
+onSessionStatusChange(params: OnSessionStatusChangeParams): void
 ```
 
 ### 入参
@@ -249,26 +297,32 @@ onSessionStatus(sessionId: string, callback: (status: SessionStatus) => void): v
 
 ### 出参示例
 
-回调函数接收的状态参数示例：
+回调函数接收的参数示例：
 
 ```typescript
 // 执行中状态
-SessionStatus.EXECUTING  // "executing"
+{
+  status: SessionStatus.EXECUTING,  // "executing"
+}
 
 // 停止状态
-SessionStatus.STOPPED    // "stopped"
+{
+  status: SessionStatus.STOPPED,    // "stopped"
+}
 
 // 完成状态
-SessionStatus.COMPLETED  // "completed"
+{
+  status: SessionStatus.COMPLETED,  // "completed"
+}
 ```
 
 ### 实现方法
 
-1. 建立WebSocket流式连接：
-   - **URL**: `ws://{host}:8082/ws/skill/stream/{sessionId}`
-   - 连接时自动订阅该会话的消息流
+1. **前提条件**：
+   - WebSocket会话连接必须已建立（通过 `executeSkill` 或 `registerSessionListener` 创建）
+   - 该接口不会主动创建WebSocket连接
 
-2. 监听WebSocket消息，根据消息类型更新会话状态：
+2. **监听WebSocket消息**，根据消息类型更新会话状态：
 
    | WebSocket消息type | 说明 | SessionStatus |
    |------------------|------|---------------|
@@ -287,11 +341,6 @@ SessionStatus.COMPLETED  // "completed"
    }
    ```
 
-4. 连接行为：
-   - 支持多客户端订阅同一会话
-   - 连接关闭时自动取消订阅
-   - 若该会话无剩余订阅者，清理序列计数器
-
 ### 错误处理
 
 | 场景 | 说明 |
@@ -299,9 +348,35 @@ SessionStatus.COMPLETED  // "completed"
 | 连接缺少sessionId | 服务端立即关闭连接 |
 | 传输错误 | 自动移除故障连接 |
 
+### 调用示例
+
+```typescript
+try {
+  onSessionStatusChange({
+    sessionId: '42',
+    callback: (result) => {
+      switch (result.status) {
+        case SessionStatus.EXECUTING:
+          console.log('AI正在处理中...');
+          break;
+        case SessionStatus.STOPPED:
+          console.log('会话已停止');
+          break;
+        case SessionStatus.COMPLETED:
+          console.log('AI处理完成');
+          break;
+      }
+    }
+  });
+} catch (error) {
+  console.error('注册状态监听失败:', error.message);
+  // 错误处理：连接失败、无效sessionId等
+}
+```
+
 ---
 
-## 5. 小程序状态回调接口
+## 5. 小程序状态变更回调接口
 
 ### 接口说明
 
@@ -322,7 +397,7 @@ SessionStatus.COMPLETED  // "completed"
 ### 接口名
 
 ```typescript
-onSkillWecodeStatus(callback: (status: SkillWecodeStatus) => void): void
+onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void
 ```
 
 ### 入参
@@ -339,14 +414,18 @@ onSkillWecodeStatus(callback: (status: SkillWecodeStatus) => void): void
 
 ### 出参示例
 
-回调函数接收的状态参数示例：
+回调函数接收的参数示例：
 
 ```typescript
 // 关闭状态
-SkillWecodeStatus.CLOSED      // "closed"
+{
+  status: SkillWecodeStatus.CLOSED,      // "closed"
+}
 
 // 最小化状态
-SkillWecodeStatus.MINIMIZED   // "minimized"
+{
+  status: SkillWecodeStatus.MINIMIZED,   // "minimized"
+}
 ```
 
 ### 实现方法
@@ -374,6 +453,30 @@ SkillWecodeStatus.MINIMIZED   // "minimized"
 | minimized | 小程序进入后台 | 保持连接，会话状态设为IDLE | 系统事件触发后 |
 | minimized | 调用`controlSkillWeCode("minimize")` | 保持连接，会话状态设为IDLE | 接口调用成功后立即 |
 
+### 调用示例
+
+```typescript
+try {
+  onSkillWecodeStatusChange({
+    callback: (result) => {
+      switch (result.status) {
+        case SkillWecodeStatus.CLOSED:
+          console.log('小程序已关闭');
+          // 清理资源
+          break;
+        case SkillWecodeStatus.MINIMIZED:
+          console.log('小程序已最小化');
+          // 保持连接，可后续恢复
+          break;
+      }
+    }
+  });
+} catch (error) {
+  console.error('注册小程序状态监听失败:', error.message);
+  // 错误处理：监听注册失败等
+}
+```
+
 ---
 
 ## 6. 重新生成问答接口
@@ -385,7 +488,7 @@ SkillWecodeStatus.MINIMIZED   // "minimized"
 ### 接口名
 
 ```typescript
-regenerateAnswer(sessionId: string): Promise<AnswerResult>
+regenerateAnswer(params: RegenerateAnswerParams): Promise<AnswerResult>
 ```
 
 ### 入参
@@ -422,6 +525,21 @@ regenerateAnswer(sessionId: string): Promise<AnswerResult>
 - 重新生成会消耗新的token配额
 - 适用于AI回答不完整或不满意的情况
 
+### 调用示例
+
+```typescript
+try {
+  const result = await regenerateAnswer({ sessionId: '42' });
+  
+  if (result.success) {
+    console.log('重新生成已启动，消息ID:', result.messageId);
+  }
+} catch (error) {
+  console.error('重新生成失败:', error.message);
+  // 错误处理：会话不存在、WebSocket未连接、网络错误等
+}
+```
+
 ---
 
 ## 7. 发送AI生成消息结果接口
@@ -433,7 +551,7 @@ regenerateAnswer(sessionId: string): Promise<AnswerResult>
 ### 接口名
 
 ```typescript
-sendMessageToIM(sessionId: string, content: string): Promise<boolean>
+sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 ```
 
 ### 入参
@@ -448,6 +566,22 @@ sendMessageToIM(sessionId: string, content: string): Promise<boolean>
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | success | boolean | 发送是否成功 |
+| chatId | string | IM聊天ID（成功时返回） |
+| contentLength | number | 发送内容的字符长度（成功时返回） |
+| errorMessage | string | 错误信息（失败时返回） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "success": true,
+  "chatId": "chat-789",
+  "contentLength": 22
+}
+```
+
 
 ### 实现方法
 
@@ -481,6 +615,25 @@ sendMessageToIM(sessionId: string, content: string): Promise<boolean>
 
 - 调用IM平台API发送文本消息到指定聊天
 
+### 调用示例
+
+```typescript
+try {
+  const result = await sendMessageToIM({
+    sessionId: '42',
+    content: '代码重构已完成，请查看 PR #42'
+  });
+  
+  if (result.success) {
+    console.log('消息已发送到IM，聊天ID:', result.chatId);
+    console.log('内容长度:', result.contentLength);
+  }
+} catch (error) {
+  console.error('发送消息到IM失败:', error.message);
+  // 错误处理：会话不存在、IM聊天ID未关联、网络错误等
+}
+```
+
 ---
 
 ## 8. 获取当前会话的消息列表接口
@@ -492,7 +645,7 @@ sendMessageToIM(sessionId: string, content: string): Promise<boolean>
 ### 接口名
 
 ```typescript
-getSessionMessage(sessionId: string, page?: number, size?: number): Promise<PageResult<ChatMessage>>
+getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<ChatMessage>>
 ```
 
 ### 入参
@@ -564,6 +717,28 @@ getSessionMessage(sessionId: string, page?: number, size?: number): Promise<Page
 | SYSTEM | 系统消息 |
 | TOOL | 工具执行结果 |
 
+### 调用示例
+
+```typescript
+try {
+  const result = await getSessionMessage({
+    sessionId: '42',
+    page: 0,
+    size: 50
+  });
+  
+  console.log('总消息数:', result.totalElements);
+  console.log('当前页:', result.number);
+  
+  result.content.forEach(message => {
+    console.log(`[${message.role}] ${message.content}`);
+  });
+} catch (error) {
+  console.error('获取消息列表失败:', error.message);
+  // 错误处理：会话不存在、网络错误等
+}
+```
+
 ---
 
 ## 9. 注册会话监听器接口
@@ -575,7 +750,7 @@ getSessionMessage(sessionId: string, page?: number, size?: number): Promise<Page
 ### 接口名
 
 ```typescript
-registerSessionListener(sessionId: string, listener: SessionListener): void
+registerSessionListener(params: RegisterSessionListenerParams): void
 ```
 
 ### 入参
@@ -635,7 +810,47 @@ interface SessionError {
 
 - 回调注册是异步安全的，可在任何时机调用
 - 建议在小程序 `onShow` 生命周期中注册监听器
-- 移除监听器需调用 `unregisterSessionListener(sessionId, listener)`
+- 移除监听器需调用 `unregisterSessionListener(sessionId, onMessage, onError?, onClose?)`
+
+### 调用示例
+
+```typescript
+// 定义回调函数
+const onMessage = (message: StreamMessage) => {
+  switch (message.type) {
+    case 'delta':
+      console.log('AI响应片段:', message.content);
+      break;
+    case 'done':
+      console.log('AI处理完成');
+      break;
+    case 'error':
+      console.error('处理错误:', message.content);
+      break;
+  }
+};
+
+const onError = (error: SessionError) => {
+  console.error('连接错误:', error.code, error.message);
+};
+
+const onClose = (reason: string) => {
+  console.log('连接关闭:', reason);
+};
+
+try {
+  registerSessionListener({
+    sessionId: '42',
+    onMessage,
+    onError,
+    onClose
+  });
+  console.log('监听器注册成功');
+} catch (error) {
+  console.error('注册监听器失败:', error.message);
+  // 错误处理：无效sessionId、连接失败等
+}
+```
 
 ---
 
@@ -648,7 +863,7 @@ interface SessionError {
 ### 接口名
 
 ```typescript
-unregisterSessionListener(sessionId: string, listener: SessionListener): void
+unregisterSessionListener(params: UnregisterSessionListenerParams): void
 ```
 
 ### 入参
@@ -656,7 +871,9 @@ unregisterSessionListener(sessionId: string, listener: SessionListener): void
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | sessionId | string | 是 | 会话ID |
-| listener | object | 是 | 要移除的监听器对象 |
+| onMessage | function | 是 | 要移除的消息回调函数 |
+| onError | function | 否 | 要移除的错误回调函数 |
+| onClose | function | 否 | 要移除的连接关闭回调函数 |
 
 ### 实现方法
 
@@ -668,7 +885,7 @@ unregisterSessionListener(sessionId: string, listener: SessionListener): void
 ```typescript
 // 小程序页面销毁时移除监听
 onUnmounted(() => {
-  unregisterSessionListener(sessionId, sessionListener);
+  unregisterSessionListener(sessionId, onMessage, onError, onClose);
 });
 ```
 
@@ -676,6 +893,27 @@ onUnmounted(() => {
 
 - 移除的监听器必须是之前通过 `registerSessionListener` 注册的同一个监听器对象
 - 建议保存监听器对象引用以便后续移除
+
+### 调用示例
+
+```typescript
+// 保存回调函数引用
+const onMessage = (message: StreamMessage) => {
+  console.log('收到消息:', message);
+};
+
+try {
+  // 移除监听器
+  unregisterSessionListener({
+    sessionId: '42',
+    onMessage
+  });
+  console.log('监听器已移除');
+} catch (error) {
+  console.error('移除监听器失败:', error.message);
+  // 错误处理：监听器未注册、无效sessionId等
+}
+```
 
 ---
 
@@ -688,7 +926,7 @@ onUnmounted(() => {
 ### 接口名
 
 ```typescript
-sendMessage(sessionId: string, content: string): Promise<boolean>
+sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 ```
 
 ### 入参
@@ -702,7 +940,21 @@ sendMessage(sessionId: string, content: string): Promise<boolean>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| success | boolean | 发送是否成功 |
+| messageId | number | 消息ID（成功时返回） |
+| seq | number | 会话内消息序号（成功时返回） |
+| createdAt | string | 消息创建时间（成功时返回） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "messageId": 1,
+  "seq": 1,
+  "createdAt": "2026-03-06T10:30:00"
+}
+```
 
 ### 实现方法
 
@@ -777,6 +1029,26 @@ sendMessage(sessionId: string, content: string): Promise<boolean>
 - 向AI-Gateway发送`chat`调度指令（携带消息文本和toolSessionId）
 - AI响应将通过WebSocket流式推送
 
+### 调用示例
+
+```typescript
+try {
+  const result = await sendMessage({
+    sessionId: '42',
+    content: '请帮我重构登录模块的校验逻辑'
+  });
+  
+  console.log('消息发送成功，消息ID:', result.messageId);
+  console.log('消息序号:', result.seq);
+  console.log('创建时间:', result.createdAt);
+  
+  // AI响应将通过 registerSessionListener 注册的回调接收
+} catch (error) {
+  console.error('发送消息失败:', error.message);
+  // 错误处理：会话不存在、会话已关闭、网络错误等
+}
+```
+
 ---
 
 ## 12. 权限确认接口
@@ -788,7 +1060,7 @@ sendMessage(sessionId: string, content: string): Promise<boolean>
 ### 接口名
 
 ```typescript
-replyPermission(sessionId: string, permissionId: string, approved: boolean): Promise<boolean>
+replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 ```
 
 ### 入参
@@ -804,6 +1076,21 @@ replyPermission(sessionId: string, permissionId: string, approved: boolean): Pro
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | success | boolean | 回复是否成功 |
+| permissionId | string | 权限确认请求ID（成功时返回） |
+| approved | boolean | 审批结果（成功时返回） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "success": true,
+  "permissionId": "p-abc123",
+  "approved": true
+}
+```
+
 
 ### 实现方法
 
@@ -836,6 +1123,38 @@ replyPermission(sessionId: string, permissionId: string, approved: boolean): Pro
 
 - 向AI-Gateway发送`permission_reply`调度指令（携带permissionId、approved、toolSessionId）
 
+### 调用示例
+
+```typescript
+try {
+  // 用户批准权限请求
+  const result = await replyPermission({
+    sessionId: '42',
+    permissionId: 'p-abc123',
+    approved: true
+  });
+  
+  if (result.success) {
+    console.log('权限确认已发送，审批结果:', result.approved);
+  }
+} catch (error) {
+  console.error('回复权限确认失败:', error.message);
+  // 错误处理：会话不存在、无关联Agent、会话已关闭等
+}
+
+// 用户拒绝权限请求
+try {
+  const result = await replyPermission({
+    sessionId: '42',
+    permissionId: 'p-abc123',
+    approved: false
+  });
+  console.log('权限已拒绝');
+} catch (error) {
+  console.error('回复权限确认失败:', error.message);
+}
+```
+
 ---
 
 ## 13. 小程序控制接口
@@ -847,7 +1166,7 @@ replyPermission(sessionId: string, permissionId: string, approved: boolean): Pro
 ### 接口名
 
 ```typescript
-controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
+controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResult>
 ```
 
 ### 入参
@@ -860,7 +1179,18 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| success | boolean | 操作是否成功 |
+| status | string | 操作状态：success（成功）、failed（失败） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "status": "success"
+}
+```
+
 
 ### 实现方法
 
@@ -869,13 +1199,13 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
    - 同时调用`closeSkill`关闭Skill会话
    - 断开WebSocket连接
    - 释放所有相关资源
-   - **触发回调**: 通过`onSkillWecodeStatus`回调通知上层应用小程序状态变更为`closed`
+   - **触发回调**: 通过`onSkillWecodeStatusChange`回调通知上层应用小程序状态变更为`closed`
 
 2. **minimize - 最小化小程序**:
    - 调用鸿蒙原生窗口管理API将小程序最小化到后台
    - 会话状态保持不变（IDLE）
    - 保持WebSocket连接以便后续恢复
-   - **触发回调**: 通过`onSkillWecodeStatus`回调通知上层应用小程序状态变更为`minimized`
+   - **触发回调**: 通过`onSkillWecodeStatusChange`回调通知上层应用小程序状态变更为`minimized`
 
 ### 与其他接口的关系
 
@@ -887,9 +1217,139 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
 | 注册会话监听 | `registerSessionListener` | 小程序打开后注册监听器 |
 | 移除会话监听 | `unregisterSessionListener` | 小程序关闭时移除监听器 |
 | 发送消息 | `sendMessageContent` | 发送新消息触发AI处理 |
-| 监听小程序状态 | `onSkillWecodeStatus` | 接收小程序状态变化通知 |
+| 监听小程序状态 | `onSkillWecodeStatusChange` | 接收小程序状态变化通知 |
+
+### 调用示例
+
+```typescript
+// 关闭小程序
+try {
+  const result = await controlSkillWeCode({
+    action: SkillWeCodeAction.CLOSE
+  });
+  
+  if (result.status === 'success') {
+    console.log('小程序已关闭');
+    // 会自动调用 closeSkill 关闭会话
+  }
+} catch (error) {
+  console.error('关闭小程序失败:', error.message);
+  // 错误处理：窗口管理失败、网络错误等
+}
+
+// 最小化小程序
+try {
+  const result = await controlSkillWeCode({
+    action: SkillWeCodeAction.MINIMIZE
+  });
+  
+  if (result.status === 'success') {
+    console.log('小程序已最小化');
+    // WebSocket连接保持，可后续恢复
+  }
+} catch (error) {
+  console.error('最小化小程序失败:', error.message);
+  // 错误处理：窗口管理失败、网络错误等
+}
+```
 
 ## 数据类型定义
+
+### ExecuteSkillParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| imChatId | string | 是 | IM聊天ID |
+| skillDefinitionId | number | 是 | 技能定义 ID |
+| userId | string | 是 | 用户ID |
+| agentId | number | 否 | PCAgent ID，提供时将触发 AI-Gateway 创建 OpenCode 会话 |
+| title | string | 否 | 会话标题 |
+| skillContent | string | 是 | 用户输入的Skill指令内容，即用户发起技能请求的输入 |
+
+### CloseSkillParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 要关闭的会话ID |
+
+### StopSkillParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 要停止的会话ID |
+
+### OnSessionStatusChangeParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| callback | function | 是 | 状态变更回调函数 |
+
+### OnSkillWecodeStatusChangeParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| callback | function | 是 | 小程序状态变更回调函数 |
+
+### RegenerateAnswerParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+
+### SendMessageToIMParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| content | string | 是 | AI生成的消息内容 |
+
+### GetSessionMessageParams
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|------|------|
+| sessionId | string | 是 | - | 会话ID |
+| page | number | 否 | 0 | 页码（从 0 开始） |
+| size | number | 否 | 50 | 每页条数 |
+
+### RegisterSessionListenerParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| onMessage | function | 是 | 消息回调函数，接收AI响应流 |
+| onError | function | 否 | 错误回调函数，接收错误信息 |
+| onClose | function | 否 | 连接关闭回调函数 |
+
+### UnregisterSessionListenerParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| onMessage | function | 是 | 要移除的消息回调函数 |
+| onError | function | 否 | 要移除的错误回调函数 |
+| onClose | function | 否 | 要移除的连接关闭回调函数 |
+
+### SendMessageParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| content | string | 是 | 用户输入的消息内容 |
+
+### ReplyPermissionParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| permissionId | string | 是 | 权限确认请求ID |
+| approved | boolean | 是 | 审批结果：true批准，false拒绝 |
+
+### ControlSkillWeCodeParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| action | SkillWeCodeAction | 是 | 操作类型：close（关闭）、minimize（最小化） |
 
   ### SessionListener
 
@@ -899,13 +1359,27 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
   | onError | function | 否 | 错误回调函数，接收错误信息 |
   | onClose | function | 否 | 连接关闭回调函数 |
 
-  ### SessionStatus
+  ### SessionStatusResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | SessionStatus | 会话状态，枚举值：executing（执行中）、stopped（停止）、completed（完成） |
+
+### SessionStatus
 
 | 枚举值 | 说明 |
 |--------|------|
 | executing | 执行中 |
 | stopped | 已停止 |
 | completed | 已完成 |
+
+### SkillWecodeStatusResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | SkillWecodeStatus | 小程序状态，枚举值：closed（关闭）、minimized（缩小） |
+| timestamp | number | 状态变更时间戳（毫秒） |
+| message | string | 状态变更说明信息（可选） |
 
 ### SkillWecodeStatus
 
@@ -942,6 +1416,36 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
 | seq | number | 递增序列号 |
 | content | string | 消息内容 |
 | usage | object | token用量统计（仅done类型） |
+
+### SendMessageToIMResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| success | boolean | 发送是否成功 |
+| chatId | string | IM聊天ID（成功时返回） |
+| contentLength | number | 发送内容的字符长度（成功时返回） |
+
+### SendMessageResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| messageId | number | 消息ID（成功时返回） |
+| seq | number | 会话内消息序号（成功时返回） |
+| createdAt | string | 消息创建时间（成功时返回） |
+
+### ReplyPermissionResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| success | boolean | 回复是否成功 |
+| permissionId | string | 权限确认请求ID（成功时返回） |
+| approved | boolean | 审批结果（成功时返回） |
+
+### ControlSkillWeCodeResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 操作状态：success（成功）、failed（失败） |
 
 ### SkillSession
 
