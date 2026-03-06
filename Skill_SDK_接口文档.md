@@ -246,7 +246,19 @@ onSessionStatus(sessionId: string, callback: (status: SessionStatus) => void): v
 
 ### 接口说明
 
-监听小程序的状态变化，当小程序被关闭或缩小到后台时触发回调，通知上层应用进行相应处理。该回调用于处理用户主动关闭小程序或系统触发的小程序后台化事件。
+监听小程序的状态变化，当小程序被关闭或缩小到后台时触发回调，通知上层应用进行相应处理。该回调用于处理以下场景：
+- 用户主动关闭或缩小小程序
+- 系统触发的小程序后台化事件
+- 调用`controlSkillWeCode`接口主动控制小程序状态
+
+### 触发条件
+
+| 触发场景 | 回调状态 |
+|----------|----------|
+| 用户关闭小程序 | closed |
+| 系统锁屏 | minimized |
+| 调用`controlSkillWeCode("close")` | closed |
+| 调用`controlSkillWeCode("minimize")` | minimized |
 
 ### 接口名
 
@@ -268,19 +280,28 @@ onSkillWecodeStatus(callback: (status: SkillWecodeStatus) => void): void
 
 ### 实现方法
 
-1. 注册系统级生命周期事件监听器（鸿蒙原生能力）
+1. **注册系统级生命周期事件监听器**（鸿蒙原生能力）：
+   - 注册窗口关闭事件监听器
+   - 注册应用前后台切换事件监听器
+   - 注册系统锁屏事件监听器
 
-2. 监听以下事件：
-   - **小程序关闭**: 用户主动关闭小程序或调用`closeSkill`
-   - **小程序最小化**: 用户将小程序切换到后台或系统锁屏
+2. **监听接口调用事件**：
+   - 监听`controlSkillWeCode`接口的调用
+   - 当该接口被调用时，根据传入的action触发相应状态回调
 
+3. **状态回调触发逻辑**：
+   - 当调用`controlSkillWeCode("close")`时，触发回调并传入`closed`状态
+   - 当调用`controlSkillWeCode("minimize")`时，触发回调并传入`minimized`状态
+   - 回调函数将在接口调用成功后立即执行
 
 ### 处理逻辑
 
-| 状态 | 触发场景 | SDK行为 |
-|------|----------|---------|
-| closed | 用户关闭小程序 | 断开WebSocket，调用`closeSkill` |
-| minimized | 小程序进入后台 | 保持连接，会话状态设为IDLE |
+| 状态 | 触发场景 | SDK行为 | 回调触发时机 |
+|------|----------|---------|--------------|
+| closed | 用户关闭小程序 | 断开WebSocket，调用`closeSkill` | 窗口关闭事件触发后 |
+| closed | 调用`controlSkillWeCode("close")` | 断开WebSocket，调用`closeSkill` | 接口调用成功后立即 |
+| minimized | 小程序进入后台 | 保持连接，会话状态设为IDLE | 系统事件触发后 |
+| minimized | 调用`controlSkillWeCode("minimize")` | 保持连接，会话状态设为IDLE | 接口调用成功后立即 |
 
 ---
 
@@ -777,11 +798,13 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
    - 同时调用`closeSkill`关闭Skill会话
    - 断开WebSocket连接
    - 释放所有相关资源
+   - **触发回调**: 通过`onSkillWecodeStatus`回调通知上层应用小程序状态变更为`closed`
 
 2. **minimize - 最小化小程序**:
    - 调用鸿蒙原生窗口管理API将小程序最小化到后台
    - 会话状态保持不变（IDLE）
    - 保持WebSocket连接以便后续恢复
+   - **触发回调**: 通过`onSkillWecodeStatus`回调通知上层应用小程序状态变更为`minimized`
 
 ### 与其他接口的关系
 
@@ -793,6 +816,7 @@ controlSkillWeCode(action: SkillWeCodeAction): Promise<boolean>
 | 注册会话监听 | `registerSessionListener` | 小程序打开后注册监听器 |
 | 移除会话监听 | `unregisterSessionListener` | 小程序关闭时移除监听器 |
 | 发送消息 | `sendMessageContent` | 发送新消息触发AI处理 |
+| 监听小程序状态 | `onSkillWecodeStatus` | 接收小程序状态变化通知 |
 
 ## 数据类型定义
 
