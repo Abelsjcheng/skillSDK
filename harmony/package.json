@@ -1,0 +1,9 @@
+{
+  "name": "skill-sdk",
+  "version": "1.0.0",
+  "description": "Skill SDK for HarmonyOS",
+  "main": "./src/main/ets/index.ets",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}

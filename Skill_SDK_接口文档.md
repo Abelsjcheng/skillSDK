@@ -1,4 +1,4 @@
-# Skill SDK 接口文档
+# Skill SDK 工程文档
 
 ## 概述
 
@@ -10,7 +10,7 @@
 
 ### 接口说明
 
-与Skill服务端建立WebSocket会话连接，接收群组ID和用户输入的Skill指令内容，触发会话开始。该接口支持停止生成、重试、多轮对话等操作。
+与Skill服务端建立WebSocket会话连接，并发送用户消息到服务端触发AI处理。
 
 ### 接口名
 
@@ -57,7 +57,7 @@ executeSkill(imChatId: string, userId: string, skillContent: string, agentId?: n
    - **URL**: `ws://{host}:8082/ws/skill/stream/{sessionId}`
    - 用于接收服务端推送的AI响应流（增量内容、完成通知、错误信息等）
 
-3. 如果提供了skillContent，自动发送首条用户消息触发AI处理：
+3. 根据skillContent，自动发送首条用户消息触发AI处理：
    - 调用 `POST /api/skill/sessions/{sessionId}/messages`
    - 请求体: `{ "content": skillContent }`
 

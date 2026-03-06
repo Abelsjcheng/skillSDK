@@ -1,0 +1,9 @@
+{
+  "module": {
+    "name": "skill-sdk",
+    "type": "shared",
+    "description": "Skill SDK for HarmonyOS",
+    "apiVersion": 20,
+    "compileSdk": 20
+  }
+}

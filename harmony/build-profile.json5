@@ -1,0 +1,20 @@
+{
+  "app": {
+    "compileSdkVersion": 20,
+    "compatibleSdkVersion": 20
+  },
+  "modules": [
+    {
+      "name": "skill-sdk",
+      "srcPath": "./src/main/ets",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
