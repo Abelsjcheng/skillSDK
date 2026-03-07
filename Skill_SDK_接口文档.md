@@ -67,16 +67,25 @@ executeSkill(params: ExecuteSkillParams): Promise<SkillSession>
      ```
    - **响应**: 返回 `SkillSession` 对象，包含会话ID
 
-2. 建立WebSocket流式连接：
-   - **URL**: `ws://{host}:8082/ws/skill/stream/{sessionId}`
-   - 用于接收服务端推送的AI响应流（增量内容、完成通知、错误信息等）
+2. 建立WebSocket流式连接并注册内部缓存监听器：
+   - **URL**: `ws://{host}:8082/ws/skill/stream`
+   - **单例模式**：客户端只需建立一个WebSocket连接即可接收所有会话的消息推送
+   - **内部缓存监听器**：SDK在建立WebSocket连接时，会自动注册一个内部监听器用于缓存流式消息数据，确保即使用户未调用 `registerSessionListener` 也不会丢失数据
+   - 内部监听器职责：
+     - 接收并缓存所有 `delta` 类型的增量消息
+     - 在 `done` 类型消息到达时标记流式消息完成
+     - 在 `error` 类型消息到达时清理缓存
+   - 缓存的数据可通过 `getSessionMessage` 接口获取，会自动合并历史消息和流式缓存消息
 
 3. 根据skillContent，自动发送首条用户消息触发AI处理：
-   - 调用 `POST /api/skill/sessions/{sessionId}/messages`
-   - 请求体: `{ "content": skillContent }`
+   - **URL**: `POST /api/skill/sessions/{sessionId}/messages`
+   - **请求体**: `{ "content": skillContent }`
+   - **重要**：只有调用此API发送消息后，服务端才会开始推送AI响应流，触发WebSocket消息回调机制
 
 4. **WebSocket消息回调机制**：
-   - WebSocket连接建立后，服务端会立即开始推送AI响应流
+   - WebSocket连接建立后处于待机状态，等待消息触发
+   - 调用消息发送API后，服务端开始推送AI响应流
+   - 内部缓存监听器首先接收并缓存所有消息
    - 所有通过 `registerSessionListener` 注册的监听器会实时接收消息
    - 消息类型包括：
      - `delta`: AI生成的增量内容
@@ -87,16 +96,53 @@ executeSkill(params: ExecuteSkillParams): Promise<SkillSession>
    - 示例消息格式：
      ```json
      {
+       "sessionId": "42",
        "type": "delta",
        "seq": 1,
        "content": "好的，我来分析一下登录模块的代码..."
      }
      ```
 
-5. **时序安全保障**：
-   - 如果 `registerSessionListener` 在 `executeSkill` 之前调用，监听器会被暂存
-   - WebSocket连接建立后，暂存的监听器会自动生效
-   - 确保不会因调用时序问题遗漏任何消息
+5. **数据缓存流程**：
+   ```
+   ┌─────────────────────────────────────────────────────────────────┐
+   │                    executeSkill 数据缓存流程                     │
+   ├─────────────────────────────────────────────────────────────────┤
+   │                                                                 │
+   │  1. 创建会话 (REST API)                                         │
+   │         │                                                       │
+   │         ▼                                                       │
+   │  2. 建立WebSocket连接                                           │
+   │         │                                                       │
+   │         ▼                                                       │
+   │  ┌─────────────────┐                                           │
+   │  │ 注册内部缓存监听器 │ ◄─── 自动注册，确保数据不丢失           │
+   │  └────────┬────────┘                                           │
+   │           │                                                     │
+   │           ▼                                                     │
+   │  3. 发送首条消息 (REST API)                                     │
+   │         │                                                       │
+   │         ▼                                                       │
+   │  4. 服务端开始推送AI响应流                                      │
+   │         │                                                       │
+   │         ▼                                                       │
+   │  ┌─────────────────┐                                           │
+   │  │ 接收流式消息     │                                           │
+   │  │ delta/done/error │                                          │
+   │  └────────┬────────┘                                           │
+   │           │                                                     │
+   │           ▼                                                     │
+   │  ┌─────────────────┐                                           │
+   │  │ 更新流式消息缓存 │ ◄─── StreamingMessageCache               │
+   │  └────────┬────────┘                                           │
+   │           │                                                     │
+   │           ▼                                                     │
+   │  ┌─────────────────┐                                           │
+   │  │ 分发给用户监听器 │ ◄─── registerSessionListener 注册的监听器 │
+   │  └─────────────────┘                                           │
+   │                                                                 │
+   └─────────────────────────────────────────────────────────────────┘
+   ```
 
 ### 调用示例
 
@@ -916,12 +962,7 @@ interface SessionError {
    - 如果WebSocket尚未建立，监听器会被暂存，连接建立后自动生效
    - SDK保证回调注册与WebSocket连接建立的时序无关
 
-3. **连接管理**：
-   - 首次注册监听器时，如果WebSocket未连接，自动建立连接
-   - 多个监听器共享同一个WebSocket连接
-   - 当会话无剩余监听器时，可选择断开WebSocket连接（可配置）
-
-4. **事件分发**：
+3. **事件分发**：
    - WebSocket收到消息后，调用所有监听器的 `onMessage` 回调
    - 连接错误时，调用所有监听器的 `onError` 回调
    - 连接关闭时，调用所有监听器的 `onClose` 回调
@@ -1317,32 +1358,43 @@ controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCode
 
 1. **close - 关闭小程序**:
    - 调用鸿蒙原生窗口管理API关闭小程序
-   - 同时调用`closeSkill`关闭Skill会话
-   - 断开WebSocket连接
-   - 释放所有相关资源
-   - **触发回调**: 通过`onSkillWecodeStatusChange`回调通知上层应用小程序状态变更为`closed`
+   - 通过`onSkillWecodeStatusChange`回调通知上层应用小程序状态变更为`closed`
+   - 由上层应用决定是否调用`closeSkill`关闭 Skill 会话
+   - SDK 不主动处理 WebSocket 连接，由上层应用管理
 
 2. **minimize - 最小化小程序**:
-   - 调用鸿蒙原生窗口管理API将小程序最小化到后台
-   - 会话状态保持不变（IDLE）
-   - 保持WebSocket连接以便后续恢复
-   - **触发回调**: 通过`onSkillWecodeStatusChange`回调通知上层应用小程序状态变更为`minimized`
+   - 调用鸿蒙原生窗口管理 API 将小程序最小化到后台
+   - 通过`onSkillWecodeStatusChange`回调通知上层应用小程序状态变更为`minimized`
+   - SDK 不处理 WebSocket 连接，由上层应用根据需要决定是否调用`stopSkill`停止 AI 生成
 
 ### 与其他接口的关系
 
 | 操作 | 调用接口 | 说明 |
 |------|----------|------|
-| 关闭小程序 | `controlSkillWeCode(close)` + `closeSkill` | 完全释放资源 |
-| 最小化小程序 | `controlSkillWeCode(minimize)` | 保持会话，可恢复 |
-| 停止AI生成 | `stopSkill` | 仅停止流式推送，不改变小程序状态 |
+| 关闭小程序 | `controlSkillWeCode(close)` | SDK 仅通知状态，上层应用决定是否调用`closeSkill` |
+| 最小化小程序 | `controlSkillWeCode(minimize)` | SDK 仅通知状态，上层应用决定是否调用`stopSkill` |
+| 停止 AI 生成 | `stopSkill` | 仅停止流式推送，不改变小程序状态 |
 | 注册会话监听 | `registerSessionListener` | 小程序打开后注册监听器 |
 | 移除会话监听 | `unregisterSessionListener` | 小程序关闭时移除监听器 |
-| 发送消息 | `sendMessageContent` | 发送新消息触发AI处理 |
+| 发送消息 | `sendMessageContent` | 发送新消息触发 AI 处理 |
 | 监听小程序状态 | `onSkillWecodeStatusChange` | 接收小程序状态变化通知 |
 
 ### 调用示例
 
 ```typescript
+// 监听小程序状态变化
+onSkillWecodeStatusChange((status) => {
+  if (status === SkillWecodeStatus.CLOSED) {
+    console.log('小程序已关闭');
+    // 上层应用决定是否调用 closeSkill 关闭会话
+    closeSkill({ sessionId });
+  } else if (status === SkillWecodeStatus.MINIMIZED) {
+    console.log('小程序已最小化');
+    // 上层应用根据需要决定是否调用 stopSkill 停止 AI 生成
+    stopSkill({ sessionId });
+  }
+});
+
 // 关闭小程序
 try {
   const result = await controlSkillWeCode({
@@ -1350,12 +1402,12 @@ try {
   });
   
   if (result.status === 'success') {
-    console.log('小程序已关闭');
-    // 会自动调用 closeSkill 关闭会话
+    console.log('关闭小程序指令已发送');
+    // SDK 会通过 onSkillWecodeStatusChange 回调通知状态
+    // 上层应用在回调中决定是否关闭会话
   }
 } catch (error) {
   console.error('关闭小程序失败:', error.message);
-  // 错误处理：窗口管理失败、网络错误等
 }
 
 // 最小化小程序
@@ -1365,12 +1417,12 @@ try {
   });
   
   if (result.status === 'success') {
-    console.log('小程序已最小化');
-    // WebSocket连接保持，可后续恢复
+    console.log('最小化小程序指令已发送');
+    // SDK 会通过 onSkillWecodeStatusChange 回调通知状态
+    // 上层应用在回调中决定是否停止 AI 生成
   }
 } catch (error) {
   console.error('最小化小程序失败:', error.message);
-  // 错误处理：窗口管理失败、网络错误等
 }
 ```
 

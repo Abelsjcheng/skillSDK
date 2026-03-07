@@ -621,28 +621,25 @@ GET /api/skill/sessions/42/messages?page=0&size=50
 
 ### 5.1 流式推送端点 (Skill Stream)
 
-客户端订阅 AI 响应流。连接后，服务端会实时推送 AI 处理过程中的增量内容更新、完成通知和错误信息。
+客户端订阅 AI 响应流。此接口为单例模式，客户端只需建立一个WebSocket连接即可接收所有会话的消息推送。服务端会实时推送 AI 处理过程中的增量内容更新、完成通知和错误信息。
 
-| 项目     | 值                                             |
-| -------- | ---------------------------------------------- |
-| **URL**  | `ws://{host}:8082/ws/skill/stream/{sessionId}` |
-| **方向** | 服务端 → 客户端（单向推送）                    |
-| **认证** | 无                                             |
-| **CORS** | 可通过 `skill.websocket.allowed-origins` 配置  |
-
-**路径参数：**
-
-| 参数        | 类型     | 说明        |
-| ----------- | -------- | ----------- |
-| `sessionId` | `String` | 技能会话 ID |
+| 项目     | 值                                      |
+| -------- | --------------------------------------- |
+| **URL**  | `ws://{host}:8082/ws/skill/stream`      |
+| **方向** | 服务端 → 客户端（单向推送）             |
+| **认证** | 无                                      |
+| **CORS** | 可通过 `skill.websocket.allowed-origins` 配置 |
 
 **连接示例：**
 ```javascript
-const ws = new WebSocket('ws://localhost:8082/ws/skill/stream/42');
+const ws = new WebSocket('ws://localhost:8082/ws/skill/stream');
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  console.log(msg.type, msg.seq, msg.content);
+  console.log('会话ID:', msg.sessionId);
+  console.log('消息类型:', msg.type);
+  console.log('序列号:', msg.seq);
+  console.log('内容:', msg.content);
 };
 ```
 
@@ -650,17 +647,19 @@ ws.onmessage = (event) => {
 
 ```json
 {
+  "sessionId": "<会话ID>",
   "type": "<消息类型>",
   "seq": 1,
   "content": "<消息内容>"
 }
 ```
 
-| 字段      | 类型               | 说明                               |
-| --------- | ------------------ | ---------------------------------- |
-| `type`    | `String`           | 消息类型（见下表）                 |
-| `seq`     | `Long`             | 递增序列号，用于客户端排序         |
-| `content` | `String \| Object` | 消息内容，可能是纯文本或 JSON 对象 |
+| 字段        | 类型               | 说明                               |
+| ----------- | ------------------ | ---------------------------------- |
+| `sessionId` | `String`           | 技能会话 ID，用于区分不同会话的消息 |
+| `type`      | `String`           | 消息类型（见下表）                 |
+| `seq`       | `Long`             | 递增序列号，用于客户端排序         |
+| `content`   | `String \| Object` | 消息内容，可能是纯文本或 JSON 对象 |
 
 #### 消息类型
 
@@ -677,6 +676,7 @@ ws.onmessage = (event) => {
 增量内容（delta）：
 ```json
 {
+  "sessionId": "42",
   "type": "delta",
   "seq": 1,
   "content": "好的，我来分析"
@@ -685,6 +685,7 @@ ws.onmessage = (event) => {
 
 ```json
 {
+  "sessionId": "42",
   "type": "delta",
   "seq": 2,
   "content": "一下登录模块的代码结构..."
@@ -694,6 +695,7 @@ ws.onmessage = (event) => {
 执行完成（done）：
 ```json
 {
+  "sessionId": "42",
   "type": "done",
   "seq": 10,
   "content": {
@@ -708,6 +710,7 @@ ws.onmessage = (event) => {
 Agent 离线通知：
 ```json
 {
+  "sessionId": "42",
   "type": "agent_offline",
   "seq": 11,
   "content": null
@@ -716,12 +719,39 @@ Agent 离线通知：
 
 #### 连接行为
 
-| 事件               | 行为                                                    |
-| ------------------ | ------------------------------------------------------- |
-| 连接建立           | 订阅指定 sessionId 的消息流（支持多客户端订阅同一会话） |
-| 连接关闭           | 自动取消订阅；若该会话无剩余订阅者，清理序列计数器      |
-| 路径缺少 sessionId | 服务端立即关闭连接，关闭码 `BAD_DATA`                   |
-| 传输错误           | 自动移除故障连接                                        |
+| 事件         | 行为                                                    |
+| ------------ | ------------------------------------------------------- |
+| 连接建立     | 客户端建立单一WebSocket连接，可接收所有会话的消息推送   |
+| 消息推送     | 服务端推送消息时携带sessionId，客户端根据sessionId分发  |
+| 连接关闭     | 自动取消所有订阅；清理相关资源                          |
+| 传输错误     | 自动移除故障连接                                        |
+
+#### 客户端消息分发建议
+
+客户端应根据消息中的 `sessionId` 字段进行消息分发：
+
+```javascript
+const sessionCallbacks = new Map();
+
+// 注册会话回调
+function registerSessionCallback(sessionId, callback) {
+  sessionCallbacks.set(sessionId, callback);
+}
+
+// 移除会话回调
+function unregisterSessionCallback(sessionId) {
+  sessionCallbacks.delete(sessionId);
+}
+
+// WebSocket消息处理
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  const callback = sessionCallbacks.get(msg.sessionId);
+  if (callback) {
+    callback(msg);
+  }
+};
+```
 
 ---
 

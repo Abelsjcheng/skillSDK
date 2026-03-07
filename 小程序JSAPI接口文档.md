@@ -257,7 +257,7 @@ window.HWH5.getSessionMessage({
 
 ### 接口说明
 
-注册会话监听器，用于接收WebSocket推送的AI响应流、错误信息和连接关闭事件。该接口支持在任何时机注册监听器，SDK会确保不会因调用时序问题遗漏消息。
+注册会话监听器，用于接收WebSocket推送的AI响应流、错误信息和连接关闭事件。该接口仅注册监听器，不会自动建立WebSocket连接。WebSocket连接由 `executeSkill` 接口建立。
 
 ### 调用方式
 
@@ -278,6 +278,7 @@ window.HWH5.registerSessionListener(params)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
+| sessionId | string | 会话ID，用于区分不同会话的消息 |
 | type | string | 消息类型：delta（增量）/ done（完成）/ error（错误）/ agent_offline / agent_online |
 | seq | number | 递增序列号 |
 | content | string/object | 消息内容 |
@@ -296,6 +297,9 @@ window.HWH5.registerSessionListener(params)
 ```javascript
 // 定义回调函数
 const onMessage = (message) => {
+  // 根据sessionId区分不同会话的消息
+  console.log('会话ID:', message.sessionId);
+  
   switch (message.type) {
     case 'delta':
       console.log('AI响应片段:', message.content);
@@ -534,109 +538,6 @@ window.HWH5.controlSkillWeCode({
 }).catch(error => {
   console.error('最小化小程序失败:', error.errorMessage);
 });
-```
-
----
-
-## 完整使用示例
-
-### 场景：多轮对话
-
-```javascript
-// 1. 注册会话监听器
-const onMessage = (message) => {
-  if (message.type === 'delta') {
-    appendToChat(message.content);
-  } else if (message.type === 'done') {
-    hideLoading();
-  }
-};
-
-const onError = (error) => {
-  showError(error.message);
-};
-
-const onClose = (reason) => {
-  console.log('连接关闭:', reason);
-};
-
-window.HWH5.registerSessionListener({
-  sessionId: '42',
-  onMessage: onMessage,
-  onError: onError,
-  onClose: onClose
-});
-
-// 2. 发送消息
-async function sendUserMessage(content) {
-  showLoading();
-  try {
-    const result = await window.HWH5.sendMessage({
-      sessionId: '42',
-      content: content
-    });
-    console.log('消息发送成功:', result.messageId);
-  } catch (error) {
-    hideLoading();
-    showError(error.errorMessage);
-  }
-}
-
-// 3. 重新生成回答
-async function regenerate(content) {
-  showLoading();
-  try {
-    const result = await window.HWH5.regenerateAnswer({
-      sessionId: '42',
-      content: content
-    });
-    console.log('重新生成已启动:', result.messageId);
-  } catch (error) {
-    hideLoading();
-    showError(error.errorMessage);
-  }
-}
-
-// 4. 发送AI回答到IM
-async function sendToIM(content) {
-  try {
-    const result = await window.HWH5.sendMessageToIM({
-      sessionId: '42',
-      content: content
-    });
-    if (result.success) {
-      console.log('已发送到IM');
-    }
-  } catch (error) {
-    console.error('发送到IM失败:', error.errorMessage);
-  }
-}
-
-// 5. 加载历史消息
-async function loadHistory() {
-  try {
-    const result = await window.HWH5.getSessionMessage({
-      sessionId: '42',
-      page: 0,
-      size: 50
-    });
-    result.content.forEach(msg => {
-      displayMessage(msg);
-    });
-  } catch (error) {
-    console.error('加载历史失败:', error.errorMessage);
-  }
-}
-
-// 6. 页面卸载时清理
-function cleanup() {
-  window.HWH5.unregisterSessionListener({
-    sessionId: '42',
-    onMessage: onMessage,
-    onError: onError,
-    onClose: onClose
-  });
-}
 ```
 
 ---
