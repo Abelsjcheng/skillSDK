@@ -1,6 +1,14 @@
 # Skill SDK for HarmonyOS
 
-鸿蒙ArkTS SDK，用于IM客户端、OpenCode Skill服务端、小程序间交互。
+鸿蒙 ArkTS SDK，用于 IM 客户端、OpenCode Skill 服务端、小程序间交互。
+
+## 文档导航
+
+- **[QUICK_START.md](./QUICK_START.md)** - 快速开始指南（5 分钟上手）
+- **[EXAMPLES.md](./EXAMPLES.md)** - 完整的接口调用示例和使用文档
+- **[API_REFERENCE.md](./API_REFERENCE.md)** - API 参考文档
+- **[DEVELOPMENT_SUMMARY.md](./DEVELOPMENT_SUMMARY.md)** - 开发总结
+- **[Skill_SDK_接口文档.md](../Skill_SDK_接口文档.md)** - 完整接口文档
 
 ## 版本要求
 
