@@ -26,6 +26,7 @@ executeSkill(params: ExecuteSkillParams): Promise<SkillSession>
 | skillDefinitionId | number | 是 | 技能定义 ID |
 | userId | string | 是 | 用户ID |
 | agentId | number | 否 | PCAgent ID，提供时将触发 AI-Gateway 创建 OpenCode 会话 |
+| title | string | 否 | 会话标题 |
 | skillContent | string | 是 | 用户输入的Skill指令内容，即用户发起技能请求的输入 |
 
 ### 出参
@@ -107,6 +108,7 @@ try {
     userId: 'user-1001',
     skillContent: '请帮我重构登录模块',
     agentId: 99,           // 可选
+    title: '重构登录模块'    // 可选，会话标题
   });
   
   console.log('会话创建成功:', session.sessionId);
@@ -483,7 +485,7 @@ try {
 
 ### 接口说明
 
-根据当前会话的最后一条用户消息内容重新生成回答，用于用户对回答结果不满意时触发重新回答。该接口会清除当前正在生成的响应，重新触发AI处理流程。
+根据提供的内容重新生成回答，用于用户对回答结果不满意时触发重新回答。该接口会清除当前正在生成的响应，重新触发AI处理流程。
 
 ### 接口名
 
@@ -496,46 +498,59 @@ regenerateAnswer(params: RegenerateAnswerParams): Promise<AnswerResult>
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | sessionId | string | 是 | 会话ID |
+| content | string | 是 | 重新生成的消息内容 |
 
 ### 出参
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| messageId | string | 消息ID，用于标识该回答 |
-| success | boolean | 重新生成是否成功启动 |
+| messageId | string | 消息ID，用于标识该回答（成功时返回） |
+
+### 出参示例
+
+成功时：
+
+```json
+{
+  "messageId": "msg-xyz789"
+}
+```
+
+```
 
 ### 实现方法
 
-1. 获取会话的最后一条用户消息（通过`getSessionMessage`获取）
-
-2. 调用服务端REST API发送用户消息（使用最后一条消息内容）：
+1. 调用服务端REST API发送用户消息：
    - **URL**: `POST /api/skill/sessions/{sessionId}/messages`
    - **请求体**:
      ```json
      {
-       "content": "{最后一条用户消息内容}"
+       "content": "{用户提供的content参数}"
      }
      ```
 
-3. 通过WebSocket流式连接接收AI重新生成的响应
+2. 通过WebSocket流式连接接收AI重新生成的响应
 
 ### 注意事项
 
 - 该接口需要确保WebSocket流式连接已建立
 - 适用于AI回答不完整或不满意的情况
+- content参数为必填，需要调用方提供重新生成的消息内容
 
 ### 调用示例
 
 ```typescript
 try {
-  const result = await regenerateAnswer({ sessionId: '42' });
+  const result = await regenerateAnswer({ 
+    sessionId: '42',
+    content: '请重新分析这个问题并提供更详细的方案'
+  });
   
   if (result.success) {
     console.log('重新生成已启动，消息ID:', result.messageId);
   }
 } catch (error) {
   console.error('重新生成失败:', error.message);
-  // 错误处理：会话不存在、WebSocket未连接、网络错误等
 }
 ```
 
@@ -1402,6 +1417,7 @@ try {
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | sessionId | string | 是 | 会话ID |
+| content | string | 是 | 重新生成的消息内容 |
 
 ### SendMessageToIMParams
 
