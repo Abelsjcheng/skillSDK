@@ -1,9 +1,22 @@
 {
   "name": "skill-sdk",
   "version": "1.0.0",
-  "description": "Skill SDK for HarmonyOS",
-  "main": "./src/main/ets/index.ets",
-  "author": "",
-  "license": "ISC",
-  "dependencies": {}
+  "description": "Skill SDK for HarmonyOS - 用于IM客户端、OpenCode Skill服务端、小程序间交互的鸿蒙ArkTS SDK",
+  "main": "index.ets",
+  "author": "OpenCode Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opencode/skill-sdk-harmony"
+  },
+  "keywords": [
+    "harmonyos",
+    "arkts",
+    "sdk",
+    "opencode",
+    "skill",
+    "websocket"
+  ],
+  "dependencies": {},
+  "devDependencies": {}
 }

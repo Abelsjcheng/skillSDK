@@ -1,20 +1,16 @@
 {
-  "app": {
-    "compileSdkVersion": 20,
-    "compatibleSdkVersion": 20
+  "apiType": "stageMode",
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "arguments": "",
+      "cppFlags": ""
+    }
   },
-  "modules": [
+  "targets": [
     {
-      "name": "skill-sdk",
-      "srcPath": "./src/main/ets",
-      "targets": [
-        {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
-        }
-      ]
+      "name": "default",
+      "runtimeOS": "HarmonyOS"
     }
   ]
 }

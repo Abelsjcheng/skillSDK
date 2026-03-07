@@ -1,27 +1,24 @@
 /**
- * Skill SDK 鸿蒙平台入口模块
- * 导出所有公共类型和API
+ * Skill SDK for HarmonyOS
+ * 鸿蒙ArkTS SDK入口文件
+ * 
+ * @version 1.0.0
+ * @description 用于IM客户端、OpenCode Skill服务端、小程序间交互的鸿蒙ArkTS SDK
  */
 
-// 类型定义
+// 导出主类
+export { SkillSDK } from './sdk/SkillSDK';
+
+// 导出所有类型
 export {
-  // 枚举类型
+  // 枚举
   SessionStatus,
   SkillWecodeStatus,
   SkillWeCodeAction,
   MessageRole,
   ContentType,
-  SessionState,
-
-  // 接口类型
-  StreamUsage,
-  StreamMessageContent,
-  StreamMessage,
-  ChatMessage,
-  SkillSession,
-  PageResult,
-  SessionError,
-
+  WebSocketMessageType,
+  
   // 参数类型
   ExecuteSkillParams,
   CloseSkillParams,
@@ -36,52 +33,26 @@ export {
   SendMessageParams,
   ReplyPermissionParams,
   ControlSkillWeCodeParams,
-
-  // 返回类型
-  ExecuteSkillResult,
-  CloseSkillResult,
-  StopSkillResult,
+  
+  // 响应类型
+  SkillSession,
+  ChatMessage,
+  StreamMessage,
+  TokenUsage,
+  SessionError,
   SessionStatusResult,
   SkillWecodeStatusResult,
-  AnswerResult,
   SendMessageToIMResult,
   SendMessageResult,
+  CloseSkillResult,
+  StopSkillResult,
+  AnswerResult,
   ReplyPermissionResult,
   ControlSkillWeCodeResult,
-
-  // 其他类型
+  PageResult,
   PermissionRequest,
-  CloseSessionResponse,
-  SendToIMResponse,
-  PermissionResponse,
-  CreateSessionRequest,
-  SendMessageRequest,
-  ReplyPermissionRequest,
-  ErrorResponse,
+  SessionListener,
+  
+  // 配置类型
   SkillSDKConfig
-} from './types';
-
-// 回调类型
-export type {
-  SessionStatusCallback,
-  SkillWecodeStatusCallback,
-  StreamMessageCallback
-} from './types';
-
-// API 函数
-export {
-  init,
-  executeSkill,
-  closeSkill,
-  stopSkill,
-  onSessionStatusChange,
-  onSkillWecodeStatusChange,
-  regenerateAnswer,
-  sendMessageToIM,
-  getSessionMessage,
-  registerSessionListener,
-  unregisterSessionListener,
-  sendMessage,
-  replyPermission,
-  controlSkillWeCode
-} from './api/skill-api';
+} from './sdk/types';
