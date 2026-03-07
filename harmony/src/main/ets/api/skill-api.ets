@@ -410,18 +410,15 @@ export function registerSessionListener(params: RegisterSessionListenerParams): 
     onClose: params.onClose
   };
 
-  // 检查会话是否已存在
-  const manager = sessionManager ? getSessionManager() : null;
-  const session = manager?.getSession(params.sessionId);
+  const manager = getSessionManager();
+  const session = manager.getSession(params.sessionId);
 
-  if (session) {
-    // WebSocket已连接，直接添加监听器
+  if (session && session.wsManager.isActive()) {
     if (!sessionListeners.has(params.sessionId)) {
       sessionListeners.set(params.sessionId, new Set());
     }
     sessionListeners.get(params.sessionId)!.add(listener);
   } else {
-    // WebSocket未连接，暂存监听器（时序安全保障）
     if (!pendingListeners.has(params.sessionId)) {
       pendingListeners.set(params.sessionId, new Set());
     }
