@@ -1,17 +1,23 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
-public class SendMessageResult {
+import java.util.ArrayList;
+import java.util.List;
+
+public class SessionMessage {
   private long id;
   private long welinkSessionId;
+  @Nullable
+  private String userId;
   @NonNull
-  private String userId = "";
-  @NonNull
-  private String role = "user";
+  private String role = "assistant";
   @NonNull
   private String content = "";
   private int messageSeq;
+  @NonNull
+  private List<SessionMessagePart> parts = new ArrayList<>();
   @NonNull
   private String createdAt = "";
 
@@ -31,12 +37,12 @@ public class SendMessageResult {
     this.welinkSessionId = welinkSessionId;
   }
 
-  @NonNull
+  @Nullable
   public String getUserId() {
     return userId;
   }
 
-  public void setUserId(@NonNull String userId) {
+  public void setUserId(@Nullable String userId) {
     this.userId = userId;
   }
 
@@ -64,6 +70,15 @@ public class SendMessageResult {
 
   public void setMessageSeq(int messageSeq) {
     this.messageSeq = messageSeq;
+  }
+
+  @NonNull
+  public List<SessionMessagePart> getParts() {
+    return parts;
+  }
+
+  public void setParts(@NonNull List<SessionMessagePart> parts) {
+    this.parts = parts;
   }
 
   @NonNull

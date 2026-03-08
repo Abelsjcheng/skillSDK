@@ -3,29 +3,32 @@ package com.opencode.skill.network;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.opencode.skill.model.ChatMessage;
-import com.opencode.skill.model.CloseSkillResult;
-import com.opencode.skill.model.CreateSessionRequest;
-import com.opencode.skill.model.PageResult;
-import com.opencode.skill.model.PermissionReplyRequest;
-import com.opencode.skill.model.SendMessageRequest;
-import com.opencode.skill.model.SendMessageResult;
-import com.opencode.skill.model.SendMessageToIMResult;
-import com.opencode.skill.model.SessionError;
-import com.opencode.skill.model.SkillSession;
-import com.opencode.skill.callback.SkillCallback;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
+import com.opencode.skill.SkillSDKConfig;
+import com.opencode.skill.callback.SkillCallback;
+import com.opencode.skill.model.CreateSessionParams;
+import com.opencode.skill.model.PageResult;
+import com.opencode.skill.model.ReplyPermissionResult;
+import com.opencode.skill.model.SendMessageResult;
+import com.opencode.skill.model.SendMessageToIMResult;
+import com.opencode.skill.model.SessionMessage;
+import com.opencode.skill.model.SkillSdkException;
+import com.opencode.skill.model.SkillSession;
+import com.opencode.skill.model.StopSkillResult;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.List;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
-import okhttp3.Callback;
+import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -33,349 +36,312 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
- * REST API 客户端
- * 负责与服务端进行 HTTP 通信
+ * HTTP client for skill server REST APIs.
  */
 public class ApiClient {
+  private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
 
-    private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
+  @NonNull
+  private final Gson gson = new Gson();
+  @Nullable
+  private OkHttpClient okHttpClient;
+  @Nullable
+  private String baseUrl;
+  @NonNull
+  private Map<String, String> defaultHeaders = Collections.emptyMap();
 
-    @NonNull
-    private final OkHttpClient okHttpClient;
-    @NonNull
-    private final Gson gson;
-    @Nullable
-    private String baseUrl;
+  public synchronized void configure(@NonNull SkillSDKConfig config) {
+    this.baseUrl = trimTrailingSlash(config.getBaseUrl());
+    this.defaultHeaders = new HashMap<>(config.getDefaultHeaders());
+    this.okHttpClient = new OkHttpClient.Builder()
+        .connectTimeout(config.getConnectTimeout(), TimeUnit.MILLISECONDS)
+        .readTimeout(config.getReadTimeout(), TimeUnit.MILLISECONDS)
+        .writeTimeout(config.getWriteTimeout(), TimeUnit.MILLISECONDS)
+        .build();
+  }
 
-    public ApiClient() {
-        this.okHttpClient = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .build();
-        this.gson = new Gson();
+  public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+    JsonObject body = new JsonObject();
+    body.addProperty("ak", params.getAk());
+    if (params.getTitle() != null && !params.getTitle().isEmpty()) {
+      body.addProperty("title", params.getTitle());
     }
+    body.addProperty("imGroupId", params.getImGroupId());
 
-    public void setBaseUrl(@NonNull String baseUrl) {
-        this.baseUrl = baseUrl;
+    Request request = newRequestBuilder("/api/skill/sessions")
+        .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+        .build();
+    executeEnvelope(request, SkillSession.class, callback);
+  }
+
+  public void listSessions(@Nullable String imGroupId, @Nullable String ak, @Nullable String status, int page, int size,
+      @NonNull SkillCallback<PageResult<SkillSession>> callback) {
+    HttpUrl.Builder builder = urlBuilder("/api/skill/sessions");
+    if (imGroupId != null && !imGroupId.isEmpty()) {
+      builder.addQueryParameter("imGroupId", imGroupId);
     }
-
-    @Nullable
-    public String getBaseUrl() {
-        return baseUrl;
+    if (ak != null && !ak.isEmpty()) {
+      builder.addQueryParameter("ak", ak);
     }
-
-    public void createSession(@NonNull CreateSessionRequest request, @NonNull SkillCallback<SkillSession> callback) {
-        String url = buildUrl("/api/skill/sessions");
-        String json = gson.toJson(request);
-        
-        Request httpRequest = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON_MEDIA_TYPE))
-                .build();
-
-        okHttpClient.newCall(httpRequest).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        SkillSession session = gson.fromJson(responseBody, SkillSession.class);
-                        callback.onSuccess(session);
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
+    if (status != null && !status.isEmpty()) {
+      builder.addQueryParameter("status", status);
     }
+    builder.addQueryParameter("page", String.valueOf(page));
+    builder.addQueryParameter("size", String.valueOf(size));
 
-    public void closeSession(long sessionId, @NonNull SkillCallback<CloseSkillResult> callback) {
-        String url = buildUrl("/api/skill/sessions/" + sessionId);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .delete()
-                .build();
+    Request request = newRequestBuilder(builder.build())
+        .get()
+        .build();
 
-        okHttpClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
+    Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
+    executeEnvelope(request, type, callback);
+  }
 
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        callback.onSuccess(new CloseSkillResult("success"));
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
+  public void getSession(long welinkSessionId, @NonNull SkillCallback<SkillSession> callback) {
+    Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId)
+        .get()
+        .build();
+    executeEnvelope(request, SkillSession.class, callback);
+  }
 
-    public void getSession(long sessionId, @NonNull SkillCallback<SkillSession> callback) {
-        String url = buildUrl("/api/skill/sessions/" + sessionId);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
+  public void sendMessage(long welinkSessionId, @NonNull String content,
+      @NonNull SkillCallback<SendMessageResult> callback) {
+    JsonObject body = new JsonObject();
+    // Service protocol v1 defines only "content".
+    body.addProperty("content", content);
 
-        okHttpClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
+    Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
+        .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+        .build();
+    executeEnvelope(request, SendMessageResult.class, callback);
+  }
 
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        SkillSession session = gson.fromJson(responseBody, SkillSession.class);
-                        callback.onSuccess(session);
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
+  public void abortSession(long welinkSessionId, @NonNull SkillCallback<StopSkillResult> callback) {
+    Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/abort")
+        .post(RequestBody.create("{}", JSON_MEDIA_TYPE))
+        .build();
+    executeEnvelope(request, StopSkillResult.class, callback);
+  }
 
-    public void sendMessage(long sessionId, @NonNull String content, @NonNull SkillCallback<SendMessageResult> callback) {
-        String url = buildUrl("/api/skill/sessions/" + sessionId + "/messages");
-        SendMessageRequest request = new SendMessageRequest(content);
-        String json = gson.toJson(request);
-        
-        Request httpRequest = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON_MEDIA_TYPE))
-                .build();
+  public void getMessages(long welinkSessionId, int page, int size,
+      @NonNull SkillCallback<PageResult<SessionMessage>> callback) {
+    HttpUrl url = urlBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
+        .addQueryParameter("page", String.valueOf(page))
+        .addQueryParameter("size", String.valueOf(size))
+        .build();
+    Request request = newRequestBuilder(url).get().build();
+    Type type = TypeToken.getParameterized(PageResult.class, SessionMessage.class).getType();
+    executeEnvelope(request, type, callback);
+  }
 
-        okHttpClient.newCall(httpRequest).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
+  public void replyPermission(long welinkSessionId, @NonNull String permId, @NonNull String response,
+      @NonNull SkillCallback<ReplyPermissionResult> callback) {
+    JsonObject body = new JsonObject();
+    body.addProperty("response", response);
 
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        ChatMessage message = gson.fromJson(responseBody, ChatMessage.class);
-                        callback.onSuccess(new SendMessageResult(message.getId(), message.getSeq(), message.getCreatedAt()));
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
+    Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/permissions/" + permId)
+        .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+        .build();
+    executeEnvelope(request, ReplyPermissionResult.class, callback);
+  }
 
-    public void getMessages(long sessionId, int page, int size, @NonNull SkillCallback<PageResult<ChatMessage>> callback) {
-        String url = buildUrl("/api/skill/sessions/" + sessionId + "/messages?page=" + page + "&size=" + size);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
+  public void sendMessageToIM(long welinkSessionId, @NonNull String content,
+      @NonNull SkillCallback<SendMessageToIMResult> callback) {
+    JsonObject body = new JsonObject();
+    body.addProperty("content", content);
 
-        okHttpClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
+    Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/send-to-im")
+        .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+        .build();
 
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        Type type = new TypeToken<PageResult<ChatMessage>>(){}.getType();
-                        PageResult<ChatMessage> result = gson.fromJson(responseBody, type);
-                        callback.onSuccess(result);
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
-
-    public void replyPermission(long sessionId, @NonNull String permissionId, boolean approved, @NonNull SkillCallback<Boolean> callback) {
-        String url = buildUrl("/api/skill/sessions/" + sessionId + "/permissions/" + permissionId);
-        PermissionReplyRequest request = new PermissionReplyRequest(approved);
-        String json = gson.toJson(request);
-        
-        Request httpRequest = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON_MEDIA_TYPE))
-                .build();
-
-        okHttpClient.newCall(httpRequest).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful()) {
-                        callback.onSuccess(true);
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
-
-    public void sendMessageToIM(long sessionId, @NonNull String content, @NonNull SkillCallback<SendMessageToIMResult> callback) {
-        String url = buildUrl("/api/skill/sessions/" + sessionId + "/send-to-im");
-        SendMessageRequest request = new SendMessageRequest(content);
-        String json = gson.toJson(request);
-        
-        Request httpRequest = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON_MEDIA_TYPE))
-                .build();
-
-        okHttpClient.newCall(httpRequest).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        JsonObject result = JsonParser.parseString(responseBody).getAsJsonObject();
-                        boolean success = result.has("success") && result.get("success").isBoolean() && result.get("success").getAsBoolean();
-                        if (success) {
-                            String chatId = result.has("chatId") ? result.get("chatId").getAsString() : "";
-                            int contentLength = result.has("contentLength") ? result.get("contentLength").getAsInt() : 0;
-                            callback.onSuccess(SendMessageToIMResult.success(chatId, contentLength));
-                        } else {
-                            String errorMsg = result.has("error") ? result.get("error").getAsString() : "Unknown error";
-                            callback.onSuccess(SendMessageToIMResult.failure(errorMsg));
-                        }
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onSuccess(SendMessageToIMResult.failure(errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
-
-    public void getSessions(long userId, int page, int size, @NonNull SkillCallback<PageResult<SkillSession>> callback) {
-        String url = buildUrl("/api/skill/sessions?userId=" + userId + "&page=" + page + "&size=" + size);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-
-        okHttpClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SessionError("NETWORK_ERROR", e.getMessage()));
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        Type type = new TypeToken<PageResult<SkillSession>>(){}.getType();
-                        PageResult<SkillSession> result = gson.fromJson(responseBody, type);
-                        callback.onSuccess(result);
-                    } else {
-                        String errorMsg = parseErrorMessage(response);
-                        callback.onError(new SessionError("API_ERROR", errorMsg));
-                    }
-                } catch (Exception e) {
-                    callback.onError(new SessionError("PARSE_ERROR", e.getMessage()));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
-
-    @NonNull
-    private String buildUrl(@NonNull String path) {
-        if (baseUrl == null) {
-            throw new IllegalStateException("Base URL is not configured");
+    executeRaw(request, new SkillCallback<JsonObject>() {
+      @Override
+      public void onSuccess(@Nullable JsonObject result) {
+        if (result == null) {
+          callback.onSuccess(new SendMessageToIMResult("failed", null, null, "Empty response"));
+          return;
         }
-        String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        return base + path;
-    }
 
-    @NonNull
-    private String parseErrorMessage(@NonNull Response response) {
+        if (result.has("code")) {
+          int code = result.get("code").getAsInt();
+          if (code != 0) {
+            callback.onError(new SkillSdkException(code, getString(result, "errormsg", "Server error")));
+            return;
+          }
+
+          JsonElement data = result.get("data");
+          if (data != null && data.isJsonObject()) {
+            JsonObject dataObj = data.getAsJsonObject();
+            SendMessageToIMResult wrapped = gson.fromJson(dataObj, SendMessageToIMResult.class);
+            if (wrapped.getStatus() == null) {
+              wrapped.setStatus("success");
+            }
+            callback.onSuccess(wrapped);
+            return;
+          }
+
+          callback.onSuccess(new SendMessageToIMResult("success", null, null, null));
+          return;
+        }
+
+        // Compatibility for undocumented endpoint.
+        boolean success = result.has("success") && result.get("success").isJsonPrimitive()
+            && result.get("success").getAsBoolean();
+        SendMessageToIMResult compatibility = new SendMessageToIMResult();
+        compatibility.setStatus(success ? "success" : "failed");
+        if (result.has("chatId") && !result.get("chatId").isJsonNull()) {
+          compatibility.setChatId(result.get("chatId").getAsString());
+        }
+        if (result.has("contentLength") && !result.get("contentLength").isJsonNull()) {
+          compatibility.setContentLength(result.get("contentLength").getAsInt());
+        }
+        if (result.has("error") && !result.get("error").isJsonNull()) {
+          compatibility.setErrorMessage(result.get("error").getAsString());
+        }
+        callback.onSuccess(compatibility);
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(error);
+      }
+    });
+  }
+
+  public synchronized void shutdown() {
+    if (okHttpClient != null) {
+      okHttpClient.dispatcher().executorService().shutdown();
+      okHttpClient.connectionPool().evictAll();
+    }
+  }
+
+  private <T> void executeEnvelope(@NonNull Request request, @NonNull Type type, @NonNull SkillCallback<T> callback) {
+    executeRaw(request, new SkillCallback<JsonObject>() {
+      @Override
+      public void onSuccess(@Nullable JsonObject root) {
+        if (root == null) {
+          callback.onError(new SkillSdkException(5000, "Empty response"));
+          return;
+        }
+        if (!root.has("code")) {
+          callback.onError(new SkillSdkException(7000, "Invalid server response"));
+          return;
+        }
+
+        int code = root.get("code").getAsInt();
+        String errormsg = getString(root, "errormsg", "");
+        if (code != 0) {
+          callback.onError(new SkillSdkException(code, errormsg.isEmpty() ? "Server error" : errormsg));
+          return;
+        }
+
+        JsonElement data = root.get("data");
+        if (data == null || data.isJsonNull()) {
+          callback.onSuccess(null);
+          return;
+        }
+        callback.onSuccess(gson.fromJson(data, type));
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(error);
+      }
+    });
+  }
+
+  private void executeRaw(@NonNull Request request, @NonNull SkillCallback<JsonObject> callback) {
+    OkHttpClient client = requireClient();
+    client.newCall(request).enqueue(new okhttp3.Callback() {
+      @Override
+      public void onFailure(@NonNull Call call, @NonNull IOException e) {
+        callback.onError(new SkillSdkException(6000, "Network error: " + e.getMessage(), e));
+      }
+
+      @Override
+      public void onResponse(@NonNull Call call, @NonNull Response response) {
         try {
-            if (response.body() != null) {
-                String body = response.body().string();
-                JsonObject json = JsonParser.parseString(body).getAsJsonObject();
-                if (json.has("error")) {
-                    return json.get("error").getAsString();
-                }
-            }
-        } catch (Exception ignored) {
+          if (!response.isSuccessful()) {
+            callback.onError(new SkillSdkException(7000, "HTTP " + response.code() + ": " + response.message()));
+            return;
+          }
+          if (response.body() == null) {
+            callback.onSuccess(null);
+            return;
+          }
+          String responseBody = response.body().string();
+          if (responseBody.trim().isEmpty()) {
+            callback.onSuccess(null);
+            return;
+          }
+          JsonElement root = JsonParser.parseString(responseBody);
+          if (!root.isJsonObject()) {
+            callback.onError(new SkillSdkException(7000, "Unexpected response JSON type"));
+            return;
+          }
+          callback.onSuccess(root.getAsJsonObject());
+        } catch (Exception e) {
+          callback.onError(new SkillSdkException(5000, "Parse response failed: " + e.getMessage(), e));
+        } finally {
+          response.close();
         }
-        return "HTTP " + response.code() + ": " + response.message();
-    }
+      }
+    });
+  }
 
-    public void shutdown() {
-        okHttpClient.dispatcher().executorService().shutdown();
-        okHttpClient.connectionPool().evictAll();
+  @NonNull
+  private Request.Builder newRequestBuilder(@NonNull String path) {
+    return newRequestBuilder(urlBuilder(path).build());
+  }
+
+  @NonNull
+  private Request.Builder newRequestBuilder(@NonNull HttpUrl url) {
+    Request.Builder builder = new Request.Builder().url(url);
+    for (Map.Entry<String, String> entry : defaultHeaders.entrySet()) {
+      builder.addHeader(entry.getKey(), entry.getValue());
     }
+    return builder;
+  }
+
+  @NonNull
+  private HttpUrl.Builder urlBuilder(@NonNull String path) {
+    String base = requireBaseUrl();
+    HttpUrl parsed = HttpUrl.parse(base + path);
+    if (parsed == null) {
+      throw new IllegalStateException("Invalid URL: " + base + path);
+    }
+    return parsed.newBuilder();
+  }
+
+  @NonNull
+  private synchronized OkHttpClient requireClient() {
+    if (okHttpClient == null) {
+      throw new IllegalStateException("ApiClient is not configured");
+    }
+    return okHttpClient;
+  }
+
+  @NonNull
+  private synchronized String requireBaseUrl() {
+    if (baseUrl == null || baseUrl.isEmpty()) {
+      throw new IllegalStateException("ApiClient baseUrl is not configured");
+    }
+    return baseUrl;
+  }
+
+  @NonNull
+  private static String trimTrailingSlash(@NonNull String value) {
+    if (value.endsWith("/")) {
+      return value.substring(0, value.length() - 1);
+    }
+    return value;
+  }
+
+  @NonNull
+  private static String getString(@NonNull JsonObject object, @NonNull String key, @NonNull String fallback) {
+    if (!object.has(key) || object.get(key).isJsonNull()) {
+      return fallback;
+    }
+    return object.get(key).getAsString();
+  }
 }

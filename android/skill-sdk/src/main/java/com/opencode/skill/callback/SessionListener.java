@@ -7,13 +7,17 @@ import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.StreamMessage;
 
 /**
- * 会话消息监听器接口
+ * Session stream listener.
  */
+@FunctionalInterface
 public interface SessionListener {
-    
-    void onMessage(@NonNull StreamMessage message);
-    
-    void onError(@Nullable SessionError error);
-    
-    void onClose(@Nullable String reason);
+  void onMessage(@NonNull StreamMessage message);
+
+  default void onError(@Nullable SessionError error) {
+    // Optional.
+  }
+
+  default void onClose(@Nullable String reason) {
+    // Optional.
+  }
 }

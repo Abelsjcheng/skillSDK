@@ -2,16 +2,16 @@ package com.opencode.skill.model;
 
 import androidx.annotation.NonNull;
 
-public class ReplyPermissionResult {
+public class ReplyPermissionParams {
   private final long welinkSessionId;
   @NonNull
-  private final String permissionId;
+  private final String permId;
   @NonNull
   private final String response;
 
-  public ReplyPermissionResult(long welinkSessionId, @NonNull String permissionId, @NonNull String response) {
+  public ReplyPermissionParams(long welinkSessionId, @NonNull String permId, @NonNull String response) {
     this.welinkSessionId = welinkSessionId;
-    this.permissionId = permissionId;
+    this.permId = permId;
     this.response = response;
   }
 
@@ -20,8 +20,8 @@ public class ReplyPermissionResult {
   }
 
   @NonNull
-  public String getPermissionId() {
-    return permissionId;
+  public String getPermId() {
+    return permId;
   }
 
   @NonNull

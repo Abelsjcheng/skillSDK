@@ -3,161 +3,102 @@ package com.opencode.skill.model;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.Objects;
-
-/**
- * 技能会话模型
- * Represents a skill session with the server.
- */
 public class SkillSession {
-    
-    private long id;
-    private long userId;
-    private long skillDefinitionId;
-    @Nullable
-    private Long agentId;
-    @Nullable
-    private String toolSessionId;
-    @Nullable
-    private String title;
-    @NonNull
-    private String status;
-    @Nullable
-    private String imChatId;
-    @NonNull
-    private String createdAt;
-    @NonNull
-    private String lastActiveAt;
+  private long welinkSessionId;
+  @NonNull
+  private String userId = "";
+  @NonNull
+  private String ak = "";
+  @Nullable
+  private String title;
+  @NonNull
+  private String imGroupId = "";
+  @NonNull
+  private String status = "ACTIVE";
+  @Nullable
+  private String toolSessionId;
+  @NonNull
+  private String createdAt = "";
+  @NonNull
+  private String updatedAt = "";
 
-    public SkillSession() {
-        this.status = "ACTIVE";
-    }
+  public long getWelinkSessionId() {
+    return welinkSessionId;
+  }
 
-    // Getters
-    public long getId() {
-        return id;
-    }
+  public void setWelinkSessionId(long welinkSessionId) {
+    this.welinkSessionId = welinkSessionId;
+  }
 
-    public long getUserId() {
-        return userId;
-    }
+  @NonNull
+  public String getUserId() {
+    return userId;
+  }
 
-    public long getSkillDefinitionId() {
-        return skillDefinitionId;
-    }
+  public void setUserId(@NonNull String userId) {
+    this.userId = userId;
+  }
 
-    @Nullable
-    public Long getAgentId() {
-        return agentId;
-    }
+  @NonNull
+  public String getAk() {
+    return ak;
+  }
 
-    @Nullable
-    public String getToolSessionId() {
-        return toolSessionId;
-    }
+  public void setAk(@NonNull String ak) {
+    this.ak = ak;
+  }
 
-    @Nullable
-    public String getTitle() {
-        return title;
-    }
+  @Nullable
+  public String getTitle() {
+    return title;
+  }
 
-    @NonNull
-    public String getStatus() {
-        return status;
-    }
+  public void setTitle(@Nullable String title) {
+    this.title = title;
+  }
 
-    @Nullable
-    public String getImChatId() {
-        return imChatId;
-    }
+  @NonNull
+  public String getImGroupId() {
+    return imGroupId;
+  }
 
-    @NonNull
-    public String getCreatedAt() {
-        return createdAt;
-    }
+  public void setImGroupId(@NonNull String imGroupId) {
+    this.imGroupId = imGroupId;
+  }
 
-    @NonNull
-    public String getLastActiveAt() {
-        return lastActiveAt;
-    }
+  @NonNull
+  public String getStatus() {
+    return status;
+  }
 
-    // Setters
-    public void setId(long id) {
-        this.id = id;
-    }
+  public void setStatus(@NonNull String status) {
+    this.status = status;
+  }
 
-    public void setUserId(long userId) {
-        this.userId = userId;
-    }
+  @Nullable
+  public String getToolSessionId() {
+    return toolSessionId;
+  }
 
-    public void setSkillDefinitionId(long skillDefinitionId) {
-        this.skillDefinitionId = skillDefinitionId;
-    }
+  public void setToolSessionId(@Nullable String toolSessionId) {
+    this.toolSessionId = toolSessionId;
+  }
 
-    public void setAgentId(@Nullable Long agentId) {
-        this.agentId = agentId;
-    }
+  @NonNull
+  public String getCreatedAt() {
+    return createdAt;
+  }
 
-    public void setToolSessionId(@Nullable String toolSessionId) {
-        this.toolSessionId = toolSessionId;
-    }
+  public void setCreatedAt(@NonNull String createdAt) {
+    this.createdAt = createdAt;
+  }
 
-    public void setTitle(@Nullable String title) {
-        this.title = title;
-    }
+  @NonNull
+  public String getUpdatedAt() {
+    return updatedAt;
+  }
 
-    public void setStatus(@NonNull String status) {
-        this.status = status;
-    }
-
-    public void setImChatId(@Nullable String imChatId) {
-        this.imChatId = imChatId;
-    }
-
-    public void setCreatedAt(@NonNull String createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public void setLastActiveAt(@NonNull String lastActiveAt) {
-        this.lastActiveAt = lastActiveAt;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        SkillSession that = (SkillSession) o;
-        return id == that.id &&
-                userId == that.userId &&
-                skillDefinitionId == that.skillDefinitionId &&
-                Objects.equals(agentId, that.agentId) &&
-                Objects.equals(toolSessionId, that.toolSessionId) &&
-                Objects.equals(title, that.title) &&
-                status.equals(that.status) &&
-                Objects.equals(imChatId, that.imChatId) &&
-                createdAt.equals(that.createdAt) &&
-                lastActiveAt.equals(that.lastActiveAt);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, userId, skillDefinitionId, agentId, toolSessionId, title, status, imChatId, createdAt, lastActiveAt);
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-        return "SkillSession{" +
-                "id=" + id +
-                ", userId=" + userId +
-                ", skillDefinitionId=" + skillDefinitionId +
-                ", agentId=" + agentId +
-                ", toolSessionId='" + toolSessionId + '\'' +
-                ", title='" + title + '\'' +
-                ", status='" + status + '\'' +
-                ", imChatId='" + imChatId + '\'' +
-                ", createdAt='" + createdAt + '\'' +
-                ", lastActiveAt='" + lastActiveAt + '\'' +
-                '}';
-    }
+  public void setUpdatedAt(@NonNull String updatedAt) {
+    this.updatedAt = updatedAt;
+  }
 }

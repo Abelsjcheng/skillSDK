@@ -3,60 +3,60 @@ package com.opencode.skill.model;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-/**
- * 发送消息到IM结果
- * Result of sending a message to IM.
- */
 public class SendMessageToIMResult {
-    
-    private final boolean success;
-    @Nullable
-    private final String chatId;
-    private final int contentLength;
-    @Nullable
-    private final String errorMessage;
+  @NonNull
+  private String status = "failed";
+  @Nullable
+  private String chatId;
+  @Nullable
+  private Integer contentLength;
+  @Nullable
+  private String errorMessage;
 
-    public SendMessageToIMResult(boolean success, @Nullable String chatId, int contentLength, @Nullable String errorMessage) {
-        this.success = success;
-        this.chatId = chatId;
-        this.contentLength = contentLength;
-        this.errorMessage = errorMessage;
-    }
+  public SendMessageToIMResult() {
+  }
 
-    public static SendMessageToIMResult success(@NonNull String chatId, int contentLength) {
-        return new SendMessageToIMResult(true, chatId, contentLength, null);
-    }
+  public SendMessageToIMResult(@NonNull String status, @Nullable String chatId, @Nullable Integer contentLength,
+      @Nullable String errorMessage) {
+    this.status = status;
+    this.chatId = chatId;
+    this.contentLength = contentLength;
+    this.errorMessage = errorMessage;
+  }
 
-    public static SendMessageToIMResult failure(@NonNull String errorMessage) {
-        return new SendMessageToIMResult(false, null, 0, errorMessage);
-    }
+  @NonNull
+  public String getStatus() {
+    return status;
+  }
 
-    public boolean isSuccess() {
-        return success;
-    }
+  public void setStatus(@NonNull String status) {
+    this.status = status;
+  }
 
-    @Nullable
-    public String getChatId() {
-        return chatId;
-    }
+  @Nullable
+  public String getChatId() {
+    return chatId;
+  }
 
-    public int getContentLength() {
-        return contentLength;
-    }
+  public void setChatId(@Nullable String chatId) {
+    this.chatId = chatId;
+  }
 
-    @Nullable
-    public String getErrorMessage() {
-        return errorMessage;
-    }
+  @Nullable
+  public Integer getContentLength() {
+    return contentLength;
+  }
 
-    @NonNull
-    @Override
-    public String toString() {
-        return "SendMessageToIMResult{" +
-                "success=" + success +
-                ", chatId='" + chatId + '\'' +
-                ", contentLength=" + contentLength +
-                ", errorMessage='" + errorMessage + '\'' +
-                '}';
-    }
+  public void setContentLength(@Nullable Integer contentLength) {
+    this.contentLength = contentLength;
+  }
+
+  @Nullable
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(@Nullable String errorMessage) {
+    this.errorMessage = errorMessage;
+  }
 }

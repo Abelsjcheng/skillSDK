@@ -4,13 +4,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * 通用技能回调接口
- *
- * @param <T> 成功时返回的数据类型
+ * Generic async callback.
  */
 public interface SkillCallback<T> {
-    
-    void onSuccess(@Nullable T result);
-    
-    void onError(@NonNull Throwable error);
+  void onSuccess(@Nullable T result);
+
+  void onError(@NonNull Throwable error);
 }

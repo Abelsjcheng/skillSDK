@@ -2,33 +2,22 @@ package com.opencode.skill.model;
 
 import androidx.annotation.NonNull;
 
-/**
- * 停止技能结果
- * Result of stopping a skill session.
- */
 public class StopSkillResult {
-    
-    @NonNull
-    private final String status;
+  private final long welinkSessionId;
+  @NonNull
+  private final String status;
 
-    public StopSkillResult(@NonNull String status) {
-        this.status = status;
-    }
+  public StopSkillResult(long welinkSessionId, @NonNull String status) {
+    this.welinkSessionId = welinkSessionId;
+    this.status = status;
+  }
 
-    @NonNull
-    public String getStatus() {
-        return status;
-    }
+  public long getWelinkSessionId() {
+    return welinkSessionId;
+  }
 
-    public boolean isSuccess() {
-        return "success".equalsIgnoreCase(status);
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-        return "StopSkillResult{" +
-                "status='" + status + '\'' +
-                '}';
-    }
+  @NonNull
+  public String getStatus() {
+    return status;
+  }
 }

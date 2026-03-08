@@ -3,475 +3,725 @@ package com.opencode.skill;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.opencode.skill.callback.SessionCloseCallback;
+import com.opencode.skill.callback.SessionErrorCallback;
 import com.opencode.skill.callback.SessionListener;
+import com.opencode.skill.callback.SessionMessageCallback;
 import com.opencode.skill.callback.SessionStatusCallback;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.callback.SkillWecodeStatusCallback;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.constant.SessionStatus;
-import com.opencode.skill.constant.SkillWeCodeAction;
 import com.opencode.skill.constant.SkillWecodeStatus;
-import com.opencode.skill.model.ChatMessage;
 import com.opencode.skill.model.CloseSkillResult;
+import com.opencode.skill.model.ControlSkillWeCodeParams;
 import com.opencode.skill.model.ControlSkillWeCodeResult;
-import com.opencode.skill.model.CreateSessionRequest;
-import com.opencode.skill.model.ExecuteSkillParams;
+import com.opencode.skill.model.CreateSessionParams;
+import com.opencode.skill.model.GetSessionMessageParams;
+import com.opencode.skill.model.OnSessionStatusChangeParams;
+import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.PageResult;
+import com.opencode.skill.model.RegisterSessionListenerParams;
+import com.opencode.skill.model.ReplyPermissionParams;
 import com.opencode.skill.model.ReplyPermissionResult;
+import com.opencode.skill.model.RegenerateAnswerParams;
+import com.opencode.skill.model.SendMessageParams;
 import com.opencode.skill.model.SendMessageResult;
+import com.opencode.skill.model.SendMessageToIMParams;
 import com.opencode.skill.model.SendMessageToIMResult;
 import com.opencode.skill.model.SessionError;
+import com.opencode.skill.model.SessionMessage;
+import com.opencode.skill.model.SessionStatusResult;
+import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.SkillSession;
+import com.opencode.skill.model.SkillWecodeStatusResult;
+import com.opencode.skill.model.StopSkillParams;
 import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.StreamMessage;
+import com.opencode.skill.model.UnregisterSessionListenerParams;
 import com.opencode.skill.network.ApiClient;
 import com.opencode.skill.network.StreamingMessageCache;
 import com.opencode.skill.network.WebSocketManager;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Skill SDK 主类 - 单例模式
- * 提供 13 个公开接口用于与 Skill 服务端交互
+ * Singleton SDK exposing 13 public APIs from SkillClientSdkInterfaceV1.md.
  */
 public final class SkillSDK {
+  private static volatile SkillSDK instance;
 
-    private static volatile SkillSDK instance;
+  @NonNull
+  private final ApiClient apiClient = new ApiClient();
+  @NonNull
+  private final WebSocketManager webSocketManager = WebSocketManager.getInstance();
+  @NonNull
+  private final StreamingMessageCache streamingMessageCache = new StreamingMessageCache();
 
-    @NonNull
-    private final ApiClient apiClient;
-    @NonNull
-    private final WebSocketManager webSocketManager;
-    @NonNull
-    private final StreamingMessageCache streamingCache;
-    @NonNull
-    private final Map<String, SessionStatusCallback> statusCallbacks = new ConcurrentHashMap<>();
-    @NonNull
-    private final List<SkillWecodeStatusCallback> wecodeStatusCallbacks = new ArrayList<>();
-    @Nullable
-    private SkillSDKConfig config;
+  @NonNull
+  private final Map<Long, CopyOnWriteArrayList<SessionStatusCallback>> sessionStatusCallbacks = new ConcurrentHashMap<>();
+  @NonNull
+  private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
+  @NonNull
+  private final Map<Long, CopyOnWriteArrayList<ListenerBinding>> listenerBindings = new ConcurrentHashMap<>();
 
-    private SkillSDK() {
-        this.apiClient = new ApiClient();
-        this.webSocketManager = WebSocketManager.getInstance();
-        this.streamingCache = new StreamingMessageCache();
+  @Nullable
+  private SkillSDKConfig config;
+
+  @NonNull
+  private final WebSocketManager.InternalListener internalStreamListener = new WebSocketManager.InternalListener() {
+    @Override
+    public void onMessage(@NonNull StreamMessage message) {
+      streamingMessageCache.ingestStreamMessage(message);
+      emitSessionStatusByEvent(message);
     }
 
-    @NonNull
-    public static SkillSDK getInstance() {
+    @Override
+    public void onError(@NonNull SessionError error) {
+      // Keep callback-level errors on registered session listeners.
+    }
+
+    @Override
+    public void onClosed(@Nullable String reason) {
+      // No-op.
+    }
+  };
+
+  private SkillSDK() {
+  }
+
+  @NonNull
+  public static SkillSDK getInstance() {
+    if (instance == null) {
+      synchronized (SkillSDK.class) {
         if (instance == null) {
-            synchronized (SkillSDK.class) {
-                if (instance == null) {
-                    instance = new SkillSDK();
-                }
-            }
+          instance = new SkillSDK();
         }
-        return instance;
+      }
+    }
+    return instance;
+  }
+
+  public synchronized void initialize(@NonNull SkillSDKConfig config) {
+    this.config = config;
+    apiClient.configure(config);
+    webSocketManager.configure(config);
+    webSocketManager.removeInternalListener(internalStreamListener);
+    webSocketManager.addInternalListener(internalStreamListener);
+  }
+
+  public boolean isInitialized() {
+    return config != null;
+  }
+
+  // 1. createSession
+  public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getAk().trim().isEmpty() || params.getImGroupId().trim().isEmpty()) {
+      callback.onError(error(1000, "ak and imGroupId are required"));
+      return;
     }
 
-    public synchronized void initialize(@NonNull SkillSDKConfig config) {
-        this.config = config;
-        this.apiClient.setBaseUrl(config.getBaseUrl());
-        this.webSocketManager.setBaseUrl(config.getBaseUrl());
-    }
-
-    public boolean isInitialized() {
-        return config != null;
-    }
-
-    // ==================== 1. executeSkill ====================
-    
-    public void executeSkill(@NonNull ExecuteSkillParams params, @NonNull SkillCallback<SkillSession> callback) {
-        checkInitialized();
-
-        CreateSessionRequest request = new CreateSessionRequest(
-                Long.parseLong(params.getUserId()),
-                params.getSkillDefinitionId()
-        );
-        request.agentId(params.getAgentId());
-        request.title(params.getTitle());
-        request.imChatId(params.getImChatId());
-
-        apiClient.createSession(request, new SkillCallback<SkillSession>() {
-            @Override
-            public void onSuccess(@Nullable SkillSession session) {
-                if (session == null) {
-                    callback.onError(new SessionError("NULL_RESPONSE", "Session is null"));
-                    return;
+    ensureConnected(new SkillCallback<Boolean>() {
+      @Override
+      public void onSuccess(@Nullable Boolean result) {
+        apiClient.listSessions(params.getImGroupId(), params.getAk(), "ACTIVE", 0, 20,
+            new SkillCallback<PageResult<SkillSession>>() {
+              @Override
+              public void onSuccess(@Nullable PageResult<SkillSession> pageResult) {
+                SkillSession reused = selectLatestActiveSession(pageResult == null ? null : pageResult.getContent(), params);
+                if (reused != null) {
+                  callback.onSuccess(reused);
+                  return;
                 }
 
-                String sessionId = String.valueOf(session.getId());
-
-                SessionListener internalListener = new SessionListener() {
-                    @Override
-                    public void onMessage(@NonNull StreamMessage message) {
-                        streamingCache.updateCache(sessionId, message);
-                        notifyStatusChange(sessionId, message.getType());
+                apiClient.createSession(params, new SkillCallback<SkillSession>() {
+                  @Override
+                  public void onSuccess(@Nullable SkillSession session) {
+                    if (session == null) {
+                      callback.onError(error(7000, "Create session returned empty data"));
+                      return;
                     }
+                    callback.onSuccess(session);
+                  }
 
-                    @Override
-                    public void onError(@Nullable SessionError error) {
-                        if (error != null) {
-                            notifyStatusError(sessionId, error);
-                        }
-                    }
-
-                    @Override
-                    public void onClose(@Nullable String reason) {
-                        notifyStatusChange(sessionId, MessageType.ERROR);
-                    }
-                };
-
-                webSocketManager.registerListener(sessionId, internalListener);
-                webSocketManager.connect();
-
-                apiClient.sendMessage(session.getId(), params.getSkillContent(), new SkillCallback<SendMessageResult>() {
-                    @Override
-                    public void onSuccess(@Nullable SendMessageResult result) {
-                        callback.onSuccess(session);
-                    }
-
-                    @Override
-                    public void onError(@NonNull Throwable error) {
-                        callback.onSuccess(session);
-                    }
+                  @Override
+                  public void onError(@NonNull Throwable error) {
+                    callback.onError(wrapError(error));
+                  }
                 });
-            }
+              }
 
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
+              @Override
+              public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+              }
+            });
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  // 2. closeSkill
+  public void closeSkill(@NonNull SkillCallback<CloseSkillResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (!webSocketManager.isConnected()) {
+      callback.onError(error(3000, "WebSocket is not connected"));
+      return;
+    }
+
+    try {
+      webSocketManager.disconnect();
+      webSocketManager.clearAllListeners();
+      listenerBindings.clear();
+      sessionStatusCallbacks.clear();
+      streamingMessageCache.clearAll();
+      callback.onSuccess(new CloseSkillResult("success"));
+    } catch (Exception e) {
+      callback.onError(error(5000, "Close skill failed: " + e.getMessage()));
+    }
+  }
+
+  // 3. stopSkill
+  public void stopSkill(@NonNull StopSkillParams params, @NonNull SkillCallback<StopSkillResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getWelinkSessionId() <= 0) {
+      callback.onError(error(1000, "welinkSessionId is invalid"));
+      return;
+    }
+
+    apiClient.abortSession(params.getWelinkSessionId(), new SkillCallback<StopSkillResult>() {
+      @Override
+      public void onSuccess(@Nullable StopSkillResult result) {
+        StopSkillResult resolved = result == null
+            ? new StopSkillResult(params.getWelinkSessionId(), "aborted")
+            : result;
+        emitSessionStatus(params.getWelinkSessionId(), SessionStatus.STOPPED);
+        callback.onSuccess(resolved);
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  // 4. onSessionStatusChange
+  public void onSessionStatusChange(@NonNull OnSessionStatusChangeParams params) {
+    ensureInitializedForVoid();
+    if (params.getWelinkSessionId() <= 0 || params.getCallback() == null) {
+      throw error(1000, "welinkSessionId and callback are required");
+    }
+    if (!webSocketManager.isConnected()) {
+      throw error(3000, "WebSocket is not connected");
+    }
+    sessionStatusCallbacks.computeIfAbsent(params.getWelinkSessionId(), key -> new CopyOnWriteArrayList<>())
+        .addIfAbsent(params.getCallback());
+  }
+
+  // 5. onSkillWecodeStatusChange
+  public void onSkillWecodeStatusChange(@NonNull OnSkillWecodeStatusChangeParams params) {
+    ensureInitializedForVoid();
+    if (params.getCallback() == null) {
+      throw error(1000, "callback is required");
+    }
+    wecodeStatusCallbacks.addIfAbsent(params.getCallback());
+  }
+
+  // 6. regenerateAnswer
+  public void regenerateAnswer(@NonNull RegenerateAnswerParams params, @NonNull SkillCallback<SendMessageResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getWelinkSessionId() <= 0) {
+      callback.onError(error(1000, "welinkSessionId is invalid"));
+      return;
+    }
+
+    String cached = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
+    if (cached != null && !cached.trim().isEmpty()) {
+      sendMessageInternal(params.getWelinkSessionId(), cached, callback);
+      return;
+    }
+
+    apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
+      @Override
+      public void onSuccess(@Nullable PageResult<SessionMessage> result) {
+        PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
+        streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), page.getContent());
+        String latest = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
+        if (latest == null || latest.trim().isEmpty()) {
+          callback.onError(error(4002, "No user message to regenerate"));
+          return;
+        }
+        sendMessageInternal(params.getWelinkSessionId(), latest, callback);
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  // 7. sendMessageToIM
+  public void sendMessageToIM(@NonNull SendMessageToIMParams params,
+      @NonNull SkillCallback<SendMessageToIMResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getWelinkSessionId() <= 0) {
+      callback.onError(error(1000, "welinkSessionId is invalid"));
+      return;
+    }
+
+    tryResolveSendToImContent(params, new SkillCallback<String>() {
+      @Override
+      public void onSuccess(@Nullable String content) {
+        if (content == null || content.trim().isEmpty()) {
+          callback.onError(error(4005, "No completed message content found"));
+          return;
+        }
+        apiClient.sendMessageToIM(params.getWelinkSessionId(), content, new SkillCallback<SendMessageToIMResult>() {
+          @Override
+          public void onSuccess(@Nullable SendMessageToIMResult result) {
+            callback.onSuccess(result == null ? new SendMessageToIMResult("failed", null, null, "Empty response") : result);
+          }
+
+          @Override
+          public void onError(@NonNull Throwable error) {
+            callback.onError(wrapError(error));
+          }
         });
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  // 8. getSessionMessage
+  public void getSessionMessage(@NonNull GetSessionMessageParams params,
+      @NonNull SkillCallback<PageResult<SessionMessage>> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getWelinkSessionId() <= 0) {
+      callback.onError(error(1000, "welinkSessionId is invalid"));
+      return;
+    }
+    int page = Math.max(params.getPage(), 0);
+    int size = params.getSize() <= 0 ? 50 : params.getSize();
+
+    apiClient.getMessages(params.getWelinkSessionId(), page, size, new SkillCallback<PageResult<SessionMessage>>() {
+      @Override
+      public void onSuccess(@Nullable PageResult<SessionMessage> result) {
+        PageResult<SessionMessage> serverPage = result == null ? new PageResult<>() : result;
+        PageResult<SessionMessage> merged = streamingMessageCache.mergeWithLocalCache(params.getWelinkSessionId(), page, size,
+            serverPage);
+        callback.onSuccess(merged);
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  // 9. registerSessionListener
+  public void registerSessionListener(@NonNull RegisterSessionListenerParams params) {
+    ensureInitializedForVoid();
+    if (params.getWelinkSessionId() <= 0 || params.getOnMessage() == null) {
+      throw error(1000, "welinkSessionId and onMessage are required");
     }
 
-    // ==================== 2. closeSkill ====================
-    
-    public void closeSkill(@NonNull String sessionId, @NonNull SkillCallback<CloseSkillResult> callback) {
-        checkInitialized();
+    SessionListener listener = new SessionListener() {
+      @Override
+      public void onMessage(@NonNull StreamMessage message) {
+        params.getOnMessage().onMessage(message);
+      }
 
-        webSocketManager.clearListeners(sessionId);
-        streamingCache.clearCache(sessionId);
-        statusCallbacks.remove(sessionId);
-
-        apiClient.closeSession(Long.parseLong(sessionId), callback);
-    }
-
-    // ==================== 3. stopSkill ====================
-    
-    public void stopSkill(@NonNull String sessionId, @NonNull SkillCallback<StopSkillResult> callback) {
-        checkInitialized();
-
-        webSocketManager.clearListeners(sessionId);
-        streamingCache.clearCache(sessionId);
-        notifyStatusChange(sessionId, "stopped");
-
-        callback.onSuccess(new StopSkillResult("success"));
-    }
-
-    // ==================== 4. onSessionStatusChange ====================
-    
-    public void onSessionStatusChange(@NonNull String sessionId, @NonNull SessionStatusCallback callback) {
-        checkInitialized();
-        statusCallbacks.put(sessionId, callback);
-    }
-
-    // ==================== 5. onSkillWecodeStatusChange ====================
-    
-    public void onSkillWecodeStatusChange(@NonNull SkillWecodeStatusCallback callback) {
-        checkInitialized();
-        synchronized (wecodeStatusCallbacks) {
-            if (!wecodeStatusCallbacks.contains(callback)) {
-                wecodeStatusCallbacks.add(callback);
-            }
+      @Override
+      public void onError(@Nullable SessionError error) {
+        if (error != null && params.getOnError() != null) {
+          params.getOnError().onError(error);
         }
-    }
+      }
 
-    public void removeSkillWecodeStatusCallback(@NonNull SkillWecodeStatusCallback callback) {
-        synchronized (wecodeStatusCallbacks) {
-            wecodeStatusCallbacks.remove(callback);
+      @Override
+      public void onClose(@Nullable String reason) {
+        if (params.getOnClose() != null) {
+          params.getOnClose().onClose(reason);
         }
+      }
+    };
+
+    ListenerBinding binding = new ListenerBinding(params.getOnMessage(), params.getOnError(), params.getOnClose(), listener);
+    listenerBindings.computeIfAbsent(params.getWelinkSessionId(), key -> new CopyOnWriteArrayList<>()).add(binding);
+    webSocketManager.registerListener(params.getWelinkSessionId(), listener);
+  }
+
+  // 10. unregisterSessionListener
+  public void unregisterSessionListener(@NonNull UnregisterSessionListenerParams params) {
+    ensureInitializedForVoid();
+    if (params.getWelinkSessionId() <= 0 || params.getOnMessage() == null) {
+      throw error(1000, "welinkSessionId and onMessage are required");
     }
 
-    // ==================== 6. regenerateAnswer ====================
-    
-    public void regenerateAnswer(@NonNull String sessionId, @NonNull String content, @NonNull SkillCallback<SendMessageResult> callback) {
-        checkInitialized();
-        apiClient.sendMessage(Long.parseLong(sessionId), content, callback);
+    CopyOnWriteArrayList<ListenerBinding> bindings = listenerBindings.get(params.getWelinkSessionId());
+    if (bindings == null || bindings.isEmpty()) {
+      throw error(4006, "Listener does not exist");
     }
 
-    // ==================== 7. sendMessageToIM ====================
-    
-    public void sendMessageToIM(@NonNull String sessionId, @NonNull String content, @NonNull SkillCallback<SendMessageToIMResult> callback) {
-        checkInitialized();
-        apiClient.sendMessageToIM(Long.parseLong(sessionId), content, callback);
+    ListenerBinding matched = null;
+    for (ListenerBinding binding : bindings) {
+      if (binding.matches(params.getOnMessage(), params.getOnError(), params.getOnClose())) {
+        matched = binding;
+        break;
+      }
+    }
+    if (matched == null) {
+      throw error(4006, "Listener does not exist");
     }
 
-    // ==================== 8. getSessionMessage ====================
-    
-    public void getSessionMessage(@NonNull String sessionId, int page, int size, @NonNull SkillCallback<PageResult<ChatMessage>> callback) {
-        checkInitialized();
+    webSocketManager.unregisterListener(params.getWelinkSessionId(), matched.sessionListener);
+    bindings.remove(matched);
+    if (bindings.isEmpty()) {
+      listenerBindings.remove(params.getWelinkSessionId());
+    }
+    if (config != null && config.isAutoDisconnectWhenNoListener() && !webSocketManager.hasAnySessionListeners()) {
+      webSocketManager.disconnect();
+    }
+  }
 
-        apiClient.getMessages(Long.parseLong(sessionId), page, size, new SkillCallback<PageResult<ChatMessage>>() {
-            @Override
-            public void onSuccess(@Nullable PageResult<ChatMessage> result) {
-                if (result == null) {
-                    callback.onSuccess(new PageResult<>());
-                    return;
-                }
+  // 11. sendMessage
+  public void sendMessage(@NonNull SendMessageParams params, @NonNull SkillCallback<SendMessageResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getWelinkSessionId() <= 0 || params.getContent().trim().isEmpty()) {
+      callback.onError(error(1000, "welinkSessionId and content are required"));
+      return;
+    }
 
-                ChatMessage streamingMessage = streamingCache.getStreamingMessage(sessionId);
-                if (streamingMessage != null && streamingCache.isStreaming(sessionId)) {
-                    List<ChatMessage> mergedList = new ArrayList<>(result.getContent());
-                    mergedList.add(streamingMessage);
-                    result.setContent(mergedList);
-                    result.setTotalElements(result.getTotalElements() + 1);
-                }
+    ensureConnected(new SkillCallback<Boolean>() {
+      @Override
+      public void onSuccess(@Nullable Boolean result) {
+        sendMessageInternal(params.getWelinkSessionId(), params.getContent(), callback);
+      }
 
-                callback.onSuccess(result);
-            }
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
 
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
+  // 12. replyPermission
+  public void replyPermission(@NonNull ReplyPermissionParams params,
+      @NonNull SkillCallback<ReplyPermissionResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getWelinkSessionId() <= 0 || params.getPermId().trim().isEmpty() || params.getResponse().trim().isEmpty()) {
+      callback.onError(error(1000, "welinkSessionId, permId and response are required"));
+      return;
+    }
+    if (!isPermissionResponseValid(params.getResponse())) {
+      callback.onError(error(1000, "response must be once/always/reject"));
+      return;
+    }
+
+    apiClient.replyPermission(params.getWelinkSessionId(), params.getPermId(), params.getResponse(),
+        new SkillCallback<ReplyPermissionResult>() {
+          @Override
+          public void onSuccess(@Nullable ReplyPermissionResult result) {
+            callback.onSuccess(result);
+          }
+
+          @Override
+          public void onError(@NonNull Throwable error) {
+            callback.onError(wrapError(error));
+          }
         });
+  }
+
+  // 13. controlSkillWeCode
+  public void controlSkillWeCode(@NonNull ControlSkillWeCodeParams params,
+      @NonNull SkillCallback<ControlSkillWeCodeResult> callback) {
+    if (!isInitialized()) {
+      callback.onError(error(5000, "SkillSDK is not initialized"));
+      return;
+    }
+    if (params.getAction() == null) {
+      callback.onError(error(1000, "action is required"));
+      return;
     }
 
-    // ==================== 9. registerSessionListener ====================
-    
-    public void registerSessionListener(@NonNull String sessionId, @NonNull SessionListener listener) {
-        checkInitialized();
-        webSocketManager.registerListener(sessionId, listener);
+    SkillWecodeStatus status = params.getAction().getValue().equals("close")
+        ? SkillWecodeStatus.CLOSED
+        : SkillWecodeStatus.MINIMIZED;
+    emitWecodeStatus(status, null);
+    callback.onSuccess(new ControlSkillWeCodeResult("success"));
+  }
+
+  public synchronized void shutdown() {
+    webSocketManager.removeInternalListener(internalStreamListener);
+    webSocketManager.shutdown();
+    apiClient.shutdown();
+    listenerBindings.clear();
+    sessionStatusCallbacks.clear();
+    wecodeStatusCallbacks.clear();
+    streamingMessageCache.clearAll();
+    config = null;
+  }
+
+  private void sendMessageInternal(long welinkSessionId, @NonNull String content,
+      @NonNull SkillCallback<SendMessageResult> callback) {
+    apiClient.sendMessage(welinkSessionId, content, new SkillCallback<SendMessageResult>() {
+      @Override
+      public void onSuccess(@Nullable SendMessageResult result) {
+        if (result != null) {
+          streamingMessageCache.recordUserMessage(result);
+        }
+        callback.onSuccess(result);
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  private void tryResolveSendToImContent(@NonNull SendMessageToIMParams params,
+      @NonNull SkillCallback<String> callback) {
+    String fromCache = streamingMessageCache.getCompletedMessageContent(params.getWelinkSessionId(), params.getMessageId());
+    if (fromCache != null && !fromCache.trim().isEmpty()) {
+      callback.onSuccess(fromCache);
+      return;
     }
 
-    // ==================== 10. unregisterSessionListener ====================
-    
-    public void unregisterSessionListener(@NonNull String sessionId, @NonNull SessionListener listener) {
-        checkInitialized();
-        webSocketManager.unregisterListener(sessionId, listener);
-    }
-
-    // ==================== 11. sendMessage ====================
-    
-    public void sendMessage(@NonNull String sessionId, @NonNull String content, @NonNull SkillCallback<SendMessageResult> callback) {
-        checkInitialized();
-
-        if (!webSocketManager.isConnected()) {
-            webSocketManager.connect();
+    apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
+      @Override
+      public void onSuccess(@Nullable PageResult<SessionMessage> result) {
+        PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
+        streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), page.getContent());
+        String content = streamingMessageCache.getCompletedMessageContent(params.getWelinkSessionId(), params.getMessageId());
+        if (content != null && !content.trim().isEmpty()) {
+          callback.onSuccess(content);
+          return;
         }
 
-        apiClient.sendMessage(Long.parseLong(sessionId), content, callback);
-    }
-
-    // ==================== 12. replyPermission ====================
-    
-    public void replyPermission(@NonNull String sessionId, @NonNull String permissionId, boolean approved, @NonNull SkillCallback<ReplyPermissionResult> callback) {
-        checkInitialized();
-
-        apiClient.replyPermission(Long.parseLong(sessionId), permissionId, approved, new SkillCallback<Boolean>() {
-            @Override
-            public void onSuccess(@Nullable Boolean result) {
-                callback.onSuccess(new ReplyPermissionResult(true, permissionId, approved));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    // ==================== 13. controlSkillWeCode ====================
-    
-    public void controlSkillWeCode(@NonNull SkillWeCodeAction action, @NonNull SkillCallback<ControlSkillWeCodeResult> callback) {
-        checkInitialized();
-
-        notifyWecodeStatusChange(action == SkillWeCodeAction.CLOSE ? SkillWecodeStatus.CLOSED : SkillWecodeStatus.MINIMIZED);
-
-        callback.onSuccess(new ControlSkillWeCodeResult("success"));
-    }
-
-    // ==================== 辅助方法 ====================
-
-    private void checkInitialized() {
-        if (config == null) {
-            throw new IllegalStateException("SkillSDK is not initialized. Call initialize() first.");
+        if (params.getMessageId() != null) {
+          long messageId = params.getMessageId();
+          if (!streamingMessageCache.hasMessage(params.getWelinkSessionId(), messageId)) {
+            callback.onError(error(4003, "Message does not exist"));
+            return;
+          }
+          if (!streamingMessageCache.isMessageCompleted(params.getWelinkSessionId(), messageId)) {
+            callback.onError(error(4004, "Message is not completed"));
+            return;
+          }
         }
-    }
+        callback.onError(error(4005, "No completed message found"));
+      }
 
-    private void notifyStatusChange(@NonNull String sessionId, @NonNull String messageType) {
-        SessionStatusCallback callback = statusCallbacks.get(sessionId);
-        if (callback != null) {
-            String status;
-            if (MessageType.DELTA.equals(messageType)) {
-                status = SessionStatus.EXECUTING.getValue();
-            } else if (MessageType.DONE.equals(messageType)) {
-                status = SessionStatus.COMPLETED.getValue();
-            } else if (MessageType.ERROR.equals(messageType) || MessageType.AGENT_OFFLINE.equals(messageType)) {
-                status = SessionStatus.STOPPED.getValue();
-            } else if ("stopped".equals(messageType)) {
-                status = SessionStatus.STOPPED.getValue();
-            } else {
-                status = SessionStatus.EXECUTING.getValue();
-            }
-            callback.onStatusChange(sessionId, status);
+      @Override
+      public void onError(@NonNull Throwable error) {
+        callback.onError(wrapError(error));
+      }
+    });
+  }
+
+  private void ensureConnected(@NonNull SkillCallback<Boolean> callback) {
+    if (webSocketManager.isConnected()) {
+      callback.onSuccess(Boolean.TRUE);
+      return;
+    }
+    webSocketManager.connect(callback);
+  }
+
+  private void emitSessionStatusByEvent(@NonNull StreamMessage message) {
+    Long sessionId = parseLong(message.getWelinkSessionId());
+    if (sessionId == null) {
+      return;
+    }
+    SessionStatus mapped = mapStatus(message);
+    if (mapped == null) {
+      return;
+    }
+    emitSessionStatus(sessionId, mapped);
+  }
+
+  private void emitSessionStatus(long sessionId, @NonNull SessionStatus status) {
+    List<SessionStatusCallback> callbacks = sessionStatusCallbacks.get(sessionId);
+    if (callbacks == null || callbacks.isEmpty()) {
+      return;
+    }
+    SessionStatusResult result = new SessionStatusResult(status);
+    for (SessionStatusCallback callback : new ArrayList<>(callbacks)) {
+      callback.onStatusChange(result);
+    }
+  }
+
+  private void emitWecodeStatus(@NonNull SkillWecodeStatus status, @Nullable String message) {
+    SkillWecodeStatusResult result = new SkillWecodeStatusResult(status, System.currentTimeMillis(), message);
+    for (SkillWecodeStatusCallback callback : new ArrayList<>(wecodeStatusCallbacks)) {
+      callback.onStatusChange(result);
+    }
+  }
+
+  @Nullable
+  private SessionStatus mapStatus(@NonNull StreamMessage message) {
+    String type = message.getType();
+    if (type == null) {
+      return null;
+    }
+    switch (type) {
+      case MessageType.STEP_START:
+      case MessageType.TEXT_DELTA:
+      case MessageType.THINKING_DELTA:
+      case MessageType.TOOL_UPDATE:
+      case MessageType.QUESTION:
+      case MessageType.PERMISSION_ASK:
+      case MessageType.FILE:
+        return SessionStatus.EXECUTING;
+      case MessageType.STEP_DONE:
+      case MessageType.TEXT_DONE:
+      case MessageType.THINKING_DONE:
+        return SessionStatus.COMPLETED;
+      case MessageType.SESSION_STATUS:
+        if ("busy".equalsIgnoreCase(message.getSessionStatus()) || "retry".equalsIgnoreCase(message.getSessionStatus())) {
+          return SessionStatus.EXECUTING;
         }
-    }
-
-    private void notifyStatusError(@NonNull String sessionId, @NonNull SessionError error) {
-        SessionStatusCallback callback = statusCallbacks.get(sessionId);
-        if (callback != null) {
-            callback.onError(sessionId, error);
+        if ("idle".equalsIgnoreCase(message.getSessionStatus())) {
+          return SessionStatus.COMPLETED;
         }
-    }
-
-    private void notifyWecodeStatusChange(@NonNull SkillWecodeStatus status) {
-        synchronized (wecodeStatusCallbacks) {
-            for (SkillWecodeStatusCallback callback : new ArrayList<>(wecodeStatusCallbacks)) {
-                callback.onStatusChange(status, System.currentTimeMillis(), null);
-            }
+        return null;
+      case MessageType.PERMISSION_REPLY:
+        if ("reject".equalsIgnoreCase(message.getResponse())) {
+          return SessionStatus.STOPPED;
         }
+        if ("once".equalsIgnoreCase(message.getResponse()) || "always".equalsIgnoreCase(message.getResponse())) {
+          return SessionStatus.EXECUTING;
+        }
+        return null;
+      case MessageType.SESSION_ERROR:
+      case MessageType.ERROR:
+      case MessageType.AGENT_OFFLINE:
+        return SessionStatus.STOPPED;
+      default:
+        return null;
     }
+  }
 
-    public void shutdown() {
-        webSocketManager.shutdown();
-        apiClient.shutdown();
-        statusCallbacks.clear();
-        wecodeStatusCallbacks.clear();
-        streamingCache.clearAll();
-        config = null;
+  @Nullable
+  private SkillSession selectLatestActiveSession(@Nullable List<SkillSession> sessions, @NonNull CreateSessionParams params) {
+    if (sessions == null || sessions.isEmpty()) {
+      return null;
     }
+    return sessions.stream()
+        .filter(session -> "ACTIVE".equalsIgnoreCase(session.getStatus()))
+        .filter(session -> params.getAk().equals(session.getAk()))
+        .filter(session -> params.getImGroupId().equals(session.getImGroupId()))
+        .max(Comparator.comparing(this::safeUpdatedAt))
+        .orElse(null);
+  }
 
-    // ==================== 同步方法 ====================
+  @NonNull
+  private Instant safeUpdatedAt(@NonNull SkillSession session) {
+    try {
+      return Instant.parse(session.getUpdatedAt());
+    } catch (Exception ignored) {
+      return Instant.EPOCH;
+    }
+  }
 
+  private void ensureInitializedForVoid() {
+    if (!isInitialized()) {
+      throw error(5000, "SkillSDK is not initialized");
+    }
+  }
+
+  @NonNull
+  private SkillSdkException wrapError(@NonNull Throwable error) {
+    if (error instanceof SkillSdkException) {
+      return (SkillSdkException) error;
+    }
+    return new SkillSdkException(5000, error.getMessage() == null ? "Internal error" : error.getMessage(), error);
+  }
+
+  @NonNull
+  private SkillSdkException error(int code, @NonNull String message) {
+    return new SkillSdkException(code, message);
+  }
+
+  private static boolean isPermissionResponseValid(@NonNull String value) {
+    return "once".equalsIgnoreCase(value) || "always".equalsIgnoreCase(value) || "reject".equalsIgnoreCase(value);
+  }
+
+  @Nullable
+  private static Long parseLong(@Nullable String value) {
+    if (value == null || value.isEmpty()) {
+      return null;
+    }
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException ignored) {
+      return null;
+    }
+  }
+
+  private static final class ListenerBinding {
+    @NonNull
+    private final SessionMessageCallback onMessage;
     @Nullable
-    public SkillSession executeSkillSync(@NonNull ExecuteSkillParams params) throws Exception {
-        AtomicReference<SkillSession> result = new AtomicReference<>();
-        AtomicReference<Throwable> error = new AtomicReference<>();
-        CountDownLatch latch = new CountDownLatch(1);
-
-        executeSkill(params, new SkillCallback<SkillSession>() {
-            @Override
-            public void onSuccess(@Nullable SkillSession session) {
-                result.set(session);
-                latch.countDown();
-            }
-
-            @Override
-            public void onError(@NonNull Throwable e) {
-                error.set(e);
-                latch.countDown();
-            }
-        });
-
-        if (!latch.await(60, TimeUnit.SECONDS)) {
-            throw new Exception("executeSkill timeout");
-        }
-
-        if (error.get() != null) {
-            throw new Exception(error.get());
-        }
-
-        return result.get();
-    }
-
+    private final SessionErrorCallback onError;
     @Nullable
-    public CloseSkillResult closeSkillSync(@NonNull String sessionId) throws Exception {
-        AtomicReference<CloseSkillResult> result = new AtomicReference<>();
-        AtomicReference<Throwable> error = new AtomicReference<>();
-        CountDownLatch latch = new CountDownLatch(1);
+    private final SessionCloseCallback onClose;
+    @NonNull
+    private final SessionListener sessionListener;
 
-        closeSkill(sessionId, new SkillCallback<CloseSkillResult>() {
-            @Override
-            public void onSuccess(@Nullable CloseSkillResult r) {
-                result.set(r);
-                latch.countDown();
-            }
-
-            @Override
-            public void onError(@NonNull Throwable e) {
-                error.set(e);
-                latch.countDown();
-            }
-        });
-
-        if (!latch.await(30, TimeUnit.SECONDS)) {
-            throw new Exception("closeSkill timeout");
-        }
-
-        if (error.get() != null) {
-            throw new Exception(error.get());
-        }
-
-        return result.get();
+    private ListenerBinding(@NonNull SessionMessageCallback onMessage, @Nullable SessionErrorCallback onError,
+        @Nullable SessionCloseCallback onClose, @NonNull SessionListener sessionListener) {
+      this.onMessage = onMessage;
+      this.onError = onError;
+      this.onClose = onClose;
+      this.sessionListener = sessionListener;
     }
 
-    @Nullable
-    public SendMessageResult sendMessageSync(@NonNull String sessionId, @NonNull String content) throws Exception {
-        AtomicReference<SendMessageResult> result = new AtomicReference<>();
-        AtomicReference<Throwable> error = new AtomicReference<>();
-        CountDownLatch latch = new CountDownLatch(1);
-
-        sendMessage(sessionId, content, new SkillCallback<SendMessageResult>() {
-            @Override
-            public void onSuccess(@Nullable SendMessageResult r) {
-                result.set(r);
-                latch.countDown();
-            }
-
-            @Override
-            public void onError(@NonNull Throwable e) {
-                error.set(e);
-                latch.countDown();
-            }
-        });
-
-        if (!latch.await(30, TimeUnit.SECONDS)) {
-            throw new Exception("sendMessage timeout");
-        }
-
-        if (error.get() != null) {
-            throw new Exception(error.get());
-        }
-
-        return result.get();
+    private boolean matches(@NonNull SessionMessageCallback onMessage, @Nullable SessionErrorCallback onError,
+        @Nullable SessionCloseCallback onClose) {
+      return this.onMessage == onMessage && this.onError == onError && this.onClose == onClose;
     }
-
-    @Nullable
-    public PageResult<ChatMessage> getSessionMessageSync(@NonNull String sessionId, int page, int size) throws Exception {
-        AtomicReference<PageResult<ChatMessage>> result = new AtomicReference<>();
-        AtomicReference<Throwable> error = new AtomicReference<>();
-        CountDownLatch latch = new CountDownLatch(1);
-
-        getSessionMessage(sessionId, page, size, new SkillCallback<PageResult<ChatMessage>>() {
-            @Override
-            public void onSuccess(@Nullable PageResult<ChatMessage> r) {
-                result.set(r);
-                latch.countDown();
-            }
-
-            @Override
-            public void onError(@NonNull Throwable e) {
-                error.set(e);
-                latch.countDown();
-            }
-        });
-
-        if (!latch.await(30, TimeUnit.SECONDS)) {
-            throw new Exception("getSessionMessage timeout");
-        }
-
-        if (error.get() != null) {
-            throw new Exception(error.get());
-        }
-
-        return result.get();
-    }
+  }
 }

@@ -4,117 +4,44 @@ import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
-/**
- * 分页结果模型
- * Represents a paginated result from the server.
- *
- * @param <T> the type of items in the result
- */
 public class PageResult<T> {
-    
-    @NonNull
-    private List<T> content;
-    private long totalElements;
-    private int totalPages;
-    private int number;
-    private int size;
+  @NonNull
+  private List<T> content = new ArrayList<>();
+  private int page;
+  private int size;
+  private long total;
 
-    public PageResult() {
-        this.content = new ArrayList<>();
-    }
+  @NonNull
+  public List<T> getContent() {
+    return content;
+  }
 
-    // Getters
-    @NonNull
-    public List<T> getContent() {
-        return content;
-    }
+  public void setContent(@NonNull List<T> content) {
+    this.content = content;
+  }
 
-    public long getTotalElements() {
-        return totalElements;
-    }
+  public int getPage() {
+    return page;
+  }
 
-    public int getTotalPages() {
-        return totalPages;
-    }
+  public void setPage(int page) {
+    this.page = page;
+  }
 
-    public int getNumber() {
-        return number;
-    }
+  public int getSize() {
+    return size;
+  }
 
-    public int getSize() {
-        return size;
-    }
+  public void setSize(int size) {
+    this.size = size;
+  }
 
-    // Setters
-    public void setContent(@NonNull List<T> content) {
-        this.content = content;
-    }
+  public long getTotal() {
+    return total;
+  }
 
-    public void setTotalElements(long totalElements) {
-        this.totalElements = totalElements;
-    }
-
-    public void setTotalPages(int totalPages) {
-        this.totalPages = totalPages;
-    }
-
-    public void setNumber(int number) {
-        this.number = number;
-    }
-
-    public void setSize(int size) {
-        this.size = size;
-    }
-
-    /**
-     * Check if there is a next page
-     */
-    public boolean hasNext() {
-        return number < totalPages - 1;
-    }
-
-    /**
-     * Check if there is a previous page
-     */
-    public boolean hasPrevious() {
-        return number > 0;
-    }
-
-    /**
-     * Check if the result is empty
-     */
-    public boolean isEmpty() {
-        return content.isEmpty();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PageResult<?> that = (PageResult<?>) o;
-        return totalElements == that.totalElements &&
-                totalPages == that.totalPages &&
-                number == that.number &&
-                size == that.size &&
-                content.equals(that.content);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(content, totalElements, totalPages, number, size);
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-        return "PageResult{" +
-                "content=" + content +
-                ", totalElements=" + totalElements +
-                ", totalPages=" + totalPages +
-                ", number=" + number +
-                ", size=" + size +
-                '}';
-    }
+  public void setTotal(long total) {
+    this.total = total;
+  }
 }
