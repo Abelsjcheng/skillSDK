@@ -1,0 +1,79 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  background-color: transparent;
+  height: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+}
+
+.text-area {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-icon {
+  font-size: 16px;
+  margin-left: 8px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.title-text {
+  font-size: 14px;
+  line-height: 22px;
+  color: rgba(102, 102, 102, 1);
+  margin-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.action-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  padding: 0;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.maximize-btn:hover {
+  background-color: #d0d0d0;
+}
+
+.close-btn:hover {
+  background-color: #ff4d4f;
+  color: white;
+}

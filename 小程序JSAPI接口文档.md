@@ -25,7 +25,7 @@
 
 ### 接口说明
 
-根据提供的内容重新生成回答，用于用户对回答结果不满意时触发重新回答。该接口会清除当前正在生成的响应，重新触发 AI 处理流程。
+根据当前会话的最后一条用户消息重新触发回答生成。
 
 ### 调用方式
 
@@ -37,8 +37,7 @@ window.HWH5.regenerateAnswer(params)
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| sessionId | string | 是 | 会话 ID |
-| content | string | 是 | 重新生成的消息内容 |
+| welinkSessionId | number | 是 | 会话 ID |
 
 ### 返回值
 
@@ -46,37 +45,35 @@ window.HWH5.regenerateAnswer(params)
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| messageId | string | 消息 ID，用于标识该回答（成功时返回） |
+| id | number | 消息 ID |
+| welinkSessionId | number | 所属会话 ID |
+| userId | string | 发送用户 ID |
+| role | string | 固定为 "user" |
+| content | string | 重发的消息内容 |
+| messageSeq | number | 该消息在会话内的顺序号 |
+| createdAt | string | 创建时间，ISO-8601 |
 
-### 返回示例
+### 错误处理
 
-成功时：
-
-```json
-{
-  "messageId": "msg-xyz789"
-}
-```
-
-失败时：
-
-```json
-{
-  "errorMessage": "消息内容为空"
-}
-```
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | welinkSessionId 缺失或格式错误 |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
+| 4001 | 会话已关闭 | 会话已被关闭，无法重新生成 |
+| 4002 | 无用户消息 | 会话中没有用户消息可用于重新生成 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
 
 ### 调用示例
 
 ```javascript
 // 重新生成回答
 window.HWH5.regenerateAnswer({
-  sessionId: '42',
-  content: '请重新分析这个问题并提供更详细的方案'
+  welinkSessionId: 42
 }).then(result => {
-  console.log('重新生成已启动，消息 ID:', result.messageId);
+  console.log('重新生成已启动，消息 ID:', result.id);
 }).catch(error => {
-  console.error('重新生成失败:', error.errorMessage);
+  console.error('重新生成失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -86,7 +83,9 @@ window.HWH5.regenerateAnswer({
 
 ### 接口说明
 
-将 AI 生成的消息结果发送到 IM 客户端，用于将 Skill 服务端的回答内容同步到 IM 会话中。通过调用服务端 API，将消息内容转发到会话关联的 IM 聊天中。
+将用户在 Skill 小程序中最终确认的文本内容发送到 IM 聊天，用于"选中文本发送到聊天"场景。
+
+SDK 内部维护消息缓存，记录每条消息完成后的最终内容。调用此接口时，SDK 从缓存中获取消息的最终完整文本，然后发送到 IM。
 
 ### 调用方式
 
@@ -98,8 +97,8 @@ window.HWH5.sendMessageToIM(params)
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| sessionId | string | 是 | 会话 ID |
-| content | string | 是 | AI 生成的消息内容 |
+| welinkSessionId | number | 是 | 会话 ID |
+| messageId | number | 否 | 要发送到 IM 的消息 ID，SDK 会从缓存中获取该消息的最终完整内容。不填则获取当前会话最后一条最终消息的内容 |
 
 ### 返回值
 
@@ -107,48 +106,33 @@ window.HWH5.sendMessageToIM(params)
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| success | boolean | 发送是否成功 |
-| chatId | string | IM 聊天 ID（成功时返回） |
-| contentLength | number | 发送内容的字符长度（成功时返回） |
-| errorMessage | string | 错误信息（失败时返回） |
+| status | string | 发送结果：success / failed |
 
-### 返回示例
+### 错误处理
 
-成功时：
-
-```json
-{
-  "success": true,
-  "chatId": "chat-789",
-  "contentLength": 22
-}
-```
-
-失败时：
-
-```json
-{
-  "success": false,
-  "errorMessage": "会话不存在"
-}
-```
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | welinkSessionId 缺失或格式错误 |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
+| 4003 | 消息不存在 | 请求的消息在缓存中不存在 |
+| 4004 | 消息未完成 | 请求的消息尚未收到完成事件 |
+| 4005 | 无最终消息 | 会话中没有已完成的消息 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
 
 ### 调用示例
 
 ```javascript
 // 发送 AI 生成的消息到 IM
 window.HWH5.sendMessageToIM({
-  sessionId: '42',
-  content: '代码重构已完成，请查看 PR #42'
+  welinkSessionId: 42,
+  messageId: 101
 }).then(result => {
-  if (result.success) {
-    console.log('消息已发送到 IM，聊天 ID:', result.chatId);
-    console.log('内容长度:', result.contentLength);
-  } else {
-    console.error('发送失败:', result.errorMessage);
+  if (result.status === 'success') {
+    console.log('发送到 IM 成功');
   }
 }).catch(error => {
-  console.error('发送消息到 IM 失败:', error.errorMessage);
+  console.error('发送消息到 IM 失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -158,7 +142,7 @@ window.HWH5.sendMessageToIM({
 
 ### 接口说明
 
-获取当前会话的消息列表，将数据持久化存储到本地。分页查询指定会话的消息历史记录，包括用户消息和 AI 回答。
+获取当前会话的消息列表。SDK 会将服务端历史消息与本地尚未落库的流式消息缓存合并后返回。
 
 ### 调用方式
 
@@ -170,7 +154,7 @@ window.HWH5.getSessionMessage(params)
 
 | 参数名 | 类型 | 必填 | 默认值 | 说明 |
 |--------|------|------|--------|------|
-| sessionId | string | 是 | - | 会话 ID |
+| welinkSessionId | number | 是 | - | 会话 ID |
 | page | number | 否 | 0 | 页码（从 0 开始） |
 | size | number | 否 | 50 | 每页条数 |
 
@@ -180,75 +164,70 @@ window.HWH5.getSessionMessage(params)
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| content | Array\<ChatMessage\> | 历史消息列表，包含用户消息和 AI 回答 |
-| totalElements | number | 总记录数 |
-| totalPages | number | 总页数 |
-| number | number | 当前页码（从 0 开始） |
+| content | Array\<SessionMessage\> | 历史消息列表 |
+| page | number | 当前页码（从 0 开始） |
 | size | number | 每页大小 |
+| total | number | 总记录数 |
 
-### ChatMessage 结构
+### SessionMessage 结构
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | number | 消息 ID |
-| sessionId | number | 会话 ID |
-| seq | number | 会话内消息序号 |
-| role | string | 角色：USER（用户）/ ASSISTANT（AI）/ SYSTEM（系统）/ TOOL（工具） |
-| content | string | 消息内容 |
-| contentType | string | 内容类型：MARKDOWN / CODE / PLAIN |
-| createdAt | string | 创建时间（ISO 8601 格式） |
-| meta | string | 扩展元数据（JSON 格式） |
+| welinkSessionId | number | 所属会话 ID |
+| userId | string \| null | 用户 ID |
+| role | string | user / assistant / system / tool |
+| content | string | 聚合后的消息内容 |
+| messageSeq | number | 会话内消息顺序 |
+| parts | Array\<SessionMessagePart\> | 消息部件列表 |
+| createdAt | string | 创建时间，ISO-8601 |
 
-### 返回示例
+### SessionMessagePart 结构
 
-```json
-{
-  "content": [
-    {
-      "id": 1,
-      "sessionId": 42,
-      "seq": 1,
-      "role": "USER",
-      "content": "请帮我重构登录模块",
-      "contentType": "MARKDOWN",
-      "createdAt": "2026-03-06T10:30:00",
-      "meta": null
-    },
-    {
-      "id": 2,
-      "sessionId": 42,
-      "seq": 2,
-      "role": "ASSISTANT",
-      "content": "好的，我来分析一下登录模块的代码...",
-      "contentType": "MARKDOWN",
-      "createdAt": "2026-03-06T10:30:05",
-      "meta": "{\"usage\":{\"inputTokens\":150,\"outputTokens\":320}}"
-    }
-  ],
-  "totalElements": 2,
-  "totalPages": 1,
-  "number": 0,
-  "size": 50
-}
-```
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| partId | string | Part 唯一 ID |
+| partSeq | number | Part 在消息内的顺序 |
+| type | string | text / thinking / tool / question / permission / file |
+| content | string | 文本内容 |
+| toolName | string | 工具名 |
+| toolCallId | string | 工具调用 ID |
+| toolStatus | string | 工具状态 |
+| toolInput | object | 工具输入 |
+| toolOutput | string | 工具输出 |
+| question | string | 问题正文 |
+| options | string[] | 问题选项 |
+| permissionId | string | 权限请求 ID |
+| fileName | string | 文件名 |
+| fileUrl | string | 文件 URL |
+| fileMime | string | 文件 MIME 类型 |
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | welinkSessionId 缺失或格式错误 |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
 
 ### 调用示例
 
 ```javascript
 // 获取会话消息列表
 window.HWH5.getSessionMessage({
-  sessionId: '42',
+  welinkSessionId: 42,
   page: 0,
   size: 50
 }).then(result => {
-  console.log('总消息数:', result.totalElements);
-  console.log('当前页:', result.number);
+  console.log('总消息数:', result.total);
+  console.log('当前页:', result.page);
   
   result.content.forEach(message => {
     console.log(`[${message.role}] ${message.content}`);
   });
 }).catch(error => {
-  console.error('获取消息列表失败:', error.errorMessage);
+  console.error('获取消息列表失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -258,7 +237,7 @@ window.HWH5.getSessionMessage({
 
 ### 接口说明
 
-注册会话监听器，用于接收 WebSocket 推送的 AI 响应流、错误信息和连接关闭事件。该接口仅注册监听器，不会自动建立 WebSocket 连接。WebSocket 连接由 `executeSkill` 接口建立。
+注册会话监听器，用于接收 WebSocket 推送的完整事件流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器，SDK 会确保不会因调用时序问题遗漏消息。
 
 ### 调用方式
 
@@ -270,8 +249,8 @@ window.HWH5.registerSessionListener(params)
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| sessionId | string | 是 | 会话 ID |
-| onMessage | function | 是 | 消息回调函数，接收 AI 响应流 |
+| welinkSessionId | number | 是 | 会话 ID |
+| onMessage | function | 是 | 消息回调函数，接收 StreamMessage |
 | onError | function | 否 | 错误回调函数，接收错误信息 |
 | onClose | function | 否 | 连接关闭回调函数 |
 
@@ -279,49 +258,84 @@ window.HWH5.registerSessionListener(params)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| sessionId | string | 会话 ID，用于区分不同会话的消息 |
-| type | string | 消息类型：delta（增量）/ done（完成）/ error（错误）/ agent_offline / agent_online |
+| type | string | 事件类型 |
 | seq | number | 递增序列号 |
-| content | string/object | 消息内容 |
-| usage | object | token 用量统计（仅 done 类型） |
+| welinkSessionId | string | 所属会话 ID |
+| emittedAt | string | 事件产生时间，ISO-8601 |
+| raw | object | 原始 OpenCode 事件，仅调试用 |
+| messageId | string | 稳定消息 ID |
+| messageSeq | number | 会话内消息顺序 |
+| role | string | user / assistant / system / tool |
+| partId | string | Part 唯一 ID |
+| partSeq | number | Part 在消息内的顺序 |
+| content | string | 文本内容或最终完整内容 |
+| toolName | string | 工具名称 |
+| toolCallId | string | 工具调用 ID |
+| status | string | 工具状态或问题运行状态 |
+| input | object | 工具输入参数 |
+| output | string | 工具输出结果 |
+| error | string | 错误描述 |
+| title | string | 工具标题或会话标题 |
+| header | string | 问题分组标题 |
+| question | string | 问题正文 |
+| options | string[] | 问题预设选项 |
+| fileName | string | 文件名 |
+| fileUrl | string | 文件访问 URL |
+| fileMime | string | MIME 类型 |
+| tokens | object | token 使用统计 |
+| cost | number | 本步骤费用 |
+| reason | string | 结束原因 |
+| sessionStatus | string | 服务端原始状态：busy / idle / retry |
+| permissionId | string | 权限请求 ID |
+| permType | string | 权限类型 |
+| metadata | object | 权限请求详情 |
+| response | string | 权限回复值：once / always / reject |
+| messages | array | snapshot 携带的已完成消息快照 |
+| parts | array | streaming 携带的进行中消息部件 |
 
-### SessionError 结构
+### 错误处理
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| code | string | 错误码 |
-| message | string | 错误消息 |
-| timestamp | number | 时间戳 |
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 welinkSessionId 或 onMessage |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 调用示例
 
 ```javascript
 // 定义回调函数
 const onMessage = (message) => {
-  // 根据 sessionId 区分不同会话的消息
-  console.log('会话 ID:', message.sessionId);
+  // 根据 welinkSessionId 区分不同会话的消息
+  console.log('会话 ID:', message.welinkSessionId);
   
   switch (message.type) {
-    case 'delta':
+    case 'text.delta':
       console.log('AI 响应片段:', message.content);
       break;
-    case 'done':
-      console.log('AI 处理完成');
+    case 'tool.update':
+      console.log('工具状态:', message.toolName, message.status);
       break;
+    case 'question':
+      console.log('AI 提问:', message.question);
+      break;
+    case 'permission.ask':
+      console.log('权限请求:', message.permissionId, message.title);
+      break;
+    case 'session.status':
+      console.log('原始会话状态:', message.sessionStatus);
+      break;
+    case 'snapshot':
+      console.log('收到断线恢复快照，消息数:', message.messages.length);
+      break;
+    case 'session.error':
     case 'error':
-      console.error('处理错误:', message.content);
-      break;
-    case 'agent_offline':
-      console.warn('Agent 离线');
-      break;
-    case 'agent_online':
-      console.log('Agent 上线');
+      console.error('处理错误:', message.error);
       break;
   }
 };
 
 const onError = (error) => {
-  console.error('连接错误:', error.code, error.message);
+  console.error('连接错误:', error.errorCode, error.errorMessage);
 };
 
 const onClose = (reason) => {
@@ -330,7 +344,7 @@ const onClose = (reason) => {
 
 // 注册监听器
 window.HWH5.registerSessionListener({
-  sessionId: '42',
+  welinkSessionId: 42,
   onMessage: onMessage,
   onError: onError,
   onClose: onClose
@@ -345,7 +359,7 @@ console.log('监听器注册成功');
 
 ### 接口说明
 
-移除已注册的会话监听器。当监听器不再需要接收消息时调用，例如小程序关闭或切换页面时。
+移除已注册的会话监听器。当监听器不再需要接收消息时调用，例如小程序关闭或页面销毁。
 
 ### 调用方式
 
@@ -357,10 +371,18 @@ window.HWH5.unregisterSessionListener(params)
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| sessionId | string | 是 | 会话 ID |
+| welinkSessionId | number | 是 | 会话 ID |
 | onMessage | function | 是 | 要移除的消息回调函数 |
 | onError | function | 否 | 要移除的错误回调函数 |
 | onClose | function | 否 | 要移除的连接关闭回调函数 |
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 welinkSessionId 或 onMessage |
+| 4006 | 监听器不存在 | 指定的监听器未注册 |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 调用示例
 
@@ -371,7 +393,7 @@ const onMessage = (message) => {
 };
 
 const onError = (error) => {
-  console.error('错误:', error);
+  console.error('错误:', error.errorCode, error.errorMessage);
 };
 
 const onClose = (reason) => {
@@ -380,7 +402,7 @@ const onClose = (reason) => {
 
 // 注册监听器
 window.HWH5.registerSessionListener({
-  sessionId: '42',
+  welinkSessionId: 42,
   onMessage: onMessage,
   onError: onError,
   onClose: onClose
@@ -388,7 +410,7 @@ window.HWH5.registerSessionListener({
 
 // 页面卸载时移除监听器
 window.HWH5.unregisterSessionListener({
-  sessionId: '42',
+  welinkSessionId: 42,
   onMessage: onMessage,
   onError: onError,
   onClose: onClose
@@ -403,7 +425,7 @@ console.log('监听器已移除');
 
 ### 接口说明
 
-发送用户输入的内容，触发会话的持续回答，用于多轮对话场景。该接口会先发送消息到服务端，然后通过 WebSocket 接收 AI 的流式响应。
+发送用户输入内容，触发会话的新一轮回答。支持首次发送消息和后续多轮对话。AI 响应通过 `registerSessionListener` 注册的回调接收。
 
 ### 调用方式
 
@@ -415,8 +437,9 @@ window.HWH5.sendMessage(params)
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| sessionId | string | 是 | 会话 ID |
+| welinkSessionId | number | 是 | 会话 ID |
 | content | string | 是 | 用户输入的消息内容 |
+| toolCallId | string | 否 | 回答 AI `question` 时携带对应的工具调用 ID |
 
 ### 返回值
 
@@ -424,45 +447,58 @@ window.HWH5.sendMessage(params)
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| messageId | number | 消息 ID（成功时返回） |
-| seq | number | 会话内消息序号（成功时返回） |
-| createdAt | string | 消息创建时间（成功时返回） |
+| id | number | 消息 ID |
+| welinkSessionId | number | 所属会话 ID |
+| userId | string | 发送用户 ID |
+| role | string | 固定为 "user" |
+| content | string | 消息内容 |
+| messageSeq | number | 该消息在会话内的顺序号 |
+| createdAt | string | 创建时间，ISO-8601 |
 
-### 返回示例
+### 错误处理
 
-成功时：
-
-```json
-{
-  "messageId": 1,
-  "seq": 1,
-  "createdAt": "2026-03-06T10:30:00"
-}
-```
-
-失败时：
-
-```json
-{
-  "errorMessage": "会话已关闭"
-}
-```
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | welinkSessionId 或 content 缺失或格式错误 |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
+| 4001 | 会话已关闭 | 会话已被关闭，无法发送消息 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
+| 7001 | AI 网关错误 | AI-Gateway 调度失败 |
 
 ### 调用示例
 
+#### 示例 1：首次发送消息（创建会话后）
+
 ```javascript
-// 发送消息
+// 先创建会话
+// 然后发送首条消息
 window.HWH5.sendMessage({
-  sessionId: '42',
-  content: '请帮我重构登录模块的校验逻辑'
+  welinkSessionId: 42,
+  content: '帮我创建一个React项目'
 }).then(result => {
-  console.log('消息发送成功，消息 ID:', result.messageId);
-  console.log('消息序号:', result.seq);
+  console.log('消息发送成功:', result.id);
   console.log('创建时间:', result.createdAt);
   
   // AI 响应将通过 registerSessionListener 注册的回调接收
 }).catch(error => {
-  console.error('发送消息失败:', error.errorMessage);
+  console.error('发送消息失败:', error.errorCode, error.errorMessage);
+});
+```
+
+#### 示例 2：后续多轮对话
+
+```javascript
+window.HWH5.sendMessage({
+  welinkSessionId: 42,
+  content: '请帮我重构登录模块的校验逻辑'
+}).then(result => {
+  console.log('消息发送成功:', result.id);
+  console.log('创建时间:', result.createdAt);
+  
+  // AI 响应将通过 registerSessionListener 注册的回调接收
+}).catch(error => {
+  console.error('发送消息失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -472,9 +508,7 @@ window.HWH5.sendMessage({
 
 ### 接口说明
 
-停止 Skill 服务端 WebSocket 会话的持续回调，中断当前正在进行的回答生成，但保持会话连接。调用此接口后，会话状态将变为`stopped`，用户可以后续发送新消息继续对话。
-
-**注意**：此接口仅停止客户端接收 WebSocket 推送，服务端的 AI 处理可能仍在进行。如需完全停止 AI 处理并关闭会话，请使用 `closeSkill` 接口（如果提供）或结合 `controlSkillWeCode` 使用。
+停止指定会话当前轮回答生成，但保持 WebSocket 连接和 Skill 会话本身继续可用。调用后用户仍可继续发送新消息。
 
 ### 调用方式
 
@@ -486,7 +520,7 @@ window.HWH5.stopSkill(params)
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| sessionId | string | 是 | 要停止的会话 ID |
+| welinkSessionId | number | 是 | 会话 ID |
 
 ### 返回值
 
@@ -494,42 +528,32 @@ window.HWH5.stopSkill(params)
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| status | string | 停止状态：success（成功）、failed（失败） |
+| welinkSessionId | number | 会话 ID |
+| status | string | 中止结果，成功时为 `aborted` |
 
-### 返回示例
+### 错误处理
 
-成功时：
-
-```json
-{
-  "status": "success"
-}
-```
-
-失败时：
-
-```json
-{
-  "status": "failed",
-  "errorMessage": "会话不存在"
-}
-```
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | welinkSessionId 缺失或格式错误 |
+| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
+| 4001 | 会话已关闭 | 会话已被关闭，无法停止 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
 
 ### 调用示例
 
 ```javascript
 // 停止技能生成
 window.HWH5.stopSkill({
-  sessionId: '42'
+  welinkSessionId: 42
 }).then(result => {
-  if (result.status === 'success') {
-    console.log('技能生成已停止');
+  if (result.status === 'aborted') {
+    console.log('当前轮回答已停止');
     // 会话仍然保持，可以发送新消息继续对话
-  } else {
-    console.error('停止失败:', result.errorMessage);
   }
 }).catch(error => {
-  console.error('停止技能失败:', error.errorMessage);
+  console.error('停止会话失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -540,7 +564,7 @@ window.HWH5.stopSkill({
 | 会话连接 | 保持连接 | 释放资源 |
 | 会话状态 | stopped | closed |
 | 后续操作 | 可发送新消息继续对话 | 会话不可恢复 |
-| WebSocket | 断开但不删除订阅 | 断开连接 |
+| WebSocket | 保持连接 | 断开连接 |
 
 ### 使用场景
 
@@ -553,9 +577,13 @@ window.HWH5.stopSkill({
 
 ### 接口说明
 
-执行小程序的关闭或最小化操作，用于控制小程序的生命周期。该接口直接控制 OpenCode 小程序的显示状态。
+执行小程序的关闭或最小化操作，用于控制小程序生命周期。
 
-**注意**：该接口仅通过 `onSkillWecodeStatusChange` 回调通知上层应用状态变更，不主动处理 WebSocket 连接或会话。上层应用需要在回调中决定是否调用 `closeSkill` 或`stopSkill`。
+**重要说明**：
+
+- 当前 V1 保持现状：`close` 只处理小程序侧关闭逻辑
+- 上层可在 `close` 成功后继续调用 `closeSkill()` 释放 WebSocket
+- 是否关闭服务端会话仍由上层自行决定，当前客户端文档未新增该能力
 
 ### 调用方式
 
@@ -575,26 +603,15 @@ window.HWH5.controlSkillWeCode(params)
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| status | string | 操作状态：`success`（成功）、`failed`（失败） |
+| status | string | 操作状态：`success` / `failed` |
 
-### 返回示例
+### 错误处理
 
-成功时：
-
-```json
-{
-  "status": "success"
-}
-```
-
-失败时：
-
-```json
-{
-  "status": "failed",
-  "errorMessage": "小程序未处于活跃状态"
-}
-```
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | action 缺失或值无效 |
+| 4009 | 小程序不存在 | 小程序未初始化或已关闭 |
+| 4010 | 操作失败 | 小程序操作执行失败 |
 
 ### 调用示例
 
@@ -604,39 +621,39 @@ window.HWH5.onSkillWecodeStatusChange((status) => {
   if (status === 'closed') {
     console.log('小程序已关闭');
     // 上层应用决定是否调用 closeSkill 关闭会话
-    window.HWH5.closeSkill({ sessionId: '42' });
+    window.HWH5.closeSkill();
   } else if (status === 'minimized') {
     console.log('小程序已最小化');
     // 上层应用根据需要决定是否调用 stopSkill 停止 AI 生成
-    window.HWH5.stopSkill({ sessionId: '42' });
+    window.HWH5.stopSkill({ welinkSessionId: 42 });
   }
 });
 
 // 关闭小程序
-window.HWH5.controlSkillWeCode({
-  action: 'close'
-}).then(result => {
-  if (result.status === 'success') {
-    console.log('关闭小程序指令已发送');
-    // SDK 会通过 onSkillWecodeStatusChange 回调通知状态
-    // 上层应用在回调中决定是否关闭会话
-  }
-}).catch(error => {
-  console.error('关闭小程序失败:', error.errorMessage);
-});
+try {
+  await window.HWH5.controlSkillWeCode({
+    action: 'close'
+  });
+  
+  console.log('关闭小程序指令已发送');
+  // SDK 会通过 onSkillWecodeStatusChange 回调通知状态
+  // 上层应用在回调中决定是否关闭会话
+} catch (error) {
+  console.error('关闭小程序失败:', error.errorCode, error.errorMessage);
+}
 
 // 最小化小程序
-window.HWH5.controlSkillWeCode({
-  action: 'minimize'
-}).then(result => {
-  if (result.status === 'success') {
-    console.log('最小化小程序指令已发送');
-    // SDK 会通过 onSkillWecodeStatusChange 回调通知状态
-    // 上层应用在回调中决定是否停止 AI 生成
-  }
-}).catch(error => {
-  console.error('最小化小程序失败:', error.errorMessage);
-});
+try {
+  await window.HWH5.controlSkillWeCode({
+    action: 'minimize'
+  });
+  
+  console.log('最小化小程序指令已发送');
+  // SDK 会通过 onSkillWecodeStatusChange 回调通知状态
+  // 上层应用在回调中决定是否停止 AI 生成
+} catch (error) {
+  console.error('最小化小程序失败:', error.errorCode, error.errorMessage);
+}
 ```
 
 ---
@@ -645,12 +662,25 @@ window.HWH5.controlSkillWeCode({
 
 | 错误码 | 说明 |
 |--------|------|
-| CONTENT_EMPTY | 消息内容为空 |
-| SESSION_NOT_FOUND | 会话不存在 |
-| SESSION_CLOSED | 会话已关闭 |
-| WEBSOCKET_ERROR | WebSocket 连接错误 |
-| NETWORK_ERROR | 网络错误 |
-| WECODE_NOT_ACTIVE | 小程序未处于活跃状态 |
+| 1000 | 无效的参数 |
+| 2000 | Agent 离线 |
+| 2001 | 超出速率限制 |
+| 3000 | 未建立连接 |
+| 4000 | 会话不存在 |
+| 4001 | 会话已关闭 |
+| 4002 | 无用户消息 |
+| 4003 | 消息不存在 |
+| 4004 | 消息未完成 |
+| 4005 | 无最终消息 |
+| 4006 | 监听器不存在 |
+| 4007 | 权限请求不存在 |
+| 4008 | 权限请求已过期 |
+| 4009 | 小程序不存在 |
+| 4010 | 操作失败 |
+| 5000 | 内部错误 |
+| 6000 | 网络错误 |
+| 7000 | 服务端错误 |
+| 7001 | AI 网关错误 |
 
 ---
 
