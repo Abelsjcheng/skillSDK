@@ -1,66 +1,40 @@
 /**
- * Logger
- * 日志工具类
+ * Lightweight logger with runtime switch.
  */
-
 export class Logger {
-  private prefix: string;
-  private enableLog: boolean;
+  private readonly prefix: string;
+  private enabled: boolean;
 
-  constructor(prefix: string, enableLog: boolean = false) {
+  constructor(prefix: string, enabled: boolean = false) {
     this.prefix = prefix;
-    this.enableLog = enableLog;
+    this.enabled = enabled;
   }
 
-  /**
-   * 设置日志开关
-   */
-  setEnableLog(enable: boolean): void {
-    this.enableLog = enable;
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
   }
 
-  /**
-   * 信息日志
-   */
   info(message: string, ...args: unknown[]): void {
-    if (this.enableLog) {
+    if (this.enabled) {
       console.info(`[${this.prefix}] ${message}`, ...args);
     }
   }
 
-  /**
-   * 警告日志
-   */
   warn(message: string, ...args: unknown[]): void {
-    if (this.enableLog) {
+    if (this.enabled) {
       console.warn(`[${this.prefix}] ${message}`, ...args);
     }
   }
 
-  /**
-   * 错误日志
-   */
   error(message: string, ...args: unknown[]): void {
-    if (this.enableLog) {
+    if (this.enabled) {
       console.error(`[${this.prefix}] ${message}`, ...args);
     }
   }
 
-  /**
-   * 调试日志
-   */
   debug(message: string, ...args: unknown[]): void {
-    if (this.enableLog) {
+    if (this.enabled) {
       console.debug(`[${this.prefix}] ${message}`, ...args);
-    }
-  }
-
-  /**
-   * 普通日志
-   */
-  log(message: string, ...args: unknown[]): void {
-    if (this.enableLog) {
-      console.log(`[${this.prefix}] ${message}`, ...args);
     }
   }
 }

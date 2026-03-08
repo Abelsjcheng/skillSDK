@@ -1,58 +1,49 @@
 /**
- * Skill SDK for HarmonyOS
- * 鸿蒙ArkTS SDK入口文件
- * 
- * @version 1.0.0
- * @description 用于IM客户端、OpenCode Skill服务端、小程序间交互的鸿蒙ArkTS SDK
+ * Harmony Skill SDK package entry.
  */
 
-// 导出主类
 export { SkillSDK } from './sdk/SkillSDK';
 
-// 导出所有类型
 export {
-  // 枚举
-  SessionStatus,
-  SkillWecodeStatus,
-  SkillWeCodeAction,
+  ControlSkillWeCodeParams,
+  ControlSkillWeCodeResult,
+  CreateSessionParams,
+  CloseSkillResult,
+  GetSessionMessageParams,
+  MessageContentType,
   MessageRole,
-  ContentType,
-  WebSocketMessageType,
-  
-  // 参数类型
-  ExecuteSkillParams,
-  CloseSkillParams,
-  StopSkillParams,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
-  RegenerateAnswerParams,
-  SendMessageToIMParams,
-  GetSessionMessageParams,
-  RegisterSessionListenerParams,
-  UnregisterSessionListenerParams,
-  SendMessageParams,
-  ReplyPermissionParams,
-  ControlSkillWeCodeParams,
-  
-  // 响应类型
-  SkillSession,
-  ChatMessage,
-  StreamMessage,
-  TokenUsage,
-  SessionError,
-  SessionStatusResult,
-  SkillWecodeStatusResult,
-  SendMessageToIMResult,
-  SendMessageResult,
-  CloseSkillResult,
-  StopSkillResult,
-  AnswerResult,
-  ReplyPermissionResult,
-  ControlSkillWeCodeResult,
   PageResult,
-  PermissionRequest,
+  PermissionResponse,
+  RegisterSessionListenerParams,
+  RegenerateAnswerParams,
+  ReplyPermissionParams,
+  ReplyPermissionResult,
+  SDKError,
+  SendMessageParams,
+  SendMessageResult,
+  SendMessageToIMParams,
+  SendMessageToIMResult,
+  SessionError,
   SessionListener,
-  
-  // 配置类型
-  SkillSDKConfig
+  SessionMessage,
+  SessionMessagePart,
+  SessionRecordStatus,
+  SessionRuntimeStatus,
+  SessionStatus,
+  SessionStatusResult,
+  SkillSDKConfig,
+  SkillSdkException,
+  SkillSession,
+  SkillWecodeStatus,
+  SkillWecodeStatusResult,
+  SkillWeCodeAction,
+  StopSkillParams,
+  StopSkillResult,
+  StreamMessage,
+  StreamMessageType,
+  StreamSnapshotMessage,
+  StreamingPart,
+  UnregisterSessionListenerParams
 } from './sdk/types';

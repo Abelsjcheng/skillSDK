@@ -1,373 +1,353 @@
 /**
- * Skill SDK Types
- * 鸿蒙ArkTS SDK类型定义
+ * Skill SDK type contracts aligned with:
+ * - SkillClientSdkInterfaceV1.md
+ * - 01-layer1-miniapp-skill-api.md
  */
 
-// ==================== 枚举类型 ====================
+// ---------------------------
+// Constants and Enums
+// ---------------------------
 
-/**
- * 会话状态枚举
- */
 export enum SessionStatus {
   EXECUTING = 'executing',
   STOPPED = 'stopped',
   COMPLETED = 'completed'
 }
 
-/**
- * 小程序状态枚举
- */
 export enum SkillWecodeStatus {
   CLOSED = 'closed',
   MINIMIZED = 'minimized'
 }
 
-/**
- * 小程序操作类型枚举
- */
 export enum SkillWeCodeAction {
   CLOSE = 'close',
   MINIMIZE = 'minimize'
 }
 
-/**
- * 消息角色枚举
- */
-export enum MessageRole {
-  USER = 'USER',
-  ASSISTANT = 'ASSISTANT',
-  SYSTEM = 'SYSTEM',
-  TOOL = 'TOOL'
+export type PermissionResponse = 'once' | 'always' | 'reject';
+export type SessionRecordStatus = 'ACTIVE' | 'CLOSED';
+export type SessionRuntimeStatus = 'busy' | 'idle' | 'retry';
+export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
+export type MessageContentType = 'plain' | 'markdown' | 'code';
+
+export type StreamMessageType =
+  | 'text.delta'
+  | 'text.done'
+  | 'thinking.delta'
+  | 'thinking.done'
+  | 'tool.update'
+  | 'question'
+  | 'file'
+  | 'step.start'
+  | 'step.done'
+  | 'session.status'
+  | 'session.title'
+  | 'session.error'
+  | 'permission.ask'
+  | 'permission.reply'
+  | 'agent.online'
+  | 'agent.offline'
+  | 'error'
+  | 'snapshot'
+  | 'streaming';
+
+// ---------------------------
+// SDK Config and Error
+// ---------------------------
+
+export interface SkillSDKConfig {
+  baseUrl: string;
+  wsUrl?: string;
+  timeout?: number;
+  enableLog?: boolean;
+  defaultHeaders?: Record<string, string>;
 }
 
-/**
- * 内容类型枚举
- */
-export enum ContentType {
-  MARKDOWN = 'MARKDOWN',
-  CODE = 'CODE',
-  PLAIN = 'PLAIN'
+export interface SDKError {
+  errorCode: number;
+  errorMessage: string;
 }
 
-/**
- * WebSocket消息类型枚举
- */
-export enum WebSocketMessageType {
-  DELTA = 'delta',
-  DONE = 'done',
-  ERROR = 'error',
-  AGENT_OFFLINE = 'agent_offline',
-  AGENT_ONLINE = 'agent_online'
+export class SkillSdkException extends Error implements SDKError {
+  errorCode: number;
+  errorMessage: string;
+
+  constructor(errorCode: number, errorMessage: string, cause?: unknown) {
+    super(errorMessage);
+    this.errorCode = errorCode;
+    this.errorMessage = errorMessage;
+    this.name = 'SkillSdkException';
+    if (cause !== undefined) {
+      (this as Record<string, unknown>).cause = cause;
+    }
+  }
 }
 
-// ==================== 请求参数类型 ====================
+// ---------------------------
+// REST envelope
+// ---------------------------
 
-/**
- * 执行技能参数
- */
-export interface ExecuteSkillParams {
-  imChatId: string;
-  skillDefinitionId: number;
-  userId: string;
-  agentId?: number;
-  title?: string;
-  skillContent: string;
+export interface RestApiResponse<T> {
+  code: number;
+  errormsg: string;
+  data: T | null;
 }
 
-/**
- * 关闭技能参数
- */
-export interface CloseSkillParams {
-  sessionId: string;
-}
+// ---------------------------
+// Shared entities
+// ---------------------------
 
-/**
- * 停止技能参数
- */
-export interface StopSkillParams {
-  sessionId: string;
-}
-
-/**
- * 会话状态变更回调参数
- */
-export interface OnSessionStatusChangeParams {
-  sessionId: string;
-  callback: (result: SessionStatusResult) => void;
-}
-
-/**
- * 小程序状态变更回调参数
- */
-export interface OnSkillWecodeStatusChangeParams {
-  callback: (result: SkillWecodeStatusResult) => void;
-}
-
-/**
- * 重新生成问答参数
- */
-export interface RegenerateAnswerParams {
-  sessionId: string;
-  content: string;
-}
-
-/**
- * 发送消息到IM参数
- */
-export interface SendMessageToIMParams {
-  sessionId: string;
-  content: string;
-}
-
-/**
- * 获取会话消息参数
- */
-export interface GetSessionMessageParams {
-  sessionId: string;
-  page?: number;
-  size?: number;
-}
-
-/**
- * 注册会话监听器参数
- */
-export interface RegisterSessionListenerParams {
-  sessionId: string;
-  onMessage: (message: StreamMessage) => void;
-  onError?: (error: SessionError) => void;
-  onClose?: (reason: string) => void;
-}
-
-/**
- * 移除会话监听器参数
- */
-export interface UnregisterSessionListenerParams {
-  sessionId: string;
-  onMessage: (message: StreamMessage) => void;
-  onError?: (error: SessionError) => void;
-  onClose?: (reason: string) => void;
-}
-
-/**
- * 发送消息参数
- */
-export interface SendMessageParams {
-  sessionId: string;
-  content: string;
-}
-
-/**
- * 权限确认参数
- */
-export interface ReplyPermissionParams {
-  sessionId: string;
-  permissionId: string;
-  approved: boolean;
-}
-
-/**
- * 小程序控制参数
- */
-export interface ControlSkillWeCodeParams {
-  action: SkillWeCodeAction;
-}
-
-// ==================== 响应数据类型 ====================
-
-/**
- * 技能会话
- */
 export interface SkillSession {
-  id: number;
-  userId: number;
-  skillDefinitionId: number;
-  agentId?: number;
-  toolSessionId?: string;
-  title?: string;
-  status: string;
-  imChatId?: string;
+  welinkSessionId: number;
+  userId: string;
+  ak: string;
+  title: string;
+  imGroupId: string;
+  status: SessionRecordStatus;
+  toolSessionId: string | null;
   createdAt: string;
-  lastActiveAt: string;
+  updatedAt: string;
 }
 
-/**
- * 聊天消息
- */
-export interface ChatMessage {
+export interface SessionMessagePart {
+  partId: string;
+  partSeq?: number;
+  type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+  content?: string;
+  toolName?: string;
+  toolCallId?: string;
+  toolStatus?: 'pending' | 'running' | 'completed' | 'error';
+  toolInput?: Record<string, unknown>;
+  toolOutput?: string;
+  toolError?: string;
+  header?: string;
+  question?: string;
+  options?: string[];
+  permissionId?: string;
+  permissionResponse?: PermissionResponse;
+  fileName?: string;
+  fileUrl?: string;
+  fileMime?: string;
+}
+
+export interface SessionMessage {
   id: number | string;
-  sessionId: number;
-  seq: number;
-  role: string;
+  welinkSessionId: number;
+  userId: string | null;
+  role: MessageRole;
   content: string;
-  contentType: string;
+  messageSeq: number;
+  parts: SessionMessagePart[];
   createdAt: string;
-  meta?: string;
+  contentType?: MessageContentType;
 }
 
-/**
- * 流式消息
- */
-export interface StreamMessage {
-  sessionId: string;
-  type: string;
+export interface PageResult<T> {
+  content: T[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+// ---------------------------
+// WebSocket entities
+// ---------------------------
+
+export interface StreamSnapshotMessage {
+  id: string;
   seq: number;
-  content: string | object;
-  usage?: TokenUsage;
+  role: MessageRole;
+  content: string;
+  contentType: MessageContentType;
+  createdAt?: string;
+  parts?: SessionMessagePart[];
 }
 
-/**
- * Token用量统计
- */
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
+export interface StreamingPart {
+  partId: string;
+  partSeq?: number;
+  type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+  content?: string;
+  toolName?: string;
+  toolCallId?: string;
+  status?: 'pending' | 'running' | 'completed' | 'error';
+  header?: string;
+  question?: string;
+  options?: string[];
+  fileName?: string;
+  fileUrl?: string;
+  fileMime?: string;
 }
 
-/**
- * 会话错误
- */
+export interface StreamMessage {
+  type: StreamMessageType;
+  seq: number;
+  welinkSessionId: string;
+  emittedAt: string;
+  createdAt?: string;
+  raw?: Record<string, unknown>;
+
+  messageId?: string;
+  messageSeq?: number;
+  role?: MessageRole;
+  partId?: string;
+  partSeq?: number;
+
+  content?: string;
+  toolName?: string;
+  toolCallId?: string;
+  status?: 'pending' | 'running' | 'completed' | 'error';
+  input?: Record<string, unknown>;
+  output?: string;
+  error?: string;
+  title?: string;
+  header?: string;
+  question?: string;
+  options?: string[];
+  fileName?: string;
+  fileUrl?: string;
+  fileMime?: string;
+  tokens?: {
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    cache?: {
+      read?: number;
+      write?: number;
+    };
+  };
+  cost?: number;
+  reason?: string;
+  sessionStatus?: SessionRuntimeStatus;
+  permissionId?: string;
+  permType?: string;
+  metadata?: Record<string, unknown>;
+  response?: PermissionResponse;
+  messages?: StreamSnapshotMessage[];
+  parts?: StreamingPart[];
+}
+
 export interface SessionError {
   code: string;
   message: string;
   timestamp: number;
 }
 
-/**
- * 会话状态结果
- */
-export interface SessionStatusResult {
-  status: SessionStatus;
-}
-
-/**
- * 小程序状态结果
- */
-export interface SkillWecodeStatusResult {
-  status: SkillWecodeStatus;
-  timestamp: number;
-  message?: string;
-}
-
-/**
- * 发送消息到IM结果
- */
-export interface SendMessageToIMResult {
-  success: boolean;
-  chatId?: string;
-  contentLength?: number;
-  errorMessage?: string;
-}
-
-/**
- * 发送消息结果
- */
-export interface SendMessageResult {
-  messageId: number;
-  seq: number;
-  createdAt: string;
-}
-
-/**
- * 关闭技能结果
- */
-export interface CloseSkillResult {
-  status: string;
-}
-
-/**
- * 停止技能结果
- */
-export interface StopSkillResult {
-  status: string;
-}
-
-/**
- * 回答结果
- */
-export interface AnswerResult {
-  messageId: string;
-}
-
-/**
- * 权限确认结果
- */
-export interface ReplyPermissionResult {
-  success: boolean;
-  permissionId?: string;
-  approved?: boolean;
-}
-
-/**
- * 小程序控制结果
- */
-export interface ControlSkillWeCodeResult {
-  status: string;
-}
-
-/**
- * 分页结果
- */
-export interface PageResult<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
-}
-
-/**
- * 权限请求
- */
-export interface PermissionRequest {
-  permissionId: string;
-  sessionId: number;
-  action: string;
-  approved: boolean;
-}
-
-/**
- * 会话监听器
- */
 export interface SessionListener {
   onMessage: (message: StreamMessage) => void;
   onError?: (error: SessionError) => void;
   onClose?: (reason: string) => void;
 }
 
-// ==================== 配置类型 ====================
+// ---------------------------
+// API params and results
+// ---------------------------
 
-/**
- * SDK配置
- */
-export interface SkillSDKConfig {
-  baseUrl: string;
-  wsUrl: string;
-  timeout?: number;
-  enableLog?: boolean;
+export interface CreateSessionParams {
+  ak: string;
+  title?: string;
+  imGroupId: string;
 }
 
-// ==================== 内部类型 ====================
+export interface CloseSkillResult {
+  status: 'success' | 'failed';
+}
 
-/**
- * 流式消息缓存项
- */
-export interface StreamingMessageCache {
-  sessionId: string;
-  messageId: string;
+export interface StopSkillParams {
+  welinkSessionId: number;
+}
+
+export interface StopSkillResult {
+  welinkSessionId: number;
+  status: 'aborted';
+}
+
+export interface SessionStatusResult {
+  status: SessionStatus;
+}
+
+export interface OnSessionStatusChangeParams {
+  welinkSessionId: number;
+  callback: (result: SessionStatusResult) => void;
+}
+
+export interface SkillWecodeStatusResult {
+  status: SkillWecodeStatus;
+  timestamp: number;
+  message?: string;
+}
+
+export interface OnSkillWecodeStatusChangeParams {
+  callback: (result: SkillWecodeStatusResult) => void;
+}
+
+export interface RegenerateAnswerParams {
+  welinkSessionId: number;
+}
+
+export interface SendMessageToIMParams {
+  welinkSessionId: number;
+  messageId?: number | string;
+}
+
+export interface SendMessageToIMResult {
+  status: 'success' | 'failed';
+  chatId?: string;
+  contentLength?: number;
+}
+
+export interface GetSessionMessageParams {
+  welinkSessionId: number;
+  page?: number;
+  size?: number;
+}
+
+export interface RegisterSessionListenerParams {
+  welinkSessionId: number;
+  onMessage: (message: StreamMessage) => void;
+  onError?: (error: SessionError) => void;
+  onClose?: (reason: string) => void;
+}
+
+export interface UnregisterSessionListenerParams {
+  welinkSessionId: number;
+  onMessage: (message: StreamMessage) => void;
+  onError?: (error: SessionError) => void;
+  onClose?: (reason: string) => void;
+}
+
+export interface SendMessageParams {
+  welinkSessionId: number;
   content: string;
-  seq: number;
-  isStreaming: boolean;
-  createdAt: string;
-  lastUpdated: number;
+  toolCallId?: string;
 }
 
-/**
- * REST API响应包装
- */
-export interface ApiResponse<T> {
-  data?: T;
-  error?: {
-    code: string;
-    message: string;
-  };
+export interface SendMessageResult {
+  id: number;
+  welinkSessionId: number;
+  userId: string;
+  role: 'user';
+  content: string;
+  messageSeq: number;
+  createdAt: string;
+}
+
+export interface ReplyPermissionParams {
+  welinkSessionId: number;
+  permId: string;
+  response: PermissionResponse;
+}
+
+export interface ReplyPermissionResult {
+  welinkSessionId: number;
+  permissionId: string;
+  response: PermissionResponse;
+}
+
+export interface ControlSkillWeCodeParams {
+  action: SkillWeCodeAction;
+}
+
+export interface ControlSkillWeCodeResult {
+  status: 'success' | 'failed';
 }

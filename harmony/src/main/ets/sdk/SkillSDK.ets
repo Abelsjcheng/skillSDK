@@ -1,457 +1,480 @@
-/**
- * Skill SDK - Main Entry
- * Skill SDK主入口类（单例模式）
- * 提供所有13个公共接口
- */
-
 import { HttpClient } from './core/HttpClient';
 import { WebSocketManager } from './core/WebSocketManager';
 import { MessageCacheManager } from './managers/MessageCacheManager';
 import { SessionStateManager } from './managers/SessionStateManager';
 import { WeCodeStateManager } from './managers/WeCodeStateManager';
+import { Logger } from './utils/Logger';
+import { Validator } from './utils/Validator';
 import {
-  SkillSDKConfig,
-  ExecuteSkillParams,
-  CloseSkillParams,
-  StopSkillParams,
+  CloseSkillResult,
+  ControlSkillWeCodeParams,
+  ControlSkillWeCodeResult,
+  CreateSessionParams,
+  GetSessionMessageParams,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
-  RegenerateAnswerParams,
-  SendMessageToIMParams,
-  GetSessionMessageParams,
-  RegisterSessionListenerParams,
-  UnregisterSessionListenerParams,
-  SendMessageParams,
-  ReplyPermissionParams,
-  ControlSkillWeCodeParams,
-  SkillSession,
-  CloseSkillResult,
-  StopSkillResult,
-  AnswerResult,
-  SendMessageToIMResult,
   PageResult,
-  ChatMessage,
-  SendMessageResult,
+  RegisterSessionListenerParams,
+  RegenerateAnswerParams,
+  ReplyPermissionParams,
   ReplyPermissionResult,
-  ControlSkillWeCodeResult,
+  SendMessageParams,
+  SendMessageResult,
+  SendMessageToIMParams,
+  SendMessageToIMResult,
+  SessionMessage,
+  SessionStatus,
+  SkillSDKConfig,
+  SkillSdkException,
+  SkillSession,
   SkillWecodeStatus,
   SkillWeCodeAction,
+  StopSkillParams,
+  StopSkillResult,
   StreamMessage,
-  SessionStatus
+  UnregisterSessionListenerParams
 } from './types';
 
+/**
+ * Singleton SDK entry.
+ * Exposes 13 public interfaces aligned with SkillClientSdkInterfaceV1.md.
+ */
 export class SkillSDK {
   private static instance: SkillSDK | null = null;
-  
-  // 核心组件
-  private httpClient: HttpClient;
-  private wsManager: WebSocketManager;
-  private messageCacheManager: MessageCacheManager;
-  private sessionStateManager: SessionStateManager;
-  private wecodeStateManager: WeCodeStateManager;
-  
-  // 配置
+
   private config: SkillSDKConfig;
-  
-  // 当前活跃会话ID（用于stopSkill）
-  private activeSessionId: string | null = null;
+  private readonly logger: Logger;
+  private readonly httpClient: HttpClient;
+  private readonly wsManager: WebSocketManager;
+  private readonly messageCacheManager: MessageCacheManager;
+  private readonly sessionStateManager: SessionStateManager;
+  private readonly weCodeStateManager: WeCodeStateManager;
 
   private constructor(config: SkillSDKConfig) {
-    this.config = config;
-    
-    // 初始化核心组件
-    this.httpClient = new HttpClient(config);
-    this.wsManager = WebSocketManager.getInstance(config);
-    this.messageCacheManager = new MessageCacheManager(config.enableLog);
-    this.sessionStateManager = new SessionStateManager(config.enableLog);
-    this.wecodeStateManager = new WeCodeStateManager(config.enableLog);
-    
-    // 设置WebSocket内部缓存监听器
-    this.wsManager.setInternalCacheListener((message: StreamMessage) => {
-      this.handleInternalCacheMessage(message);
+    this.validateConfig(config);
+    this.config = {
+      ...config,
+      timeout: config.timeout ?? 30_000,
+      enableLog: config.enableLog ?? false
+    };
+    this.logger = new Logger('SkillSDK', this.config.enableLog);
+
+    this.httpClient = new HttpClient(this.config);
+    this.wsManager = WebSocketManager.getInstance(this.config);
+    this.messageCacheManager = new MessageCacheManager(this.config.enableLog);
+    this.sessionStateManager = new SessionStateManager(this.config.enableLog);
+    this.weCodeStateManager = new WeCodeStateManager(this.config.enableLog);
+
+    this.wsManager.setMessageHandler((message: StreamMessage) => {
+      this.messageCacheManager.onStreamMessage(message);
+      this.sessionStateManager.onStreamMessage(message);
     });
   }
 
-  /**
-   * 获取单例实例
-   */
   static getInstance(config?: SkillSDKConfig): SkillSDK {
-    if (!SkillSDK.instance) {
-      if (!config) {
-        throw new Error('SkillSDK config is required for first initialization');
+    if (SkillSDK.instance === null) {
+      if (config === undefined) {
+        throw new SkillSdkException(1000, 'SkillSDK config is required on first initialization');
       }
       SkillSDK.instance = new SkillSDK(config);
     }
     return SkillSDK.instance;
   }
 
-  /**
-   * 销毁单例实例
-   */
-  static destroyInstance(): void {
-    if (SkillSDK.instance) {
-      SkillSDK.instance.cleanup();
+  static async destroyInstance(): Promise<void> {
+    if (SkillSDK.instance === null) {
+      return;
+    }
+    try {
+      await SkillSDK.instance.wsManager.disconnect();
+      SkillSDK.instance.wsManager.clearAllListeners();
+      SkillSDK.instance.messageCacheManager.clearAll();
+      SkillSDK.instance.sessionStateManager.clearAll();
+      SkillSDK.instance.weCodeStateManager.clearAll();
+      WebSocketManager.destroyInstance();
+    } finally {
       SkillSDK.instance = null;
     }
   }
 
-  /**
-   * 处理内部缓存消息
-   */
-  private handleInternalCacheMessage(message: StreamMessage): void {
-    // 更新消息缓存
-    this.messageCacheManager.updateStreamingCache(message);
-    
-    // 更新会话状态
-    this.sessionStateManager.updateStatusFromMessage(message);
-  }
-
-  // ==================== 1. 执行技能接口 ====================
-  
-  /**
-   * 执行技能
-   * 与Skill服务端建立WebSocket会话连接，并发送用户消息到服务端触发AI处理
-   */
-  async executeSkill(params: ExecuteSkillParams): Promise<SkillSession> {
-    try {
-      // 1. 调用服务端REST API创建会话
-      const sessionData = {
-        userId: parseInt(params.userId),
-        skillDefinitionId: params.skillDefinitionId,
-        agentId: params.agentId,
-        title: params.title,
-        imChatId: params.imChatId
-      };
-      
-      const session = await this.httpClient.post<SkillSession>('/api/skill/sessions', sessionData);
-      
-      // 2. 建立WebSocket流式连接（单例模式）
-      await this.wsManager.connect();
-      
-      // 3. 发送首条用户消息触发AI处理
-      await this.httpClient.post(`/api/skill/sessions/${session.id}/messages`, {
-        content: params.skillContent
-      });
-      
-      // 记录活跃会话
-      this.activeSessionId = String(session.id);
-      
-      return session;
-    } catch (error) {
-      throw this.handleError('executeSkill', error);
+  updateConfig(nextConfig: Partial<SkillSDKConfig>): void {
+    this.config = {
+      ...this.config,
+      ...nextConfig
+    };
+    this.httpClient.updateConfig(nextConfig);
+    this.wsManager.updateConfig(nextConfig);
+    if (nextConfig.enableLog !== undefined) {
+      this.logger.setEnabled(nextConfig.enableLog);
+      this.messageCacheManager.setEnableLog(nextConfig.enableLog);
+      this.sessionStateManager.setEnableLog(nextConfig.enableLog);
+      this.weCodeStateManager.setEnableLog(nextConfig.enableLog);
     }
   }
 
-  // ==================== 2. 关闭技能接口 ====================
-  
-  /**
-   * 关闭技能
-   * 关闭与Skill服务端的WebSocket会话连接，释放资源
-   */
-  async closeSkill(params: CloseSkillParams): Promise<CloseSkillResult> {
+  // 1. createSession
+  async createSession(params: CreateSessionParams): Promise<SkillSession> {
     try {
-      // 1. 调用服务端REST API关闭会话
-      await this.httpClient.delete(`/api/skill/sessions/${params.sessionId}`);
-      
-      // 2. 清理缓存和状态
-      this.messageCacheManager.clearCache(params.sessionId);
-      this.sessionStateManager.unregisterCallback(params.sessionId);
-      
-      // 清除活跃会话记录
-      if (this.activeSessionId === params.sessionId) {
-        this.activeSessionId = null;
+      Validator.requireObject(params, 'params');
+      Validator.requireString(params.ak, 'ak');
+      Validator.requireString(params.imGroupId, 'imGroupId');
+      if (params.title !== undefined) {
+        Validator.requireString(params.title, 'title');
       }
-      
+
+      await this.wsManager.connect();
+
+      const sessionList = await this.httpClient.get<PageResult<SkillSession>>('/api/skill/sessions', {
+        imGroupId: params.imGroupId,
+        ak: params.ak,
+        status: 'ACTIVE',
+        page: 0,
+        size: 20
+      });
+
+      const active = sessionList.content ?? [];
+      if (active.length > 0) {
+        return this.pickLatestSession(active);
+      }
+
+      return await this.httpClient.post<SkillSession>('/api/skill/sessions', {
+        ak: params.ak,
+        title: params.title,
+        imGroupId: params.imGroupId
+      });
+    } catch (error) {
+      throw this.normalizeError('createSession', error);
+    }
+  }
+
+  // 2. closeSkill
+  async closeSkill(): Promise<CloseSkillResult> {
+    try {
+      if (!this.wsManager.isConnected()) {
+        throw new SkillSdkException(3000, 'WebSocket is not connected');
+      }
+      await this.wsManager.disconnect();
+      this.wsManager.clearAllListeners();
+      this.messageCacheManager.clearAll();
+      this.sessionStateManager.clearAll();
+      this.weCodeStateManager.clearAll();
       return { status: 'success' };
     } catch (error) {
-      throw this.handleError('closeSkill', error);
+      throw this.normalizeError('closeSkill', error);
     }
   }
 
-  // ==================== 3. 停止技能接口 ====================
-  
-  /**
-   * 停止技能
-   * 停止Skill服务端WebSocket会话的持续回调，但保持会话连接
-   */
+  // 3. stopSkill
   async stopSkill(params: StopSkillParams): Promise<StopSkillResult> {
     try {
-      // 断开WebSocket连接（但保持会话）
-      if (this.wsManager.isActive()) {
-        await this.wsManager.disconnect();
-      }
-      
-      // 更新会话状态为stopped
-      this.sessionStateManager.setStatus(params.sessionId, SessionStatus.STOPPED);
-      
-      // 清除活跃会话记录
-      if (this.activeSessionId === params.sessionId) {
-        this.activeSessionId = null;
-      }
-      
-      return { status: 'success' };
-    } catch (error) {
-      throw this.handleError('stopSkill', error);
-    }
-  }
+      Validator.requireObject(params, 'params');
+      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
 
-  // ==================== 4. 会话状态变更回调接口 ====================
-  
-  /**
-   * 会话状态变更回调
-   * 监听会话消息状态变更的回调接口
-   */
-  onSessionStatusChange(params: OnSessionStatusChangeParams): void {
-    this.sessionStateManager.registerCallback(params.sessionId, params.callback);
-  }
-
-  // ==================== 5. 小程序状态变更回调接口 ====================
-  
-  /**
-   * 小程序状态变更回调
-   * 监听小程序的状态变化
-   */
-  onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void {
-    this.wecodeStateManager.registerCallback(params.callback);
-  }
-
-  // ==================== 6. 重新生成问答接口 ====================
-  
-  /**
-   * 重新生成问答
-   * 根据提供的内容重新生成回答
-   */
-  async regenerateAnswer(params: RegenerateAnswerParams): Promise<AnswerResult> {
-    try {
-      // 确保WebSocket连接
-      if (!this.wsManager.isActive()) {
-        await this.wsManager.connect();
-      }
-      
-      // 发送消息
-      const result = await this.httpClient.post<{ id: number }>(
-        `/api/skill/sessions/${params.sessionId}/messages`,
-        { content: params.content }
+      const result = await this.httpClient.post<StopSkillResult>(
+        `/api/skill/sessions/${params.welinkSessionId}/abort`
       );
-      
-      return { messageId: String(result.id) };
-    } catch (error) {
-      throw this.handleError('regenerateAnswer', error);
-    }
-  }
-
-  // ==================== 7. 发送AI生成消息结果接口 ====================
-  
-  /**
-   * 发送消息到IM
-   * 将AI生成的消息结果发送到IM客户端
-   */
-  async sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult> {
-    try {
-      const result = await this.httpClient.post<SendMessageToIMResult>(
-        `/api/skill/sessions/${params.sessionId}/send-to-im`,
-        { content: params.content }
-      );
-      
+      this.sessionStateManager.forceStatus(params.welinkSessionId, SessionStatus.STOPPED);
       return result;
     } catch (error) {
-      throw this.handleError('sendMessageToIM', error);
+      throw this.normalizeError('stopSkill', error);
     }
   }
 
-  // ==================== 8. 获取当前会话的消息列表接口 ====================
-  
-  /**
-   * 获取会话消息列表
-   * 获取当前会话的消息列表，将数据持久化存储到本地
-   */
-  async getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<ChatMessage>> {
+  // 4. onSessionStatusChange
+  onSessionStatusChange(params: OnSessionStatusChangeParams): void {
+    Validator.requireObject(params, 'params');
+    Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+    Validator.requireFunction(params.callback, 'callback');
+    this.sessionStateManager.register(params);
+  }
+
+  // 5. onSkillWecodeStatusChange
+  onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void {
+    Validator.requireObject(params, 'params');
+    Validator.requireFunction(params.callback, 'callback');
+    this.weCodeStateManager.register(params);
+  }
+
+  // 6. regenerateAnswer
+  async regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult> {
     try {
-      const page = params.page || 0;
-      const size = params.size || 50;
-      
-      // 1. 获取服务端历史消息
-      const historicalMessages = await this.httpClient.get<PageResult<ChatMessage>>(
-        `/api/skill/sessions/${params.sessionId}/messages`,
-        { page, size }
+      Validator.requireObject(params, 'params');
+      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+
+      let content = this.messageCacheManager.getLastUserMessageContent(params.welinkSessionId);
+      if (content === null) {
+        const history = await this.fetchServerMessages(params.welinkSessionId, 0, 200);
+        this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
+        content = this.messageCacheManager.getLastUserMessageContent(params.welinkSessionId);
+      }
+
+      if (content === null || content.trim() === '') {
+        throw new SkillSdkException(4002, 'No user message available for regenerate');
+      }
+
+      return await this.sendMessage({
+        welinkSessionId: params.welinkSessionId,
+        content
+      });
+    } catch (error) {
+      throw this.normalizeError('regenerateAnswer', error);
+    }
+  }
+
+  // 7. sendMessageToIM
+  async sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+
+      const content = this.messageCacheManager.getFinalMessageContent(
+        params.welinkSessionId,
+        params.messageId
       );
-      
-      // 2. 合并流式消息缓存
-      const mergedContent = this.messageCacheManager.mergeMessages(
-        historicalMessages.content,
-        params.sessionId
+      if (content === null) {
+        if (params.messageId !== undefined) {
+          throw new SkillSdkException(4003, 'Message not found in local cache');
+        }
+        throw new SkillSdkException(4005, 'No finalized message in local cache');
+      }
+
+      let raw: Record<string, unknown>;
+      try {
+        raw = await this.httpClient.post<Record<string, unknown>>(
+          `/api/skill/sessions/${params.welinkSessionId}/send-to-im`,
+          { content },
+          { expectEnvelope: false }
+        );
+      } catch (error) {
+        const normalized = this.normalizeError('sendMessageToIM', error);
+        if (normalized.errorCode === 7000 && normalized.errorMessage.includes('404')) {
+          throw new SkillSdkException(7002, 'send-to-im API is not implemented on server');
+        }
+        throw normalized;
+      }
+
+      return this.normalizeSendToImResult(raw);
+    } catch (error) {
+      throw this.normalizeError('sendMessageToIM', error);
+    }
+  }
+
+  // 8. getSessionMessage
+  async getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMessage>> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.optionalNonNegativeInteger(params.page, 'page');
+      Validator.optionalPositiveInteger(params.size, 'size');
+
+      const page = params.page ?? 0;
+      const size = params.size ?? 50;
+      const history = await this.fetchServerMessages(params.welinkSessionId, page, size);
+      this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
+      const mergedContent = this.messageCacheManager.mergeWithHistory(
+        params.welinkSessionId,
+        history.content
       );
-      
+
       return {
-        ...historicalMessages,
-        content: mergedContent
+        ...history,
+        content: mergedContent,
+        total: Math.max(history.total, mergedContent.length)
       };
     } catch (error) {
-      throw this.handleError('getSessionMessage', error);
+      throw this.normalizeError('getSessionMessage', error);
     }
   }
 
-  // ==================== 9. 注册会话监听器接口 ====================
-  
-  /**
-   * 注册会话监听器
-   * 注册会话监听器，用于接收WebSocket推送的AI响应流
-   */
+  // 9. registerSessionListener
   registerSessionListener(params: RegisterSessionListenerParams): void {
-    const listener = {
-      onMessage: params.onMessage,
-      onError: params.onError,
-      onClose: params.onClose
-    };
-    
-    this.wsManager.registerSessionListener(params.sessionId, listener);
-  }
+    Validator.requireObject(params, 'params');
+    Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+    Validator.requireFunction(params.onMessage, 'onMessage');
+    Validator.optionalFunction(params.onError, 'onError');
+    Validator.optionalFunction(params.onClose, 'onClose');
 
-  // ==================== 10. 移除会话监听器接口 ====================
-  
-  /**
-   * 移除会话监听器
-   * 移除已注册的会话监听器
-   */
-  unregisterSessionListener(params: UnregisterSessionListenerParams): void {
-    this.wsManager.unregisterSessionListener(params.sessionId, {
+    this.wsManager.registerSessionListener(params.welinkSessionId, {
       onMessage: params.onMessage,
       onError: params.onError,
       onClose: params.onClose
     });
   }
 
-  // ==================== 11. 发送消息内容接口 ====================
-  
-  /**
-   * 发送消息
-   * 发送用户输入的内容，触发会话的持续回答
-   */
+  // 10. unregisterSessionListener
+  unregisterSessionListener(params: UnregisterSessionListenerParams): void {
+    Validator.requireObject(params, 'params');
+    Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+    Validator.requireFunction(params.onMessage, 'onMessage');
+    Validator.optionalFunction(params.onError, 'onError');
+    Validator.optionalFunction(params.onClose, 'onClose');
+
+    this.wsManager.unregisterSessionListener(params.welinkSessionId, {
+      onMessage: params.onMessage,
+      onError: params.onError,
+      onClose: params.onClose
+    });
+  }
+
+  // 11. sendMessage
   async sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
     try {
-      // 确保WebSocket连接
-      if (!this.wsManager.isActive()) {
+      Validator.requireObject(params, 'params');
+      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.content, 'content');
+      if (params.toolCallId !== undefined) {
+        Validator.requireString(params.toolCallId, 'toolCallId');
+      }
+
+      if (!this.wsManager.isConnected()) {
         await this.wsManager.connect();
       }
-      
-      // 发送消息
-      const message = await this.httpClient.post<{
-        id: number;
-        seq: number;
-        createdAt: string;
-      }>(`/api/skill/sessions/${params.sessionId}/messages`, {
-        content: params.content
-      });
-      
-      // 更新活跃会话
-      this.activeSessionId = params.sessionId;
-      
-      return {
-        messageId: message.id,
-        seq: message.seq,
-        createdAt: message.createdAt
-      };
-    } catch (error) {
-      throw this.handleError('sendMessage', error);
-    }
-  }
 
-  // ==================== 12. 权限确认接口 ====================
-  
-  /**
-   * 权限确认
-   * 对AI发起的权限确认请求进行批准或拒绝
-   */
-  async replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult> {
-    try {
-      const result = await this.httpClient.post<ReplyPermissionResult>(
-        `/api/skill/sessions/${params.sessionId}/permissions/${params.permissionId}`,
-        { approved: params.approved }
+      const result = await this.httpClient.post<SendMessageResult>(
+        `/api/skill/sessions/${params.welinkSessionId}/messages`,
+        {
+          content: params.content
+        }
       );
-      
+
+      this.messageCacheManager.cacheSentUserMessage(result);
       return result;
     } catch (error) {
-      throw this.handleError('replyPermission', error);
+      throw this.normalizeError('sendMessage', error);
     }
   }
 
-  // ==================== 13. 小程序控制接口 ====================
-  
-  /**
-   * 控制小程序
-   * 执行小程序的关闭或最小化操作
-   * 注意：该接口仅通过 onSkillWecodeStatusChange 回调通知上层应用，不处理 WebSocket 连接
-   */
+  // 12. replyPermission
+  async replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.permId, 'permId');
+      Validator.requireEnum(params.response, ['once', 'always', 'reject'], 'response');
+
+      return await this.httpClient.post<ReplyPermissionResult>(
+        `/api/skill/sessions/${params.welinkSessionId}/permissions/${params.permId}`,
+        {
+          response: params.response
+        }
+      );
+    } catch (error) {
+      throw this.normalizeError('replyPermission', error);
+    }
+  }
+
+  // 13. controlSkillWeCode
   async controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResult> {
     try {
-      switch (params.action) {
-        case SkillWeCodeAction.CLOSE:
-          // 关闭小程序 - 仅通知状态，由上层应用决定是否调用 closeSkill
-          this.wecodeStateManager.notifyStatusChange(SkillWecodeStatus.CLOSED, 'User closed the miniapp');
-          break;
-          
-        case SkillWeCodeAction.MINIMIZE:
-          // 最小化小程序 - 仅通知状态，由上层应用决定是否调用 stopSkill
-          this.wecodeStateManager.notifyStatusChange(SkillWecodeStatus.MINIMIZED, 'User minimized the miniapp');
-          break;
-          
-        default:
-          throw new Error(`Unknown action: ${params.action}`);
+      Validator.requireObject(params, 'params');
+      Validator.requireEnum(
+        params.action,
+        [SkillWeCodeAction.CLOSE, SkillWeCodeAction.MINIMIZE],
+        'action'
+      );
+
+      if (params.action === SkillWeCodeAction.CLOSE) {
+        this.weCodeStateManager.notify(SkillWecodeStatus.CLOSED, 'miniapp closed');
+      } else {
+        this.weCodeStateManager.notify(SkillWecodeStatus.MINIMIZED, 'miniapp minimized');
       }
-      
+
       return { status: 'success' };
     } catch (error) {
-      throw this.handleError('controlSkillWeCode', error);
+      throw this.normalizeError('controlSkillWeCode', error);
     }
   }
 
-  // ==================== 辅助方法 ====================
-  
-  /**
-   * 错误处理
-   */
-  private handleError(method: string, error: unknown): Error {
-    if (this.config.enableLog) {
-      console.error(`[SkillSDK] ${method} error:`, error);
+  private async fetchServerMessages(
+    welinkSessionId: number,
+    page: number,
+    size: number
+  ): Promise<PageResult<SessionMessage>> {
+    const result = await this.httpClient.get<PageResult<SessionMessage>>(
+      `/api/skill/sessions/${welinkSessionId}/messages`,
+      { page, size }
+    );
+    return {
+      content: result.content ?? [],
+      page: result.page ?? page,
+      size: result.size ?? size,
+      total: result.total ?? 0
+    };
+  }
+
+  private normalizeSendToImResult(raw: Record<string, unknown>): SendMessageToIMResult {
+    if (typeof raw !== 'object' || raw === null) {
+      throw new SkillSdkException(7000, 'Unexpected send-to-im response schema');
     }
-    
-    if (error instanceof Error) {
+    const payload = raw as Record<string, unknown>;
+
+    if ('code' in payload && 'data' in payload) {
+      const code = Number(payload.code);
+      const errormsg = String(payload.errormsg ?? '');
+      if (code !== 0) {
+        throw new SkillSdkException(code, errormsg || 'send-to-im failed');
+      }
+      const data = payload.data as Record<string, unknown>;
+      return {
+        status: (String(data.status ?? 'failed') === 'success' ? 'success' : 'failed'),
+        chatId: data.chatId === undefined ? undefined : String(data.chatId),
+        contentLength:
+          data.contentLength === undefined ? undefined : Number(data.contentLength)
+      };
+    }
+
+    if ('success' in payload) {
+      const success = Boolean(payload.success);
+      return {
+        status: success ? 'success' : 'failed',
+        chatId: payload.chatId === undefined ? undefined : String(payload.chatId),
+        contentLength:
+          payload.contentLength === undefined ? undefined : Number(payload.contentLength)
+      };
+    }
+
+    if ('status' in payload) {
+      return {
+        status: String(payload.status) === 'success' ? 'success' : 'failed',
+        chatId: payload.chatId === undefined ? undefined : String(payload.chatId),
+        contentLength:
+          payload.contentLength === undefined ? undefined : Number(payload.contentLength)
+      };
+    }
+
+    throw new SkillSdkException(7000, 'Unexpected send-to-im response schema');
+  }
+
+  private pickLatestSession(sessions: SkillSession[]): SkillSession {
+    const sorted = [...sessions].sort((a: SkillSession, b: SkillSession) => {
+      const left = Number.isNaN(Date.parse(a.updatedAt)) ? 0 : Date.parse(a.updatedAt);
+      const right = Number.isNaN(Date.parse(b.updatedAt)) ? 0 : Date.parse(b.updatedAt);
+      return right - left;
+    });
+    return sorted[0];
+  }
+
+  private validateConfig(config: SkillSDKConfig): void {
+    Validator.requireObject(config, 'config');
+    Validator.requireHttpUrl(config.baseUrl, 'baseUrl');
+    if (config.wsUrl !== undefined) {
+      Validator.requireWebSocketUrl(config.wsUrl, 'wsUrl');
+    }
+  }
+
+  private normalizeError(method: string, error: unknown): SkillSdkException {
+    if (error instanceof SkillSdkException) {
+      this.logger.warn(`${method} failed: [${error.errorCode}] ${error.errorMessage}`);
       return error;
     }
-    
-    return new Error(`Unknown error in ${method}`);
-  }
-
-  /**
-   * 清理资源
-   */
-  private async cleanup(): Promise<void> {
-    try {
-      await this.wsManager.disconnect();
-      this.wsManager.clearAllListeners();
-      this.messageCacheManager.clearAllCache();
-      this.sessionStateManager.clearAllCallbacks();
-      this.wecodeStateManager.clearAllCallbacks();
-    } catch (error) {
-      if (this.config.enableLog) {
-        console.error('[SkillSDK] Cleanup error:', error);
+    if (error instanceof Error) {
+      this.logger.warn(`${method} failed: ${error.message}`);
+      if (error.message.includes('must be')) {
+        return new SkillSdkException(1000, error.message, error);
       }
+      return new SkillSdkException(5000, error.message, error);
     }
-  }
-
-  /**
-   * 更新配置
-   */
-  updateConfig(config: Partial<SkillSDKConfig>): void {
-    if (config.baseUrl) {
-      this.config.baseUrl = config.baseUrl;
-      this.httpClient.updateConfig(config);
-    }
-    if (config.enableLog !== undefined) {
-      this.config.enableLog = config.enableLog;
-      this.messageCacheManager.setEnableLog(config.enableLog);
-      this.sessionStateManager.setEnableLog(config.enableLog);
-      this.wecodeStateManager.setEnableLog(config.enableLog);
-    }
+    this.logger.warn(`${method} failed with unknown error`, error);
+    return new SkillSdkException(5000, 'Unknown SDK error', error);
   }
 }

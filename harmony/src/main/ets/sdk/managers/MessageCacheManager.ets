@@ -1,186 +1,452 @@
+import { Logger } from '../utils/Logger';
+import {
+  MessageRole,
+  SessionMessage,
+  SessionMessagePart,
+  SendMessageResult,
+  StreamMessage,
+  StreamSnapshotMessage,
+  StreamingPart
+} from '../types';
+
+interface LocalMessageState {
+  messageSeq: number;
+  messageId?: string;
+  role: MessageRole;
+  content: string;
+  parts: SessionMessagePart[];
+  createdAt: string;
+  final: boolean;
+  userId: string | null;
+}
+
+interface SessionCacheState {
+  bySeq: Map<number, LocalMessageState>;
+  byMessageId: Map<string, number>;
+}
+
 /**
- * Message Cache Manager
- * 消息缓存管理器，用于缓存流式消息和历史消息合并
+ * In-memory message cache for:
+ * - stream aggregation
+ * - history + local merge
+ * - regenerate/send-to-im lookups
  */
-
-import { StreamMessage, ChatMessage, StreamingMessageCache } from '../types';
-
 export class MessageCacheManager {
-  // 流式消息缓存 (sessionId -> StreamingMessageCache)
-  private streamingCache: Map<string, StreamingMessageCache> = new Map();
-  
-  private enableLog: boolean;
+  private readonly logger: Logger;
+  private readonly sessions: Map<number, SessionCacheState> = new Map();
 
   constructor(enableLog: boolean = false) {
-    this.enableLog = enableLog;
+    this.logger = new Logger('MessageCacheManager', enableLog);
   }
 
-  /**
-   * 更新流式消息缓存
-   * 根据WebSocket消息类型更新缓存
-   */
-  updateStreamingCache(message: StreamMessage): void {
-    const sessionId = message.sessionId;
-    
-    switch (message.type) {
-      case 'delta':
-        // 增量消息 - 累加内容
-        this.handleDeltaMessage(sessionId, message);
-        break;
-      case 'done':
-        // 完成消息 - 标记完成
-        this.handleDoneMessage(sessionId);
-        break;
-      case 'error':
-        // 错误消息 - 清理缓存
-        this.handleErrorMessage(sessionId);
-        break;
-      default:
-        if (this.enableLog) {
-          console.log(`[MessageCacheManager] Unhandled message type: ${message.type}`);
-        }
+  setEnableLog(enable: boolean): void {
+    this.logger.setEnabled(enable);
+  }
+
+  clearSession(sessionId: number): void {
+    this.sessions.delete(sessionId);
+  }
+
+  clearAll(): void {
+    this.sessions.clear();
+  }
+
+  cacheHistory(sessionId: number, messages: SessionMessage[]): void {
+    const state = this.ensureSessionState(sessionId);
+    for (const message of messages) {
+      const normalized = this.normalizeHistoryMessage(message);
+      state.bySeq.set(normalized.messageSeq, normalized);
+      state.byMessageId.set(String(message.id), normalized.messageSeq);
     }
   }
 
-  /**
-   * 处理增量消息
-   */
-  private handleDeltaMessage(sessionId: string, message: StreamMessage): void {
-    const existingCache = this.streamingCache.get(sessionId);
-    const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
-    
-    if (existingCache) {
-      // 累加内容
-      existingCache.content += content;
-      existingCache.seq = message.seq;
-      existingCache.lastUpdated = Date.now();
-    } else {
-      // 创建新缓存
-      this.streamingCache.set(sessionId, {
-        sessionId: sessionId,
-        messageId: `streaming-${sessionId}`,
-        content: content,
-        seq: message.seq,
-        isStreaming: true,
-        createdAt: new Date().toISOString(),
-        lastUpdated: Date.now()
-      });
-      
-      if (this.enableLog) {
-        console.log(`[MessageCacheManager] Created streaming cache for session: ${sessionId}`);
-      }
-    }
-  }
-
-  /**
-   * 处理完成消息
-   */
-  private handleDoneMessage(sessionId: string): void {
-    const cache = this.streamingCache.get(sessionId);
-    if (cache) {
-      cache.isStreaming = false;
-      cache.lastUpdated = Date.now();
-      
-      if (this.enableLog) {
-        console.log(`[MessageCacheManager] Streaming completed for session: ${sessionId}`);
-      }
-    }
-  }
-
-  /**
-   * 处理错误消息
-   */
-  private handleErrorMessage(sessionId: string): void {
-    this.streamingCache.delete(sessionId);
-    
-    if (this.enableLog) {
-      console.log(`[MessageCacheManager] Cache cleared for session due to error: ${sessionId}`);
-    }
-  }
-
-  /**
-   * 获取流式消息缓存
-   */
-  getStreamingCache(sessionId: string): StreamingMessageCache | null {
-    return this.streamingCache.get(sessionId) || null;
-  }
-
-  /**
-   * 合并历史消息和流式消息
-   * 用于 getSessionMessage 接口
-   */
-  mergeMessages(historicalMessages: ChatMessage[], sessionId: string): ChatMessage[] {
-    const cache = this.streamingCache.get(sessionId);
-    
-    if (!cache) {
-      return historicalMessages;
-    }
-
-    // 检查是否需要合并
-    // 如果历史消息中已包含相同消息（通过seq判断），则不合并
-    const maxSeq = Math.max(...historicalMessages.map(m => m.seq), 0);
-    
-    if (cache.seq <= maxSeq) {
-      // 历史消息已包含此消息，不合并
-      return historicalMessages;
-    }
-
-    // 构造流式消息对象
-    const streamingMessage: ChatMessage = {
-      id: cache.messageId,
-      sessionId: parseInt(sessionId) || 0,
-      seq: cache.seq,
-      role: 'ASSISTANT',
-      content: cache.content,
-      contentType: 'MARKDOWN',
-      createdAt: cache.createdAt,
-      meta: JSON.stringify({ isStreaming: cache.isStreaming })
+  cacheSentUserMessage(result: SendMessageResult): void {
+    const state = this.ensureSessionState(result.welinkSessionId);
+    const local: LocalMessageState = {
+      messageSeq: result.messageSeq,
+      role: 'user',
+      content: result.content,
+      parts: [],
+      createdAt: result.createdAt,
+      final: true,
+      userId: result.userId
     };
+    state.bySeq.set(local.messageSeq, local);
+  }
 
-    // 合并到消息列表
-    const merged = [...historicalMessages, streamingMessage];
-    
-    if (this.enableLog) {
-      console.log(`[MessageCacheManager] Merged streaming message for session: ${sessionId}`);
+  onStreamMessage(message: StreamMessage): void {
+    const sessionId = this.parseSessionId(message.welinkSessionId);
+    if (sessionId === null) {
+      return;
+    }
+    const state = this.ensureSessionState(sessionId);
+
+    if (message.type === 'snapshot') {
+      this.applySnapshot(state, message.messages ?? []);
+      return;
     }
 
+    if (message.type === 'streaming') {
+      this.applyStreaming(state, message);
+      return;
+    }
+
+    const messageSeq = message.messageSeq;
+    if (messageSeq === undefined) {
+      return;
+    }
+
+    const local = this.ensureLocalMessage(state, messageSeq, message.role ?? 'assistant', message.messageId);
+    if (message.createdAt !== undefined) {
+      local.createdAt = message.createdAt;
+    }
+
+    this.applyMessageEvent(local, message);
+    if (message.messageId !== undefined) {
+      state.byMessageId.set(message.messageId, messageSeq);
+    }
+  }
+
+  getLastUserMessageContent(sessionId: number): string | null {
+    const state = this.sessions.get(sessionId);
+    if (state === undefined) {
+      return null;
+    }
+    const ordered = this.toOrderedMessages(state);
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const item = ordered[i];
+      if (item.role === 'user' && item.content.trim() !== '') {
+        return item.content;
+      }
+    }
+    return null;
+  }
+
+  getFinalMessageContent(sessionId: number, messageId?: number | string): string | null {
+    const state = this.sessions.get(sessionId);
+    if (state === undefined) {
+      return null;
+    }
+
+    if (messageId !== undefined) {
+      const seq = this.resolveMessageSeqById(state, messageId);
+      if (seq === null) {
+        return null;
+      }
+      const target = state.bySeq.get(seq);
+      if (target === undefined || !target.final || target.content.trim() === '') {
+        return null;
+      }
+      return target.content;
+    }
+
+    const ordered = this.toOrderedMessages(state);
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const item = ordered[i];
+      if (item.final && item.content.trim() !== '') {
+        return item.content;
+      }
+    }
+    return null;
+  }
+
+  mergeWithHistory(sessionId: number, history: SessionMessage[]): SessionMessage[] {
+    const state = this.sessions.get(sessionId);
+    if (state === undefined) {
+      return history;
+    }
+
+    const historyBySeq = new Map<number, SessionMessage>();
+    for (const message of history) {
+      historyBySeq.set(message.messageSeq, message);
+    }
+
+    const merged: SessionMessage[] = [...history];
+    const orderedLocal = this.toOrderedMessages(state);
+    for (const local of orderedLocal) {
+      if (historyBySeq.has(local.messageSeq)) {
+        continue;
+      }
+      merged.push(this.toSessionMessage(sessionId, local));
+    }
+
+    merged.sort((a: SessionMessage, b: SessionMessage) => a.messageSeq - b.messageSeq);
     return merged;
   }
 
-  /**
-   * 清除指定会话的缓存
-   */
-  clearCache(sessionId: string): void {
-    this.streamingCache.delete(sessionId);
-    
-    if (this.enableLog) {
-      console.log(`[MessageCacheManager] Cache cleared for session: ${sessionId}`);
+  private normalizeHistoryMessage(message: SessionMessage): LocalMessageState {
+    return {
+      messageSeq: message.messageSeq,
+      messageId: String(message.id),
+      role: message.role,
+      content: message.content,
+      parts: message.parts ?? [],
+      createdAt: message.createdAt,
+      final: true,
+      userId: message.userId
+    };
+  }
+
+  private applySnapshot(state: SessionCacheState, messages: StreamSnapshotMessage[]): void {
+    for (const item of messages) {
+      const local: LocalMessageState = {
+        messageSeq: item.seq,
+        messageId: item.id,
+        role: item.role,
+        content: item.content,
+        parts: item.parts ?? [],
+        createdAt: item.createdAt ?? new Date().toISOString(),
+        final: true,
+        userId: item.role === 'user' ? '' : null
+      };
+      state.bySeq.set(local.messageSeq, local);
+      state.byMessageId.set(item.id, item.seq);
     }
   }
 
-  /**
-   * 清除所有缓存
-   */
-  clearAllCache(): void {
-    this.streamingCache.clear();
-    
-    if (this.enableLog) {
-      console.log('[MessageCacheManager] All cache cleared');
+  private applyStreaming(state: SessionCacheState, message: StreamMessage): void {
+    if (message.messageSeq === undefined) {
+      return;
+    }
+    const local = this.ensureLocalMessage(
+      state,
+      message.messageSeq,
+      message.role ?? 'assistant',
+      message.messageId
+    );
+    local.final = message.sessionStatus === 'idle';
+    if (message.parts !== undefined) {
+      local.parts = message.parts.map((part: StreamingPart) => this.toPartFromStreaming(part));
+      local.content = this.aggregateContent(local.parts);
+    }
+    if (message.messageId !== undefined) {
+      state.byMessageId.set(message.messageId, message.messageSeq);
     }
   }
 
-  /**
-   * 检查是否有流式消息正在传输
-   */
-  isStreaming(sessionId: string): boolean {
-    const cache = this.streamingCache.get(sessionId);
-    return cache ? cache.isStreaming : false;
+  private applyMessageEvent(local: LocalMessageState, message: StreamMessage): void {
+    switch (message.type) {
+      case 'text.delta':
+      case 'thinking.delta':
+        this.upsertTextPart(local, message);
+        local.content = this.aggregateContent(local.parts);
+        local.final = false;
+        break;
+      case 'text.done':
+      case 'thinking.done':
+        this.upsertTextPart(local, message, true);
+        local.content = this.aggregateContent(local.parts);
+        local.final = true;
+        break;
+      case 'tool.update':
+        this.upsertToolPart(local, message);
+        local.final = message.status === 'completed';
+        break;
+      case 'question':
+        this.upsertQuestionPart(local, message);
+        local.final = false;
+        break;
+      case 'permission.ask':
+      case 'permission.reply':
+        this.upsertPermissionPart(local, message);
+        local.final = message.type === 'permission.reply';
+        break;
+      case 'file':
+        this.upsertFilePart(local, message);
+        break;
+      case 'step.done':
+        local.final = true;
+        break;
+      case 'session.error':
+      case 'error':
+        local.final = true;
+        break;
+      default:
+        break;
+    }
   }
 
-  /**
-   * 更新日志开关
-   */
-  setEnableLog(enable: boolean): void {
-    this.enableLog = enable;
+  private upsertTextPart(local: LocalMessageState, message: StreamMessage, overwrite: boolean = false): void {
+    const part = this.ensurePart(local, message.partId, message.partSeq, message.type.startsWith('thinking') ? 'thinking' : 'text');
+    if (overwrite) {
+      part.content = message.content ?? '';
+      return;
+    }
+    part.content = `${part.content ?? ''}${message.content ?? ''}`;
+  }
+
+  private upsertToolPart(local: LocalMessageState, message: StreamMessage): void {
+    const part = this.ensurePart(local, message.partId, message.partSeq, 'tool');
+    part.toolName = message.toolName;
+    part.toolCallId = message.toolCallId;
+    part.toolStatus = message.status;
+    part.toolInput = message.input;
+    part.toolOutput = message.output;
+    part.toolError = message.error;
+  }
+
+  private upsertQuestionPart(local: LocalMessageState, message: StreamMessage): void {
+    const part = this.ensurePart(local, message.partId, message.partSeq, 'question');
+    part.toolName = message.toolName;
+    part.toolCallId = message.toolCallId;
+    part.toolStatus = message.status;
+    part.header = message.header;
+    part.question = message.question;
+    part.options = message.options;
+  }
+
+  private upsertPermissionPart(local: LocalMessageState, message: StreamMessage): void {
+    const part = this.ensurePart(local, message.partId, message.partSeq, 'permission');
+    part.permissionId = message.permissionId;
+    part.permissionResponse = message.response;
+    part.toolName = message.permType;
+    part.content = message.title;
+  }
+
+  private upsertFilePart(local: LocalMessageState, message: StreamMessage): void {
+    const part = this.ensurePart(local, message.partId, message.partSeq, 'file');
+    part.fileName = message.fileName;
+    part.fileUrl = message.fileUrl;
+    part.fileMime = message.fileMime;
+  }
+
+  private ensurePart(
+    local: LocalMessageState,
+    partId: string | undefined,
+    partSeq: number | undefined,
+    type: SessionMessagePart['type']
+  ): SessionMessagePart {
+    const targetPartId = partId ?? `auto_${type}_${partSeq ?? local.parts.length + 1}`;
+    let part = local.parts.find((item: SessionMessagePart) => item.partId === targetPartId);
+    if (part !== undefined) {
+      return part;
+    }
+    part = {
+      partId: targetPartId,
+      partSeq,
+      type,
+      content: ''
+    };
+    local.parts.push(part);
+    local.parts.sort((a: SessionMessagePart, b: SessionMessagePart) => {
+      const left = a.partSeq ?? Number.MAX_SAFE_INTEGER;
+      const right = b.partSeq ?? Number.MAX_SAFE_INTEGER;
+      return left - right;
+    });
+    return part;
+  }
+
+  private toPartFromStreaming(part: StreamingPart): SessionMessagePart {
+    return {
+      partId: part.partId,
+      partSeq: part.partSeq,
+      type: part.type,
+      content: part.content,
+      toolName: part.toolName,
+      toolCallId: part.toolCallId,
+      toolStatus: part.status,
+      header: part.header,
+      question: part.question,
+      options: part.options,
+      fileName: part.fileName,
+      fileUrl: part.fileUrl,
+      fileMime: part.fileMime
+    };
+  }
+
+  private aggregateContent(parts: SessionMessagePart[]): string {
+    const texts: string[] = [];
+    for (const part of parts) {
+      if ((part.type === 'text' || part.type === 'thinking') && part.content !== undefined) {
+        texts.push(part.content);
+      }
+    }
+    return texts.join('');
+  }
+
+  private resolveMessageSeqById(state: SessionCacheState, messageId: number | string): number | null {
+    if (typeof messageId === 'number') {
+      if (state.bySeq.has(messageId)) {
+        return messageId;
+      }
+      const fromMap = state.byMessageId.get(String(messageId));
+      return fromMap === undefined ? null : fromMap;
+    }
+    const seq = state.byMessageId.get(messageId);
+    if (seq !== undefined) {
+      return seq;
+    }
+    const numeric = Number(messageId);
+    if (!Number.isNaN(numeric) && state.bySeq.has(numeric)) {
+      return numeric;
+    }
+    return null;
+  }
+
+  private toOrderedMessages(state: SessionCacheState): LocalMessageState[] {
+    const ordered = Array.from(state.bySeq.values());
+    ordered.sort((a: LocalMessageState, b: LocalMessageState) => a.messageSeq - b.messageSeq);
+    return ordered;
+  }
+
+  private toSessionMessage(sessionId: number, local: LocalMessageState): SessionMessage {
+    return {
+      id: local.messageId ?? local.messageSeq,
+      welinkSessionId: sessionId,
+      userId: local.userId,
+      role: local.role,
+      content: local.content,
+      messageSeq: local.messageSeq,
+      parts: local.parts,
+      createdAt: local.createdAt
+    };
+  }
+
+  private parseSessionId(welinkSessionId: string): number | null {
+    const parsed = Number(welinkSessionId);
+    if (Number.isNaN(parsed)) {
+      return null;
+    }
+    return parsed;
+  }
+
+  private ensureSessionState(sessionId: number): SessionCacheState {
+    let state = this.sessions.get(sessionId);
+    if (state !== undefined) {
+      return state;
+    }
+    state = {
+      bySeq: new Map<number, LocalMessageState>(),
+      byMessageId: new Map<string, number>()
+    };
+    this.sessions.set(sessionId, state);
+    return state;
+  }
+
+  private ensureLocalMessage(
+    state: SessionCacheState,
+    messageSeq: number,
+    role: MessageRole,
+    messageId?: string
+  ): LocalMessageState {
+    const existing = state.bySeq.get(messageSeq);
+    if (existing !== undefined) {
+      if (messageId !== undefined) {
+        existing.messageId = messageId;
+      }
+      return existing;
+    }
+    const created: LocalMessageState = {
+      messageSeq,
+      messageId,
+      role,
+      content: '',
+      parts: [],
+      createdAt: new Date().toISOString(),
+      final: false,
+      userId: role === 'user' ? '' : null
+    };
+    state.bySeq.set(messageSeq, created);
+    return created;
   }
 }

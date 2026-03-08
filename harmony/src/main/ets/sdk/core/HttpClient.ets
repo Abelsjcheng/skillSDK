@@ -1,141 +1,166 @@
-/**
- * HTTP Client
- * HTTP请求客户端，基于HarmonyOS @kit.NetworkKit实现
- */
-
 import { http } from '@kit.NetworkKit';
-import { ApiResponse, SkillSDKConfig } from '../types';
+import { Logger } from '../utils/Logger';
+import {
+  RestApiResponse,
+  SkillSDKConfig,
+  SkillSdkException
+} from '../types';
 
+type QueryValue = string | number | boolean;
+type QueryParams = Record<string, QueryValue | QueryValue[] | undefined>;
+
+interface RequestOptions {
+  expectEnvelope?: boolean;
+}
+
+/**
+ * HTTP transport wrapper for HarmonyOS API 20.
+ */
 export class HttpClient {
   private baseUrl: string;
   private timeout: number;
-  private enableLog: boolean;
+  private defaultHeaders: Record<string, string>;
+  private readonly logger: Logger;
 
   constructor(config: SkillSDKConfig) {
-    this.baseUrl = config.baseUrl;
-    this.timeout = config.timeout || 30000;
-    this.enableLog = config.enableLog || false;
+    this.baseUrl = this.normalizeBaseUrl(config.baseUrl);
+    this.timeout = config.timeout ?? 30_000;
+    this.defaultHeaders = config.defaultHeaders ?? {};
+    this.logger = new Logger('HttpClient', config.enableLog ?? false);
   }
 
-  /**
-   * 发送GET请求
-   */
-  async get<T>(path: string, params?: Record<string, string | number | string[]>): Promise<T> {
-    const url = this.buildUrl(path, params);
-    return this.request<T>(url, http.RequestMethod.GET);
-  }
-
-  /**
-   * 发送POST请求
-   */
-  async post<T>(path: string, body?: object): Promise<T> {
-    const url = this.buildUrl(path);
-    return this.request<T>(url, http.RequestMethod.POST, body);
-  }
-
-  /**
-   * 发送DELETE请求
-   */
-  async delete<T>(path: string): Promise<T> {
-    const url = this.buildUrl(path);
-    return this.request<T>(url, http.RequestMethod.DELETE);
-  }
-
-  /**
-   * 通用请求方法
-   */
-  private async request<T>(url: string, method: http.RequestMethod, body?: object): Promise<T> {
-    const httpRequest = http.createHttp();
-    
-    try {
-      if (this.enableLog) {
-        console.log(`[HttpClient] ${method} ${url}`);
-        if (body) {
-          console.log(`[HttpClient] Body: ${JSON.stringify(body)}`);
-        }
-      }
-
-      const options: http.HttpRequestOptions = {
-        method: method,
-        header: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        readTimeout: this.timeout,
-        connectTimeout: this.timeout,
-        expectDataType: http.HttpDataType.STRING
-      };
-
-      if (body) {
-        options.extraData = JSON.stringify(body);
-      }
-
-      const response = await httpRequest.request(url, options);
-      
-      if (this.enableLog) {
-        console.log(`[HttpClient] Response Code: ${response.responseCode}`);
-        console.log(`[HttpClient] Response: ${response.result}`);
-      }
-
-      // 处理响应
-      if (response.responseCode === 200 || response.responseCode === 201) {
-        const result = response.result as string;
-        if (!result) {
-          return {} as T;
-        }
-        return JSON.parse(result) as T;
-      } else {
-        // 处理错误响应
-        const errorResult = response.result as string;
-        if (errorResult) {
-          const errorData = JSON.parse(errorResult);
-          throw new Error(errorData.error || errorData.message || `HTTP Error: ${response.responseCode}`);
-        }
-        throw new Error(`HTTP Error: ${response.responseCode}`);
-      }
-    } catch (error) {
-      if (this.enableLog) {
-        console.error(`[HttpClient] Error: ${error}`);
-      }
-      throw error;
-    } finally {
-      httpRequest.destroy();
-    }
-  }
-
-  /**
-   * 构建完整URL
-   */
-  private buildUrl(path: string, params?: Record<string, string | number | string[]>): string {
-    let url = `${this.baseUrl}${path}`;
-    
-    if (params && Object.keys(params).length > 0) {
-      const queryString = Object.entries(params)
-        .map(([key, value]) => {
-          if (Array.isArray(value)) {
-            return value.map(v => `${encodeURIComponent(key)}=${encodeURIComponent(v)}`).join('&');
-          }
-          return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-        })
-        .join('&');
-      url += `?${queryString}`;
-    }
-    
-    return url;
-  }
-
-  /**
-   * 更新配置
-   */
   updateConfig(config: Partial<SkillSDKConfig>): void {
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
+    if (config.baseUrl !== undefined) {
+      this.baseUrl = this.normalizeBaseUrl(config.baseUrl);
     }
-    if (config.timeout) {
+    if (config.timeout !== undefined) {
       this.timeout = config.timeout;
     }
-    if (config.enableLog !== undefined) {
-      this.enableLog = config.enableLog;
+    if (config.defaultHeaders !== undefined) {
+      this.defaultHeaders = config.defaultHeaders;
     }
+    if (config.enableLog !== undefined) {
+      this.logger.setEnabled(config.enableLog);
+    }
+  }
+
+  async get<T>(path: string, query?: QueryParams, options?: RequestOptions): Promise<T> {
+    return await this.request<T>(path, http.RequestMethod.GET, undefined, query, options);
+  }
+
+  async post<T>(
+    path: string,
+    body?: Record<string, unknown>,
+    options?: RequestOptions
+  ): Promise<T> {
+    return await this.request<T>(path, http.RequestMethod.POST, body, undefined, options);
+  }
+
+  async delete<T>(path: string, options?: RequestOptions): Promise<T> {
+    return await this.request<T>(path, http.RequestMethod.DELETE, undefined, undefined, options);
+  }
+
+  private async request<T>(
+    path: string,
+    method: http.RequestMethod,
+    body?: Record<string, unknown>,
+    query?: QueryParams,
+    options?: RequestOptions
+  ): Promise<T> {
+    const requestUrl = this.buildUrl(path, query);
+    const client = http.createHttp();
+    const expectEnvelope = options?.expectEnvelope ?? true;
+
+    const requestOptions: http.HttpRequestOptions = {
+      method,
+      readTimeout: this.timeout,
+      connectTimeout: this.timeout,
+      expectDataType: http.HttpDataType.STRING,
+      header: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...this.defaultHeaders
+      }
+    };
+
+    if (body !== undefined) {
+      requestOptions.extraData = JSON.stringify(body);
+    }
+
+    try {
+      this.logger.debug(`${method} ${requestUrl}`, body ?? {});
+      const response = await client.request(requestUrl, requestOptions);
+      const responseText = (response.result as string) ?? '';
+
+      this.logger.debug(`response code=${response.responseCode}`, responseText);
+
+      if (response.responseCode !== 200) {
+        throw new SkillSdkException(7000, `HTTP status ${response.responseCode}`);
+      }
+
+      if (responseText.trim() === '') {
+        return {} as T;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(responseText);
+      } catch (error) {
+        throw new SkillSdkException(7000, 'Response is not valid JSON', error);
+      }
+
+      if (!expectEnvelope) {
+        return parsed as T;
+      }
+
+      const envelope = parsed as RestApiResponse<T>;
+      if (typeof envelope.code !== 'number' || !('data' in envelope)) {
+        throw new SkillSdkException(7000, 'Server response envelope is invalid');
+      }
+
+      if (envelope.code !== 0) {
+        throw new SkillSdkException(envelope.code, envelope.errormsg || 'Server returned error');
+      }
+
+      return (envelope.data ?? ({} as T)) as T;
+    } catch (error) {
+      if (error instanceof SkillSdkException) {
+        throw error;
+      }
+      throw new SkillSdkException(6000, 'Network request failed', error);
+    } finally {
+      client.destroy();
+    }
+  }
+
+  private buildUrl(path: string, query?: QueryParams): string {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const base = `${this.baseUrl}${normalizedPath}`;
+    if (query === undefined) {
+      return base;
+    }
+
+    const queryParts: string[] = [];
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined) {
+        continue;
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`);
+        }
+      } else {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+      }
+    }
+
+    if (queryParts.length === 0) {
+      return base;
+    }
+    return `${base}?${queryParts.join('&')}`;
+  }
+
+  private normalizeBaseUrl(url: string): string {
+    return url.endsWith('/') ? url.slice(0, url.length - 1) : url;
   }
 }

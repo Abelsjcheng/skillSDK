@@ -1,328 +1,262 @@
-/**
- * WebSocket Manager
- * WebSocket管理器，基于HarmonyOS @kit.NetworkKit实现
- * 单例模式 - 客户端只需建立一个WebSocket连接即可接收所有会话的消息推送
- */
-
 import { webSocket } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { StreamMessage, SessionListener, SkillSDKConfig } from '../types';
+import { Logger } from '../utils/Logger';
+import {
+  SessionError,
+  SessionListener,
+  SkillSDKConfig,
+  StreamMessage,
+  SkillSdkException
+} from '../types';
 
+type MessageHandler = (message: StreamMessage) => void;
+
+/**
+ * Singleton WebSocket manager.
+ * One connection is shared by all sessions and listeners.
+ */
 export class WebSocketManager {
   private static instance: WebSocketManager | null = null;
-  private ws: webSocket.WebSocket | null = null;
+
+  private socket: webSocket.WebSocket | null = null;
   private wsUrl: string;
-  private enableLog: boolean;
-  private isConnected: boolean = false;
-  
-  // 会话监听器映射 (sessionId -> listener[])
-  private sessionListeners: Map<string, SessionListener[]> = new Map();
-  
-  // 内部缓存监听器 - 用于缓存流式消息数据
-  private internalCacheListener: ((message: StreamMessage) => void) | null = null;
-  
+  private readonly logger: Logger;
+  private connected: boolean = false;
+  private messageHandler: MessageHandler | null = null;
+  private listenersBySession: Map<string, SessionListener[]> = new Map();
+
   private constructor(config: SkillSDKConfig) {
-    this.wsUrl = config.wsUrl;
-    this.enableLog = config.enableLog || false;
+    this.wsUrl = this.resolveWsUrl(config);
+    this.logger = new Logger('WebSocketManager', config.enableLog ?? false);
   }
 
-  /**
-   * 获取单例实例
-   */
   static getInstance(config: SkillSDKConfig): WebSocketManager {
-    if (!WebSocketManager.instance) {
+    if (WebSocketManager.instance === null) {
       WebSocketManager.instance = new WebSocketManager(config);
     }
     return WebSocketManager.instance;
   }
 
-  /**
-   * 设置内部缓存监听器
-   */
-  setInternalCacheListener(listener: (message: StreamMessage) => void): void {
-    this.internalCacheListener = listener;
+  static destroyInstance(): void {
+    WebSocketManager.instance = null;
   }
 
-  /**
-   * 连接WebSocket
-   */
+  updateConfig(config: Partial<SkillSDKConfig>): void {
+    if (config.wsUrl !== undefined || config.baseUrl !== undefined) {
+      const merged: SkillSDKConfig = {
+        baseUrl: config.baseUrl ?? '',
+        wsUrl: config.wsUrl,
+        enableLog: false
+      };
+      this.wsUrl = this.resolveWsUrl(merged, this.wsUrl);
+    }
+    if (config.enableLog !== undefined) {
+      this.logger.setEnabled(config.enableLog);
+    }
+  }
+
+  setMessageHandler(handler: MessageHandler): void {
+    this.messageHandler = handler;
+  }
+
+  isConnected(): boolean {
+    return this.connected;
+  }
+
   async connect(): Promise<void> {
-    if (this.isConnected && this.ws) {
-      if (this.enableLog) {
-        console.log('[WebSocketManager] Already connected');
-      }
+    if (this.connected && this.socket !== null) {
       return;
     }
 
-    try {
-      this.ws = webSocket.createWebSocket();
-      this.setupEventHandlers();
-      
-      await new Promise<void>((resolve, reject) => {
-        if (!this.ws) {
-          reject(new Error('WebSocket not created'));
+    this.socket = webSocket.createWebSocket();
+    this.setupSocketEventHandlers(this.socket);
+
+    await new Promise<void>((resolve, reject) => {
+      if (this.socket === null) {
+        reject(new SkillSdkException(6000, 'WebSocket is not initialized'));
+        return;
+      }
+      this.socket.connect(this.wsUrl, (error: BusinessError, _result: boolean) => {
+        if (error) {
+          reject(new SkillSdkException(6000, 'WebSocket connect failed', error));
           return;
         }
-
-        this.ws.connect(this.wsUrl, (err: BusinessError, value: boolean) => {
-          if (!err) {
-            if (this.enableLog) {
-              console.log('[WebSocketManager] Connected successfully');
-            }
-            this.isConnected = true;
-            resolve();
-          } else {
-            if (this.enableLog) {
-              console.error(`[WebSocketManager] Connect failed: ${JSON.stringify(err)}`);
-            }
-            reject(new Error(err.message));
-          }
-        });
-      });
-    } catch (error) {
-      this.isConnected = false;
-      throw error;
-    }
-  }
-
-  /**
-   * 设置事件处理器
-   */
-  private setupEventHandlers(): void {
-    if (!this.ws) {
-      return;
-    }
-
-    // 连接打开事件
-    this.ws.on('open', (err: BusinessError, value: Object) => {
-      if (err) {
-        if (this.enableLog) {
-          console.error(`[WebSocketManager] Open error: ${JSON.stringify(err)}`);
-        }
-        this.notifyError(err.message, 'CONNECTION_ERROR');
-        return;
-      }
-      if (this.enableLog) {
-        console.log('[WebSocketManager] Connection opened');
-      }
-      this.isConnected = true;
-    });
-
-    // 消息接收事件
-    this.ws.on('message', (err: BusinessError, value: string | ArrayBuffer) => {
-      if (err) {
-        if (this.enableLog) {
-          console.error(`[WebSocketManager] Message error: ${JSON.stringify(err)}`);
-        }
-        this.notifyError(err.message, 'MESSAGE_ERROR');
-        return;
-      }
-
-      try {
-        const messageStr = typeof value === 'string' ? value : this.arrayBufferToString(value);
-        const message: StreamMessage = JSON.parse(messageStr);
-        
-        if (this.enableLog) {
-          console.log(`[WebSocketManager] Received message: ${messageStr}`);
-        }
-
-        // 1. 首先通知内部缓存监听器
-        if (this.internalCacheListener) {
-          this.internalCacheListener(message);
-        }
-
-        // 2. 然后分发给会话监听器
-        this.dispatchMessage(message);
-      } catch (error) {
-        if (this.enableLog) {
-          console.error(`[WebSocketManager] Parse message error: ${error}`);
-        }
-      }
-    });
-
-    // 连接关闭事件
-    this.ws.on('close', (err: BusinessError, value: webSocket.CloseResult) => {
-      if (this.enableLog) {
-        console.log(`[WebSocketManager] Connection closed: code=${value.code}, reason=${value.reason}`);
-      }
-      this.isConnected = false;
-      this.notifyAllClose(`Connection closed: ${value.reason}`);
-    });
-
-    // 错误事件
-    this.ws.on('error', (err: BusinessError) => {
-      if (this.enableLog) {
-        console.error(`[WebSocketManager] Error: ${JSON.stringify(err)}`);
-      }
-      this.notifyError(err.message, 'SOCKET_ERROR');
-    });
-  }
-
-  /**
-   * 分发消息到对应的会话监听器
-   */
-  private dispatchMessage(message: StreamMessage): void {
-    const sessionId = message.sessionId;
-    if (!sessionId) {
-      return;
-    }
-
-    const listeners = this.sessionListeners.get(sessionId);
-    if (listeners && listeners.length > 0) {
-      listeners.forEach(listener => {
-        try {
-          listener.onMessage(message);
-        } catch (error) {
-          if (this.enableLog) {
-            console.error(`[WebSocketManager] Listener callback error: ${error}`);
-          }
-        }
-      });
-    }
-  }
-
-  /**
-   * 通知所有监听器错误
-   */
-  private notifyError(message: string, code: string): void {
-    this.sessionListeners.forEach((listeners) => {
-      listeners.forEach(listener => {
-        if (listener.onError) {
-          try {
-            listener.onError({
-              code: code,
-              message: message,
-              timestamp: Date.now()
-            });
-          } catch (error) {
-            if (this.enableLog) {
-              console.error(`[WebSocketManager] Error callback failed: ${error}`);
-            }
-          }
-        }
+        this.connected = true;
+        resolve();
       });
     });
   }
 
-  /**
-   * 通知所有监听器连接关闭
-   */
-  private notifyAllClose(reason: string): void {
-    this.sessionListeners.forEach((listeners) => {
-      listeners.forEach(listener => {
-        if (listener.onClose) {
-          try {
-            listener.onClose(reason);
-          } catch (error) {
-            if (this.enableLog) {
-              console.error(`[WebSocketManager] Close callback failed: ${error}`);
-            }
-          }
-        }
-      });
-    });
-  }
-
-  /**
-   * 注册会话监听器
-   */
-  registerSessionListener(sessionId: string, listener: SessionListener): void {
-    if (!this.sessionListeners.has(sessionId)) {
-      this.sessionListeners.set(sessionId, []);
-    }
-    const listeners = this.sessionListeners.get(sessionId)!;
-    
-    // 检查是否已存在相同的监听器
-    const exists = listeners.some(l => l.onMessage === listener.onMessage);
-    if (!exists) {
-      listeners.push(listener);
-      if (this.enableLog) {
-        console.log(`[WebSocketManager] Listener registered for session: ${sessionId}`);
-      }
-    }
-  }
-
-  /**
-   * 移除会话监听器
-   */
-  unregisterSessionListener(sessionId: string, listener: Partial<SessionListener>): void {
-    const listeners = this.sessionListeners.get(sessionId);
-    if (!listeners) {
-      return;
-    }
-
-    const index = listeners.findIndex(l => l.onMessage === listener.onMessage);
-    if (index !== -1) {
-      listeners.splice(index, 1);
-      if (this.enableLog) {
-        console.log(`[WebSocketManager] Listener removed for session: ${sessionId}`);
-      }
-      
-      // 如果没有监听器了，移除整个会话
-      if (listeners.length === 0) {
-        this.sessionListeners.delete(sessionId);
-      }
-    }
-  }
-
-  /**
-   * 断开连接
-   */
   async disconnect(): Promise<void> {
-    if (!this.ws || !this.isConnected) {
+    if (!this.connected || this.socket === null) {
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      if (!this.ws) {
+    await new Promise<void>((resolve, reject) => {
+      if (this.socket === null) {
         resolve();
         return;
       }
-
-      this.ws.close((err: BusinessError) => {
-        if (!err) {
-          if (this.enableLog) {
-            console.log('[WebSocketManager] Disconnected successfully');
-          }
-          this.isConnected = false;
-          this.ws = null;
-          resolve();
-        } else {
-          if (this.enableLog) {
-            console.error(`[WebSocketManager] Disconnect failed: ${JSON.stringify(err)}`);
-          }
-          reject(new Error(err.message));
+      this.socket.close((error: BusinessError) => {
+        if (error) {
+          reject(new SkillSdkException(6000, 'WebSocket close failed', error));
+          return;
         }
+        resolve();
       });
+    });
+
+    this.connected = false;
+    this.socket = null;
+  }
+
+  registerSessionListener(sessionId: number, listener: SessionListener): void {
+    const key = String(sessionId);
+    if (!this.listenersBySession.has(key)) {
+      this.listenersBySession.set(key, []);
+    }
+    const listeners = this.listenersBySession.get(key) as SessionListener[];
+    const exists = listeners.some((item: SessionListener) => item.onMessage === listener.onMessage);
+    if (!exists) {
+      listeners.push(listener);
+    }
+  }
+
+  unregisterSessionListener(sessionId: number, listener: Partial<SessionListener>): void {
+    const key = String(sessionId);
+    const listeners = this.listenersBySession.get(key);
+    if (listeners === undefined) {
+      return;
+    }
+    const next = listeners.filter((item: SessionListener) => item.onMessage !== listener.onMessage);
+    if (next.length === 0) {
+      this.listenersBySession.delete(key);
+      return;
+    }
+    this.listenersBySession.set(key, next);
+  }
+
+  clearAllListeners(): void {
+    this.listenersBySession.clear();
+  }
+
+  private setupSocketEventHandlers(socket: webSocket.WebSocket): void {
+    socket.on('open', (error: BusinessError, _value: Object) => {
+      if (error) {
+        this.broadcastError('WS_OPEN_ERROR', error.message);
+        return;
+      }
+      this.connected = true;
+      this.logger.info(`connected: ${this.wsUrl}`);
+    });
+
+    socket.on('message', (error: BusinessError, value: string | ArrayBuffer) => {
+      if (error) {
+        this.broadcastError('WS_MESSAGE_ERROR', error.message);
+        return;
+      }
+      const payload = typeof value === 'string' ? value : this.arrayBufferToString(value);
+      let parsed: StreamMessage;
+      try {
+        parsed = JSON.parse(payload) as StreamMessage;
+      } catch (parseError) {
+        this.logger.warn('ignore invalid ws message', payload, parseError);
+        return;
+      }
+
+      if (this.messageHandler !== null) {
+        this.messageHandler(parsed);
+      }
+
+      const rawSessionId = (parsed as Record<string, unknown>).welinkSessionId;
+      if (rawSessionId === undefined || rawSessionId === null || String(rawSessionId) === '') {
+        return;
+      }
+      const listeners = this.listenersBySession.get(String(rawSessionId));
+      if (listeners === undefined) {
+        return;
+      }
+      for (const listener of listeners) {
+        try {
+          listener.onMessage(parsed);
+        } catch (listenerError) {
+          this.logger.warn('listener onMessage failed', listenerError);
+        }
+      }
+    });
+
+    socket.on('close', (error: BusinessError, value: webSocket.CloseResult) => {
+      this.connected = false;
+      if (error) {
+        this.broadcastError('WS_CLOSE_ERROR', error.message);
+      }
+      const reason = `code=${value.code}, reason=${value.reason}`;
+      this.broadcastClose(reason);
+    });
+
+    socket.on('error', (error: BusinessError) => {
+      this.broadcastError('WS_ERROR', error.message);
     });
   }
 
-  /**
-   * 检查连接状态
-   */
-  isActive(): boolean {
-    return this.isConnected && this.ws !== null;
+  private broadcastError(code: string, message: string): void {
+    const payload: SessionError = {
+      code,
+      message,
+      timestamp: Date.now()
+    };
+    for (const listeners of this.listenersBySession.values()) {
+      for (const listener of listeners) {
+        if (listener.onError !== undefined) {
+          try {
+            listener.onError(payload);
+          } catch (error) {
+            this.logger.warn('listener onError failed', error);
+          }
+        }
+      }
+    }
   }
 
-  /**
-   * ArrayBuffer转字符串
-   */
+  private broadcastClose(reason: string): void {
+    for (const listeners of this.listenersBySession.values()) {
+      for (const listener of listeners) {
+        if (listener.onClose !== undefined) {
+          try {
+            listener.onClose(reason);
+          } catch (error) {
+            this.logger.warn('listener onClose failed', error);
+          }
+        }
+      }
+    }
+  }
+
+  private resolveWsUrl(config: SkillSDKConfig, fallback?: string): string {
+    if (config.wsUrl !== undefined && config.wsUrl.trim() !== '') {
+      return config.wsUrl;
+    }
+    if (config.baseUrl !== undefined && config.baseUrl.trim() !== '') {
+      const normalized = config.baseUrl.replace(/\/$/, '');
+      if (normalized.startsWith('https://')) {
+        return `${normalized.replace('https://', 'wss://')}/ws/skill/stream`;
+      }
+      if (normalized.startsWith('http://')) {
+        return `${normalized.replace('http://', 'ws://')}/ws/skill/stream`;
+      }
+    }
+    if (fallback !== undefined) {
+      return fallback;
+    }
+    throw new SkillSdkException(1000, 'Unable to resolve WebSocket URL');
+  }
+
   private arrayBufferToString(buffer: ArrayBuffer): string {
-    const uint8Array = new Uint8Array(buffer);
-    let result = '';
-    for (let i = 0; i < uint8Array.length; i++) {
-      result += String.fromCharCode(uint8Array[i]);
+    const view = new Uint8Array(buffer);
+    let output = '';
+    for (let i = 0; i < view.length; i++) {
+      output += String.fromCharCode(view[i]);
     }
-    return result;
-  }
-
-  /**
-   * 清理所有监听器
-   */
-  clearAllListeners(): void {
-    this.sessionListeners.clear();
-    if (this.enableLog) {
-      console.log('[WebSocketManager] All listeners cleared');
-    }
+    return output;
   }
 }
