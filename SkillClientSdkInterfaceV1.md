@@ -140,70 +140,66 @@ try {
 
 ---
 
-## 2. 关闭会话接口
+## 2. 关闭技能接口
 
 ### 接口说明
 
-关闭并删除指定的 Skill 会话，同时关闭 SDK 与 Skill 服务端之间的 WebSocket 连接，释放本地资源。
+关闭 SDK 与 Skill 服务端之间的 WebSocket 连接，释放本地资源。
 
 **重要说明**：
 
-- `closeSession` 会调用服务端的 `DELETE /api/skill/sessions/{welinkSessionId}` 接口
-- 该接口会关闭服务端会话并删除相关资源
-- 同时关闭 WebSocket 连接并清理本地资源
+- `closeSkill` 在 V1 中只负责关闭 WebSocket 连接
+- 该接口**不会**关闭服务端会话，也**不会**调用服务端的 `DELETE /api/skill/sessions/{welinkSessionId}`
+- 因此关闭窗口后的服务端会话生命周期仍需上层自行处理
 
 ### 接口名
 
 ```typescript
-closeSession(params: CloseSessionParams): Promise<CloseSessionResult>
+closeSkill(): Promise<CloseSkillResult>
 ```
 
 ### 入参
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| welinkSessionId | number | 是 | 会话 ID |
+| 无 | 无 | 无 | 无 |
 
 ### 出参
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| welinkSessionId | number | 会话 ID |
-| status | string | 关闭状态：`closed` |
+| status | string | 关闭状态：`success` / `failed` |
 
 ### 出参示例
 
 ```json
 {
-  "welinkSessionId": 42,
-  "status": "closed"
+  "status": "success"
 }
 ```
 
 ### 实现方法
 
-1. 调用服务端 REST API：
-   - **URL**: `DELETE /api/skill/sessions/{welinkSessionId}`
-2. 关闭当前 SDK 维护的 WebSocket 连接
-3. 清理本地监听器、重连状态和流式缓存
+1. 关闭当前 SDK 维护的 WebSocket 连接
+2. 清理本地监听器、重连状态和流式缓存
 
 ### 调用示例
 
 ```typescript
 try {
-  const result = await closeSession({ welinkSessionId: 42 });
+  const result = await closeSkill();
 
-  if (result.status === "closed") {
-    console.log("会话已关闭:", result.welinkSessionId);
+  if (result.status === "success") {
+    console.log("WebSocket 已关闭");
   }
 } catch (error) {
-  console.error("关闭会话失败:", error.message);
+  console.error("关闭连接失败:", error.message);
 }
 ```
 
 ---
 
-## 3. 停止会话接口
+## 3. 停止技能接口
 
 ### 接口说明
 
@@ -212,7 +208,7 @@ try {
 ### 接口名
 
 ```typescript
-stopSession(params: StopSessionParams): Promise<StopSessionResult>
+stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 ```
 
 ### 入参
@@ -247,7 +243,7 @@ stopSession(params: StopSessionParams): Promise<StopSessionResult>
 
 ```typescript
 try {
-  const result = await stopSession({ welinkSessionId: 42 });
+  const result = await stopSkill({ welinkSessionId: 42 });
 
   if (result.status === "aborted") {
     console.log("当前轮回答已停止");
@@ -293,12 +289,34 @@ onSessionStatusChange(params: OnSessionStatusChangeParams): void
 
 ### 状态映射
 
-| 触发源 | 原始状态 | SDK状态 |
-|--------|----------|---------|
-| `session.status` 事件 | `busy` | `executing` |
-| `session.status` 事件 | `retry` | `executing` |
-| `session.status` 事件 | `idle` | `completed` |
-| `stopSession` 成功 | `aborted` | `stopped` |
+| WebSocket 消息 `type` | 附加条件 | SDK 状态 | 说明 |
+|----------------------|----------|----------|------|
+| `step.start` | 无 | `executing` | 一轮推理开始 |
+| `session.status` | `sessionStatus = busy` | `executing` | 会话处理中 |
+| `session.status` | `sessionStatus = retry` | `executing` | 会话重试中 |
+| `text.delta` | 无 | `executing` | 正在流式输出文本 |
+| `thinking.delta` | 无 | `executing` | 正在流式输出思维链 |
+| `tool.update` | 无 | `executing` | 工具调用进行中或状态更新中 |
+| `question` | 无 | `executing` | 当前轮进入提问交互，尚未结束 |
+| `permission.ask` | 无 | `executing` | 当前轮进入权限确认，尚未结束 |
+| `permission.reply` | `response = once` 或 `always` | `executing` | 权限已处理，执行继续 |
+| `file` | 无 | `executing` | 文件/附件属于当前轮输出中的内容事件，不视为结束 |
+| `step.done` | 无 | `completed` | 当前推理步骤完成 |
+| `session.status` | `sessionStatus = idle` | `completed` | 会话回到空闲，表示当前轮完成 |
+| `text.done` | 无 | `completed` | 文本部件完成 |
+| `thinking.done` | 无 | `completed` | 思维链部件完成 |
+| `permission.reply` | `response = reject` | `stopped` | 权限被拒绝，当前执行路径中断 |
+| `session.error` | 无 | `stopped` | 会话级异常中断 |
+| `error` | 无 | `stopped` | 系统级异常中断 |
+| `agent.offline` | 无 | `stopped` | Agent 下线，当前轮无法继续 |
+
+### 补充说明
+
+- `session.title` 暂不参与状态映射
+- `text.done`、`thinking.done` 属于部件级完成信号，会先映射为 `completed`
+- 如果后续再次收到 `executing` 类事件，例如新的 `tool.update`、`text.delta` 或 `session.status=busy`，状态可再次切回 `executing`
+- 更稳定的整轮完成信号优先看 `step.done` 或 `session.status=idle`
+- `stopSkill()` 成功后，SDK 仍会额外触发一次 `stopped`，这是客户端补充行为，不属于服务端流式事件映射本身
 
 ### 调用示例
 
@@ -479,22 +497,9 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 
 ### 实现方法
 
-1.调用服务端REST API发送消息到IM：
-- **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
-- **请求体**:
-  ```json
-  {
-    "content": "代码重构已完成，请查看 PR #42"
-  }
-  ```
-- **响应**:
-  ```json
-  {
-    "success": true,
-    "chatId": "chat-789",
-    "contentLength": 22
-  }
-  ```
+1. 上层应用从 Skill 小程序中获取用户最终确认的文本
+2. SDK 调用 Skill 服务端“发送到 IM”接口，传入 `welinkSessionId` 和 `content`
+3. Skill 服务端再调用 IM 平台 API 发送该文本
 
 ### 注意事项
 
@@ -912,6 +917,8 @@ try {
 **重要说明**：
 
 - 当前 V1 保持现状：`close` 只处理小程序侧关闭逻辑
+- 上层可在 `close` 成功后继续调用 `closeSkill()` 释放 WebSocket
+- 是否关闭服务端会话仍由上层自行决定，当前客户端文档未新增该能力
 
 ### 接口名
 
@@ -984,7 +991,7 @@ await controlSkillWeCode({
 | imGroupId | String | 是 | 关联的 IM 群组 ID |
 | content | String | 是 | 首条用户消息内容，用于触发首轮 AI 执行 |
 
-### StopSessionParams
+### StopSkillParams
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -1056,12 +1063,6 @@ await controlSkillWeCode({
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | action | SkillWeCodeAction | 是 | 操作类型：`close` / `minimize` |
-
-### CloseSessionParams
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| welinkSessionId | number | 是 | 要关闭的会话 ID |
 
 ### SendMessageToIMParams
 
@@ -1256,19 +1257,18 @@ await controlSkillWeCode({
 | messageSeq | number | 该消息在会话中的顺序号 |
 | createdAt | string | 创建时间，ISO-8601 |
 
-### StopSessionResult
+### StopSkillResult
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | welinkSessionId | number | 会话 ID |
 | status | string | 中止结果，成功时为 `aborted` |
 
-### CloseSessionResult
+### CloseSkillResult
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| welinkSessionId | number | 会话 ID |
-| status | string | 关闭状态：`closed` |
+| status | string | 关闭结果：`success` / `failed` |
 
 ### ReplyPermissionResult
 
