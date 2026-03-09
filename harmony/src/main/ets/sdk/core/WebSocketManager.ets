@@ -78,7 +78,7 @@ export class WebSocketManager {
       }
       this.socket.connect(this.wsUrl, (error: BusinessError) => {
         if (error) {
-          reject(new SkillSdkException(6000, 'WebSocket connect failed', error));
+          reject(new SkillSdkException(6000, 'WebSocket connect failed'));
           return;
         }
         this.connected = true;
@@ -99,7 +99,7 @@ export class WebSocketManager {
       }
       this.socket.close((error: BusinessError) => {
         if (error) {
-          reject(new SkillSdkException(6000, 'WebSocket close failed', error));
+          reject(new SkillSdkException(6000, 'WebSocket close failed'));
           return;
         }
         resolve();
@@ -168,7 +168,7 @@ export class WebSocketManager {
         this.messageHandler(parsed);
       }
 
-      const rawSessionId = (parsed as Record<string, unknown>).welinkSessionId;
+      const rawSessionId = parsed.welinkSessionId;
       if (rawSessionId === undefined || rawSessionId === null || String(rawSessionId) === '') {
         return;
       }

@@ -50,7 +50,7 @@ export class HttpClient {
 
   async post<T>(
     path: string,
-    body?: Record<string, unknown>,
+    body?: Record<string, any>,
     options?: RequestOptions
   ): Promise<T> {
     return await this.request<T>(path, http.RequestMethod.POST, body, undefined, options);
@@ -63,7 +63,7 @@ export class HttpClient {
   private async request<T>(
     path: string,
     method: http.RequestMethod,
-    body?: Record<string, unknown>,
+    body?: Record<string, any>,
     query?: QueryParams,
     options?: RequestOptions
   ): Promise<T> {
@@ -102,11 +102,11 @@ export class HttpClient {
         return {} as T;
       }
 
-      let parsed: unknown;
+      let parsed: any;
       try {
         parsed = JSON.parse(responseText);
       } catch (error) {
-        throw new SkillSdkException(7000, 'Response is not valid JSON', error);
+        throw new SkillSdkException(7000, 'Response is not valid JSON');
       }
 
       if (!expectEnvelope) {
@@ -127,7 +127,7 @@ export class HttpClient {
       if (error instanceof SkillSdkException) {
         throw error;
       }
-      throw new SkillSdkException(6000, 'Network request failed', error);
+      throw new SkillSdkException(6000, 'Network request failed');
     } finally {
       client.destroy();
     }

@@ -72,14 +72,11 @@ export class SkillSdkException extends Error implements SDKError {
   errorCode: number;
   errorMessage: string;
 
-  constructor(errorCode: number, errorMessage: string, cause?: unknown) {
+  constructor(errorCode: number, errorMessage: string) {
     super(errorMessage);
     this.errorCode = errorCode;
     this.errorMessage = errorMessage;
     this.name = 'SkillSdkException';
-    if (cause !== undefined) {
-      (this as Record<string, unknown>).cause = cause;
-    }
   }
 }
 
@@ -117,7 +114,7 @@ export interface SessionMessagePart {
   toolName?: string;
   toolCallId?: string;
   toolStatus?: 'pending' | 'running' | 'completed' | 'error';
-  toolInput?: Record<string, unknown>;
+  toolInput?: Record<string, any>;
   toolOutput?: string;
   toolError?: string;
   header?: string;
@@ -185,7 +182,7 @@ export interface StreamMessage {
   welinkSessionId: string;
   emittedAt: string;
   createdAt?: string;
-  raw?: Record<string, unknown>;
+  raw?: Record<string, any>;
 
   messageId?: string;
   messageSeq?: number;
@@ -197,7 +194,7 @@ export interface StreamMessage {
   toolName?: string;
   toolCallId?: string;
   status?: 'pending' | 'running' | 'completed' | 'error';
-  input?: Record<string, unknown>;
+  input?: Record<string, any>;
   output?: string;
   error?: string;
   title?: string;
@@ -221,7 +218,7 @@ export interface StreamMessage {
   sessionStatus?: SessionRuntimeStatus;
   permissionId?: string;
   permType?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, any>;
   response?: PermissionResponse;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];

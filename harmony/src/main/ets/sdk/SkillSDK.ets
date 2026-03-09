@@ -470,11 +470,11 @@ export class SkillSDK {
     if (error instanceof Error) {
       this.logger.warn(`${method} failed: ${error.message}`);
       if (error.message.includes('must be')) {
-        return new SkillSdkException(1000, error.message, error);
+        return new SkillSdkException(1000, error.message);
       }
-      return new SkillSdkException(5000, error.message, error);
+      return new SkillSdkException(5000, error.message);
     }
     this.logger.warn(`${method} failed with unknown error`, error);
-    return new SkillSdkException(5000, 'Unknown SDK error', error);
+    return new SkillSdkException(5000, 'Unknown SDK error');
   }
 }
