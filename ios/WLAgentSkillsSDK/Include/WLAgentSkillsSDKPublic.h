@@ -7,4 +7,3 @@
 
 #import "WLAgentSkillsSDK.h"
 #import "WLAgentSkillsTypes.h"
-#import "WLAgentSkillsConfig.h"

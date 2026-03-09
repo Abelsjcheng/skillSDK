@@ -1,249 +1,268 @@
-//
+﻿//
 //  WLAgentSkillsHTTPClient.m
 //  WLAgentSkillsSDK
 //
 
 #import "WLAgentSkillsHTTPClient.h"
 #import "WLAgentSkillsConfig.h"
+#import "WLAgentSkillsTypes.h"
 @import AFNetworking;
+
+static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.http";
 
 @interface WLAgentSkillsHTTPClient ()
 
 @property (nonatomic, strong) AFHTTPSessionManager *sessionManager;
+@property (nonatomic, copy) NSString *configuredBaseURL;
 
 @end
 
 @implementation WLAgentSkillsHTTPClient
 
 + (instancetype)sharedClient {
-    static WLAgentSkillsHTTPClient *sharedInstance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sharedInstance = [[WLAgentSkillsHTTPClient alloc] init];
-    });
-    return sharedInstance;
+  static WLAgentSkillsHTTPClient *sharedInstance = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    sharedInstance = [[WLAgentSkillsHTTPClient alloc] init];
+  });
+  return sharedInstance;
 }
 
 - (instancetype)init {
-    self = [super init];
-    if (self) {
-        WLAgentSkillsConfig *config = [WLAgentSkillsConfig sharedConfig];
-        NSURL *baseURL = [NSURL URLWithString:config.baseURL];
-        _sessionManager = [[AFHTTPSessionManager alloc] initWithBaseURL:baseURL];
-        _sessionManager.requestSerializer = [AFJSONRequestSerializer serializer];
-        _sessionManager.responseSerializer = [AFJSONResponseSerializer serializer];
-        _sessionManager.requestSerializer.timeoutInterval = config.requestTimeout;
-        [_sessionManager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-        [_sessionManager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-    }
-    return self;
+  self = [super init];
+  if (self) {
+    [self rebuildSessionManager];
+  }
+  return self;
 }
 
-#pragma mark - Session Management
-
-- (void)createSessionWithUserId:(NSString *)userId
-            skillDefinitionId:(NSInteger)skillDefinitionId
-                        agentId:(NSInteger)agentId
-                          title:(nullable NSString *)title
-                       imChatId:(nullable NSString *)imChatId
-                        success:(WLAgentSkillsSuccessBlock)success
-                        failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSMutableDictionary *params = [NSMutableDictionary dictionary];
-    params[@"userId"] = @([userId integerValue]);
-    params[@"skillDefinitionId"] = @(skillDefinitionId);
-    
-    if (agentId > 0) {
-        params[@"agentId"] = @(agentId);
-    }
-    if (title.length > 0) {
-        params[@"title"] = title;
-    }
-    if (imChatId.length > 0) {
-        params[@"imChatId"] = imChatId;
-    }
-    
-    [self.sessionManager POST:@"/api/skill/sessions"
-                   parameters:params
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+- (void)reloadConfiguration {
+  [self rebuildSessionManager];
 }
 
-- (void)getSessionListWithUserId:(NSString *)userId
-                        statuses:(nullable NSArray<NSString *> *)statuses
-                            page:(NSInteger)page
-                            size:(NSInteger)size
-                         success:(WLAgentSkillsSuccessBlock)success
-                         failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSMutableDictionary *params = [NSMutableDictionary dictionary];
-    params[@"userId"] = @([userId integerValue]);
-    params[@"page"] = @(page);
-    params[@"size"] = @(size);
-    
-    if (statuses.count > 0) {
-        params[@"statuses"] = statuses;
-    }
-    
-    [self.sessionManager GET:@"/api/skill/sessions"
-                   parameters:params
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+#pragma mark - Public APIs
+
+- (void)createSessionWithAK:(NSString *)ak
+                      title:(nullable NSString *)title
+                  imGroupId:(NSString *)imGroupId
+                    success:(WLAgentSkillsHTTPSuccessBlock)success
+                    failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSMutableDictionary *parameters = [@{
+    @"ak" : ak,
+    @"imGroupId" : imGroupId
+  } mutableCopy];
+  if (title.length > 0) {
+    parameters[@"title"] = title;
+  }
+
+  [self POST:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
 }
 
-- (void)getSessionDetailWithSessionId:(NSString *)sessionId
-                             success:(WLAgentSkillsSuccessBlock)success
-                             failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@", sessionId];
-    
-    [self.sessionManager GET:path
-                   parameters:nil
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+- (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
+                          status:(nullable NSString *)status
+                            page:(nullable NSNumber *)page
+                            size:(nullable NSNumber *)size
+                         success:(WLAgentSkillsHTTPSuccessBlock)success
+                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
+  if (imGroupId.length > 0) {
+    parameters[@"imGroupId"] = imGroupId;
+  }
+  if (status.length > 0) {
+    parameters[@"status"] = status;
+  }
+  if (page != nil) {
+    parameters[@"page"] = page;
+  }
+  if (size != nil) {
+    parameters[@"size"] = size;
+  }
+
+  [self GET:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
 }
 
-- (void)closeSessionWithSessionId:(NSString *)sessionId
-                         success:(WLAgentSkillsSuccessBlock)success
-                         failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@", sessionId];
-    
-    [self.sessionManager DELETE:path
-                     parameters:nil
-                        headers:nil
-                        success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+- (void)getMessagesWithSessionId:(NSNumber *)welinkSessionId
+                            page:(NSNumber *)page
+                            size:(NSNumber *)size
+                         success:(WLAgentSkillsHTTPSuccessBlock)success
+                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", welinkSessionId];
+  NSDictionary *parameters = @{
+    @"page" : page ?: @0,
+    @"size" : size ?: @50
+  };
+  [self GET:path parameters:parameters success:success failure:failure];
 }
 
-#pragma mark - Message Management
-
-- (void)sendMessageWithSessionId:(NSString *)sessionId
+- (void)sendMessageWithSessionId:(NSNumber *)welinkSessionId
                          content:(NSString *)content
-                         success:(WLAgentSkillsSuccessBlock)success
-                         failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", sessionId];
-    NSDictionary *params = @{@"content": content};
-    
-    [self.sessionManager POST:path
-                   parameters:params
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+                      toolCallId:(nullable NSString *)toolCallId
+                         success:(WLAgentSkillsHTTPSuccessBlock)success
+                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", welinkSessionId];
+  NSMutableDictionary *parameters = [@{ @"content" : content } mutableCopy];
+  if (toolCallId.length > 0) {
+    parameters[@"toolCallId"] = toolCallId;
+  }
+  [self POST:path parameters:parameters success:success failure:failure];
 }
 
-- (void)getMessageHistoryWithSessionId:(NSString *)sessionId
-                                  page:(NSInteger)page
-                                  size:(NSInteger)size
-                               success:(WLAgentSkillsSuccessBlock)success
-                               failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", sessionId];
-    NSDictionary *params = @{@"page": @(page), @"size": @(size)};
-    
-    [self.sessionManager GET:path
-                   parameters:params
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+- (void)abortSessionWithSessionId:(NSNumber *)welinkSessionId
+                          success:(WLAgentSkillsHTTPSuccessBlock)success
+                          failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/abort", welinkSessionId];
+  [self POST:path parameters:nil success:success failure:failure];
 }
 
-- (void)replyPermissionWithSessionId:(NSString *)sessionId
-                       permissionId:(NSString *)permissionId
-                           approved:(BOOL)approved
-                            success:(WLAgentSkillsSuccessBlock)success
-                            failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/permissions/%@", sessionId, permissionId];
-    NSDictionary *params = @{@"approved": @(approved)};
-    
-    [self.sessionManager POST:path
-                   parameters:params
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
+- (void)replyPermissionWithSessionId:(NSNumber *)welinkSessionId
+                              permId:(NSString *)permId
+                            response:(NSString *)response
+                             success:(WLAgentSkillsHTTPSuccessBlock)success
+                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/permissions/%@", welinkSessionId, permId];
+  NSDictionary *parameters = @{ @"response" : response };
+  [self POST:path parameters:parameters success:success failure:failure];
 }
 
-- (void)sendMessageToIMWithSessionId:(NSString *)sessionId
-                             content:(NSString *)content
-                             success:(WLAgentSkillsSuccessBlock)success
-                             failure:(WLAgentSkillsFailureBlock)failure {
-    
-    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/send-to-im", sessionId];
-    NSDictionary *params = @{@"content": content};
-    
-    [self.sessionManager POST:path
-                   parameters:params
-                      headers:nil
-                     progress:nil
-                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        if (success) {
-            success(responseObject);
-        }
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        if (failure) {
-            failure(error);
-        }
+- (void)sendToIMWithSessionId:(NSNumber *)welinkSessionId
+                      content:(NSString *)content
+                      success:(WLAgentSkillsHTTPSuccessBlock)success
+                      failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/send-to-im", welinkSessionId];
+  NSDictionary *parameters = @{ @"content" : content };
+  [self POST:path parameters:parameters success:success failure:failure];
+}
+
+#pragma mark - Internal HTTP
+
+- (void)GET:(NSString *)path
+ parameters:(nullable NSDictionary *)parameters
+    success:(WLAgentSkillsHTTPSuccessBlock)success
+    failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  [self ensureConfigurationUpToDate];
+  [self.sessionManager GET:path
+                parameters:parameters
+                   headers:nil
+                  progress:nil
+                   success:^(__unused NSURLSessionDataTask *task, id responseObject) {
+    [self handleResponseObject:responseObject success:success failure:failure];
+  }
+                   failure:^(__unused NSURLSessionDataTask *task, NSError *error) {
+    [self handleFailureError:error failure:failure];
+  }];
+}
+
+- (void)POST:(NSString *)path
+  parameters:(nullable NSDictionary *)parameters
+     success:(WLAgentSkillsHTTPSuccessBlock)success
+     failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  [self ensureConfigurationUpToDate];
+  [self.sessionManager POST:path
+                 parameters:parameters
+                    headers:nil
+                   progress:nil
+                    success:^(__unused NSURLSessionDataTask *task, id responseObject) {
+    [self handleResponseObject:responseObject success:success failure:failure];
+  }
+                    failure:^(__unused NSURLSessionDataTask *task, NSError *error) {
+    [self handleFailureError:error failure:failure];
+  }];
+}
+
+- (void)handleResponseObject:(id)responseObject
+                     success:(WLAgentSkillsHTTPSuccessBlock)success
+                     failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  if (![responseObject isKindOfClass:[NSDictionary class]]) {
+    if (success) {
+      success(responseObject);
+    }
+    return;
+  }
+
+  NSDictionary *dict = (NSDictionary *)responseObject;
+  NSNumber *code = dict[@"code"];
+  if (code != nil) {
+    if (code.integerValue == 0) {
+      if (success) {
+        id data = dict[@"data"];
+        success(data);
+      }
+      return;
+    }
+
+    NSString *message = [dict[@"errormsg"] isKindOfClass:[NSString class]] ? dict[@"errormsg"] : @"Service error";
+    NSError *error = [NSError errorWithDomain:WLAgentSkillsHTTPErrorDomain
+                                         code:code.integerValue
+                                     userInfo:@{
+      NSLocalizedDescriptionKey : message,
+      WLAgentSkillsErrorCodeKey : code,
+      WLAgentSkillsErrorMessageKey : message
     }];
+    if (failure) {
+      failure(error);
+    }
+    return;
+  }
+
+  if (success) {
+    success(dict);
+  }
+}
+
+- (void)handleFailureError:(NSError *)error failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSData *responseData = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
+  if (responseData.length > 0) {
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:nil];
+    if ([json isKindOfClass:[NSDictionary class]]) {
+      NSString *message = @"Network request failed";
+      NSInteger code = error.code;
+
+      if (json[@"errormsg"]) {
+        message = [json[@"errormsg"] description];
+      } else if (json[@"message"]) {
+        message = [json[@"message"] description];
+      }
+
+      if (json[@"code"] != nil) {
+        code = [json[@"code"] integerValue];
+      }
+
+      NSError *wrapped = [NSError errorWithDomain:error.domain
+                                             code:code
+                                         userInfo:@{
+        NSLocalizedDescriptionKey : message,
+        WLAgentSkillsErrorCodeKey : @(code),
+        WLAgentSkillsErrorMessageKey : message
+      }];
+      if (failure) {
+        failure(wrapped);
+      }
+      return;
+    }
+  }
+
+  if (failure) {
+    failure(error);
+  }
+}
+
+- (void)ensureConfigurationUpToDate {
+  NSString *baseURL = [WLAgentSkillsConfig sharedConfig].baseURL;
+  if (![baseURL isEqualToString:self.configuredBaseURL]) {
+    [self rebuildSessionManager];
+  }
+}
+
+- (void)rebuildSessionManager {
+  WLAgentSkillsConfig *config = [WLAgentSkillsConfig sharedConfig];
+  NSURL *baseURL = [NSURL URLWithString:config.baseURL];
+  self.sessionManager = [[AFHTTPSessionManager alloc] initWithBaseURL:baseURL];
+  self.sessionManager.requestSerializer = [AFJSONRequestSerializer serializer];
+  self.sessionManager.responseSerializer = [AFJSONResponseSerializer serializer];
+  self.sessionManager.requestSerializer.timeoutInterval = config.requestTimeout;
+  [self.sessionManager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+  [self.sessionManager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+  self.configuredBaseURL = config.baseURL;
 }
 
 @end

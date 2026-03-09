@@ -440,14 +440,14 @@
 
 | 项目     | 值                                                |
 | -------- | ------------------------------------------------- |
-| **URL**  | `POST /api/skill/sessions/{sessionId}/send-to-im` |
+| **URL**  | `POST /api/skill/sessions/{welinkSessionId}/send-to-im` |
 | **认证** | 无                                                |
 
 **路径参数：**
 
 | 参数        | 类型   | 说明    |
 | ----------- | ------ | ------- |
-| `sessionId` | `Long` | 会话 ID |
+| `welinkSessionId` | `Long` | 会话 ID |
 
 **请求体：**
 

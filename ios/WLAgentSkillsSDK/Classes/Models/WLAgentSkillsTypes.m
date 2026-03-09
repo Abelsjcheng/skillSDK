@@ -1,324 +1,391 @@
-//
+﻿//
 //  WLAgentSkillsTypes.m
 //  WLAgentSkillsSDK
 //
 
 #import "WLAgentSkillsTypes.h"
 
-#pragma mark - WLAgentSkillsSkillDefinition
+NSString * const WLAgentSkillsErrorCodeKey = @"errorCode";
+NSString * const WLAgentSkillsErrorMessageKey = @"errorMessage";
 
-@implementation WLAgentSkillsSkillDefinition
-
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _skillDefinitionId = [dictionary[@"id"] integerValue];
-        _skillCode = dictionary[@"skillCode"];
-        _skillName = dictionary[@"skillName"];
-        _toolType = dictionary[@"toolType"];
-        _skillDescription = dictionary[@"description"];
-        _iconUrl = dictionary[@"iconUrl"];
-        _status = dictionary[@"status"];
-        _sortOrder = [dictionary[@"sortOrder"] integerValue];
-        _createdAt = dictionary[@"createdAt"];
-        _updatedAt = dictionary[@"updatedAt"];
-    }
-    return self;
+static NSString *WLAgentSkillsStringValue(id value, NSString *fallback) {
+  if ([value isKindOfClass:[NSString class]]) {
+    return (NSString *)value;
+  }
+  if ([value respondsToSelector:@selector(stringValue)]) {
+    return [value stringValue];
+  }
+  return fallback;
 }
 
-- (NSDictionary *)toDictionary {
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-    dict[@"id"] = @(self.skillDefinitionId);
-    if (self.skillCode) dict[@"skillCode"] = self.skillCode;
-    if (self.skillName) dict[@"skillName"] = self.skillName;
-    if (self.toolType) dict[@"toolType"] = self.toolType;
-    if (self.skillDescription) dict[@"description"] = self.skillDescription;
-    if (self.iconUrl) dict[@"iconUrl"] = self.iconUrl;
-    if (self.status) dict[@"status"] = self.status;
-    dict[@"sortOrder"] = @(self.sortOrder);
-    if (self.createdAt) dict[@"createdAt"] = self.createdAt;
-    if (self.updatedAt) dict[@"updatedAt"] = self.updatedAt;
-    return [dict copy];
+static NSNumber *WLAgentSkillsNumberValue(id value, NSNumber *fallback) {
+  if ([value isKindOfClass:[NSNumber class]]) {
+    return (NSNumber *)value;
+  }
+  if ([value isKindOfClass:[NSString class]]) {
+    NSDecimalNumber *decimal = [NSDecimalNumber decimalNumberWithString:(NSString *)value];
+    if (![decimal isEqualToNumber:[NSDecimalNumber notANumber]]) {
+      return decimal;
+    }
+  }
+  return fallback;
+}
+
+static NSDictionary *WLAgentSkillsDictionaryValue(id value) {
+  if ([value isKindOfClass:[NSDictionary class]]) {
+    return (NSDictionary *)value;
+  }
+  return @{};
+}
+
+static NSArray *WLAgentSkillsArrayValue(id value) {
+  if ([value isKindOfClass:[NSArray class]]) {
+    return (NSArray *)value;
+  }
+  return @[];
+}
+
+#pragma mark - Param Models
+
+@implementation WLAgentSkillsCreateSessionParams
+@end
+
+@implementation WLAgentSkillsStopSkillParams
+@end
+
+@implementation WLAgentSkillsOnSessionStatusChangeParams
+@end
+
+@implementation WLAgentSkillsOnSkillWecodeStatusChangeParams
+@end
+
+@implementation WLAgentSkillsRegenerateAnswerParams
+@end
+
+@implementation WLAgentSkillsSendMessageToIMParams
+@end
+
+@implementation WLAgentSkillsGetSessionMessageParams
+
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _page = @0;
+    _size = @50;
+  }
+  return self;
 }
 
 @end
 
-#pragma mark - WLAgentSkillsSession
+@implementation WLAgentSkillsRegisterSessionListenerParams
+@end
 
-@implementation WLAgentSkillsSession
+@implementation WLAgentSkillsUnregisterSessionListenerParams
+@end
+
+@implementation WLAgentSkillsSendMessageParams
+@end
+
+@implementation WLAgentSkillsReplyPermissionParams
+@end
+
+@implementation WLAgentSkillsControlSkillWeCodeParams
+@end
+
+#pragma mark - Data Models
+
+@implementation WLAgentSkillsSkillSession
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _sessionId = [dictionary[@"id"] integerValue];
-        _userId = [dictionary[@"userId"] integerValue];
-        _skillDefinitionId = [dictionary[@"skillDefinitionId"] integerValue];
-        _agentId = [dictionary[@"agentId"] integerValue];
-        _toolSessionId = dictionary[@"toolSessionId"];
-        _title = dictionary[@"title"];
-        
-        NSString *statusStr = dictionary[@"status"];
-        if ([statusStr isEqualToString:@"ACTIVE"]) {
-            _status = WLAgentSkillsSessionStatusActive;
-        } else if ([statusStr isEqualToString:@"IDLE"]) {
-            _status = WLAgentSkillsSessionStatusIdle;
-        } else {
-            _status = WLAgentSkillsSessionStatusClosed;
-        }
-        
-        _imChatId = dictionary[@"imChatId"];
-        _createdAt = dictionary[@"createdAt"];
-        _lastActiveAt = dictionary[@"lastActiveAt"];
-    }
-    return self;
-}
-
-- (NSDictionary *)toDictionary {
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-    dict[@"id"] = @(self.sessionId);
-    dict[@"userId"] = @(self.userId);
-    dict[@"skillDefinitionId"] = @(self.skillDefinitionId);
-    dict[@"agentId"] = @(self.agentId);
-    if (self.toolSessionId) dict[@"toolSessionId"] = self.toolSessionId;
-    if (self.title) dict[@"title"] = self.title;
-    dict[@"status"] = [self statusString];
-    if (self.imChatId) dict[@"imChatId"] = self.imChatId;
-    if (self.createdAt) dict[@"createdAt"] = self.createdAt;
-    if (self.lastActiveAt) dict[@"lastActiveAt"] = self.lastActiveAt;
-    return [dict copy];
-}
-
-- (NSString *)statusString {
-    switch (self.status) {
-        case WLAgentSkillsSessionStatusActive:
-            return @"ACTIVE";
-        case WLAgentSkillsSessionStatusIdle:
-            return @"IDLE";
-        case WLAgentSkillsSessionStatusClosed:
-            return @"CLOSED";
-    }
+  self = [super init];
+  if (self) {
+    _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+    _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
+    _ak = WLAgentSkillsStringValue(dictionary[@"ak"], @"");
+    _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
+    _imGroupId = WLAgentSkillsStringValue(dictionary[@"imGroupId"], @"");
+    _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
+    _toolSessionId = WLAgentSkillsStringValue(dictionary[@"toolSessionId"], nil);
+    _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
+    _updatedAt = WLAgentSkillsStringValue(dictionary[@"updatedAt"], @"");
+  }
+  return self;
 }
 
 @end
 
-#pragma mark - WLAgentSkillsMessage
-
-@implementation WLAgentSkillsMessage
+@implementation WLAgentSkillsSessionMessagePart
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _messageId = [dictionary[@"id"] integerValue];
-        _sessionId = [dictionary[@"sessionId"] integerValue];
-        _seq = [dictionary[@"seq"] integerValue];
-        
-        NSString *roleStr = dictionary[@"role"];
-        if ([roleStr isEqualToString:@"USER"]) {
-            _role = WLAgentSkillsMessageRoleUser;
-        } else if ([roleStr isEqualToString:@"ASSISTANT"]) {
-            _role = WLAgentSkillsMessageRoleAssistant;
-        } else if ([roleStr isEqualToString:@"SYSTEM"]) {
-            _role = WLAgentSkillsMessageRoleSystem;
-        } else {
-            _role = WLAgentSkillsMessageRoleTool;
-        }
-        
-        _content = dictionary[@"content"];
-        
-        NSString *contentTypeStr = dictionary[@"contentType"];
-        if ([contentTypeStr isEqualToString:@"CODE"]) {
-            _contentType = WLAgentSkillsContentTypeCode;
-        } else if ([contentTypeStr isEqualToString:@"PLAIN"]) {
-            _contentType = WLAgentSkillsContentTypePlain;
-        } else {
-            _contentType = WLAgentSkillsContentTypeMarkdown;
-        }
-        
-        _createdAt = dictionary[@"createdAt"];
-        _meta = dictionary[@"meta"];
-    }
-    return self;
+  self = [super init];
+  if (self) {
+    _partId = WLAgentSkillsStringValue(dictionary[@"partId"], nil);
+    _partSeq = WLAgentSkillsNumberValue(dictionary[@"partSeq"], nil);
+    _type = WLAgentSkillsStringValue(dictionary[@"type"], nil);
+    _content = WLAgentSkillsStringValue(dictionary[@"content"], nil);
+    _toolName = WLAgentSkillsStringValue(dictionary[@"toolName"], nil);
+    _toolCallId = WLAgentSkillsStringValue(dictionary[@"toolCallId"], nil);
+    _toolStatus = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
+    _toolInput = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
+    _toolOutput = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
+    _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
+    _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+    _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
+    _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
+    _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
+    _fileMime = WLAgentSkillsStringValue(dictionary[@"fileMime"], nil);
+  }
+  return self;
 }
 
 - (NSDictionary *)toDictionary {
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-    dict[@"id"] = @(self.messageId);
-    dict[@"sessionId"] = @(self.sessionId);
-    dict[@"seq"] = @(self.seq);
-    dict[@"role"] = [self roleString];
-    if (self.content) dict[@"content"] = self.content;
-    dict[@"contentType"] = [self contentTypeString];
-    if (self.createdAt) dict[@"createdAt"] = self.createdAt;
-    if (self.meta) dict[@"meta"] = self.meta;
-    return [dict copy];
-}
-
-- (NSString *)roleString {
-    switch (self.role) {
-        case WLAgentSkillsMessageRoleUser:
-            return @"USER";
-        case WLAgentSkillsMessageRoleAssistant:
-            return @"ASSISTANT";
-        case WLAgentSkillsMessageRoleSystem:
-            return @"SYSTEM";
-        case WLAgentSkillsMessageRoleTool:
-            return @"TOOL";
-    }
-}
-
-- (NSString *)contentTypeString {
-    switch (self.contentType) {
-        case WLAgentSkillsContentTypeMarkdown:
-            return @"MARKDOWN";
-        case WLAgentSkillsContentTypeCode:
-            return @"CODE";
-        case WLAgentSkillsContentTypePlain:
-            return @"PLAIN";
-    }
+  NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
+  if (self.partId.length > 0) {
+    dictionary[@"partId"] = self.partId;
+  }
+  if (self.partSeq != nil) {
+    dictionary[@"partSeq"] = self.partSeq;
+  }
+  if (self.type.length > 0) {
+    dictionary[@"type"] = self.type;
+  }
+  if (self.content.length > 0) {
+    dictionary[@"content"] = self.content;
+  }
+  if (self.toolName.length > 0) {
+    dictionary[@"toolName"] = self.toolName;
+  }
+  if (self.toolCallId.length > 0) {
+    dictionary[@"toolCallId"] = self.toolCallId;
+  }
+  if (self.toolStatus.length > 0) {
+    dictionary[@"toolStatus"] = self.toolStatus;
+  }
+  if (self.toolInput.count > 0) {
+    dictionary[@"toolInput"] = self.toolInput;
+  }
+  if (self.toolOutput.length > 0) {
+    dictionary[@"toolOutput"] = self.toolOutput;
+  }
+  if (self.question.length > 0) {
+    dictionary[@"question"] = self.question;
+  }
+  if (self.options.count > 0) {
+    dictionary[@"options"] = self.options;
+  }
+  if (self.permissionId.length > 0) {
+    dictionary[@"permissionId"] = self.permissionId;
+  }
+  if (self.fileName.length > 0) {
+    dictionary[@"fileName"] = self.fileName;
+  }
+  if (self.fileUrl.length > 0) {
+    dictionary[@"fileUrl"] = self.fileUrl;
+  }
+  if (self.fileMime.length > 0) {
+    dictionary[@"fileMime"] = self.fileMime;
+  }
+  return dictionary;
 }
 
 @end
 
-#pragma mark - WLAgentSkillsPageResult
+@implementation WLAgentSkillsSessionMessage
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+  self = [super init];
+  if (self) {
+    _messageId = WLAgentSkillsNumberValue(dictionary[@"id"], @0);
+    _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+    if ([dictionary[@"userId"] isKindOfClass:[NSNull class]]) {
+      _userId = nil;
+    } else {
+      _userId = WLAgentSkillsStringValue(dictionary[@"userId"], nil);
+    }
+    _role = WLAgentSkillsStringValue(dictionary[@"role"], @"");
+    _content = WLAgentSkillsStringValue(dictionary[@"content"], @"");
+    _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], @0);
+    _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
+
+    NSMutableArray<WLAgentSkillsSessionMessagePart *> *parts = [NSMutableArray array];
+    for (NSDictionary *part in WLAgentSkillsArrayValue(dictionary[@"parts"])) {
+      if (![part isKindOfClass:[NSDictionary class]]) {
+        continue;
+      }
+      [parts addObject:[[WLAgentSkillsSessionMessagePart alloc] initWithDictionary:part]];
+    }
+    _parts = [parts copy];
+  }
+  return self;
+}
+
+- (NSDictionary *)toDictionary {
+  NSMutableArray *parts = [NSMutableArray array];
+  for (WLAgentSkillsSessionMessagePart *part in self.parts) {
+    [parts addObject:[part toDictionary]];
+  }
+  return @{
+    @"id" : self.messageId ?: @0,
+    @"welinkSessionId" : self.welinkSessionId ?: @0,
+    @"userId" : self.userId ?: [NSNull null],
+    @"role" : self.role ?: @"",
+    @"content" : self.content ?: @"",
+    @"messageSeq" : self.messageSeq ?: @0,
+    @"parts" : parts,
+    @"createdAt" : self.createdAt ?: @""
+  };
+}
+
+@end
 
 @implementation WLAgentSkillsPageResult
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        NSArray *contentArray = dictionary[@"content"];
-        NSMutableArray *messages = [NSMutableArray array];
-        for (NSDictionary *msgDict in contentArray) {
-            WLAgentSkillsMessage *msg = [[WLAgentSkillsMessage alloc] initWithDictionary:msgDict];
-            [messages addObject:msg];
-        }
-        _content = [messages copy];
-        
-        _totalElements = [dictionary[@"totalElements"] integerValue];
-        _totalPages = [dictionary[@"totalPages"] integerValue];
-        _number = [dictionary[@"number"] integerValue];
-        _size = [dictionary[@"size"] integerValue];
+  self = [super init];
+  if (self) {
+    NSMutableArray<WLAgentSkillsSessionMessage *> *messages = [NSMutableArray array];
+    for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"content"])) {
+      if (![item isKindOfClass:[NSDictionary class]]) {
+        continue;
+      }
+      [messages addObject:[[WLAgentSkillsSessionMessage alloc] initWithDictionary:item]];
     }
-    return self;
-}
-
-- (NSDictionary *)toDictionary {
-    NSMutableArray *contentArray = [NSMutableArray array];
-    for (WLAgentSkillsMessage *msg in self.content) {
-        [contentArray addObject:[msg toDictionary]];
-    }
-    
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-    dict[@"content"] = contentArray;
-    dict[@"totalElements"] = @(self.totalElements);
-    dict[@"totalPages"] = @(self.totalPages);
-    dict[@"number"] = @(self.number);
-    dict[@"size"] = @(self.size);
-    return [dict copy];
+    _content = [messages copy];
+    _page = WLAgentSkillsNumberValue(dictionary[@"page"], @0);
+    _size = WLAgentSkillsNumberValue(dictionary[@"size"], @50);
+    _total = WLAgentSkillsNumberValue(dictionary[@"total"], @((NSInteger)messages.count));
+  }
+  return self;
 }
 
 @end
 
-#pragma mark - WLAgentSkillsStreamMessage
+@implementation WLAgentSkillsSessionError
+
+- (instancetype)initWithCode:(NSString *)code message:(NSString *)message {
+  self = [super init];
+  if (self) {
+    _code = code.length > 0 ? code : @"UNKNOWN";
+    _message = message.length > 0 ? message : @"Unknown error";
+    _timestamp = @((long long)([[NSDate date] timeIntervalSince1970] * 1000));
+  }
+  return self;
+}
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+  return [self initWithCode:WLAgentSkillsStringValue(dictionary[@"code"], @"UNKNOWN")
+                    message:WLAgentSkillsStringValue(dictionary[@"message"], @"Unknown error")];
+}
+
+@end
 
 @implementation WLAgentSkillsStreamMessage
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _sessionId = dictionary[@"sessionId"];
-        
-        NSString *typeStr = dictionary[@"type"];
-        if ([typeStr isEqualToString:@"delta"]) {
-            _type = WLAgentSkillsStreamMessageTypeDelta;
-        } else if ([typeStr isEqualToString:@"done"]) {
-            _type = WLAgentSkillsStreamMessageTypeDone;
-        } else if ([typeStr isEqualToString:@"error"]) {
-            _type = WLAgentSkillsStreamMessageTypeError;
-        } else if ([typeStr isEqualToString:@"agent_offline"]) {
-            _type = WLAgentSkillsStreamMessageTypeAgentOffline;
-        } else if ([typeStr isEqualToString:@"agent_online"]) {
-            _type = WLAgentSkillsStreamMessageTypeAgentOnline;
-        } else {
-            _type = WLAgentSkillsStreamMessageTypeDelta;
-        }
-        
-        _seq = [dictionary[@"seq"] integerValue];
-        _content = dictionary[@"content"];
-        
-        if ([dictionary[@"content"] isKindOfClass:[NSDictionary class]]) {
-            _usage = dictionary[@"content"][@"usage"];
-        }
-    }
-    return self;
-}
+  self = [super init];
+  if (self) {
+    _type = WLAgentSkillsStringValue(dictionary[@"type"], @"");
+    _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], @0);
+    _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
+    _emittedAt = WLAgentSkillsStringValue(dictionary[@"emittedAt"], @"");
+    _raw = [dictionary[@"raw"] isKindOfClass:[NSDictionary class]] ? dictionary[@"raw"] : nil;
 
-- (NSString *)typeString {
-    switch (self.type) {
-        case WLAgentSkillsStreamMessageTypeDelta:
-            return @"delta";
-        case WLAgentSkillsStreamMessageTypeDone:
-            return @"done";
-        case WLAgentSkillsStreamMessageTypeError:
-            return @"error";
-        case WLAgentSkillsStreamMessageTypeAgentOffline:
-            return @"agent_offline";
-        case WLAgentSkillsStreamMessageTypeAgentOnline:
-            return @"agent_online";
-    }
+    _messageId = WLAgentSkillsStringValue(dictionary[@"messageId"], nil);
+    _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], nil);
+    _role = WLAgentSkillsStringValue(dictionary[@"role"], nil);
+
+    _partId = WLAgentSkillsStringValue(dictionary[@"partId"], nil);
+    _partSeq = WLAgentSkillsNumberValue(dictionary[@"partSeq"], nil);
+
+    _content = WLAgentSkillsStringValue(dictionary[@"content"], nil);
+    _toolName = WLAgentSkillsStringValue(dictionary[@"toolName"], nil);
+    _toolCallId = WLAgentSkillsStringValue(dictionary[@"toolCallId"], nil);
+    _status = WLAgentSkillsStringValue(dictionary[@"status"], nil);
+    _input = [dictionary[@"input"] isKindOfClass:[NSDictionary class]] ? dictionary[@"input"] : nil;
+    _output = WLAgentSkillsStringValue(dictionary[@"output"], nil);
+    _error = WLAgentSkillsStringValue(dictionary[@"error"], nil);
+    _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
+    _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
+    _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
+    _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+    _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
+    _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
+    _fileMime = WLAgentSkillsStringValue(dictionary[@"fileMime"], nil);
+    _tokens = [dictionary[@"tokens"] isKindOfClass:[NSDictionary class]] ? dictionary[@"tokens"] : nil;
+    _cost = WLAgentSkillsNumberValue(dictionary[@"cost"], nil);
+    _reason = WLAgentSkillsStringValue(dictionary[@"reason"], nil);
+    _sessionStatus = WLAgentSkillsStringValue(dictionary[@"sessionStatus"], nil);
+    _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
+    _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
+    _metadata = [dictionary[@"metadata"] isKindOfClass:[NSDictionary class]] ? dictionary[@"metadata"] : nil;
+    _response = WLAgentSkillsStringValue(dictionary[@"response"], nil);
+    _messages = [dictionary[@"messages"] isKindOfClass:[NSArray class]] ? dictionary[@"messages"] : nil;
+    _parts = [dictionary[@"parts"] isKindOfClass:[NSArray class]] ? dictionary[@"parts"] : nil;
+  }
+  return self;
 }
 
 @end
 
-#pragma mark - WLAgentSkillsSessionError
+#pragma mark - Result Models
 
-@implementation WLAgentSkillsSessionError
+@implementation WLAgentSkillsSendMessageResult
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _code = dictionary[@"code"] ?: @"UNKNOWN";
-        _message = dictionary[@"message"] ?: @"Unknown error";
-        _timestamp = [[NSDate date] timeIntervalSince1970] * 1000;
-    }
-    return self;
+  self = [super init];
+  if (self) {
+    _messageId = WLAgentSkillsNumberValue(dictionary[@"id"], @0);
+    _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+    _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
+    _role = WLAgentSkillsStringValue(dictionary[@"role"], @"");
+    _content = WLAgentSkillsStringValue(dictionary[@"content"], @"");
+    _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], @0);
+    _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
+  }
+  return self;
 }
 
 @end
 
-#pragma mark - Result Classes Implementation
+@implementation WLAgentSkillsStopSkillResult
 
-#pragma mark CloseSkillResult
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+  self = [super init];
+  if (self) {
+    _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+    _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
+  }
+  return self;
+}
+
+@end
 
 @implementation WLAgentSkillsCloseSkillResult
 @end
 
-#pragma mark StopSkillResult
+@implementation WLAgentSkillsReplyPermissionResult
 
-@implementation WLAgentSkillsStopSkillResult
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+  self = [super init];
+  if (self) {
+    _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+    _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], @"");
+    _response = WLAgentSkillsStringValue(dictionary[@"response"], @"");
+  }
+  return self;
+}
+
 @end
 
-#pragma mark RegenerateAnswerResult
-
-@implementation WLAgentSkillsRegenerateAnswerResult
+@implementation WLAgentSkillsControlSkillWeCodeResult
 @end
-
-#pragma mark SendMessageToIMResult
 
 @implementation WLAgentSkillsSendMessageToIMResult
 @end
 
-#pragma mark SendMessageResult
-
-@implementation WLAgentSkillsSendMessageResult
+@implementation WLAgentSkillsSessionStatusResult
 @end
 
-#pragma mark ReplyPermissionResult
-
-@implementation WLAgentSkillsReplyPermissionResult
-@end
-
-#pragma mark ControlSkillWeCodeResult
-
-@implementation WLAgentSkillsControlSkillWeCodeResult
+@implementation WLAgentSkillsSkillWecodeStatusResult
 @end

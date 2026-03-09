@@ -1,4 +1,4 @@
-//
+﻿//
 //  WLAgentSkillsWebSocketManager.m
 //  WLAgentSkillsSDK
 //
@@ -7,180 +7,285 @@
 #import "WLAgentSkillsConfig.h"
 @import SocketRocket;
 
-@interface WLAgentSkillsSessionListener : NSObject
-
-@property (nonatomic, copy) void (^onMessage)(WLAgentSkillsStreamMessage *message);
-@property (nonatomic, copy) void (^onError)(WLAgentSkillsSessionError *error);
-@property (nonatomic, copy) void (^onClose)(NSString *reason);
-
+@interface WLAgentSkillsSocketListener : NSObject
+@property (nonatomic, copy) WLAgentSkillsSessionMessageCallback onMessage;
+@property (nonatomic, copy, nullable) WLAgentSkillsSessionErrorCallback onError;
+@property (nonatomic, copy, nullable) WLAgentSkillsSessionCloseCallback onClose;
 @end
 
-@implementation WLAgentSkillsSessionListener
+@implementation WLAgentSkillsSocketListener
 @end
 
 @interface WLAgentSkillsWebSocketManager () <SRWebSocketDelegate>
 
 @property (nonatomic, strong, nullable) SRWebSocket *webSocket;
-@property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSessionListener *> *sessionListeners;
-@property (nonatomic, strong) WLAgentSkillsSessionListener *internalCacheListener;
-@property (nonatomic, assign) BOOL isConnected;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray<WLAgentSkillsSocketListener *> *> *listeners;
+@property (nonatomic, assign, readwrite) BOOL isConnected;
+@property (nonatomic, assign) BOOL isConnecting;
 
 @end
 
 @implementation WLAgentSkillsWebSocketManager
 
 + (instancetype)sharedManager {
-    static WLAgentSkillsWebSocketManager *sharedInstance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sharedInstance = [[WLAgentSkillsWebSocketManager alloc] init];
-    });
-    return sharedInstance;
+  static WLAgentSkillsWebSocketManager *sharedInstance = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    sharedInstance = [[WLAgentSkillsWebSocketManager alloc] init];
+  });
+  return sharedInstance;
 }
 
 - (instancetype)init {
-    self = [super init];
-    if (self) {
-        _sessionListeners = [NSMutableDictionary dictionary];
-        _isConnected = NO;
-        [self setupInternalCacheListener];
-    }
-    return self;
+  self = [super init];
+  if (self) {
+    _listeners = [NSMutableDictionary dictionary];
+    _isConnected = NO;
+    _isConnecting = NO;
+  }
+  return self;
 }
 
-- (void)setupInternalCacheListener {
-    __weak typeof(self) weakSelf = self;
-    _internalCacheListener = [[WLAgentSkillsSessionListener alloc] init];
-    _internalCacheListener.onMessage = ^(WLAgentSkillsStreamMessage *message) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"WLAgentSkillsStreamMessageReceived"
-                                                            object:weakSelf
-                                                          userInfo:@{@"message": message}];
-    };
-}
-
-#pragma mark - Connection Management
-
-- (void)connect {
-    if (self.webSocket && self.isConnected) {
-        return;
+- (void)connectIfNeeded {
+  @synchronized(self) {
+    if (self.isConnected || self.isConnecting) {
+      return;
     }
-    
-    WLAgentSkillsConfig *config = [WLAgentSkillsConfig sharedConfig];
-    NSURL *url = [NSURL URLWithString:config.webSocketURL];
-    NSURLRequest *request = [NSURLRequest requestWithURL:url];
-    
-    self.webSocket = [[SRWebSocket alloc] initWithURLRequest:request];
+
+    NSString *wsURL = [WLAgentSkillsConfig sharedConfig].webSocketURL;
+    NSURL *url = [NSURL URLWithString:wsURL];
+    if (url == nil) {
+      return;
+    }
+
+    self.isConnecting = YES;
+    self.webSocket = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:url]];
     self.webSocket.delegate = self;
     [self.webSocket open];
+  }
 }
 
 - (void)disconnect {
-    if (self.webSocket) {
-        [self.webSocket close];
-        self.webSocket = nil;
+  @synchronized(self) {
+    if (self.webSocket != nil) {
+      [self.webSocket close];
     }
+    self.webSocket.delegate = nil;
+    self.webSocket = nil;
     self.isConnected = NO;
+    self.isConnecting = NO;
+  }
 }
 
-#pragma mark - Session Subscription
+- (void)addListenerForSessionId:(NSNumber *)welinkSessionId
+                      onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                        onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                        onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
+  if (welinkSessionId == nil || onMessage == nil) {
+    return;
+  }
 
-- (void)subscribeToSession:(NSString *)sessionId
-                  onMessage:(void (^)(WLAgentSkillsStreamMessage *message))onMessage
-                    onError:(void (^)(WLAgentSkillsSessionError *error))onError
-                    onClose:(void (^)(NSString *reason))onClose {
-    
-    if (!self.isConnected) {
-        [self connect];
+  NSString *key = welinkSessionId.stringValue;
+  WLAgentSkillsSocketListener *listener = [[WLAgentSkillsSocketListener alloc] init];
+  listener.onMessage = onMessage;
+  listener.onError = onError;
+  listener.onClose = onClose;
+
+  @synchronized(self) {
+    NSMutableArray<WLAgentSkillsSocketListener *> *listeners = self.listeners[key];
+    if (listeners == nil) {
+      listeners = [NSMutableArray array];
+      self.listeners[key] = listeners;
     }
-    
-    WLAgentSkillsSessionListener *listener = [[WLAgentSkillsSessionListener alloc] init];
-    listener.onMessage = onMessage;
-    listener.onError = onError;
-    listener.onClose = onClose;
-    
-    self.sessionListeners[sessionId] = listener;
+    [listeners addObject:listener];
+  }
+
+  [self connectIfNeeded];
 }
 
-- (void)unsubscribeFromSession:(NSString *)sessionId {
-    [self.sessionListeners removeObjectForKey:sessionId];
-    
-    if (self.sessionListeners.count == 0) {
-        [self disconnect];
+- (void)removeListenerForSessionId:(NSNumber *)welinkSessionId
+                         onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                           onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                           onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
+  if (welinkSessionId == nil || onMessage == nil) {
+    return;
+  }
+
+  NSString *key = welinkSessionId.stringValue;
+  @synchronized(self) {
+    NSMutableArray<WLAgentSkillsSocketListener *> *listeners = self.listeners[key];
+    if (listeners.count == 0) {
+      return;
     }
+
+    NSIndexSet *indexes = [listeners indexesOfObjectsPassingTest:^BOOL(WLAgentSkillsSocketListener *obj, NSUInteger idx, BOOL *stop) {
+      BOOL onMessageEqual = (obj.onMessage == onMessage);
+      if (!onMessageEqual) {
+        return NO;
+      }
+      BOOL onErrorEqual = (onError == nil) || (obj.onError == onError);
+      BOOL onCloseEqual = (onClose == nil) || (obj.onClose == onClose);
+      return onErrorEqual && onCloseEqual;
+    }];
+
+    if (indexes.count > 0) {
+      [listeners removeObjectsAtIndexes:indexes];
+    }
+
+    if (listeners.count == 0) {
+      [self.listeners removeObjectForKey:key];
+    }
+
+    if (self.listeners.count == 0) {
+      [self disconnect];
+    }
+  }
 }
 
-- (BOOL)isSubscribedToSession:(NSString *)sessionId {
-    return self.sessionListeners[sessionId] != nil;
+- (void)removeAllListenersForSessionId:(NSNumber *)welinkSessionId {
+  if (welinkSessionId == nil) {
+    return;
+  }
+
+  @synchronized(self) {
+    [self.listeners removeObjectForKey:welinkSessionId.stringValue];
+    if (self.listeners.count == 0) {
+      [self disconnect];
+    }
+  }
+}
+
+- (BOOL)hasListenerForSessionId:(NSNumber *)welinkSessionId {
+  if (welinkSessionId == nil) {
+    return NO;
+  }
+  @synchronized(self) {
+    return self.listeners[welinkSessionId.stringValue].count > 0;
+  }
 }
 
 #pragma mark - SRWebSocketDelegate
 
 - (void)webSocketDidOpen:(SRWebSocket *)webSocket {
+  @synchronized(self) {
+    self.isConnecting = NO;
     self.isConnected = YES;
-    
-    if ([self.delegate respondsToSelector:@selector(webSocketDidConnect)]) {
-        [self.delegate webSocketDidConnect];
-    }
+  }
+  if ([self.delegate respondsToSelector:@selector(webSocketManagerDidConnect)]) {
+    [self.delegate webSocketManagerDidConnect];
+  }
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didFailWithError:(NSError *)error {
+  @synchronized(self) {
+    self.isConnecting = NO;
     self.isConnected = NO;
-    
-    WLAgentSkillsSessionError *sessionError = [[WLAgentSkillsSessionError alloc] initWithDictionary:@{
-        @"code": @"WebSocketError",
-        @"message": error.localizedDescription ?: @"Connection failed"
-    }];
-    
-    for (WLAgentSkillsSessionListener *listener in self.sessionListeners.allValues) {
-        if (listener.onError) {
-            listener.onError(sessionError);
-        }
-    }
-    
-    if ([self.delegate respondsToSelector:@selector(webSocketDidDisconnectWithError:)]) {
-        [self.delegate webSocketDidDisconnectWithError:error];
-    }
+  }
+
+  WLAgentSkillsSessionError *sessionError = [[WLAgentSkillsSessionError alloc] initWithCode:@"6000"
+                                                                                      message:error.localizedDescription ?: @"WebSocket connect failed"];
+  [self notifyAllError:sessionError];
+
+  if ([self.delegate respondsToSelector:@selector(webSocketManagerDidDisconnectWithError:)]) {
+    [self.delegate webSocketManagerDidDisconnectWithError:error];
+  }
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didCloseWithCode:(NSInteger)code reason:(NSString *)reason wasClean:(BOOL)wasClean {
+  @synchronized(self) {
+    self.isConnecting = NO;
     self.isConnected = NO;
-    
-    NSString *closeReason = reason ?: @"Connection closed";
-    
-    for (WLAgentSkillsSessionListener *listener in self.sessionListeners.allValues) {
-        if (listener.onClose) {
-            listener.onClose(closeReason);
-        }
-    }
-    
-    if ([self.delegate respondsToSelector:@selector(webSocketDidDisconnectWithError:)]) {
-        [self.delegate webSocketDidDisconnectWithError:nil];
-    }
+  }
+
+  NSString *closeReason = reason.length > 0 ? reason : @"WebSocket closed";
+  [self notifyAllClose:closeReason];
+
+  if ([self.delegate respondsToSelector:@selector(webSocketManagerDidDisconnectWithError:)]) {
+    [self.delegate webSocketManagerDidDisconnectWithError:nil];
+  }
+}
+
+- (void)webSocket:(SRWebSocket *)webSocket didReceiveMessage:(id)message {
+  [self handleRawMessage:message];
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didReceiveMessageWithString:(NSString *)string {
-    NSData *data = [string dataUsingEncoding:NSUTF8StringEncoding];
-    NSError *error;
-    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
-    
-    if (error || !json) {
-        return;
+  [self handleRawMessage:string];
+}
+
+- (void)webSocket:(SRWebSocket *)webSocket didReceiveMessageWithData:(NSData *)data {
+  [self handleRawMessage:data];
+}
+
+- (void)handleRawMessage:(id)message {
+  NSDictionary *json = nil;
+
+  if ([message isKindOfClass:[NSString class]]) {
+    NSData *data = [(NSString *)message dataUsingEncoding:NSUTF8StringEncoding];
+    if (data != nil) {
+      json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     }
-    
-    WLAgentSkillsStreamMessage *message = [[WLAgentSkillsStreamMessage alloc] initWithDictionary:json];
-    
-    if ([self.delegate respondsToSelector:@selector(webSocketDidReceiveMessage:)]) {
-        [self.delegate webSocketDidReceiveMessage:message];
+  } else if ([message isKindOfClass:[NSData class]]) {
+    json = [NSJSONSerialization JSONObjectWithData:(NSData *)message options:0 error:nil];
+  } else if ([message isKindOfClass:[NSDictionary class]]) {
+    json = message;
+  }
+
+  if (![json isKindOfClass:[NSDictionary class]]) {
+    return;
+  }
+
+  WLAgentSkillsStreamMessage *streamMessage = [[WLAgentSkillsStreamMessage alloc] initWithDictionary:json];
+
+  if ([self.delegate respondsToSelector:@selector(webSocketManagerDidReceiveMessage:)]) {
+    [self.delegate webSocketManagerDidReceiveMessage:streamMessage];
+  }
+
+  NSString *sessionKey = streamMessage.welinkSessionId;
+  if (sessionKey.length == 0) {
+    return;
+  }
+
+  NSArray<WLAgentSkillsSocketListener *> *listeners = nil;
+  @synchronized(self) {
+    listeners = [self.listeners[sessionKey] copy];
+  }
+
+  for (WLAgentSkillsSocketListener *listener in listeners) {
+    if (listener.onMessage != nil) {
+      listener.onMessage(streamMessage);
     }
-    
-    WLAgentSkillsSessionListener *listener = self.sessionListeners[message.sessionId];
-    if (listener && listener.onMessage) {
-        listener.onMessage(message);
+  }
+}
+
+#pragma mark - Notify Helpers
+
+- (void)notifyAllError:(WLAgentSkillsSessionError *)error {
+  NSArray<WLAgentSkillsSocketListener *> *allListeners = [self flattenedListeners];
+  for (WLAgentSkillsSocketListener *listener in allListeners) {
+    if (listener.onError != nil) {
+      listener.onError(error);
     }
-    
-    if (_internalCacheListener.onMessage) {
-        _internalCacheListener.onMessage(message);
+  }
+}
+
+- (void)notifyAllClose:(NSString *)reason {
+  NSArray<WLAgentSkillsSocketListener *> *allListeners = [self flattenedListeners];
+  for (WLAgentSkillsSocketListener *listener in allListeners) {
+    if (listener.onClose != nil) {
+      listener.onClose(reason);
     }
+  }
+}
+
+- (NSArray<WLAgentSkillsSocketListener *> *)flattenedListeners {
+  NSMutableArray<WLAgentSkillsSocketListener *> *result = [NSMutableArray array];
+  @synchronized(self) {
+    for (NSArray<WLAgentSkillsSocketListener *> *value in self.listeners.allValues) {
+      [result addObjectsFromArray:value];
+    }
+  }
+  return result;
 }
 
 @end

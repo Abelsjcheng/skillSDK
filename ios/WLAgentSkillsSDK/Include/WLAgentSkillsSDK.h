@@ -1,89 +1,75 @@
-//
+﻿//
 //  WLAgentSkillsSDK.h
 //  WLAgentSkillsSDK
 //
 
 #import <Foundation/Foundation.h>
 #import "WLAgentSkillsTypes.h"
-#import "WLAgentSkillsConfig.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface WLAgentSkillsSDK : NSObject
 
-#pragma mark - Configuration
++ (instancetype)sharedInstance;
 
 + (void)configureWithBaseURL:(NSString *)baseURL;
++ (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL;
 
-#pragma mark - 1. executeSkill - 执行技能
+#pragma mark - 1. 创建会话
+- (void)createSession:(WLAgentSkillsCreateSessionParams *)params
+              success:(void (^)(WLAgentSkillsSkillSession *session))success
+              failure:(void (^)(NSError *error))failure;
 
-- (void)executeSkillWithParams:(WLAgentSkillsExecuteSkillParams *)params
-                        success:(void (^)(WLAgentSkillsSession *session))success
-                        failure:(void (^)(NSError *error))failure;
+#pragma mark - 2. 关闭技能（仅关闭本地WebSocket）
+- (void)closeSkillWithSuccess:(void (^)(WLAgentSkillsCloseSkillResult *result))success
+                      failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 2. closeSkill - 关闭技能
+#pragma mark - 3. 停止技能
+- (void)stopSkill:(WLAgentSkillsStopSkillParams *)params
+          success:(void (^)(WLAgentSkillsStopSkillResult *result))success
+          failure:(void (^)(NSError *error))failure;
 
-- (void)closeSkillWithParams:(WLAgentSkillsCloseSkillParams *)params
-                     success:(void (^)(WLAgentSkillsCloseSkillResult *result))success
-                     failure:(void (^)(NSError *error))failure;
+#pragma mark - 4. 会话状态变更回调
+- (void)onSessionStatusChange:(WLAgentSkillsOnSessionStatusChangeParams *)params;
 
-#pragma mark - 3. stopSkill - 停止技能
+#pragma mark - 5. 小程序状态变更回调
+- (void)onSkillWecodeStatusChange:(WLAgentSkillsOnSkillWecodeStatusChangeParams *)params;
 
-- (void)stopSkillWithParams:(WLAgentSkillsStopSkillParams *)params
-                    success:(void (^)(WLAgentSkillsStopSkillResult *result))success
-                    failure:(void (^)(NSError *error))failure;
+#pragma mark - 6. 重新生成问答
+- (void)regenerateAnswer:(WLAgentSkillsRegenerateAnswerParams *)params
+                 success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+                 failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 4. onSessionStatusChange - 会话状态变更回调
+#pragma mark - 7. 发送AI结果到IM
+- (void)sendMessageToIM:(WLAgentSkillsSendMessageToIMParams *)params
+                success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
+                failure:(void (^)(NSError *error))failure;
 
-- (void)onSessionStatusChangeWithParams:(WLAgentSkillsOnSessionStatusChangeParams *)params;
+#pragma mark - 8. 获取会话消息
+- (void)getSessionMessage:(WLAgentSkillsGetSessionMessageParams *)params
+                  success:(void (^)(WLAgentSkillsPageResult *result))success
+                  failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 5. onSkillWecodeStatusChange - 小程序状态变更回调
+#pragma mark - 9. 注册会话监听器
+- (void)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params;
 
-- (void)onSkillWecodeStatusChangeWithParams:(WLAgentSkillsOnSkillWecodeStatusChangeParams *)params;
+#pragma mark - 10. 移除会话监听器
+- (void)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params;
 
-#pragma mark - 6. regenerateAnswer - 重新生成问答
+#pragma mark - 11. 发送消息
+- (void)sendMessage:(WLAgentSkillsSendMessageParams *)params
+            success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+            failure:(void (^)(NSError *error))failure;
 
-- (void)regenerateAnswerWithParams:(WLAgentSkillsRegenerateAnswerParams *)params
-                           success:(void (^)(WLAgentSkillsRegenerateAnswerResult *result))success
-                           failure:(void (^)(NSError *error))failure;
+#pragma mark - 12. 权限确认
+- (void)replyPermission:(WLAgentSkillsReplyPermissionParams *)params
+                success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
+                failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 7. sendMessageToIM - 发送AI生成消息到IM
-
-- (void)sendMessageToIMWithParams:(WLAgentSkillsSendMessageToIMParams *)params
-                          success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
-                          failure:(void (^)(NSError *error))failure;
-
-#pragma mark - 8. getSessionMessage - 获取当前会话消息列表
-
-- (void)getSessionMessageWithParams:(WLAgentSkillsGetSessionMessageParams *)params
-                            success:(void (^)(WLAgentSkillsPageResult *result))success
-                            failure:(void (^)(NSError *error))failure;
-
-#pragma mark - 9. registerSessionListener - 注册会话监听器
-
-- (void)registerSessionListenerWithParams:(WLAgentSkillsRegisterSessionListenerParams *)params;
-
-#pragma mark - 10. unregisterSessionListener - 移除会话监听器
-
-- (void)unregisterSessionListenerWithParams:(WLAgentSkillsUnregisterSessionListenerParams *)params;
-
-#pragma mark - 11. sendMessage - 发送消息内容
-
-- (void)sendMessageWithParams:(WLAgentSkillsSendMessageParams *)params
-                     success:(void (^)(WLAgentSkillsSendMessageResult *result))success
-                     failure:(void (^)(NSError *error))failure;
-
-#pragma mark - 12. replyPermission - 权限确认
-
-- (void)replyPermissionWithParams:(WLAgentSkillsReplyPermissionParams *)params
-                          success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
-                          failure:(void (^)(NSError *error))failure;
-
-#pragma mark - 13. controlSkillWeCode - 小程序控制
-
-- (void)controlSkillWeCodeWithParams:(WLAgentSkillsControlSkillWeCodeParams *)params
-                             success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
-                             failure:(void (^)(NSError *error))failure;
+#pragma mark - 13. 小程序控制
+- (void)controlSkillWeCode:(WLAgentSkillsControlSkillWeCodeParams *)params
+                   success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
+                   failure:(void (^)(NSError *error))failure;
 
 @end
 

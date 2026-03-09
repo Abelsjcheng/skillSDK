@@ -1,4 +1,4 @@
-//
+﻿//
 //  WLAgentSkillsConfig.h
 //  WLAgentSkillsSDK
 //
@@ -18,6 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)sharedConfig;
 
 - (void)configureWithBaseURL:(NSString *)baseURL;
+- (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL;
 
 @end
 

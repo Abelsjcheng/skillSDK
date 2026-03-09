@@ -1,4 +1,4 @@
-//
+﻿//
 //  WLAgentSkillsStreamingCache.h
 //  WLAgentSkillsSDK
 //
@@ -12,10 +12,20 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)sharedCache;
 
-- (void)cacheMessage:(WLAgentSkillsStreamMessage *)message forSessionId:(NSString *)sessionId;
-- (NSString *)getCachedContentForSessionId:(NSString *)sessionId;
-- (BOOL)isStreamingForSessionId:(NSString *)sessionId;
-- (void)clearCacheForSessionId:(NSString *)sessionId;
+- (void)updateWithStreamMessage:(WLAgentSkillsStreamMessage *)message;
+- (void)cacheSendMessageResult:(WLAgentSkillsSendMessageResult *)result;
+- (void)cacheHistoryMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
+               forSessionId:(NSNumber *)welinkSessionId;
+
+- (NSArray<WLAgentSkillsSessionMessage *> *)mergedMessagesWithServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
+                                                                 sessionId:(NSNumber *)welinkSessionId;
+
+- (nullable NSString *)latestCompletedContentForSessionId:(NSNumber *)welinkSessionId
+                                                 messageId:(nullable NSNumber *)messageId;
+
+- (nullable NSString *)lastUserMessageContentForSessionId:(NSNumber *)welinkSessionId;
+
+- (void)clearCacheForSessionId:(NSNumber *)welinkSessionId;
 - (void)clearAllCache;
 
 @end

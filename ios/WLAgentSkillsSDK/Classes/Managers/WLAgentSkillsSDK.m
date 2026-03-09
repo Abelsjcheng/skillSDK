@@ -1,403 +1,587 @@
-//
+﻿//
 //  WLAgentSkillsSDK.m
 //  WLAgentSkillsSDK
 //
 
 #import "WLAgentSkillsSDK.h"
 #import "WLAgentSkillsHTTPClient.h"
-#import "WLAgentSkillsWebSocketManager.h"
 #import "WLAgentSkillsStreamingCache.h"
+#import "WLAgentSkillsWebSocketManager.h"
+#import "WLAgentSkillsConfig.h"
 
-@interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketDelegate>
+static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
-@property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsClientSessionStatus> *sessionStatuses;
-@property (nonatomic, copy, nullable) void (^sessionStatusCallback)(WLAgentSkillsClientSessionStatus status);
-@property (nonatomic, copy, nullable) void (^wecodeStatusCallback)(WLAgentSkillsWeCodeStatus status);
+@interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
+
+@property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSessionStatusCallback> *sessionStatusCallbacks;
+@property (nonatomic, copy, nullable) WLAgentSkillsWecodeStatusCallback wecodeStatusCallback;
 
 @end
 
 @implementation WLAgentSkillsSDK
 
-+ (instancetype)sharedSDK {
-    static WLAgentSkillsSDK *sharedInstance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sharedInstance = [[WLAgentSkillsSDK alloc] init];
-    });
-    return sharedInstance;
++ (instancetype)sharedInstance {
+  static WLAgentSkillsSDK *sharedInstance = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    sharedInstance = [[WLAgentSkillsSDK alloc] init];
+  });
+  return sharedInstance;
+}
+
++ (void)configureWithBaseURL:(NSString *)baseURL {
+  [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL];
+  [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
+}
+
++ (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL {
+  [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL webSocketURL:webSocketURL];
+  [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
 }
 
 - (instancetype)init {
-    self = [super init];
-    if (self) {
-        _sessionStatuses = [NSMutableDictionary dictionary];
-        [WLAgentSkillsWebSocketManager sharedManager].delegate = self;
+  self = [super init];
+  if (self) {
+    _sessionStatusCallbacks = [NSMutableDictionary dictionary];
+    [WLAgentSkillsWebSocketManager sharedManager].delegate = self;
+  }
+  return self;
+}
+
+#pragma mark - 1. createSession
+
+- (void)createSession:(WLAgentSkillsCreateSessionParams *)params
+              success:(void (^)(WLAgentSkillsSkillSession *session))success
+              failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.ak.length == 0 || params.imGroupId.length == 0) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: ak and imGroupId are required."];
+    return;
+  }
+
+  [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
+
+  __weak typeof(self) weakSelf = self;
+  [[WLAgentSkillsHTTPClient sharedClient] getSessionsWithImGroupId:params.imGroupId
+                                                             status:@"ACTIVE"
+                                                               page:@0
+                                                               size:@20
+                                                            success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    NSArray *content = [data[@"content"] isKindOfClass:[NSArray class]] ? data[@"content"] : @[];
+    NSDictionary *existing = content.count > 0 && [content.firstObject isKindOfClass:[NSDictionary class]] ? content.firstObject : nil;
+
+    if (existing != nil) {
+      if (success) {
+        success([[WLAgentSkillsSkillSession alloc] initWithDictionary:existing]);
+      }
+      return;
     }
-    return self;
-}
 
-#pragma mark - Configuration
-
-+ (void)configureWithBaseURL:(NSString *)baseURL {
-    [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL];
-}
-
-#pragma mark - 1. executeSkill - 执行技能
-
-- (void)executeSkillWithParams:(WLAgentSkillsExecuteSkillParams *)params
-                        success:(void (^)(WLAgentSkillsSession *session))success
-                        failure:(void (^)(NSError *error))failure {
-    
-    WLAgentSkillsHTTPClient *client = [WLAgentSkillsHTTPClient sharedClient];
-    NSInteger agentId = params.agentId > 0 ? params.agentId : 0;
-    
-    [client createSessionWithUserId:params.userId
-                 skillDefinitionId:params.skillDefinitionId
-                             agentId:agentId
-                               title:params.title
-                            imChatId:params.imChatId
-                             success:^(id responseObject) {
-        
-        NSDictionary *sessionDict = responseObject;
-        WLAgentSkillsSession *session = [[WLAgentSkillsSession alloc] initWithDictionary:sessionDict];
-        
-        NSString *sessionIdStr = [NSString stringWithFormat:@"%ld", (long)session.sessionId];
-        
-        [[WLAgentSkillsWebSocketManager sharedManager] subscribeToSession:sessionIdStr
-                                                                onMessage:^(WLAgentSkillsStreamMessage *message) {
-            [self handleStreamMessage:message forSessionId:sessionIdStr];
-        } onError:^(WLAgentSkillsSessionError *error) {
-            NSLog(@"WebSocket error for session %@: %@", sessionIdStr, error.message);
-        } onClose:^(NSString *reason) {
-            NSLog(@"WebSocket closed for session %@: %@", sessionIdStr, reason);
-        }];
-        
-        [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:sessionIdStr
-                                                                content:params.skillContent
-                                                                success:^(id responseObject) {
-            if (success) {
-                success(session);
-            }
-        } failure:^(NSError *error) {
-            if (failure) {
-                failure(error);
-            }
-        }];
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
+    [[WLAgentSkillsHTTPClient sharedClient] createSessionWithAK:params.ak
+                                                           title:params.title
+                                                       imGroupId:params.imGroupId
+                                                         success:^(id  _Nullable createdResponse) {
+      NSDictionary *created = [createdResponse isKindOfClass:[NSDictionary class]] ? createdResponse : @{};
+      WLAgentSkillsSkillSession *session = [[WLAgentSkillsSkillSession alloc] initWithDictionary:created];
+      if (success) {
+        success(session);
+      }
+    }
+                                                         failure:^(NSError * _Nonnull error) {
+      [weakSelf dispatchFailureObject:failure error:error];
     }];
+  }
+                                                            failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
 }
 
-- (void)handleStreamMessage:(WLAgentSkillsStreamMessage *)message forSessionId:(NSString *)sessionId {
-    [[WLAgentSkillsStreamingCache sharedCache] cacheMessage:message forSessionId:sessionId];
-    
-    WLAgentSkillsClientSessionStatus status;
-    switch (message.type) {
-        case WLAgentSkillsStreamMessageTypeDelta:
-        case WLAgentSkillsStreamMessageTypeAgentOnline:
-            status = WLAgentSkillsClientSessionStatusExecuting;
-            break;
-        case WLAgentSkillsStreamMessageTypeDone:
-            status = WLAgentSkillsClientSessionStatusCompleted;
-            break;
-        case WLAgentSkillsStreamMessageTypeError:
-        case WLAgentSkillsStreamMessageTypeAgentOffline:
-            status = WLAgentSkillsClientSessionStatusStopped;
-            break;
-    }
-    
-    self.sessionStatuses[sessionId] = status;
-    
-    if (self.sessionStatusCallback) {
-        self.sessionStatusCallback(status);
-    }
+#pragma mark - 2. closeSkill
+
+- (void)closeSkillWithSuccess:(void (^)(WLAgentSkillsCloseSkillResult *result))success
+                      failure:(void (^)(NSError *error))failure {
+  WLAgentSkillsWebSocketManager *manager = [WLAgentSkillsWebSocketManager sharedManager];
+  if (!manager.isConnected) {
+    [self dispatchFailure:failure code:3000 message:@"WebSocket is not connected."];
+    return;
+  }
+
+  [manager disconnect];
+  [[WLAgentSkillsStreamingCache sharedCache] clearAllCache];
+
+  WLAgentSkillsCloseSkillResult *result = [[WLAgentSkillsCloseSkillResult alloc] init];
+  result.status = @"success";
+  if (success) {
+    success(result);
+  }
 }
 
-#pragma mark - 2. closeSkill - 关闭技能
+#pragma mark - 3. stopSkill
 
-- (void)closeSkillWithParams:(WLAgentSkillsCloseSkillParams *)params
-                     success:(void (^)(WLAgentSkillsCloseSkillResult *result))success
-                     failure:(void (^)(NSError *error))failure {
-    
-    [[WLAgentSkillsHTTPClient sharedClient] closeSessionWithSessionId:params.sessionId
-                                                            success:^(id responseObject) {
-        
-        [[WLAgentSkillsWebSocketManager sharedManager] unsubscribeFromSession:params.sessionId];
-        [[WLAgentSkillsStreamingCache sharedCache] clearCacheForSessionId:params.sessionId];
-        [self.sessionStatuses removeObjectForKey:params.sessionId];
-        
-        WLAgentSkillsCloseSkillResult *result = [[WLAgentSkillsCloseSkillResult alloc] init];
+- (void)stopSkill:(WLAgentSkillsStopSkillParams *)params
+          success:(void (^)(WLAgentSkillsStopSkillResult *result))success
+          failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.welinkSessionId == nil) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  [[WLAgentSkillsHTTPClient sharedClient] abortSessionWithSessionId:params.welinkSessionId
+                                                             success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    WLAgentSkillsStopSkillResult *result = [[WLAgentSkillsStopSkillResult alloc] initWithDictionary:data];
+    [weakSelf emitSessionStatus:WLAgentSkillsClientSessionStatusStopped
+                      sessionId:params.welinkSessionId];
+    if (success) {
+      success(result);
+    }
+  }
+                                                             failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
+}
+
+#pragma mark - 4. onSessionStatusChange
+
+- (void)onSessionStatusChange:(WLAgentSkillsOnSessionStatusChangeParams *)params {
+  if (params == nil || params.welinkSessionId == nil || params.callback == nil) {
+    return;
+  }
+  @synchronized(self) {
+    self.sessionStatusCallbacks[params.welinkSessionId.stringValue] = [params.callback copy];
+  }
+}
+
+#pragma mark - 5. onSkillWecodeStatusChange
+
+- (void)onSkillWecodeStatusChange:(WLAgentSkillsOnSkillWecodeStatusChangeParams *)params {
+  if (params == nil || params.callback == nil) {
+    return;
+  }
+  self.wecodeStatusCallback = [params.callback copy];
+}
+
+#pragma mark - 6. regenerateAnswer
+
+- (void)regenerateAnswer:(WLAgentSkillsRegenerateAnswerParams *)params
+                 success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+                 failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.welinkSessionId == nil) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
+    return;
+  }
+
+  NSString *cachedContent = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
+  if (cachedContent.length > 0) {
+    [self sendMessageWithSessionId:params.welinkSessionId
+                           content:cachedContent
+                        toolCallId:nil
+                           success:success
+                           failure:failure];
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
+                                                               page:@0
+                                                               size:@50
+                                                            success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    WLAgentSkillsPageResult *pageResult = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
+    [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:pageResult.content
+                                                       forSessionId:params.welinkSessionId];
+
+    NSString *content = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
+    if (content.length == 0) {
+      [weakSelf dispatchFailure:failure code:4002 message:@"No user message can be used for regenerateAnswer."];
+      return;
+    }
+
+    [weakSelf sendMessageWithSessionId:params.welinkSessionId
+                               content:content
+                            toolCallId:nil
+                               success:success
+                               failure:failure];
+  }
+                                                            failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
+}
+
+#pragma mark - 7. sendMessageToIM
+
+- (void)sendMessageToIM:(WLAgentSkillsSendMessageToIMParams *)params
+                success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
+                failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.welinkSessionId == nil) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  void (^sendWithContent)(NSString *) = ^(NSString *content) {
+    [[WLAgentSkillsHTTPClient sharedClient] sendToIMWithSessionId:params.welinkSessionId
+                                                           content:content
+                                                           success:^(id  _Nullable responseObject) {
+      WLAgentSkillsSendMessageToIMResult *result = [[WLAgentSkillsSendMessageToIMResult alloc] init];
+
+      if ([responseObject isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dict = responseObject;
+        if (dict[@"status"] != nil) {
+          result.status = [dict[@"status"] description];
+        } else if (dict[@"success"] != nil) {
+          BOOL ok = [dict[@"success"] boolValue];
+          result.status = ok ? @"success" : @"failed";
+        } else {
+          result.status = @"success";
+        }
+        if (dict[@"chatId"] != nil) {
+          result.chatId = [dict[@"chatId"] description];
+        }
+        if (dict[@"contentLength"] != nil) {
+          result.contentLength = @([dict[@"contentLength"] integerValue]);
+        }
+      } else {
         result.status = @"success";
-        
-        if (success) {
-            success(result);
-        }
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
-}
+      }
 
-#pragma mark - 3. stopSkill - 停止技能
-
-- (void)stopSkillWithParams:(WLAgentSkillsStopSkillParams *)params
-                    success:(void (^)(WLAgentSkillsStopSkillResult *result))success
-                    failure:(void (^)(NSError *error))failure {
-    
-    [[WLAgentSkillsWebSocketManager sharedManager] unsubscribeFromSession:params.sessionId];
-    
-    self.sessionStatuses[params.sessionId] = WLAgentSkillsClientSessionStatusStopped;
-    
-    if (self.sessionStatusCallback) {
-        self.sessionStatusCallback(WLAgentSkillsClientSessionStatusStopped);
-    }
-    
-    WLAgentSkillsStopSkillResult *result = [[WLAgentSkillsStopSkillResult alloc] init];
-    result.status = @"success";
-    
-    if (success) {
+      if (success) {
         success(result);
+      }
     }
-}
-
-#pragma mark - 4. onSessionStatusChange - 会话状态变更回调
-
-- (void)onSessionStatusChangeWithParams:(WLAgentSkillsOnSessionStatusChangeParams *)params {
-    self.sessionStatuses[params.sessionId] = WLAgentSkillsClientSessionStatusExecuting;
-    self.sessionStatusCallback = params.callback;
-    
-    [[NSNotificationCenter defaultCenter] addObserverForName:@"WLAgentSkillsStreamMessageReceived"
-                                                        object:nil
-                                                         queue:[NSOperationQueue mainQueue]
-                                                    usingBlock:^(NSNotification *note) {
-        WLAgentSkillsStreamMessage *message = note.userInfo[@"message"];
-        if ([message.sessionId isEqualToString:params.sessionId]) {
-            [self handleStreamMessage:message forSessionId:params.sessionId];
-        }
+                                                           failure:^(NSError * _Nonnull error) {
+      [weakSelf dispatchFailureObject:failure error:error];
     }];
-}
+  };
 
-#pragma mark - 5. onSkillWecodeStatusChange - 小程序状态变更回调
+  NSString *content = [[WLAgentSkillsStreamingCache sharedCache] latestCompletedContentForSessionId:params.welinkSessionId
+                                                                                             messageId:params.messageId];
+  if (content.length > 0) {
+    sendWithContent(content);
+    return;
+  }
 
-- (void)onSkillWecodeStatusChangeWithParams:(WLAgentSkillsOnSkillWecodeStatusChangeParams *)params {
-    self.wecodeStatusCallback = params.callback;
-}
+  [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
+                                                               page:@0
+                                                               size:@50
+                                                            success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    WLAgentSkillsPageResult *pageResult = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
+    [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:pageResult.content
+                                                       forSessionId:params.welinkSessionId];
 
-#pragma mark - 6. regenerateAnswer - 重新生成问答
-
-- (void)regenerateAnswerWithParams:(WLAgentSkillsRegenerateAnswerParams *)params
-                           success:(void (^)(WLAgentSkillsRegenerateAnswerResult *result))success
-                           failure:(void (^)(NSError *error))failure {
-    
-    [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:params.sessionId
-                                                            content:params.content
-                                                            success:^(id responseObject) {
-        
-        NSDictionary *msgDict = responseObject;
-        WLAgentSkillsRegenerateAnswerResult *result = [[WLAgentSkillsRegenerateAnswerResult alloc] init];
-        result.messageId = [NSString stringWithFormat:@"%@", msgDict[@"id"] ?: @""];
-        
-        if (success) {
-            success(result);
-        }
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
-}
-
-#pragma mark - 7. sendMessageToIM - 发送AI生成消息到IM
-
-- (void)sendMessageToIMWithParams:(WLAgentSkillsSendMessageToIMParams *)params
-                          success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
-                          failure:(void (^)(NSError *error))failure {
-    
-    [[WLAgentSkillsHTTPClient sharedClient] sendMessageToIMWithSessionId:params.sessionId
-                                                                content:params.content
-                                                                success:^(id responseObject) {
-        
-        NSDictionary *dict = responseObject;
-        WLAgentSkillsSendMessageToIMResult *result = [[WLAgentSkillsSendMessageToIMResult alloc] init];
-        result.success = [dict[@"success"] boolValue];
-        result.chatId = dict[@"chatId"];
-        result.contentLength = [dict[@"contentLength"] integerValue];
-        
-        if (success) {
-            success(result);
-        }
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
-}
-
-#pragma mark - 8. getSessionMessage - 获取当前会话消息列表
-
-- (void)getSessionMessageWithParams:(WLAgentSkillsGetSessionMessageParams *)params
-                            success:(void (^)(WLAgentSkillsPageResult *result))success
-                            failure:(void (^)(NSError *error))failure {
-    
-    NSInteger page = params.page > 0 ? params.page : 0;
-    NSInteger size = params.size > 0 ? params.size : 50;
-    
-    [[WLAgentSkillsHTTPClient sharedClient] getMessageHistoryWithSessionId:params.sessionId
-                                                                    page:page
-                                                                    size:size
-                                                                 success:^(id responseObject) {
-        
-        NSDictionary *pageDict = responseObject;
-        WLAgentSkillsPageResult *pageResult = [[WLAgentSkillsPageResult alloc] initWithDictionary:pageDict];
-        
-        NSString *cachedContent = [[WLAgentSkillsStreamingCache sharedCache] getCachedContentForSessionId:params.sessionId];
-        BOOL isStreaming = [[WLAgentSkillsStreamingCache sharedCache] isStreamingForSessionId:params.sessionId];
-        
-        if (cachedContent.length > 0) {
-            WLAgentSkillsMessage *streamingMessage = [[WLAgentSkillsMessage alloc] init];
-            streamingMessage.messageId = 0;
-            streamingMessage.sessionId = [params.sessionId integerValue];
-            streamingMessage.seq = pageResult.content.count + 1;
-            streamingMessage.role = WLAgentSkillsMessageRoleAssistant;
-            streamingMessage.content = cachedContent;
-            streamingMessage.contentType = WLAgentSkillsContentTypeMarkdown;
-            streamingMessage.createdAt = [[NSDate date] description];
-            streamingMessage.meta = isStreaming ? @"{\"isStreaming\":true}" : nil;
-            
-            NSMutableArray *content = [pageResult.content mutableCopy];
-            [content addObject:streamingMessage];
-            pageResult.content = content;
-            pageResult.totalElements += 1;
-        }
-        
-        if (success) {
-            success(pageResult);
-        }
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
-}
-
-#pragma mark - 9. registerSessionListener - 注册会话监听器
-
-- (void)registerSessionListenerWithParams:(WLAgentSkillsRegisterSessionListenerParams *)params {
-    [[WLAgentSkillsWebSocketManager sharedManager] subscribeToSession:params.sessionId
-                                                              onMessage:params.onMessage
-                                                                onError:params.onError
-                                                                onClose:params.onClose];
-}
-
-#pragma mark - 10. unregisterSessionListener - 移除会话监听器
-
-- (void)unregisterSessionListenerWithParams:(WLAgentSkillsUnregisterSessionListenerParams *)params {
-    [[WLAgentSkillsWebSocketManager sharedManager] unsubscribeFromSession:params.sessionId];
-}
-
-#pragma mark - 11. sendMessage - 发送消息内容
-
-- (void)sendMessageWithParams:(WLAgentSkillsSendMessageParams *)params
-                     success:(void (^)(WLAgentSkillsSendMessageResult *result))success
-                     failure:(void (^)(NSError *error))failure {
-    
-    [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:params.sessionId
-                                                            content:params.content
-                                                            success:^(id responseObject) {
-        
-        NSDictionary *msgDict = responseObject;
-        WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] init];
-        result.messageId = [msgDict[@"id"] integerValue];
-        result.seq = [msgDict[@"seq"] integerValue];
-        result.createdAt = msgDict[@"createdAt"];
-        
-        if (success) {
-            success(result);
-        }
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
-}
-
-#pragma mark - 12. replyPermission - 权限确认
-
-- (void)replyPermissionWithParams:(WLAgentSkillsReplyPermissionParams *)params
-                          success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
-                          failure:(void (^)(NSError *error))failure {
-    
-    [[WLAgentSkillsHTTPClient sharedClient] replyPermissionWithSessionId:params.sessionId
-                                                            permissionId:params.permissionId
-                                                                approved:params.approved
-                                                                 success:^(id responseObject) {
-        
-        NSDictionary *dict = responseObject;
-        WLAgentSkillsReplyPermissionResult *result = [[WLAgentSkillsReplyPermissionResult alloc] init];
-        result.success = [dict[@"success"] boolValue];
-        result.permissionId = dict[@"permissionId"];
-        result.approved = [dict[@"approved"] boolValue];
-        
-        if (success) {
-            success(result);
-        }
-        
-    } failure:^(NSError *error) {
-        if (failure) {
-            failure(error);
-        }
-    }];
-}
-
-#pragma mark - 13. controlSkillWeCode - 小程序控制
-
-- (void)controlSkillWeCodeWithParams:(WLAgentSkillsControlSkillWeCodeParams *)params
-                             success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
-                             failure:(void (^)(NSError *error))failure {
-    
-    WLAgentSkillsWeCodeStatus status;
-    switch (params.action) {
-        case WLAgentSkillsWeCodeActionClose:
-            status = WLAgentSkillsWeCodeStatusClosed;
-            break;
-        case WLAgentSkillsWeCodeActionMinimize:
-            status = WLAgentSkillsWeCodeStatusMinimized;
-            break;
+    NSString *latest = [[WLAgentSkillsStreamingCache sharedCache] latestCompletedContentForSessionId:params.welinkSessionId
+                                                                                             messageId:params.messageId];
+    if (latest.length == 0) {
+      NSInteger code = params.messageId != nil ? 4003 : 4005;
+      NSString *message = params.messageId != nil ? @"Message not found in SDK cache." : @"No completed message available.";
+      [weakSelf dispatchFailure:failure code:code message:message];
+      return;
     }
-    
-    if (self.wecodeStatusCallback) {
-        self.wecodeStatusCallback(status);
+
+    sendWithContent(latest);
+  }
+                                                            failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
+}
+
+#pragma mark - 8. getSessionMessage
+
+- (void)getSessionMessage:(WLAgentSkillsGetSessionMessageParams *)params
+                  success:(void (^)(WLAgentSkillsPageResult *result))success
+                  failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.welinkSessionId == nil) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
+    return;
+  }
+
+  NSNumber *page = params.page ?: @0;
+  NSNumber *size = params.size ?: @50;
+
+  __weak typeof(self) weakSelf = self;
+  [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
+                                                               page:page
+                                                               size:size
+                                                            success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    WLAgentSkillsPageResult *serverPage = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
+
+    NSArray<WLAgentSkillsSessionMessage *> *merged = [[WLAgentSkillsStreamingCache sharedCache] mergedMessagesWithServerMessages:serverPage.content
+                                                                                                                      sessionId:params.welinkSessionId];
+
+    NSInteger pageValue = page.integerValue;
+    NSInteger sizeValue = MAX(1, size.integerValue);
+    NSInteger start = pageValue * sizeValue;
+    NSInteger end = MIN(start + sizeValue, merged.count);
+
+    NSArray<WLAgentSkillsSessionMessage *> *paged = @[];
+    if (start < end) {
+      paged = [merged subarrayWithRange:NSMakeRange(start, end - start)];
     }
-    
-    WLAgentSkillsControlSkillWeCodeResult *result = [[WLAgentSkillsControlSkillWeCodeResult alloc] init];
-    result.status = @"success";
-    
+
+    NSMutableArray *dictContent = [NSMutableArray arrayWithCapacity:paged.count];
+    for (WLAgentSkillsSessionMessage *message in paged) {
+      [dictContent addObject:[message toDictionary]];
+    }
+
+    NSDictionary *pageDict = @{
+      @"content" : dictContent,
+      @"page" : @(pageValue),
+      @"size" : @(sizeValue),
+      @"total" : @(merged.count)
+    };
+
+    WLAgentSkillsPageResult *result = [[WLAgentSkillsPageResult alloc] initWithDictionary:pageDict];
     if (success) {
-        success(result);
+      success(result);
     }
+  }
+                                                            failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
 }
 
-#pragma mark - WLAgentSkillsWebSocketDelegate
+#pragma mark - 9. registerSessionListener
 
-- (void)webSocketDidConnect {
-    NSLog(@"WebSocket connected");
+- (void)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params {
+  if (params == nil || params.welinkSessionId == nil || params.onMessage == nil) {
+    return;
+  }
+
+  [[WLAgentSkillsWebSocketManager sharedManager] addListenerForSessionId:params.welinkSessionId
+                                                                onMessage:params.onMessage
+                                                                  onError:params.onError
+                                                                  onClose:params.onClose];
 }
 
-- (void)webSocketDidDisconnectWithError:(NSError *)error {
-    NSLog(@"WebSocket disconnected: %@", error.localizedDescription);
+#pragma mark - 10. unregisterSessionListener
+
+- (void)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params {
+  if (params == nil || params.welinkSessionId == nil || params.onMessage == nil) {
+    return;
+  }
+
+  [[WLAgentSkillsWebSocketManager sharedManager] removeListenerForSessionId:params.welinkSessionId
+                                                                   onMessage:params.onMessage
+                                                                     onError:params.onError
+                                                                     onClose:params.onClose];
 }
 
-- (void)webSocketDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
-    NSLog(@"Received message: %@", message.content);
+#pragma mark - 11. sendMessage
+
+- (void)sendMessage:(WLAgentSkillsSendMessageParams *)params
+            success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+            failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.welinkSessionId == nil || params.content.length == 0) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId and content are required."];
+    return;
+  }
+
+  [self sendMessageWithSessionId:params.welinkSessionId
+                         content:params.content
+                      toolCallId:params.toolCallId
+                         success:success
+                         failure:failure];
+}
+
+#pragma mark - 12. replyPermission
+
+- (void)replyPermission:(WLAgentSkillsReplyPermissionParams *)params
+                success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
+                failure:(void (^)(NSError *error))failure {
+  if (params == nil || params.welinkSessionId == nil || params.permId.length == 0 || params.response.length == 0) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params for replyPermission."];
+    return;
+  }
+
+  NSSet *validResponses = [NSSet setWithArray:@[@"once", @"always", @"reject"]];
+  if (![validResponses containsObject:params.response]) {
+    [self dispatchFailure:failure code:1000 message:@"response must be once/always/reject."];
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  [[WLAgentSkillsHTTPClient sharedClient] replyPermissionWithSessionId:params.welinkSessionId
+                                                                 permId:params.permId
+                                                               response:params.response
+                                                                success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    WLAgentSkillsReplyPermissionResult *result = [[WLAgentSkillsReplyPermissionResult alloc] initWithDictionary:data];
+    if (success) {
+      success(result);
+    }
+  }
+                                                                failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
+}
+
+#pragma mark - 13. controlSkillWeCode
+
+- (void)controlSkillWeCode:(WLAgentSkillsControlSkillWeCodeParams *)params
+                   success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
+                   failure:(void (^)(NSError *error))failure {
+  if (params == nil) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params for controlSkillWeCode."];
+    return;
+  }
+
+  WLAgentSkillsSkillWecodeStatusResult *statusResult = [[WLAgentSkillsSkillWecodeStatusResult alloc] init];
+  statusResult.timestamp = @((long long)([[NSDate date] timeIntervalSince1970] * 1000));
+
+  switch (params.action) {
+    case WLAgentSkillsWecodeActionClose:
+      statusResult.status = WLAgentSkillsWecodeStatusClosed;
+      statusResult.message = @"Skill miniapp closed";
+      break;
+    case WLAgentSkillsWecodeActionMinimize:
+      statusResult.status = WLAgentSkillsWecodeStatusMinimized;
+      statusResult.message = @"Skill miniapp minimized";
+      break;
+    default:
+      [self dispatchFailure:failure code:1000 message:@"Unsupported action for controlSkillWeCode."];
+      return;
+  }
+
+  if (self.wecodeStatusCallback != nil) {
+    self.wecodeStatusCallback(statusResult);
+  }
+
+  WLAgentSkillsControlSkillWeCodeResult *result = [[WLAgentSkillsControlSkillWeCodeResult alloc] init];
+  result.status = @"success";
+  if (success) {
+    success(result);
+  }
+}
+
+#pragma mark - WLAgentSkillsWebSocketManagerDelegate
+
+- (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
+  [[WLAgentSkillsStreamingCache sharedCache] updateWithStreamMessage:message];
+
+  NSInteger mappedStatus = [self mapStreamMessageToSessionStatus:message];
+  if (mappedStatus == NSNotFound) {
+    return;
+  }
+
+  NSNumber *sessionId = @([message.welinkSessionId longLongValue]);
+  if (sessionId.longLongValue <= 0) {
+    return;
+  }
+
+  [self emitSessionStatus:(WLAgentSkillsClientSessionStatus)mappedStatus sessionId:sessionId];
+}
+
+#pragma mark - Internal Helpers
+
+- (void)sendMessageWithSessionId:(NSNumber *)welinkSessionId
+                         content:(NSString *)content
+                      toolCallId:(nullable NSString *)toolCallId
+                         success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+                         failure:(void (^)(NSError *error))failure {
+  [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
+
+  __weak typeof(self) weakSelf = self;
+  [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:welinkSessionId
+                                                            content:content
+                                                         toolCallId:toolCallId
+                                                            success:^(id  _Nullable responseObject) {
+    NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+    WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] initWithDictionary:data];
+    [[WLAgentSkillsStreamingCache sharedCache] cacheSendMessageResult:result];
+    if (success) {
+      success(result);
+    }
+  }
+                                                            failure:^(NSError * _Nonnull error) {
+    [weakSelf dispatchFailureObject:failure error:error];
+  }];
+}
+
+- (NSInteger)mapStreamMessageToSessionStatus:(WLAgentSkillsStreamMessage *)message {
+  NSString *type = message.type ?: @"";
+
+  if ([type isEqualToString:@"step.start"] ||
+      [type isEqualToString:@"text.delta"] ||
+      [type isEqualToString:@"thinking.delta"] ||
+      [type isEqualToString:@"tool.update"] ||
+      [type isEqualToString:@"question"] ||
+      [type isEqualToString:@"permission.ask"] ||
+      [type isEqualToString:@"file"]) {
+    return WLAgentSkillsClientSessionStatusExecuting;
+  }
+
+  if ([type isEqualToString:@"permission.reply"]) {
+    if ([message.response isEqualToString:@"reject"]) {
+      return WLAgentSkillsClientSessionStatusStopped;
+    }
+    if ([message.response isEqualToString:@"once"] || [message.response isEqualToString:@"always"]) {
+      return WLAgentSkillsClientSessionStatusExecuting;
+    }
+  }
+
+  if ([type isEqualToString:@"session.status"]) {
+    if ([message.sessionStatus isEqualToString:@"busy"] || [message.sessionStatus isEqualToString:@"retry"]) {
+      return WLAgentSkillsClientSessionStatusExecuting;
+    }
+    if ([message.sessionStatus isEqualToString:@"idle"]) {
+      return WLAgentSkillsClientSessionStatusCompleted;
+    }
+  }
+
+  if ([type isEqualToString:@"step.done"] ||
+      [type isEqualToString:@"text.done"] ||
+      [type isEqualToString:@"thinking.done"]) {
+    return WLAgentSkillsClientSessionStatusCompleted;
+  }
+
+  if ([type isEqualToString:@"session.error"] ||
+      [type isEqualToString:@"error"] ||
+      [type isEqualToString:@"agent.offline"]) {
+    return WLAgentSkillsClientSessionStatusStopped;
+  }
+
+  return NSNotFound;
+}
+
+- (void)emitSessionStatus:(WLAgentSkillsClientSessionStatus)status sessionId:(NSNumber *)sessionId {
+  WLAgentSkillsSessionStatusCallback callback = nil;
+  @synchronized(self) {
+    callback = self.sessionStatusCallbacks[sessionId.stringValue];
+  }
+
+  if (callback == nil) {
+    return;
+  }
+
+  WLAgentSkillsSessionStatusResult *result = [[WLAgentSkillsSessionStatusResult alloc] init];
+  result.status = status;
+  callback(result);
+}
+
+- (void)dispatchFailure:(void (^)(NSError *error))failure
+                   code:(NSInteger)code
+                message:(NSString *)message {
+  if (failure == nil) {
+    return;
+  }
+
+  NSError *error = [NSError errorWithDomain:WLAgentSkillsSDKErrorDomain
+                                       code:code
+                                   userInfo:@{
+    NSLocalizedDescriptionKey : message ?: @"Unknown error",
+    WLAgentSkillsErrorCodeKey : @(code),
+    WLAgentSkillsErrorMessageKey : message ?: @"Unknown error"
+  }];
+  failure(error);
+}
+
+- (void)dispatchFailureObject:(void (^)(NSError *error))failure error:(NSError *)error {
+  if (failure != nil) {
+    failure(error);
+  }
 }
 
 @end

@@ -1,4 +1,4 @@
-//
+﻿//
 //  WLAgentSkillsWebSocketManager.h
 //  WLAgentSkillsSDK
 //
@@ -8,33 +8,35 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@protocol WLAgentSkillsWebSocketDelegate <NSObject>
-
+@protocol WLAgentSkillsWebSocketManagerDelegate <NSObject>
 @optional
-- (void)webSocketDidConnect;
-- (void)webSocketDidDisconnectWithError:(nullable NSError *)error;
-- (void)webSocketDidReceiveMessage:(WLAgentSkillsStreamMessage *)message;
-
+- (void)webSocketManagerDidConnect;
+- (void)webSocketManagerDidDisconnectWithError:(nullable NSError *)error;
+- (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message;
 @end
 
 @interface WLAgentSkillsWebSocketManager : NSObject
 
-@property (nonatomic, weak, nullable) id<WLAgentSkillsWebSocketDelegate> delegate;
+@property (nonatomic, weak, nullable) id<WLAgentSkillsWebSocketManagerDelegate> delegate;
 @property (nonatomic, assign, readonly) BOOL isConnected;
 
 + (instancetype)sharedManager;
 
-- (void)connect;
+- (void)connectIfNeeded;
 - (void)disconnect;
 
-- (void)subscribeToSession:(NSString *)sessionId
-                  onMessage:(void (^)(WLAgentSkillsStreamMessage *message))onMessage
-                    onError:(void (^)(WLAgentSkillsSessionError *error))onError
-                    onClose:(void (^)(NSString *reason))onClose;
+- (void)addListenerForSessionId:(NSNumber *)welinkSessionId
+                      onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                        onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                        onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
 
-- (void)unsubscribeFromSession:(NSString *)sessionId;
+- (void)removeListenerForSessionId:(NSNumber *)welinkSessionId
+                         onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                           onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                           onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
 
-- (BOOL)isSubscribedToSession:(NSString *)sessionId;
+- (void)removeAllListenersForSessionId:(NSNumber *)welinkSessionId;
+- (BOOL)hasListenerForSessionId:(NSNumber *)welinkSessionId;
 
 @end
 
