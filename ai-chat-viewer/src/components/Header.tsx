@@ -1,69 +1,66 @@
-import React from 'react';
-import { AIProgressStatus } from '../types';
+﻿import React from 'react';
+import { AgentStatus, SessionStatus } from '../types';
 import '../styles/Header.less';
 
 interface HeaderProps {
   title: string;
-  progress: AIProgressStatus;
-  isMaximized: boolean;
-  onMaximize: () => void;
+  sessionStatus: SessionStatus;
+  agentStatus: AgentStatus;
+  onMinimize: () => void;
   onClose: () => void;
+  disabled?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  title, 
-  progress, 
-  isMaximized, 
-  onMaximize, 
-  onClose 
+const sessionStatusText: Record<SessionStatus, string> = {
+  busy: '生成中',
+  idle: '空闲',
+  retry: '重试中',
+  unknown: '初始化中',
+};
+
+const agentStatusText: Record<AgentStatus, string> = {
+  online: 'Agent 在线',
+  offline: 'Agent 离线',
+  unknown: 'Agent 状态未知',
+};
+
+const Header: React.FC<HeaderProps> = ({
+  title,
+  sessionStatus,
+  agentStatus,
+  onMinimize,
+  onClose,
+  disabled = false,
 }) => {
-  const getProgressIcon = () => {
-    switch (progress.status) {
-      case 'thinking':
-        return '🤔';
-      case 'processing':
-        return '⚙️';
-      case 'completed':
-        return '✅';
-      case 'error':
-        return '❌';
-      default:
-        return '💬';
-    }
-  };
-
-  const getProgressText = () => {
-    if (progress.status === 'processing') {
-      return `${progress.step}/${progress.totalSteps}`;
-    }
-    return '';
-  };
-
   return (
-    <div className="header">
+    <header className="header">
       <div className="text-area">
-        <span className="progress-icon" title={progress.status}>
-          {getProgressIcon()}
-        </span>
-        <span className="title-text">{title}</span>
+        <span className={`status-dot status-${sessionStatus}`} />
+        <span className="title-text" title={title}>{title}</span>
+        <span className="status-text">{sessionStatusText[sessionStatus]}</span>
+        <span className={`agent-status agent-${agentStatus}`}>{agentStatusText[agentStatus]}</span>
       </div>
       <div className="action-area">
-        <button 
-          className="icon-btn maximize-btn" 
-          onClick={onMaximize}
-          title={isMaximized ? '缩小' : '放大'}
+        <button
+          className="icon-btn minimize-btn"
+          onClick={onMinimize}
+          disabled={disabled}
+          title="缩小"
+          type="button"
         >
-          {isMaximized ? '🗗' : '🗖'}
+          缩小
         </button>
-        <button 
-          className="icon-btn close-btn" 
+        <button
+          className="icon-btn close-btn"
           onClick={onClose}
+          disabled={disabled}
           title="关闭"
+          type="button"
         >
-          ✕
+          关闭
         </button>
       </div>
-    </div>
+    </header>
   );
 };
 

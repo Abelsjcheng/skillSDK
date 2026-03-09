@@ -1,21 +1,17 @@
-* {
+﻿* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: #f5f6f7;
+  color: #1f1f1f;
+}
+
+#root {
+  height: 100vh;
 }
 
 .app-container {
@@ -23,40 +19,79 @@ body {
   flex-direction: column;
   width: 100%;
   height: 100vh;
-  padding: 12px;
+  padding: 10px;
   background-color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  box-sizing: border-box;
-  position: relative;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-.app-container.maximized {
-  max-width: 100%;
-  max-height: 100vh;
-  margin: 0;
-  padding: 12px;
-  border-radius: 0;
 }
 
 .header-wrapper,
+.status-wrapper,
 .content-wrapper,
 .footer-wrapper {
   margin-bottom: 8px;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
+}
+
+.footer-wrapper {
+  margin-bottom: 0;
+}
+
+.status-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.error-banner,
+.feedback-banner,
+.info-banner {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.error-banner {
+  background-color: #fff2f0;
+  color: #cf1322;
+  border: 1px solid #ffccc7;
+}
+
+.feedback-banner {
+  background-color: #f6ffed;
+  color: #237804;
+  border: 1px solid #b7eb8f;
+}
+
+.feedback-banner.error {
+  background-color: #fff2f0;
+  color: #cf1322;
+  border-color: #ffccc7;
+}
+
+.feedback-banner.info {
+  background-color: #e6f4ff;
+  color: #0958d9;
+  border-color: #91caff;
+}
+
+.info-banner {
+  background-color: #fafafa;
+  color: #595959;
+  border: 1px solid #f0f0f0;
 }
 
 .content-wrapper {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.loading-state {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #8c8c8c;
+  font-size: 14px;
 }

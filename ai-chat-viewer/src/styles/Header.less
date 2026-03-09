@@ -1,79 +1,102 @@
-.header {
+﻿.header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0;
-  background-color: transparent;
-  height: 24px;
-  width: 100%;
-  box-sizing: border-box;
-  position: sticky;
-  top: 0;
-  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 4px;
 }
 
 .text-area {
   display: flex;
   align-items: center;
+  gap: 8px;
   flex: 1;
   min-width: 0;
 }
 
-.progress-icon {
-  font-size: 16px;
-  margin-left: 8px;
-  line-height: 1;
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
+}
+
+.status-busy {
+  background-color: #faad14;
+  box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.2);
+}
+
+.status-idle {
+  background-color: #52c41a;
+}
+
+.status-retry {
+  background-color: #1677ff;
+}
+
+.status-unknown {
+  background-color: #bfbfbf;
 }
 
 .title-text {
   font-size: 14px;
-  line-height: 22px;
-  color: rgba(102, 102, 102, 1);
-  margin-left: 8px;
-  white-space: nowrap;
+  color: #262626;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: left;
-  flex: 1;
-  min-width: 0;
+  white-space: nowrap;
+}
+
+.status-text {
+  font-size: 12px;
+  color: #595959;
+  white-space: nowrap;
+}
+
+.agent-status {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.agent-online {
+  color: #389e0d;
+}
+
+.agent-offline {
+  color: #cf1322;
 }
 
 .action-area {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-right: 8px;
-  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .icon-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
+  height: 26px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background-color: #ffffff;
   cursor: pointer;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  padding: 0;
-  transition: background-color 0.2s;
-  flex-shrink: 0;
+  font-size: 12px;
+  color: #595959;
+  padding: 0 10px;
+  transition: all 0.2s;
 }
 
-.icon-btn:hover {
-  background-color: #e0e0e0;
+.icon-btn:hover:not(:disabled) {
+  border-color: #1677ff;
+  color: #1677ff;
 }
 
-.maximize-btn:hover {
-  background-color: #d0d0d0;
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
-.close-btn:hover {
-  background-color: #ff4d4f;
-  color: white;
+.close-btn:hover:not(:disabled) {
+  border-color: #ff4d4f;
+  color: #ff4d4f;
 }

@@ -1,90 +1,80 @@
-import React, { useState, KeyboardEvent, useEffect, useRef } from 'react';
+﻿import React, { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import '../styles/Footer.less';
 
 interface FooterProps {
   onSend: (message: string) => void;
+  onStop: () => void;
+  isGenerating: boolean;
   disabled?: boolean;
 }
 
-const Footer: React.FC<FooterProps> = ({ onSend, disabled = false }) => {
+const Footer: React.FC<FooterProps> = ({
+  onSend,
+  onStop,
+  isGenerating,
+  disabled = false,
+}) => {
   const [value, setValue] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, []);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (isFocused && inputRef.current) {
-        inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    };
+    adjustHeight();
+  }, [value, adjustHeight]);
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isFocused]);
+  const handleSend = useCallback(() => {
+    const trimmed = value.trim();
+    if (!trimmed || disabled || isGenerating) return;
+    onSend(trimmed);
+    setValue('');
+  }, [value, disabled, isGenerating, onSend]);
 
-  const handleSend = () => {
-    const trimmedValue = value.trim();
-    if (trimmedValue && !disabled) {
-      onSend(trimmedValue);
-      setValue('');
+  const handlePrimaryAction = useCallback(() => {
+    if (isGenerating) {
+      onStop();
+      return;
     }
-  };
+    handleSend();
+  }, [isGenerating, onStop, handleSend]);
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (!isGenerating) {
+        handleSend();
       }
-    }, 300);
-  };
+    }
+  }, [isGenerating, handleSend]);
 
-  const handleBlur = () => {
-    setIsFocused(false);
-  };
+  const inputDisabled = disabled || isGenerating;
+  const buttonDisabled = disabled || (!isGenerating && !value.trim());
 
   return (
-    <div className={`footer-container ${isFocused ? 'footer-focused' : ''}`}>
-      <input
-        ref={inputRef}
-        type="text"
+    <div className="footer-container">
+      <textarea
+        ref={textareaRef}
         className="footer-input"
-        placeholder="请输入您的问题..."
+        placeholder={isGenerating ? 'AI 正在生成中...' : '请输入您的问题...'}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        disabled={disabled}
+        rows={1}
+        disabled={inputDisabled}
       />
-      <button 
-        className="send-icon-btn" 
-        onClick={handleSend}
-        disabled={disabled || !value.trim()}
-        title="生成"
+      <button
+        className={`send-icon-btn ${isGenerating ? 'stop-mode' : ''}`}
+        onClick={handlePrimaryAction}
+        disabled={buttonDisabled}
+        title={isGenerating ? '停止生成' : '生成'}
+        type="button"
       >
-        <svg 
-          className="send-icon" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path 
-            d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          />
-        </svg>
-        <span className="send-btn-text">生成</span>
+        <span className="send-btn-text">{isGenerating ? '停止生成' : '生成'}</span>
       </button>
     </div>
   );

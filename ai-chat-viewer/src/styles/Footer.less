@@ -1,86 +1,63 @@
-.footer-container {
+﻿.footer-container {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
-  padding: 0;
-  background-color: #fafafa;
-  border-top: 1px solid #e0e0e0;
-  height: 36px;
   width: 100%;
-  box-sizing: border-box;
-  position: sticky;
-  bottom: 0;
-  flex-shrink: 0;
-  
-  &.footer-focused {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  }
 }
 
 .footer-input {
   flex: 1;
-  height: 36px;
-  padding: 0 12px;
+  min-height: 38px;
+  max-height: 120px;
+  resize: none;
   border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  border-radius: 6px;
+  padding: 8px 10px;
   font-size: 14px;
+  line-height: 1.45;
   font-family: inherit;
   background-color: #ffffff;
   transition: border-color 0.2s, box-shadow 0.2s;
-  
-  &:focus {
-    outline: none;
-    border-color: #1890ff;
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-  }
-  
-  &:disabled {
-    background-color: #f5f5f5;
-    cursor: not-allowed;
-  }
-  
-  &::placeholder {
-    color: #bfbfbf;
-  }
+}
+
+.footer-input:focus {
+  outline: none;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15);
+}
+
+.footer-input:disabled {
+  background-color: #fafafa;
+  color: #bfbfbf;
+  cursor: not-allowed;
 }
 
 .send-icon-btn {
-  width: 64px;
-  height: 36px;
+  height: 38px;
+  min-width: 84px;
   border: none;
-  background: linear-gradient(90deg, rgba(13, 148, 255, 1) 0%, rgba(208, 81, 255, 1) 100%);
-  color: white;
-  border-radius: 4px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #1677ff, #3f87ff);
+  color: #ffffff;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0 8px;
+  padding: 0 12px;
   transition: all 0.2s;
-  flex-shrink: 0;
-  
-  &:hover:not(:disabled) {
-    background: linear-gradient(90deg, rgba(24, 168, 255, 1) 0%, rgba(228, 101, 255, 1) 100%);
-  }
-  
-  &:active:not(:disabled) {
-    opacity: 0.9;
-  }
-  
 }
 
-.send-icon {
-  width: 16px;
-  height: 16px;
+.send-icon-btn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.send-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.send-icon-btn.stop-mode {
+  background: linear-gradient(135deg, #ff4d4f, #ff7875);
 }
 
 .send-btn-text {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
