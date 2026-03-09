@@ -350,10 +350,9 @@ case 'streaming':
     }
   }, [welinkSessionId]);
 
-  const handleSendToIM = useCallback(async (content?: string) => {
+  const handleSendToIM = useCallback(async (content: string) => {
     if (!welinkSessionId) return;
     try {
-      const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && !m.isStreaming);
       await sendMessageToIM({
         welinkSessionId,
       });
@@ -362,7 +361,7 @@ case 'streaming':
       console.error('Failed to send to IM:', err);
       setError('发送到IM失败');
     }
-  }, [welinkSessionId, messages]);
+  }, [welinkSessionId]);
 
   const handleMaximize = useCallback(async () => {
     setIsMaximized((prev) => !prev);
@@ -440,7 +439,6 @@ case 'streaming':
           isStreaming={isStreaming}
           onSend={handleSendMessage}
           onStop={handleStop}
-          onSendToIM={handleSendToIM}
         />
       </div>
     </div>

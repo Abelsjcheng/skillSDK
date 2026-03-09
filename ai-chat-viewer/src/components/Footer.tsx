@@ -5,14 +5,12 @@ interface FooterProps {
   isStreaming: boolean;
   onSend: (message: string) => void;
   onStop: () => void;
-  onSendToIM: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   isStreaming,
   onSend,
   onStop,
-  onSendToIM,
 }) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -103,13 +101,6 @@ export const Footer: React.FC<FooterProps> = ({
           <span className="send-btn-text">生成</span>
         </button>
       )}
-      <button
-        className="send-to-im-btn"
-        onClick={onSendToIM}
-        title="发送到IM"
-      >
-        ↗️ 发送
-      </button>
     </div>
   );
 };
