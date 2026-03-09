@@ -7,8 +7,7 @@ import type {
   Message, 
   StreamMessage, 
   SessionMessage, 
-  SessionStatus, 
-  AgentStatus 
+  SessionStatus 
 } from './types';
 import {
   parseWelinkSessionId,
@@ -55,16 +54,11 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
   };
 }
 
-const initialTitle = 'AI 智能问答';
-
 function App() {
   const [welinkSessionId, setWelinkSessionId] = useState<number | null>(null);
-  const [title, setTitle] = useState(initialTitle);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>('unknown');
   const [isLoading, setIsLoading] = useState(true);
-  const [isMaximized, setIsMaximized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const assemblerRef = useRef(new StreamAssembler());
@@ -187,25 +181,11 @@ function App() {
           break;
         }
 
-        case 'session.title':
-          if (msg.title) {
-            setTitle(msg.title);
-          }
-          break;
-
         case 'session.error':
           setSessionStatus('error');
           setError(msg.error ?? '会话错误');
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
-          break;
-
-        case 'agent.online':
-          setAgentStatus('online');
-          break;
-
-        case 'agent.offline':
-          setAgentStatus('offline');
           break;
 
         case 'error':
@@ -283,7 +263,6 @@ case 'streaming':
 
     onCloseRef.current = (reason) => {
       console.log('Session listener closed:', reason);
-      setAgentStatus('offline');
     };
 
     const initSession = async () => {
@@ -363,12 +342,11 @@ case 'streaming':
     }
   }, [welinkSessionId]);
 
-  const handleMaximize = useCallback(async () => {
-    setIsMaximized((prev) => !prev);
+  const handleMinimize = useCallback(async () => {
     try {
       await controlSkillWeCode({ action: 'minimize' });
     } catch (err) {
-      console.error('Failed to control skill wecode:', err);
+      console.error('Failed to minimize:', err);
     }
   }, []);
 
@@ -408,14 +386,10 @@ case 'streaming':
   const isStreaming = sessionStatus === 'busy';
 
   return (
-    <div className={`app-container ${isMaximized ? 'maximized' : ''}`}>
+    <div className="app-container">
       <div className="header-wrapper">
         <Header
-          title={title}
-          sessionStatus={sessionStatus}
-          agentStatus={agentStatus}
-          isMaximized={isMaximized}
-          onMaximize={handleMaximize}
+          onMinimize={handleMinimize}
           onClose={handleClose}
         />
       </div>

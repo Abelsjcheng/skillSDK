@@ -19,13 +19,19 @@
   min-width: 0;
 }
 
-.progress-icon {
-  font-size: 16px;
-  margin-left: 8px;
-  line-height: 1;
-  flex-shrink: 0;
+.logo-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  
+  svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .title-text {
@@ -39,6 +45,7 @@
   text-align: left;
   flex: 1;
   min-width: 0;
+  font-weight: 500;
 }
 
 .action-area {
@@ -69,19 +76,11 @@
   background-color: #e0e0e0;
 }
 
-.maximize-btn:hover {
-  background-color: #d0d0d0;
+.minimize-btn:hover {
+  background-color: #e0e0e0;
 }
 
 .close-btn:hover {
   background-color: #ff4d4f;
   color: white;
-}
-
-.agent-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-left: 8px;
-  flex-shrink: 0;
 }

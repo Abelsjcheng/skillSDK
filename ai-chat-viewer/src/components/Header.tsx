@@ -1,60 +1,35 @@
 import React from 'react';
-import type { SessionStatus, AgentStatus } from '../types';
 import '../styles/Header.less';
 
 interface HeaderProps {
-  title: string;
-  sessionStatus: SessionStatus;
-  agentStatus: AgentStatus;
-  isMaximized: boolean;
-  onMaximize: () => void;
+  onMinimize: () => void;
   onClose: () => void;
 }
 
-const sessionStatusConfig: Record<SessionStatus, { icon: string; text: string }> = {
-  idle: { icon: '💬', text: '空闲' },
-  busy: { icon: '⚙️', text: '处理中...' },
-  retry: { icon: '🔄', text: '重试中...' },
-  error: { icon: '❌', text: '错误' },
-};
-
-const agentStatusConfig: Record<AgentStatus, { color: string; text: string }> = {
-  online: { color: '#4caf50', text: '在线' },
-  offline: { color: '#9e9e9e', text: '离线' },
-  unknown: { color: '#ff9800', text: '连接中...' },
-};
-
 export const Header: React.FC<HeaderProps> = ({
-  title,
-  sessionStatus,
-  agentStatus,
-  isMaximized,
-  onMaximize,
+  onMinimize,
   onClose,
 }) => {
-  const sessionCfg = sessionStatusConfig[sessionStatus] ?? sessionStatusConfig.idle;
-  const agentCfg = agentStatusConfig[agentStatus] ?? agentStatusConfig.unknown;
-
   return (
     <div className="header">
       <div className="text-area">
-        <span className="progress-icon" title={sessionCfg.text}>
-          {sessionCfg.icon}
+        <span className="logo-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="18" height="18" rx="4" stroke="#1890ff" strokeWidth="2" fill="none"/>
+            <path d="M8 12L11 15L16 9" stroke="#1890ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </span>
-        <span className="title-text">{title}</span>
-        <span
-          className="agent-status-dot"
-          style={{ backgroundColor: agentCfg.color }}
-          title={agentCfg.text}
-        />
+        <span className="title-text">AI技能</span>
       </div>
       <div className="action-area">
         <button
-          className="icon-btn maximize-btn"
-          onClick={onMaximize}
-          title={isMaximized ? '缩小' : '放大'}
+          className="icon-btn minimize-btn"
+          onClick={onMinimize}
+          title="缩小"
         >
-          {isMaximized ? '🗗' : '🗖'}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
         </button>
         <button
           className="icon-btn close-btn"
