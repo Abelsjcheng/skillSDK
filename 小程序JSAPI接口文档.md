@@ -86,8 +86,6 @@ window.HWH5EXT.regenerateAnswer({
 
 将用户在 Skill 小程序中最终确认的文本内容发送到 IM 聊天，用于"选中文本发送到聊天"场景。
 
-SDK 内部维护消息缓存，记录每条消息完成后的最终内容。调用此接口时，SDK 从缓存中获取消息的最终完整文本，然后发送到 IM。
-
 ### 调用方式
 
 ```javascript
@@ -99,7 +97,7 @@ window.HWH5EXT.sendMessageToIM(params)
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | welinkSessionId | number | 是 | 会话 ID |
-| messageId | number | 否 | 要发送到 IM 的消息 ID，SDK 会从缓存中获取该消息的最终完整内容。不填则获取当前会话最后一条最终消息的内容 |
+| messageId | number | 否 | 要发送到 IM 的消息 ID |
 
 ### 返回值
 
@@ -143,7 +141,7 @@ window.HWH5EXT.sendMessageToIM({
 
 ### 接口说明
 
-获取当前会话的消息列表。SDK 会将服务端历史消息与本地尚未落库的流式消息缓存合并后返回。
+获取当前会话的消息列表。
 
 ### 调用方式
 
@@ -238,7 +236,7 @@ window.HWH5EXT.getSessionMessage({
 
 ### 接口说明
 
-注册会话监听器，用于接收 WebSocket 推送的完整事件流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器，SDK 会确保不会因调用时序问题遗漏消息。
+注册会话监听器，用于接收 WebSocket 推送的完整事件流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器，
 
 ### 调用方式
 
@@ -509,7 +507,7 @@ window.HWH5EXT.sendMessage({
 
 ### 接口说明
 
-停止指定会话当前轮回答生成，但保持 WebSocket 连接和 Skill 会话本身继续可用。调用后用户仍可继续发送新消息。
+停止指定会话当前轮回答生成。
 
 ### 调用方式
 
@@ -567,12 +565,7 @@ window.HWH5EXT.stopSkill({
 | 后续操作 | 可发送新消息继续对话 | 会话不可恢复 |
 | WebSocket | 保持连接 | 断开连接 |
 
-### 使用场景
 
-- **stopSkill**：用户想停止当前回答，但希望保留会话以便后续继续对话
-- **closeSkill**：用户想完全结束会话，释放所有资源
-
----
 
 ## 8. replyPermission
 
@@ -728,14 +721,7 @@ window.HWH5EXT.registerSessionListener({
 
 ### 接口说明
 
-执行小程序的关闭或最小化操作，用于控制小程序生命周期。
-
-**重要说明**：
-
-- 当前 V1 保持现状：`close` 只处理小程序侧关闭逻辑
-- 上层可在 `close` 成功后继续调用 `closeSkill()` 释放 WebSocket
-- 是否关闭服务端会话仍由上层自行决定，当前客户端文档未新增该能力
-
+执行小程序的关闭或最小化操作
 ### 调用方式
 
 ```javascript

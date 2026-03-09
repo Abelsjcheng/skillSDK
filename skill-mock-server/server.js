@@ -6,7 +6,7 @@ const cors = require('cors');
 const cookie = require('cookie');
 const { WebSocketServer, WebSocket } = require('ws');
 
-const PORT = Number(process.env.PORT || 8088);
+const PORT = Number(process.env.PORT || 8001);
 const API_PREFIX = '/api/skill';
 const WS_PATH = '/ws/skill/stream';
 

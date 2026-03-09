@@ -2,11 +2,18 @@ import React, { useState, KeyboardEvent, useEffect, useRef } from 'react';
 import '../styles/Footer.less';
 
 interface FooterProps {
+  isStreaming: boolean;
   onSend: (message: string) => void;
-  disabled?: boolean;
+  onStop: () => void;
+  onSendToIM: () => void;
 }
 
-const Footer: React.FC<FooterProps> = ({ onSend, disabled = false }) => {
+export const Footer: React.FC<FooterProps> = ({
+  isStreaming,
+  onSend,
+  onStop,
+  onSendToIM,
+}) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -24,14 +31,14 @@ const Footer: React.FC<FooterProps> = ({ onSend, disabled = false }) => {
 
   const handleSend = () => {
     const trimmedValue = value.trim();
-    if (trimmedValue && !disabled) {
+    if (trimmedValue) {
       onSend(trimmedValue);
       setValue('');
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -62,32 +69,47 @@ const Footer: React.FC<FooterProps> = ({ onSend, disabled = false }) => {
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        disabled={disabled}
+        disabled={isStreaming}
       />
-      <button 
-        className="send-icon-btn" 
-        onClick={handleSend}
-        disabled={disabled || !value.trim()}
-        title="生成"
-      >
-        <svg 
-          className="send-icon" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
+      {isStreaming ? (
+        <button
+          className="stop-icon-btn"
+          onClick={onStop}
+          title="停止生成"
         >
-          <path 
-            d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          />
-        </svg>
-        <span className="send-btn-text">生成</span>
+          <span className="stop-btn-text">⏹ 停止</span>
+        </button>
+      ) : (
+        <button
+          className="send-icon-btn"
+          onClick={handleSend}
+          disabled={!value.trim()}
+          title="生成"
+        >
+          <svg
+            className="send-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="send-btn-text">生成</span>
+        </button>
+      )}
+      <button
+        className="send-to-im-btn"
+        onClick={onSendToIM}
+        title="发送到IM"
+      >
+        ↗️ 发送
       </button>
     </div>
   );
 };
-
-export default Footer;
