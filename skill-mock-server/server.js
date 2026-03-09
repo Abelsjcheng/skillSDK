@@ -1068,9 +1068,31 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+  
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push(iface.address);
+      }
+    }
+  }
+  
   // eslint-disable-next-line no-console
-  console.log(`Skill mock server is running on http://localhost:${PORT}`);
+  console.log(`Skill mock server is running on:`);
+  // eslint-disable-next-line no-console
+  console.log(`  - Local:   http://localhost:${PORT}`);
+  for (const addr of addresses) {
+    // eslint-disable-next-line no-console
+    console.log(`  - Network: http://${addr}:${PORT}`);
+  }
   // eslint-disable-next-line no-console
   console.log(`WebSocket endpoint: ws://localhost:${PORT}${WS_PATH}`);
+  for (const addr of addresses) {
+    // eslint-disable-next-line no-console
+    console.log(`WebSocket endpoint: ws://${addr}:${PORT}${WS_PATH}`);
+  }
 });
