@@ -72,7 +72,7 @@ export class HttpClient {
     const expectEnvelope = options?.expectEnvelope ?? true;
 
     const requestOptions: http.HttpRequestOptions = {
-      method,
+      method: method,
       readTimeout: this.timeout,
       connectTimeout: this.timeout,
       expectDataType: http.HttpDataType.STRING,

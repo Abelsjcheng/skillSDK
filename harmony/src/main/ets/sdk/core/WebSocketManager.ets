@@ -76,7 +76,7 @@ export class WebSocketManager {
         reject(new SkillSdkException(6000, 'WebSocket is not initialized'));
         return;
       }
-      this.socket.connect(this.wsUrl, (error: BusinessError, _result: boolean) => {
+      this.socket.connect(this.wsUrl, (error: BusinessError) => {
         if (error) {
           reject(new SkillSdkException(6000, 'WebSocket connect failed', error));
           return;
@@ -141,7 +141,7 @@ export class WebSocketManager {
   }
 
   private setupSocketEventHandlers(socket: webSocket.WebSocket): void {
-    socket.on('open', (error: BusinessError, _value: Object) => {
+    socket.on('open', (error: BusinessError) => {
       if (error) {
         this.broadcastError('WS_OPEN_ERROR', error.message);
         return;
@@ -185,10 +185,10 @@ export class WebSocketManager {
       }
     });
 
-    socket.on('close', (error: BusinessError, value: webSocket.CloseResult) => {
+    socket.on('close', (err: BusinessError, value: webSocket.CloseResult) => {
       this.connected = false;
-      if (error) {
-        this.broadcastError('WS_CLOSE_ERROR', error.message);
+      if (err) {
+        this.broadcastError('WS_CLOSE_ERROR', err.message);
       }
       const reason = `code=${value.code}, reason=${value.reason}`;
       this.broadcastClose(reason);
