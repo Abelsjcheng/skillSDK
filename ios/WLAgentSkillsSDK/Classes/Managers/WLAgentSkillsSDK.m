@@ -62,13 +62,16 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
   __weak typeof(self) weakSelf = self;
   [[WLAgentSkillsHTTPClient sharedClient] getSessionsWithImGroupId:params.imGroupId
+                                                                 ak:params.ak
                                                              status:@"ACTIVE"
                                                                page:@0
                                                                size:@20
                                                             success:^(id  _Nullable responseObject) {
     NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
     NSArray *content = [data[@"content"] isKindOfClass:[NSArray class]] ? data[@"content"] : @[];
-    NSDictionary *existing = content.count > 0 && [content.firstObject isKindOfClass:[NSDictionary class]] ? content.firstObject : nil;
+    NSDictionary *existing = [weakSelf pickLatestActiveSessionFromArray:content
+                                                                     ak:params.ak
+                                                              imGroupId:params.imGroupId];
 
     if (existing != nil) {
       if (success) {
@@ -507,6 +510,53 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                                                             failure:^(NSError * _Nonnull error) {
     [weakSelf dispatchFailureObject:failure error:error];
   }];
+}
+
+- (nullable NSDictionary *)pickLatestActiveSessionFromArray:(NSArray *)sessions
+                                                         ak:(NSString *)ak
+                                                  imGroupId:(NSString *)imGroupId {
+  if (sessions.count == 0) {
+    return nil;
+  }
+
+  static NSISO8601DateFormatter *formatter = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    formatter = [[NSISO8601DateFormatter alloc] init];
+  });
+
+  NSDictionary *latest = nil;
+  NSDate *latestUpdatedAt = [NSDate dateWithTimeIntervalSince1970:0];
+  for (id item in sessions) {
+    if (![item isKindOfClass:[NSDictionary class]]) {
+      continue;
+    }
+    NSDictionary *session = (NSDictionary *)item;
+    NSString *status = [session[@"status"] isKindOfClass:[NSString class]] ? session[@"status"] : @"";
+    if (![status isEqualToString:@"ACTIVE"]) {
+      continue;
+    }
+    NSString *sessionAK = [session[@"ak"] isKindOfClass:[NSString class]] ? session[@"ak"] : @"";
+    NSString *sessionImGroupId = [session[@"imGroupId"] isKindOfClass:[NSString class]] ? session[@"imGroupId"] : @"";
+    if (ak.length > 0 && ![ak isEqualToString:sessionAK]) {
+      continue;
+    }
+    if (imGroupId.length > 0 && ![imGroupId isEqualToString:sessionImGroupId]) {
+      continue;
+    }
+
+    NSString *updatedAtRaw = [session[@"updatedAt"] isKindOfClass:[NSString class]] ? session[@"updatedAt"] : @"";
+    NSDate *updatedAt = updatedAtRaw.length > 0 ? [formatter dateFromString:updatedAtRaw] : nil;
+    if (updatedAt == nil) {
+      updatedAt = [NSDate dateWithTimeIntervalSince1970:0];
+    }
+
+    if (latest == nil || [updatedAt compare:latestUpdatedAt] == NSOrderedDescending) {
+      latest = session;
+      latestUpdatedAt = updatedAt;
+    }
+  }
+  return latest;
 }
 
 - (NSInteger)mapStreamMessageToSessionStatus:(WLAgentSkillsStreamMessage *)message {

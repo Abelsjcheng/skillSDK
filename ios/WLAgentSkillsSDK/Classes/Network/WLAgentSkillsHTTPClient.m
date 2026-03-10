@@ -59,6 +59,7 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 }
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
+                              ak:(nullable NSString *)ak
                            status:(nullable NSString *)status
                              page:(nullable NSNumber *)page
                              size:(nullable NSNumber *)size
@@ -67,6 +68,9 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
   NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
   if (imGroupId.length > 0) {
     parameters[@"imGroupId"] = imGroupId;
+  }
+  if (ak.length > 0) {
+    parameters[@"ak"] = ak;
   }
   if (status.length > 0) {
     parameters[@"status"] = status;

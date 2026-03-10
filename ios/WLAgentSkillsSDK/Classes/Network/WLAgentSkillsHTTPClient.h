@@ -23,6 +23,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
+                              ak:(nullable NSString *)ak
                            status:(nullable NSString *)status
                              page:(nullable NSNumber *)page
                              size:(nullable NSNumber *)size
