@@ -1,75 +1,79 @@
-import React, { useRef, useState, useCallback } from 'react';
+﻿import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import '../styles/CodeBlock.less';
 
 interface CodeBlockProps {
   code: string;
   language?: string;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    position: 'relative',
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#1e1e2e',
-    marginBlock: 8,
-    fontSize: 13,
-    lineHeight: 1.6,
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '4px 12px',
-    backgroundColor: '#181825',
-    color: '#a6adc8',
-    fontSize: 12,
-  },
-  copyBtn: {
-    background: 'none',
-    border: '1px solid #45475a',
-    borderRadius: 4,
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '2px 8px',
-    fontSize: 11,
-    transition: 'all 0.2s',
-  },
-  pre: {
-    margin: 0,
-    padding: 12,
-    overflowX: 'auto',
-    color: '#cdd6f4',
-    fontFamily: 'Consolas, "Courier New", Monaco, monospace',
-    whiteSpace: 'pre',
-    tabSize: 2,
-  },
-};
+function normalizeLanguage(language?: string): string {
+  if (!language) return 'text';
+  return language.toLowerCase();
+}
+
+function copyText(text: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      resolve();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
 
 export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(code).then(() => {
+    void copyText(code).then(() => {
       setCopied(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
       timerRef.current = setTimeout(() => setCopied(false), 2000);
     });
   }, [code]);
 
-  const langLabel = language ?? 'text';
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const normalizedLanguage = normalizeLanguage(language);
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <span>{langLabel}</span>
-        <button style={styles.copyBtn} onClick={handleCopy} type="button">
-          {copied ? '已复制!' : '复制'}
+    <div className="code-block">
+      <div className="code-block__header">
+        <span className="code-block__lang">{normalizedLanguage}</span>
+        <button className="code-block__copy-btn" onClick={handleCopy} type="button">
+          {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre style={styles.pre}>
-        <code>{code}</code>
-      </pre>
+      <SyntaxHighlighter
+        className="code-block__syntax"
+        language={normalizedLanguage}
+        style={oneDark}
+        codeTagProps={{ className: 'code-block__code' }}
+        wrapLongLines
+      >
+        {code}
+      </SyntaxHighlighter>
     </div>
   );
 };
