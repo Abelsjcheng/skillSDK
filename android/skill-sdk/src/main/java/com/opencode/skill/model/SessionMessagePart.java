@@ -29,6 +29,8 @@ public class SessionMessagePart {
   @Nullable
   private String question;
   @Nullable
+  private String header;
+  @Nullable
   private List<String> options = new ArrayList<>();
   @Nullable
   private String permissionId;
@@ -127,6 +129,15 @@ public class SessionMessagePart {
 
   public void setQuestion(@Nullable String question) {
     this.question = question;
+  }
+
+  @Nullable
+  public String getHeader() {
+    return header;
+  }
+
+  public void setHeader(@Nullable String header) {
+    this.header = header;
   }
 
   @Nullable

@@ -15,6 +15,8 @@ public class SessionMessage {
   private String role = "assistant";
   @NonNull
   private String content = "";
+  @Nullable
+  private String contentType;
   private int messageSeq;
   @NonNull
   private List<SessionMessagePart> parts = new ArrayList<>();
@@ -62,6 +64,15 @@ public class SessionMessage {
 
   public void setContent(@NonNull String content) {
     this.content = content;
+  }
+
+  @Nullable
+  public String getContentType() {
+    return contentType;
+  }
+
+  public void setContentType(@Nullable String contentType) {
+    this.contentType = contentType;
   }
 
   public int getMessageSeq() {

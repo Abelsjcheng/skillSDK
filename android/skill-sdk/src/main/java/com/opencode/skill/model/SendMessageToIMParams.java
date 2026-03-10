@@ -5,11 +5,18 @@ import androidx.annotation.Nullable;
 public class SendMessageToIMParams {
   private final long welinkSessionId;
   @Nullable
-  private final Long messageId;
+  private final String messageId;
+  @Nullable
+  private final String chatId;
 
-  public SendMessageToIMParams(long welinkSessionId, @Nullable Long messageId) {
+  public SendMessageToIMParams(long welinkSessionId, @Nullable String messageId) {
+    this(welinkSessionId, messageId, null);
+  }
+
+  public SendMessageToIMParams(long welinkSessionId, @Nullable String messageId, @Nullable String chatId) {
     this.welinkSessionId = welinkSessionId;
     this.messageId = messageId;
+    this.chatId = chatId;
   }
 
   public long getWelinkSessionId() {
@@ -17,7 +24,12 @@ public class SendMessageToIMParams {
   }
 
   @Nullable
-  public Long getMessageId() {
+  public String getMessageId() {
     return messageId;
+  }
+
+  @Nullable
+  public String getChatId() {
+    return chatId;
   }
 }

@@ -104,11 +104,13 @@ public class ApiClient {
     executeEnvelope(request, SkillSession.class, callback);
   }
 
-  public void sendMessage(long welinkSessionId, @NonNull String content,
+  public void sendMessage(long welinkSessionId, @NonNull String content, @Nullable String toolCallId,
       @NonNull SkillCallback<SendMessageResult> callback) {
     JsonObject body = new JsonObject();
-    // Service protocol v1 defines only "content".
     body.addProperty("content", content);
+    if (toolCallId != null && !toolCallId.isEmpty()) {
+      body.addProperty("toolCallId", toolCallId);
+    }
 
     Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
         .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
@@ -145,10 +147,13 @@ public class ApiClient {
     executeEnvelope(request, ReplyPermissionResult.class, callback);
   }
 
-  public void sendMessageToIM(long welinkSessionId, @NonNull String content,
+  public void sendMessageToIM(long welinkSessionId, @NonNull String content, @Nullable String chatId,
       @NonNull SkillCallback<SendMessageToIMResult> callback) {
     JsonObject body = new JsonObject();
     body.addProperty("content", content);
+    if (chatId != null && !chatId.trim().isEmpty()) {
+      body.addProperty("chatId", chatId);
+    }
 
     Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/send-to-im")
         .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))

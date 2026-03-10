@@ -261,7 +261,7 @@ public final class SkillSDK {
 
     String cached = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
     if (cached != null && !cached.trim().isEmpty()) {
-      sendMessageInternal(params.getWelinkSessionId(), cached, callback);
+      sendMessageInternal(params.getWelinkSessionId(), cached, null, callback);
       return;
     }
 
@@ -275,7 +275,7 @@ public final class SkillSDK {
           callback.onError(error(4002, "No user message to regenerate"));
           return;
         }
-        sendMessageInternal(params.getWelinkSessionId(), latest, callback);
+        sendMessageInternal(params.getWelinkSessionId(), latest, null, callback);
       }
 
       @Override
@@ -296,6 +296,14 @@ public final class SkillSDK {
       callback.onError(error(1000, "welinkSessionId is invalid"));
       return;
     }
+    if (params.getMessageId() != null && params.getMessageId().trim().isEmpty()) {
+      callback.onError(error(1000, "messageId cannot be empty"));
+      return;
+    }
+    if (params.getChatId() != null && params.getChatId().trim().isEmpty()) {
+      callback.onError(error(1000, "chatId cannot be empty"));
+      return;
+    }
 
     tryResolveSendToImContent(params, new SkillCallback<String>() {
       @Override
@@ -304,7 +312,8 @@ public final class SkillSDK {
           callback.onError(error(4005, "No completed message content found"));
           return;
         }
-        apiClient.sendMessageToIM(params.getWelinkSessionId(), content, new SkillCallback<SendMessageToIMResult>() {
+        apiClient.sendMessageToIM(params.getWelinkSessionId(), content, params.getChatId(),
+            new SkillCallback<SendMessageToIMResult>() {
           @Override
           public void onSuccess(@Nullable SendMessageToIMResult result) {
             callback.onSuccess(result == null ? new SendMessageToIMResult("failed", null, null, "Empty response") : result);
@@ -434,7 +443,7 @@ public final class SkillSDK {
     ensureConnected(new SkillCallback<Boolean>() {
       @Override
       public void onSuccess(@Nullable Boolean result) {
-        sendMessageInternal(params.getWelinkSessionId(), params.getContent(), callback);
+        sendMessageInternal(params.getWelinkSessionId(), params.getContent(), params.getToolCallId(), callback);
       }
 
       @Override
@@ -504,9 +513,9 @@ public final class SkillSDK {
     config = null;
   }
 
-  private void sendMessageInternal(long welinkSessionId, @NonNull String content,
+  private void sendMessageInternal(long welinkSessionId, @NonNull String content, @Nullable String toolCallId,
       @NonNull SkillCallback<SendMessageResult> callback) {
-    apiClient.sendMessage(welinkSessionId, content, new SkillCallback<SendMessageResult>() {
+    apiClient.sendMessage(welinkSessionId, content, toolCallId, new SkillCallback<SendMessageResult>() {
       @Override
       public void onSuccess(@Nullable SendMessageResult result) {
         if (result != null) {
@@ -542,7 +551,7 @@ public final class SkillSDK {
         }
 
         if (params.getMessageId() != null) {
-          long messageId = params.getMessageId();
+          String messageId = params.getMessageId();
           if (!streamingMessageCache.hasMessage(params.getWelinkSessionId(), messageId)) {
             callback.onError(error(4003, "Message does not exist"));
             return;

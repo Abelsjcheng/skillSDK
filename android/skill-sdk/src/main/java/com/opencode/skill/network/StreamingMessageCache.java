@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.SendMessageResult;
@@ -98,12 +99,22 @@ public class StreamingMessageCache {
     SessionCache cache = sessionCache(sessionId);
     synchronized (cache) {
       String type = event.getType();
+      if (type == null || type.isEmpty()) {
+        return;
+      }
       if (MessageType.SNAPSHOT.equals(type)) {
         mergeSnapshot(cache, sessionId, event.getMessages());
         return;
       }
       if (MessageType.STREAMING.equals(type)) {
         mergeStreaming(cache, sessionId, event);
+        return;
+      }
+      if (isTransportOnlyType(type)) {
+        applyTransportOnlyEvent(cache, event);
+        return;
+      }
+      if ((event.getMessageId() == null || event.getMessageId().trim().isEmpty()) && event.getMessageSeq() == null) {
         return;
       }
 
@@ -140,14 +151,18 @@ public class StreamingMessageCache {
   }
 
   @Nullable
-  public String getCompletedMessageContent(long welinkSessionId, @Nullable Long messageId) {
+  public String getCompletedMessageContent(long welinkSessionId, @Nullable String messageId) {
     SessionCache cache = sessionCaches.get(welinkSessionId);
     if (cache == null) {
       return null;
     }
     synchronized (cache) {
-      if (messageId != null) {
-        CachedMessage found = cache.byNumericId.get(messageId);
+      if (messageId != null && !messageId.trim().isEmpty()) {
+        Long numericMessageId = resolveExistingNumericMessageId(cache, messageId);
+        if (numericMessageId == null) {
+          return null;
+        }
+        CachedMessage found = cache.byNumericId.get(numericMessageId);
         if (found == null || !found.completed) {
           return null;
         }
@@ -167,23 +182,34 @@ public class StreamingMessageCache {
     }
   }
 
-  public boolean hasMessage(long welinkSessionId, long messageId) {
+  public boolean hasMessage(long welinkSessionId, @NonNull String messageId) {
+    if (messageId.trim().isEmpty()) {
+      return false;
+    }
     SessionCache cache = sessionCaches.get(welinkSessionId);
     if (cache == null) {
       return false;
     }
     synchronized (cache) {
-      return cache.byNumericId.containsKey(messageId);
+      Long numericMessageId = resolveExistingNumericMessageId(cache, messageId);
+      return numericMessageId != null && cache.byNumericId.containsKey(numericMessageId);
     }
   }
 
-  public boolean isMessageCompleted(long welinkSessionId, long messageId) {
+  public boolean isMessageCompleted(long welinkSessionId, @NonNull String messageId) {
+    if (messageId.trim().isEmpty()) {
+      return false;
+    }
     SessionCache cache = sessionCaches.get(welinkSessionId);
     if (cache == null) {
       return false;
     }
     synchronized (cache) {
-      CachedMessage message = cache.byNumericId.get(messageId);
+      Long numericMessageId = resolveExistingNumericMessageId(cache, messageId);
+      if (numericMessageId == null) {
+        return false;
+      }
+      CachedMessage message = cache.byNumericId.get(numericMessageId);
       return message != null && message.completed;
     }
   }
@@ -199,6 +225,52 @@ public class StreamingMessageCache {
   @NonNull
   private SessionCache sessionCache(long sessionId) {
     return sessionCaches.computeIfAbsent(sessionId, key -> new SessionCache());
+  }
+
+  private static boolean isTransportOnlyType(@NonNull String type) {
+    return MessageType.SESSION_STATUS.equals(type)
+        || MessageType.SESSION_TITLE.equals(type)
+        || MessageType.SESSION_ERROR.equals(type)
+        || MessageType.AGENT_ONLINE.equals(type)
+        || MessageType.AGENT_OFFLINE.equals(type)
+        || MessageType.ERROR.equals(type);
+  }
+
+  private void applyTransportOnlyEvent(@NonNull SessionCache cache, @NonNull StreamMessage event) {
+    String type = event.getType();
+    if (type == null) {
+      return;
+    }
+    if (MessageType.SESSION_STATUS.equals(type)) {
+      if ("idle".equalsIgnoreCase(event.getSessionStatus())) {
+        markLatestMessageCompleted(cache, true);
+        return;
+      }
+      if ("busy".equalsIgnoreCase(event.getSessionStatus()) || "retry".equalsIgnoreCase(event.getSessionStatus())) {
+        markLatestMessageCompleted(cache, false);
+        return;
+      }
+      return;
+    }
+    if (MessageType.SESSION_ERROR.equals(type)
+        || MessageType.ERROR.equals(type)
+        || MessageType.AGENT_OFFLINE.equals(type)) {
+      markLatestMessageCompleted(cache, true);
+    }
+  }
+
+  private void markLatestMessageCompleted(@NonNull SessionCache cache, boolean completed) {
+    CachedMessage latest = null;
+    for (CachedMessage candidate : cache.byNumericId.values()) {
+      if (latest == null || MESSAGE_COMPARATOR.compare(candidate.message, latest.message) > 0) {
+        latest = candidate;
+      }
+    }
+    if (latest == null) {
+      return;
+    }
+    latest.completed = completed;
+    latest.updatedAt = System.currentTimeMillis();
   }
 
   @NonNull
@@ -246,6 +318,26 @@ public class StreamingMessageCache {
     return synthetic;
   }
 
+  @Nullable
+  private Long resolveExistingNumericMessageId(@NonNull SessionCache cache, @Nullable String messageId) {
+    if (messageId == null || messageId.trim().isEmpty()) {
+      return null;
+    }
+    Long parsed = parseLong(messageId);
+    if (parsed != null) {
+      return parsed;
+    }
+    Long direct = cache.stableToNumericId.get(messageId);
+    if (direct != null) {
+      return direct;
+    }
+    String trimmed = messageId.trim();
+    if (!trimmed.equals(messageId)) {
+      return cache.stableToNumericId.get(trimmed);
+    }
+    return null;
+  }
+
   private void applyEventToMessage(@NonNull CachedMessage cached, @NonNull StreamMessage event) {
     String type = event.getType();
     if (type == null) {
@@ -276,11 +368,6 @@ public class StreamingMessageCache {
         break;
       case MessageType.STEP_DONE:
         cached.completed = true;
-        break;
-      case MessageType.SESSION_STATUS:
-        if ("idle".equalsIgnoreCase(event.getSessionStatus())) {
-          cached.completed = true;
-        }
         break;
       default:
         break;
@@ -318,6 +405,9 @@ public class StreamingMessageCache {
     }
     if (event.getQuestion() != null) {
       target.setQuestion(event.getQuestion());
+    }
+    if (event.getHeader() != null) {
+      target.setHeader(event.getHeader());
     }
     if (event.getOptions() != null && !event.getOptions().isEmpty()) {
       target.setOptions(event.getOptions());
@@ -377,14 +467,10 @@ public class StreamingMessageCache {
       if (item == null || !item.isJsonObject()) {
         continue;
       }
-      SessionMessage message = gson.fromJson(item, SessionMessage.class);
+      SessionMessage message = parseSnapshotMessage(cache, welinkSessionId, item.getAsJsonObject());
       if (message == null) {
         continue;
       }
-      if (message.getCreatedAt().isEmpty()) {
-        message.setCreatedAt(Instant.now().toString());
-      }
-      message.setWelinkSessionId(welinkSessionId);
       CachedMessage cached = cache.byNumericId.computeIfAbsent(message.getId(), k -> new CachedMessage());
       cached.message = cloneMessage(message);
       cached.completed = true;
@@ -393,6 +479,9 @@ public class StreamingMessageCache {
   }
 
   private void mergeStreaming(@NonNull SessionCache cache, long welinkSessionId, @NonNull StreamMessage event) {
+    if ((event.getMessageId() == null || event.getMessageId().trim().isEmpty()) && event.getMessageSeq() == null) {
+      return;
+    }
     CachedMessage cached = getOrCreateCachedMessage(cache, welinkSessionId, event);
     SessionMessage message = cached.message;
     JsonArray parts = event.getParts();
@@ -407,29 +496,177 @@ public class StreamingMessageCache {
         if (partJson == null || !partJson.isJsonObject()) {
           continue;
         }
-        SessionMessagePart incoming = gson.fromJson(partJson, SessionMessagePart.class);
+        SessionMessagePart incoming = parsePartFromJson(partJson.getAsJsonObject());
         if (incoming == null) {
           continue;
         }
-        if (incoming.getPartId() != null && currentParts.containsKey(incoming.getPartId())) {
-          SessionMessagePart existing = currentParts.get(incoming.getPartId());
-          if (incoming.getContent() != null) {
-            existing.setContent(incoming.getContent());
-          }
-          if (incoming.getType() != null) {
-            existing.setType(incoming.getType());
-          }
-          if (incoming.getToolStatus() != null) {
-            existing.setToolStatus(incoming.getToolStatus());
-          }
-        } else {
-          message.getParts().add(incoming);
-        }
+        mergePart(message, currentParts, incoming);
       }
     }
     recalculateContent(message);
     cached.completed = "idle".equalsIgnoreCase(event.getSessionStatus());
     cached.updatedAt = System.currentTimeMillis();
+  }
+
+  @Nullable
+  private SessionMessage parseSnapshotMessage(@NonNull SessionCache cache, long welinkSessionId, @NonNull JsonObject item) {
+    String stableMessageId = getString(item, "id");
+    Integer messageSeq = getInteger(item, "seq");
+    Long numericId = resolveNumericMessageIdIfPresent(cache, stableMessageId, messageSeq);
+    if (numericId == null) {
+      return null;
+    }
+
+    SessionMessage message = new SessionMessage();
+    message.setId(numericId);
+    message.setWelinkSessionId(welinkSessionId);
+    message.setRole(defaultString(getString(item, "role"), "assistant"));
+    message.setMessageSeq(messageSeq == null ? 0 : messageSeq);
+    message.setContentType(getString(item, "contentType"));
+
+    String content = getString(item, "content");
+    message.setContent(content == null ? "" : content);
+    String createdAt = getString(item, "createdAt");
+    message.setCreatedAt(createdAt == null || createdAt.isEmpty() ? Instant.now().toString() : createdAt);
+
+    JsonArray parts = getArray(item, "parts");
+    if (parts != null) {
+      for (JsonElement partItem : parts) {
+        if (partItem == null || !partItem.isJsonObject()) {
+          continue;
+        }
+        SessionMessagePart parsedPart = parsePartFromJson(partItem.getAsJsonObject());
+        if (parsedPart != null) {
+          message.getParts().add(parsedPart);
+        }
+      }
+    }
+
+    if ((message.getContent() == null || message.getContent().isEmpty()) && !message.getParts().isEmpty()) {
+      recalculateContent(message);
+    }
+    return message;
+  }
+
+  @Nullable
+  private SessionMessagePart parsePartFromJson(@NonNull JsonObject json) {
+    SessionMessagePart part = new SessionMessagePart();
+    part.setPartId(getString(json, "partId"));
+    part.setPartSeq(getInteger(json, "partSeq"));
+    part.setType(getString(json, "type"));
+    part.setContent(getString(json, "content"));
+    part.setToolName(getString(json, "toolName"));
+    part.setToolCallId(getString(json, "toolCallId"));
+
+    String toolStatus = getString(json, "toolStatus");
+    if (toolStatus == null || toolStatus.isEmpty()) {
+      toolStatus = getString(json, "status");
+    }
+    part.setToolStatus(toolStatus);
+
+    JsonElement toolInput = getElement(json, "toolInput");
+    if (toolInput == null || toolInput.isJsonNull()) {
+      toolInput = getElement(json, "input");
+    }
+    part.setToolInput(toolInput);
+
+    String toolOutput = getString(json, "toolOutput");
+    if (toolOutput == null || toolOutput.isEmpty()) {
+      toolOutput = getString(json, "output");
+    }
+    part.setToolOutput(toolOutput);
+
+    part.setQuestion(getString(json, "question"));
+    part.setHeader(getString(json, "header"));
+    part.setOptions(getStringList(json, "options"));
+    part.setPermissionId(getString(json, "permissionId"));
+    part.setFileName(getString(json, "fileName"));
+    part.setFileUrl(getString(json, "fileUrl"));
+    part.setFileMime(getString(json, "fileMime"));
+    return part;
+  }
+
+  private void mergePart(@NonNull SessionMessage message, @NonNull Map<String, SessionMessagePart> currentParts,
+      @NonNull SessionMessagePart incoming) {
+    SessionMessagePart target = null;
+    String incomingPartId = incoming.getPartId();
+    if (incomingPartId != null && !incomingPartId.isEmpty()) {
+      target = currentParts.get(incomingPartId);
+    }
+    if (target == null && incoming.getPartSeq() != null) {
+      for (SessionMessagePart existing : message.getParts()) {
+        if (incoming.getPartSeq().equals(existing.getPartSeq())) {
+          target = existing;
+          break;
+        }
+      }
+    }
+    if (target == null) {
+      target = new SessionMessagePart();
+      message.getParts().add(target);
+    }
+
+    if (incoming.getPartId() != null) {
+      target.setPartId(incoming.getPartId());
+    }
+    if (incoming.getPartSeq() != null) {
+      target.setPartSeq(incoming.getPartSeq());
+    }
+    if (incoming.getType() != null) {
+      target.setType(incoming.getType());
+    }
+    if (incoming.getContent() != null) {
+      target.setContent(incoming.getContent());
+    }
+    if (incoming.getToolName() != null) {
+      target.setToolName(incoming.getToolName());
+    }
+    if (incoming.getToolCallId() != null) {
+      target.setToolCallId(incoming.getToolCallId());
+    }
+    if (incoming.getToolStatus() != null) {
+      target.setToolStatus(incoming.getToolStatus());
+    }
+    if (incoming.getToolInput() != null && !incoming.getToolInput().isJsonNull()) {
+      target.setToolInput(incoming.getToolInput());
+    }
+    if (incoming.getToolOutput() != null) {
+      target.setToolOutput(incoming.getToolOutput());
+    }
+    if (incoming.getQuestion() != null) {
+      target.setQuestion(incoming.getQuestion());
+    }
+    if (incoming.getHeader() != null) {
+      target.setHeader(incoming.getHeader());
+    }
+    if (incoming.getOptions() != null && !incoming.getOptions().isEmpty()) {
+      target.setOptions(incoming.getOptions());
+    }
+    if (incoming.getPermissionId() != null) {
+      target.setPermissionId(incoming.getPermissionId());
+    }
+    if (incoming.getFileName() != null) {
+      target.setFileName(incoming.getFileName());
+    }
+    if (incoming.getFileUrl() != null) {
+      target.setFileUrl(incoming.getFileUrl());
+    }
+    if (incoming.getFileMime() != null) {
+      target.setFileMime(incoming.getFileMime());
+    }
+
+    if (target.getPartId() != null && !target.getPartId().isEmpty()) {
+      currentParts.put(target.getPartId(), target);
+    }
+  }
+
+  @Nullable
+  private Long resolveNumericMessageIdIfPresent(@NonNull SessionCache cache, @Nullable String messageId,
+      @Nullable Integer messageSeq) {
+    if ((messageId == null || messageId.trim().isEmpty()) && messageSeq == null) {
+      return null;
+    }
+    return resolveNumericMessageId(cache, messageId, messageSeq);
   }
 
   @NonNull
@@ -498,6 +735,65 @@ public class StreamingMessageCache {
       return fallback;
     }
     return current;
+  }
+
+  @Nullable
+  private static JsonElement getElement(@NonNull JsonObject object, @NonNull String key) {
+    if (!object.has(key) || object.get(key).isJsonNull()) {
+      return null;
+    }
+    return object.get(key);
+  }
+
+  @Nullable
+  private static JsonArray getArray(@NonNull JsonObject object, @NonNull String key) {
+    JsonElement value = getElement(object, key);
+    if (value == null || !value.isJsonArray()) {
+      return null;
+    }
+    return value.getAsJsonArray();
+  }
+
+  @Nullable
+  private static Integer getInteger(@NonNull JsonObject object, @NonNull String key) {
+    JsonElement value = getElement(object, key);
+    if (value == null || !value.isJsonPrimitive()) {
+      return null;
+    }
+    try {
+      return value.getAsInt();
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
+  @Nullable
+  private static String getString(@NonNull JsonObject object, @NonNull String key) {
+    JsonElement value = getElement(object, key);
+    if (value == null || !value.isJsonPrimitive()) {
+      return null;
+    }
+    try {
+      return value.getAsString();
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
+  @NonNull
+  private static List<String> getStringList(@NonNull JsonObject object, @NonNull String key) {
+    JsonArray value = getArray(object, key);
+    if (value == null) {
+      return new ArrayList<>();
+    }
+    List<String> result = new ArrayList<>();
+    for (JsonElement item : value) {
+      if (item == null || !item.isJsonPrimitive()) {
+        continue;
+      }
+      result.add(item.getAsString());
+    }
+    return result;
   }
 
   private static final class SessionCache {

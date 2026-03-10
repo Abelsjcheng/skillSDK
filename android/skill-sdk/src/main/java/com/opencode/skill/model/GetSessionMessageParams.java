@@ -5,6 +5,10 @@ public class GetSessionMessageParams {
   private final int page;
   private final int size;
 
+  public GetSessionMessageParams(long welinkSessionId) {
+    this(welinkSessionId, 0, 50);
+  }
+
   public GetSessionMessageParams(long welinkSessionId, int page, int size) {
     this.welinkSessionId = welinkSessionId;
     this.page = page;
