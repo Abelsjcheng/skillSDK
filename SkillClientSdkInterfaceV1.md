@@ -590,7 +590,7 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 
 1. SDK 内部维护消息缓存，记录每条消息完成后的最终内容：
    - 监听 `text.done` / `thinking.done` 事件，落定最终内容
-   - 按 `welinkSessionId + messageId` 存储消息的最终聚合文本
+   - 按 `welinkSessionId + messageStableId` 存储消息的最终聚合文本（`messageStableId` 来源于 `messageId` 或 `snapshot.messages[].id`）
    - 同时维护每个会话的消息顺序，以便获取最后一条消息
    - 缓存结构与 `getSessionMessage` 共享，确保数据一致性
 2. 调用 `sendMessageToIM` 时：
@@ -626,7 +626,7 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 | 键 | 说明 |
 |---|---|
 | `welinkSessionId` | 会话 ID |
-| `messageId` | 消息 ID |
+| `messageStableId` | 稳定消息 ID（`messageId` 或 `snapshot.messages[].id`） |
 
 #### 缓存更新时机
 
@@ -642,7 +642,7 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 
 #### 从缓存获取最终完整内容的流程
 
-1. **定位消息**：根据 `welinkSessionId` 和 `messageId`（如果提供）定位缓存中的消息
+1. **定位消息**：根据 `welinkSessionId` 和稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）定位缓存中的消息
 2. **检查完整性**：验证消息是否已标记为 `isCompleted`
 3. **内容聚合**：
    - 对于文本类型的消息，使用 `text.done` 事件中的最终完整内容
@@ -761,7 +761,7 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMe
 
 #### 2. 合并本地流式缓存
 
-SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 WebSocket 收到的事件，典型来源包括：
+SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 WebSocket 收到的消息级事件，典型来源包括：
 
 - `text.delta`
 - `thinking.delta`
@@ -769,17 +769,21 @@ SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 Web
 - `question`
 - `permission.ask`
 - `file`
+- `step.start` / `step.done`
 - `streaming`
+
+以下仅传输层事件不进入 `SessionMessage` 聚合缓存：`session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error`。
 
 #### 3. 缓存更新逻辑
 
-收到流式消息后，SDK 按 `welinkSessionId + messageId + partId` 更新缓存：
+收到流式消息后，SDK 按 `welinkSessionId + messageStableId + partId` 更新缓存（`messageStableId` 来源于 `messageId` 或 `snapshot.messages[].id`）：
 
 - `text.delta` / `thinking.delta`：追加内容到临时缓存，保持实时更新
 - `text.done` / `thinking.done`：落定最终内容，更新缓存为最终状态
 - `tool.update`：更新同一工具部件状态和结果
 - `question` / `permission.ask` / `file`：追加或更新对应 part
-- `snapshot` / `streaming`：用于断线重连恢复本地状态
+- `snapshot`：恢复已完成消息；其中 `messages[].id` 为 String 稳定消息 ID，`messages[].seq` 映射为 `messageSeq`
+- `streaming`：恢复进行中消息；其中 `parts[].status` 对应工具状态字段
 
 #### 4. 返回结果
 
@@ -789,7 +793,7 @@ SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 Web
 2. 获取本地流式缓存中的所有消息，包括：
    - 已完成的消息（`text.done` / `thinking.done` 标记的）
    - 进行中的消息（仅通过 `text.delta` 等增量事件接收的）
-3. 对同一 `messageId` 做去重和合并，确保消息的完整性和一致性
+3. 对同一稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）做去重和合并，确保消息的完整性和一致性
 4. 按 `messageSeq` 排序，确保消息顺序正确
 5. 若当前存在未持久化的进行中消息，将其追加到返回列表
 6. 处理分页逻辑，确保返回指定页的消息
@@ -803,8 +807,8 @@ SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 Web
 interface MessageCache {
   [welinkSessionId: string]: {
     messages: {
-      [messageId: string]: {
-        id: string;
+      [messageStableId: string]: {
+        id: number | string;
         messageSeq: number;
         role: string;
         content: string; // 聚合后的内容
@@ -821,7 +825,7 @@ interface MessageCache {
         createdAt: string;
       };
     };
-    messageSeqOrder: string[]; // 按 messageSeq 排序的 messageId 列表
+    messageSeqOrder: string[]; // 按 messageSeq 排序的稳定消息 ID 列表
   };
 }
 ```
@@ -837,7 +841,7 @@ interface MessageCache {
 
 #### 数据一致性保证
 
-- **去重机制**：通过 `messageId` 确保消息不重复
+- **去重机制**：通过稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）确保消息不重复
 - **顺序保证**：通过 `messageSeq` 确保消息顺序正确
 - **完整性保证**：对于进行中的消息，返回当前已接收的所有内容
 - **实时性保证**：缓存实时更新，确保获取到最新的消息状态
@@ -906,6 +910,15 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - 会话状态：`session.status` / `session.title` / `session.error`
 - 断线恢复：`snapshot` / `streaming`
 - 系统事件：`agent.online` / `agent.offline` / `error`
+
+#### 字段对齐说明（重要）
+
+- `snapshot.messages[].id` 类型为 `string`（稳定消息 ID）
+- `snapshot.messages[].seq` 类型为 `number`（消息顺序，语义对应 `messageSeq`）
+- `snapshot.messages[].contentType` 类型为 `string`（`plain` / `markdown` / `code`）
+- `streaming.messageId` 类型为 `string`
+- `streaming.parts[].status` 为工具状态字段（字段名为 `status`）
+- `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
 
 ### 接口名
 
@@ -1485,7 +1498,7 @@ try {
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | number | 消息 ID |
+| id | number \| string | 消息 ID（历史消息通常为 `number`；断线恢复/流式聚合场景可为 `string` 稳定消息 ID） |
 | welinkSessionId | number | 所属会话 ID |
 | userId | string \| null | 用户 ID |
 | role | string | `user` / `assistant` / `system` / `tool` |
@@ -1504,7 +1517,7 @@ try {
 | content | string | 文本内容 |
 | toolName | string | 工具名 |
 | toolCallId | string | 工具调用 ID |
-| toolStatus | string | 工具状态 |
+| toolStatus | string | 工具状态（对应 WebSocket `status` 字段） |
 | toolInput | object | 工具输入 |
 | toolOutput | string | 工具输出 |
 | question | string | 问题正文 |
@@ -1577,6 +1590,40 @@ try {
 | partId | string | Part 唯一 ID |
 | partSeq | number | Part 在消息内的顺序 |
 
+#### `snapshot` 事件字段（`type = snapshot`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| messages[].id | string | 稳定消息 ID |
+| messages[].seq | number | 消息顺序（语义对应 `messageSeq`） |
+| messages[].role | string | `user` / `assistant` / `system` / `tool` |
+| messages[].content | string | 消息内容 |
+| messages[].contentType | string | `plain` / `markdown` / `code` |
+| messages[].createdAt | string | 创建时间，ISO-8601（可选） |
+| messages[].parts | array | Part 列表（可选） |
+
+#### `streaming` 事件字段（`type = streaming`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| sessionStatus | string | `busy` / `idle` |
+| messageId | string | 当前进行中消息稳定 ID |
+| messageSeq | number | 当前进行中消息顺序 |
+| role | string | `user` / `assistant` / `system` / `tool` |
+| parts[].partId | string | Part 唯一 ID |
+| parts[].partSeq | number | Part 在消息内的顺序（可选） |
+| parts[].type | string | `text` / `thinking` / `tool` / `question` / `permission` / `file` |
+| parts[].content | string | 文本内容（可选） |
+| parts[].toolName | string | 工具名（可选） |
+| parts[].toolCallId | string | 工具调用 ID（可选） |
+| parts[].status | string | 工具状态（可选） |
+| parts[].header | string | question 分组标题（可选） |
+| parts[].question | string | question 正文（可选） |
+| parts[].options | string[] | question 选项（可选） |
+| parts[].fileName | string | 文件名（可选） |
+| parts[].fileUrl | string | 文件 URL（可选） |
+| parts[].fileMime | string | 文件 MIME 类型（可选） |
+
 #### 支持的事件类型
 
 | type | 说明 | 关键附加字段 |
@@ -1627,8 +1674,8 @@ try {
 | permType | string | 权限类型 |
 | metadata | object | 权限请求详情 |
 | response | string | 权限回复值：`once` / `always` / `reject` |
-| messages | array | `snapshot` 携带的已完成消息快照 |
-| parts | array | `streaming` 携带的进行中消息部件 |
+| messages | array | `snapshot` 携带的已完成消息快照，元素结构见上文 `snapshot` 事件字段 |
+| parts | array | `streaming` 携带的进行中消息部件，元素结构见上文 `streaming` 事件字段 |
 
 ### SendMessageResult
 
