@@ -83,7 +83,7 @@ module.exports = {
     hot: true,
     historyApiFallback: true,
   },
-  devtool: 'source-map',
+  devtool: false,
   performance: {
     hints: false,
   },

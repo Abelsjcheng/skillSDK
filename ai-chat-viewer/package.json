@@ -1,18 +1,26 @@
 {
   "name": "ai-chat-viewer",
   "version": "1.0.0",
-  "description": "AI 问答展示前端项目",
-  "main": "index.js",
+  "description": "AI 问答展示前端项目 - 支持网页运行和组件导出",
+  "main": "dist/lib/index.js",
+  "module": "dist/lib/index.js",
+  "types": "dist/lib/index.d.ts",
+  "files": [
+    "dist/lib"
+  ],
   "scripts": {
     "dev": "webpack serve --mode development --open",
     "build": "webpack --mode production",
+    "build:lib": "webpack --config webpack.lib.config.js --mode production && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:all": "npm run build && npm run build:lib",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "keywords": [
     "react",
     "ai",
     "chat",
-    "viewer"
+    "viewer",
+    "component"
   ],
   "author": "",
   "license": "MIT",
@@ -48,7 +56,6 @@
   "browserslist": [
     ">0.5%",
     "last 2 versions",
-    "IE 11",
     "not dead"
   ]
 }
