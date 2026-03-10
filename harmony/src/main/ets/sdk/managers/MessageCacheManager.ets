@@ -1,5 +1,6 @@
 import { Logger } from '../utils/Logger';
 import {
+  MessageContentType,
   MessageRole,
   SessionMessage,
   SessionMessagePart,
@@ -11,18 +12,21 @@ import {
 
 interface LocalMessageState {
   messageSeq: number;
-  messageId?: string;
+  messageId?: number | string;
+  stableMessageId?: string;
   role: MessageRole;
   content: string;
   parts: SessionMessagePart[];
   createdAt: string;
   final: boolean;
   userId: string | null;
+  contentType?: MessageContentType;
 }
 
 interface SessionCacheState {
   bySeq: Map<number, LocalMessageState>;
   byMessageId: Map<string, number>;
+  nextSyntheticMessageId: number;
 }
 
 /**
@@ -56,7 +60,7 @@ export class MessageCacheManager {
     for (const message of messages) {
       const normalized = this.normalizeHistoryMessage(message);
       state.bySeq.set(normalized.messageSeq, normalized);
-      state.byMessageId.set(String(message.id), normalized.messageSeq);
+      this.indexMessageIds(state, normalized);
     }
   }
 
@@ -64,6 +68,7 @@ export class MessageCacheManager {
     const state = this.ensureSessionState(result.welinkSessionId);
     const local: LocalMessageState = {
       messageSeq: result.messageSeq,
+      messageId: result.id,
       role: 'user',
       content: result.content,
       parts: [],
@@ -72,6 +77,7 @@ export class MessageCacheManager {
       userId: result.userId
     };
     state.bySeq.set(local.messageSeq, local);
+    this.indexMessageIds(state, local);
   }
 
   onStreamMessage(message: StreamMessage): void {
@@ -80,6 +86,11 @@ export class MessageCacheManager {
       return;
     }
     const state = this.ensureSessionState(sessionId);
+
+    if (this.isTransportOnlyType(message.type)) {
+      this.applyTransportOnlyEvent(state, message);
+      return;
+    }
 
     if (message.type === 'snapshot') {
       this.applySnapshot(state, message.messages ?? []);
@@ -102,9 +113,7 @@ export class MessageCacheManager {
     }
 
     this.applyMessageEvent(local, message);
-    if (message.messageId !== undefined) {
-      state.byMessageId.set(message.messageId, messageSeq);
-    }
+    this.indexMessageIds(state, local, message.messageId);
   }
 
   getLastUserMessageContent(sessionId: number): string | null {
@@ -122,13 +131,13 @@ export class MessageCacheManager {
     return null;
   }
 
-  getFinalMessageContent(sessionId: number, messageId?: number | string): string | null {
+  getFinalMessageContent(sessionId: number, messageId?: string): string | null {
     const state = this.sessions.get(sessionId);
     if (state === undefined) {
       return null;
     }
 
-    if (messageId !== undefined) {
+    if (messageId !== undefined && messageId.trim() !== '') {
       const seq = this.resolveMessageSeqById(state, messageId);
       if (seq === null) {
         return null;
@@ -177,30 +186,45 @@ export class MessageCacheManager {
   private normalizeHistoryMessage(message: SessionMessage): LocalMessageState {
     return {
       messageSeq: message.messageSeq,
-      messageId: String(message.id),
+      messageId: message.id,
+      stableMessageId: typeof message.id === 'string' ? message.id : undefined,
       role: message.role,
       content: message.content,
-      parts: message.parts ?? [],
+      parts: (message.parts ?? []).map((part: SessionMessagePart) => this.normalizePart(part)),
       createdAt: message.createdAt,
       final: true,
-      userId: message.userId
+      userId: message.userId,
+      contentType: message.contentType
+    };
+  }
+
+  private normalizePart(part: SessionMessagePart): SessionMessagePart {
+    return {
+      ...part,
+      options: part.options === undefined ? undefined : [...part.options]
     };
   }
 
   private applySnapshot(state: SessionCacheState, messages: StreamSnapshotMessage[]): void {
     for (const item of messages) {
+      const stableMessageId = item.id.trim();
+      const messageId: number | string = stableMessageId !== ''
+        ? stableMessageId
+        : this.allocateFallbackMessageId(state, item.seq);
       const local: LocalMessageState = {
         messageSeq: item.seq,
-        messageId: item.id,
+        messageId: messageId,
+        stableMessageId: stableMessageId !== '' ? stableMessageId : undefined,
         role: item.role,
         content: item.content,
-        parts: item.parts ?? [],
+        parts: (item.parts ?? []).map((part: SessionMessagePart) => this.normalizePart(part)),
         createdAt: item.createdAt ?? new Date().toISOString(),
         final: true,
-        userId: item.role === 'user' ? '' : null
+        userId: item.role === 'user' ? '' : null,
+        contentType: item.contentType
       };
       state.bySeq.set(local.messageSeq, local);
-      state.byMessageId.set(item.id, item.seq);
+      this.indexMessageIds(state, local, stableMessageId !== '' ? stableMessageId : undefined);
     }
   }
 
@@ -214,14 +238,21 @@ export class MessageCacheManager {
       message.role ?? 'assistant',
       message.messageId
     );
+    if (message.createdAt !== undefined) {
+      local.createdAt = message.createdAt;
+    }
     local.final = message.sessionStatus === 'idle';
     if (message.parts !== undefined) {
       local.parts = message.parts.map((part: StreamingPart) => this.toPartFromStreaming(part));
       local.content = this.aggregateContent(local.parts);
     }
-    if (message.messageId !== undefined) {
-      state.byMessageId.set(message.messageId, message.messageSeq);
+    if (message.messageId !== undefined && message.messageId.trim() !== '') {
+      local.stableMessageId = message.messageId.trim();
+      if (typeof local.messageId === 'number' || local.messageId === undefined) {
+        local.messageId = local.stableMessageId;
+      }
     }
+    this.indexMessageIds(state, local, message.messageId);
   }
 
   private applyMessageEvent(local: LocalMessageState, message: StreamMessage): void {
@@ -255,10 +286,6 @@ export class MessageCacheManager {
         this.upsertFilePart(local, message);
         break;
       case 'step.done':
-        local.final = true;
-        break;
-      case 'session.error':
-      case 'error':
         local.final = true;
         break;
       default:
@@ -316,11 +343,25 @@ export class MessageCacheManager {
     partSeq: number | undefined,
     type: SessionMessagePart['type']
   ): SessionMessagePart {
-    const targetPartId = partId ?? `auto_${type}_${partSeq ?? local.parts.length + 1}`;
-    let part = local.parts.find((item: SessionMessagePart) => item.partId === targetPartId);
+    let part: SessionMessagePart | undefined;
+    if (partId !== undefined && partId.trim() !== '') {
+      part = local.parts.find((item: SessionMessagePart) => item.partId === partId);
+    }
+    if (part === undefined && partSeq !== undefined) {
+      part = local.parts.find((item: SessionMessagePart) => item.partSeq === partSeq);
+    }
     if (part !== undefined) {
+      if (partId !== undefined && partId.trim() !== '') {
+        part.partId = partId;
+      }
+      if (partSeq !== undefined) {
+        part.partSeq = partSeq;
+      }
+      part.type = type;
       return part;
     }
+
+    const targetPartId = partId ?? `auto_${type}_${partSeq ?? local.parts.length + 1}`;
     part = {
       partId: targetPartId,
       partSeq,
@@ -345,9 +386,12 @@ export class MessageCacheManager {
       toolName: part.toolName,
       toolCallId: part.toolCallId,
       toolStatus: part.status,
+      toolInput: part.input,
+      toolOutput: part.output,
       header: part.header,
       question: part.question,
       options: part.options,
+      permissionId: part.permissionId,
       fileName: part.fileName,
       fileUrl: part.fileUrl,
       fileMime: part.fileMime
@@ -364,23 +408,13 @@ export class MessageCacheManager {
     return texts.join('');
   }
 
-  private resolveMessageSeqById(state: SessionCacheState, messageId: number | string): number | null {
-    if (typeof messageId === 'number') {
-      if (state.bySeq.has(messageId)) {
-        return messageId;
-      }
-      const fromMap = state.byMessageId.get(String(messageId));
-      return fromMap === undefined ? null : fromMap;
+  private resolveMessageSeqById(state: SessionCacheState, messageId: string): number | null {
+    const normalized = messageId.trim();
+    if (normalized === '') {
+      return null;
     }
-    const seq = state.byMessageId.get(messageId);
-    if (seq !== undefined) {
-      return seq;
-    }
-    const numeric = Number(messageId);
-    if (!Number.isNaN(numeric) && state.bySeq.has(numeric)) {
-      return numeric;
-    }
-    return null;
+    const fromMap = state.byMessageId.get(normalized);
+    return fromMap === undefined ? null : fromMap;
   }
 
   private toOrderedMessages(state: SessionCacheState): LocalMessageState[] {
@@ -398,7 +432,8 @@ export class MessageCacheManager {
       content: local.content,
       messageSeq: local.messageSeq,
       parts: local.parts,
-      createdAt: local.createdAt
+      createdAt: local.createdAt,
+      contentType: local.contentType
     };
   }
 
@@ -417,7 +452,8 @@ export class MessageCacheManager {
     }
     state = {
       bySeq: new Map<number, LocalMessageState>(),
-      byMessageId: new Map<string, number>()
+      byMessageId: new Map<string, number>(),
+      nextSyntheticMessageId: -1
     };
     this.sessions.set(sessionId, state);
     return state;
@@ -431,14 +467,20 @@ export class MessageCacheManager {
   ): LocalMessageState {
     const existing = state.bySeq.get(messageSeq);
     if (existing !== undefined) {
-      if (messageId !== undefined) {
-        existing.messageId = messageId;
+      if (messageId !== undefined && messageId.trim() !== '') {
+        existing.stableMessageId = messageId.trim();
+        if (typeof existing.messageId === 'number' || existing.messageId === undefined) {
+          existing.messageId = existing.stableMessageId;
+        }
       }
       return existing;
     }
+
+    const stableMessageId = messageId !== undefined && messageId.trim() !== '' ? messageId.trim() : undefined;
     const created: LocalMessageState = {
       messageSeq,
-      messageId,
+      messageId: stableMessageId ?? this.allocateFallbackMessageId(state, messageSeq),
+      stableMessageId,
       role,
       content: '',
       parts: [],
@@ -448,5 +490,63 @@ export class MessageCacheManager {
     };
     state.bySeq.set(messageSeq, created);
     return created;
+  }
+
+  private allocateFallbackMessageId(state: SessionCacheState, fallbackSeq?: number): number {
+    if (fallbackSeq !== undefined) {
+      return fallbackSeq;
+    }
+    const id = state.nextSyntheticMessageId;
+    state.nextSyntheticMessageId -= 1;
+    return id;
+  }
+
+  private indexMessageIds(
+    state: SessionCacheState,
+    local: LocalMessageState,
+    explicitStableId?: string
+  ): void {
+    if (local.messageId !== undefined) {
+      state.byMessageId.set(String(local.messageId), local.messageSeq);
+    }
+    if (local.stableMessageId !== undefined && local.stableMessageId.trim() !== '') {
+      state.byMessageId.set(local.stableMessageId, local.messageSeq);
+    }
+    if (explicitStableId !== undefined && explicitStableId.trim() !== '') {
+      state.byMessageId.set(explicitStableId.trim(), local.messageSeq);
+    }
+  }
+
+  private isTransportOnlyType(type: string): boolean {
+    return type === 'session.status'
+      || type === 'session.title'
+      || type === 'session.error'
+      || type === 'agent.online'
+      || type === 'agent.offline'
+      || type === 'error';
+  }
+
+  private applyTransportOnlyEvent(state: SessionCacheState, message: StreamMessage): void {
+    if (message.type === 'session.status') {
+      if (message.sessionStatus === 'idle') {
+        this.markLatestMessageFinal(state, true);
+        return;
+      }
+      if (message.sessionStatus === 'busy' || message.sessionStatus === 'retry') {
+        this.markLatestMessageFinal(state, false);
+      }
+      return;
+    }
+    if (message.type === 'session.error' || message.type === 'error' || message.type === 'agent.offline') {
+      this.markLatestMessageFinal(state, true);
+    }
+  }
+
+  private markLatestMessageFinal(state: SessionCacheState, final: boolean): void {
+    const ordered = this.toOrderedMessages(state);
+    if (ordered.length === 0) {
+      return;
+    }
+    ordered[ordered.length - 1].final = final;
   }
 }

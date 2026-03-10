@@ -168,9 +168,12 @@ export interface StreamingPart {
   toolName?: string;
   toolCallId?: string;
   status?: 'pending' | 'running' | 'completed' | 'error';
+  input?: Record<string, any>;
+  output?: string;
   header?: string;
   question?: string;
   options?: string[];
+  permissionId?: string;
   fileName?: string;
   fileUrl?: string;
   fileMime?: string;
@@ -284,7 +287,8 @@ export interface RegenerateAnswerParams {
 
 export interface SendMessageToIMParams {
   welinkSessionId: number;
-  messageId?: number | string;
+  messageId?: string;
+  chatId?: string;
 }
 
 export interface SendMessageToIMResult {

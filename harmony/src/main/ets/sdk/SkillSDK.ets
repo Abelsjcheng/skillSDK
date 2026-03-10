@@ -226,6 +226,12 @@ export class SkillSDK {
     try {
       Validator.requireObject(params, 'params');
       Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      if (params.messageId !== undefined) {
+        Validator.requireString(params.messageId, 'messageId');
+      }
+      if (params.chatId !== undefined) {
+        Validator.requireString(params.chatId, 'chatId');
+      }
 
       const content = this.messageCacheManager.getFinalMessageContent(
         params.welinkSessionId,
@@ -238,11 +244,16 @@ export class SkillSDK {
         throw new SkillSdkException(4005, 'No finalized message in local cache');
       }
 
+      const payload: Record<string, unknown> = { content };
+      if (params.chatId !== undefined) {
+        payload.chatId = params.chatId;
+      }
+
       let raw: Record<string, unknown>;
       try {
         raw = await this.httpClient.post<Record<string, unknown>>(
           `/api/skill/sessions/${params.welinkSessionId}/send-to-im`,
-          { content },
+          payload,
           { expectEnvelope: false }
         );
       } catch (error) {
@@ -330,11 +341,16 @@ export class SkillSDK {
         await this.wsManager.connect();
       }
 
+      const payload: Record<string, unknown> = {
+        content: params.content
+      };
+      if (params.toolCallId !== undefined) {
+        payload.toolCallId = params.toolCallId;
+      }
+
       const result = await this.httpClient.post<SendMessageResult>(
         `/api/skill/sessions/${params.welinkSessionId}/messages`,
-        {
-          content: params.content
-        }
+        payload
       );
 
       this.messageCacheManager.cacheSentUserMessage(result);
@@ -414,9 +430,17 @@ export class SkillSDK {
       if (code !== 0) {
         throw new SkillSdkException(code, errormsg || 'send-to-im failed');
       }
-      const data = payload.data as Record<string, unknown>;
+      const data = (typeof payload.data === 'object' && payload.data !== null)
+        ? (payload.data as Record<string, unknown>)
+        : {};
+      let status: 'success' | 'failed' = 'success';
+      if ('status' in data) {
+        status = String(data.status) === 'success' ? 'success' : 'failed';
+      } else if ('success' in data) {
+        status = Boolean(data.success) ? 'success' : 'failed';
+      }
       return {
-        status: (String(data.status ?? 'failed') === 'success' ? 'success' : 'failed'),
+        status,
         chatId: data.chatId === undefined ? undefined : String(data.chatId),
         contentLength:
           data.contentLength === undefined ? undefined : Number(data.contentLength)
