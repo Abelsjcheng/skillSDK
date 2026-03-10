@@ -178,9 +178,16 @@ public class ApiClient {
           if (data != null && data.isJsonObject()) {
             JsonObject dataObj = data.getAsJsonObject();
             SendMessageToIMResult wrapped = gson.fromJson(dataObj, SendMessageToIMResult.class);
-            if (wrapped.getStatus() == null) {
-              wrapped.setStatus("success");
+            String normalizedStatus = wrapped.getStatus();
+            if (dataObj.has("status") && !dataObj.get("status").isJsonNull()) {
+              normalizedStatus = dataObj.get("status").getAsString();
+            } else if (dataObj.has("success") && dataObj.get("success").isJsonPrimitive()) {
+              normalizedStatus = dataObj.get("success").getAsBoolean() ? "success" : "failed";
+            } else if (normalizedStatus == null || normalizedStatus.trim().isEmpty()
+                || "failed".equalsIgnoreCase(normalizedStatus)) {
+              normalizedStatus = "success";
             }
+            wrapped.setStatus(normalizedStatus);
             callback.onSuccess(wrapped);
             return;
           }

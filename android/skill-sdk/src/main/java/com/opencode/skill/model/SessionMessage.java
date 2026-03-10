@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SessionMessage {
-  private long id;
+  @NonNull
+  private String id = "";
   private long welinkSessionId;
   @Nullable
   private String userId;
@@ -23,12 +24,13 @@ public class SessionMessage {
   @NonNull
   private String createdAt = "";
 
-  public long getId() {
-    return id;
+  @NonNull
+  public String getId() {
+    return id == null ? "" : id;
   }
 
-  public void setId(long id) {
-    this.id = id;
+  public void setId(@NonNull String id) {
+    this.id = id == null ? "" : id;
   }
 
   public long getWelinkSessionId() {

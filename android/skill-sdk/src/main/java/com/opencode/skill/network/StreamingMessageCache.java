@@ -33,7 +33,7 @@ public class StreamingMessageCache {
   private static final Comparator<SessionMessage> MESSAGE_COMPARATOR = Comparator
       .comparingInt(SessionMessage::getMessageSeq)
       .thenComparing(SessionMessage::getCreatedAt)
-      .thenComparingLong(SessionMessage::getId);
+      .thenComparing(SessionMessage::getId);
 
   @NonNull
   private final Gson gson = new Gson();
@@ -44,8 +44,15 @@ public class StreamingMessageCache {
     SessionCache cache = sessionCache(welinkSessionId);
     synchronized (cache) {
       for (SessionMessage message : messages) {
-        CachedMessage cached = cache.byNumericId.computeIfAbsent(message.getId(), k -> new CachedMessage());
+        Long numericMessageId = resolveNumericMessageIdIfPresent(cache, message.getId(), message.getMessageSeq());
+        if (numericMessageId == null) {
+          continue;
+        }
+        CachedMessage cached = cache.byNumericId.computeIfAbsent(numericMessageId, k -> new CachedMessage());
         cached.message = cloneMessage(message);
+        if (cached.message.getId().isEmpty()) {
+          cached.message.setId(String.valueOf(numericMessageId));
+        }
         cached.message.setWelinkSessionId(welinkSessionId);
         cached.completed = true;
         cached.updatedAt = System.currentTimeMillis();
@@ -56,9 +63,10 @@ public class StreamingMessageCache {
   public void recordUserMessage(@NonNull SendMessageResult message) {
     SessionCache cache = sessionCache(message.getWelinkSessionId());
     synchronized (cache) {
-      CachedMessage cached = cache.byNumericId.computeIfAbsent(message.getId(), k -> new CachedMessage());
+      long numericMessageId = message.getId();
+      CachedMessage cached = cache.byNumericId.computeIfAbsent(numericMessageId, k -> new CachedMessage());
       SessionMessage sessionMessage = cached.message;
-      sessionMessage.setId(message.getId());
+      sessionMessage.setId(String.valueOf(message.getId()));
       sessionMessage.setWelinkSessionId(message.getWelinkSessionId());
       sessionMessage.setUserId(message.getUserId());
       sessionMessage.setRole(message.getRole());
@@ -279,7 +287,7 @@ public class StreamingMessageCache {
     long numericId = resolveNumericMessageId(cache, event.getMessageId(), event.getMessageSeq());
     CachedMessage cached = cache.byNumericId.computeIfAbsent(numericId, key -> new CachedMessage());
     SessionMessage message = cached.message;
-    message.setId(numericId);
+    message.setId(resolveDisplayMessageId(event, numericId));
     message.setWelinkSessionId(welinkSessionId);
     if (event.getRole() != null && !event.getRole().isEmpty()) {
       message.setRole(event.getRole());
@@ -293,18 +301,28 @@ public class StreamingMessageCache {
     return cached;
   }
 
+  @NonNull
+  private static String resolveDisplayMessageId(@NonNull StreamMessage event, long numericId) {
+    String stableMessageId = event.getMessageId();
+    if (stableMessageId != null && !stableMessageId.trim().isEmpty()) {
+      return stableMessageId.trim();
+    }
+    return String.valueOf(numericId);
+  }
+
   private long resolveNumericMessageId(@NonNull SessionCache cache, @Nullable String messageId, @Nullable Integer messageSeq) {
-    if (messageId != null && !messageId.isEmpty()) {
-      Long parsed = parseLong(messageId);
+    String normalizedMessageId = messageId == null ? null : messageId.trim();
+    if (normalizedMessageId != null && !normalizedMessageId.isEmpty()) {
+      Long parsed = parseLong(normalizedMessageId);
       if (parsed != null) {
         return parsed;
       }
-      Long existing = cache.stableToNumericId.get(messageId);
+      Long existing = cache.stableToNumericId.get(normalizedMessageId);
       if (existing != null) {
         return existing;
       }
       long synthetic = cache.syntheticIdGenerator.getAndDecrement();
-      cache.stableToNumericId.put(messageId, synthetic);
+      cache.stableToNumericId.put(normalizedMessageId, synthetic);
       return synthetic;
     }
 
@@ -320,22 +338,15 @@ public class StreamingMessageCache {
 
   @Nullable
   private Long resolveExistingNumericMessageId(@NonNull SessionCache cache, @Nullable String messageId) {
-    if (messageId == null || messageId.trim().isEmpty()) {
+    String normalizedMessageId = messageId == null ? null : messageId.trim();
+    if (normalizedMessageId == null || normalizedMessageId.isEmpty()) {
       return null;
     }
-    Long parsed = parseLong(messageId);
+    Long parsed = parseLong(normalizedMessageId);
     if (parsed != null) {
       return parsed;
     }
-    Long direct = cache.stableToNumericId.get(messageId);
-    if (direct != null) {
-      return direct;
-    }
-    String trimmed = messageId.trim();
-    if (!trimmed.equals(messageId)) {
-      return cache.stableToNumericId.get(trimmed);
-    }
-    return null;
+    return cache.stableToNumericId.get(normalizedMessageId);
   }
 
   private void applyEventToMessage(@NonNull CachedMessage cached, @NonNull StreamMessage event) {
@@ -471,7 +482,11 @@ public class StreamingMessageCache {
       if (message == null) {
         continue;
       }
-      CachedMessage cached = cache.byNumericId.computeIfAbsent(message.getId(), k -> new CachedMessage());
+      Long numericMessageId = resolveNumericMessageIdIfPresent(cache, message.getId(), message.getMessageSeq());
+      if (numericMessageId == null) {
+        continue;
+      }
+      CachedMessage cached = cache.byNumericId.computeIfAbsent(numericMessageId, k -> new CachedMessage());
       cached.message = cloneMessage(message);
       cached.completed = true;
       cached.updatedAt = System.currentTimeMillis();
@@ -518,7 +533,11 @@ public class StreamingMessageCache {
     }
 
     SessionMessage message = new SessionMessage();
-    message.setId(numericId);
+    if (stableMessageId != null && !stableMessageId.trim().isEmpty()) {
+      message.setId(stableMessageId.trim());
+    } else {
+      message.setId(String.valueOf(numericId));
+    }
     message.setWelinkSessionId(welinkSessionId);
     message.setRole(defaultString(getString(item, "role"), "assistant"));
     message.setMessageSeq(messageSeq == null ? 0 : messageSeq);
@@ -693,11 +712,15 @@ public class StreamingMessageCache {
 
   @Nullable
   private static Long parseLong(@Nullable String value) {
-    if (value == null || value.isEmpty()) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim();
+    if (normalized.isEmpty()) {
       return null;
     }
     try {
-      return Long.parseLong(value);
+      return Long.parseLong(normalized);
     } catch (NumberFormatException ignored) {
       return null;
     }
