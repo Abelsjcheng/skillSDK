@@ -15,6 +15,14 @@
 | `welinkSessionId` | Skill Server 内部分配的会话 ID |
 | `toolSessionId`   | OpenCode SDK 分配的会话 ID     |
 
+### 会话状态枚举
+
+| 状态     | 说明                             |
+| -------- | -------------------------------- |
+| `ACTIVE` | 会话活跃中，可收发消息           |
+| `IDLE`   | 会话超时闲置，由定时任务自动标记 |
+| `CLOSED` | 会话已关闭，不可再发送消息       |
+
 ### REST API 响应格式
 
 所有 REST 接口统一返回 HTTP `200 OK`，响应体结构如下：
@@ -115,13 +123,23 @@
 
 #### 请求
 
-| 字段      | 类型   | 必填  | 说明         |
-| --------- | ------ | :---: | ------------ |
-| `content` | String |   ✅   | 用户消息文本 |
+| 字段         | 类型   | 必填  | 说明                                                           |
+| ------------ | ------ | :---: | -------------------------------------------------------------- |
+| `content`    | String |   ✅   | 用户消息文本                                                   |
+| `toolCallId` | String |   ❌   | 回答 AI question 时携带对应的工具调用 ID。不带则按普通消息处理 |
 
 ```json
 {
   "content": "帮我创建一个React项目"
+}
+```
+
+回答 AI question 时：
+
+```json
+{
+  "content": "Vite",
+  "toolCallId": "call_2"
 }
 ```
 
@@ -157,7 +175,9 @@
 
 1. 从 Cookie 解析 `userId`，持久化 user message 到 MySQL（含 `userId`）
 2. 查询 session 记录获取 `toolSessionId`
-3. 构建 `invoke.chat` payload（`{ toolSessionId, text }`）发送至 Gateway
+3. 根据是否携带 `toolCallId` 分支处理：
+   - **无 `toolCallId`**：构建 `invoke.chat` payload（`{ toolSessionId, text: content }`）发送至 Gateway
+   - **有 `toolCallId`**：构建 `invoke.question_reply` payload（`{ toolSessionId, toolCallId, answer: content }`）发送至 Gateway
 
 ---
 
@@ -434,58 +454,83 @@
 
 ---
 
-### 9 发送消息到 IM
+### 9. 发送内容到 IM 群聊
 
-将消息内容转发到会话关联的 IM 聊天中。
+**POST** `/api/skill/sessions/{welinkSessionId}/send-to-im`
 
-| 项目     | 值                                                |
-| -------- | ------------------------------------------------- |
-| **URL**  | `POST /api/skill/sessions/{welinkSessionId}/send-to-im` |
-| **认证** | 无                                                |
+将 AI 回复的文本内容转发到关联的 IM 群组。
 
-**路径参数：**
+#### 路径参数
 
-| 参数        | 类型   | 说明    |
-| ----------- | ------ | ------- |
-| `welinkSessionId` | `Long` | 会话 ID |
+| 参数              | 类型 | 说明    |
+| ----------------- | ---- | ------- |
+| `welinkSessionId` | Long | 会话 ID |
 
-**请求体：**
-
-| 字段      | 类型     | 必填   | 说明                   |
-| --------- | -------- | ------ | ---------------------- |
-| `content` | `String` | **是** | 要发送到 IM 的消息内容 |
-
-**请求示例：**
-```json
-{
-  "content": "代码重构已完成，请查看 PR #42"
-}
-```
-
-**成功响应：**
-
-- **状态码**: `200 OK`
-- **响应体**:
+#### 请求
 
 ```json
 {
-  "success": true,
-  "chatId": "chat-789",
-  "contentLength": 22
+  "content": "这是 AI 生成的代码片段...",
+  "chatId": "group_abc123"
 }
 ```
 
-**错误响应：**
+| 字段      | 类型   | 必填  | 说明                                             |
+| --------- | ------ | :---: | ------------------------------------------------ |
+| `content` | String |   ✅   | 要发送的文本内容                                 |
+| `chatId`  | String |   ❌   | 目标 IM 群组 ID，不传则从会话的 `imGroupId` 获取 |
 
-| 状态码                      | 条件                    |
-| --------------------------- | ----------------------- |
-| `400 Bad Request`           | `content` 为空或空白    |
-| `404 Not Found`             | 会话不存在              |
-| `409 Conflict`              | 会话无关联的 IM 聊天 ID |
-| `500 Internal Server Error` | IM 消息发送失败         |
+#### 响应
 
-**副作用：**
-- 调用 IM 平台 API 发送文本消息到指定聊天
+```json
+{
+  "code": 0,
+  "errormsg": "",
+  "data": {
+    "success": true
+  }
+}
+```
+
+---
+
+### 10. 查询在线 Agent 列表
+
+**GET** `/api/skill/agents`
+
+查询当前用户名下在线的 Agent 列表（代理到 Gateway 的 `/api/gateway/agents`）。
+
+#### 请求
+
+无请求体。从 Cookie 解析 `userId`。
+
+#### 响应
+
+```json
+{
+  "code": 0,
+  "errormsg": "",
+  "data": [
+    {
+      "ak": "ak_xxxxxxxx",
+      "akId": "ak_xxxxxxxx",
+      "toolType": "OPENCODE",
+      "toolVersion": "1.0.0",
+      "deviceName": "MyPC",
+      "os": "WINDOWS"
+    }
+  ]
+}
+```
+
+| data[] 字段   | 类型   | 说明                  |
+| ------------- | ------ | --------------------- |
+| `ak`          | String | Agent 的 Access Key   |
+| `akId`        | String | 同 `ak`，前端兼容字段 |
+| `toolType`    | String | 工具类型              |
+| `toolVersion` | String | 工具版本号            |
+| `deviceName`  | String | 设备名称              |
+| `os`          | String | 操作系统              |
 
 ---
 
