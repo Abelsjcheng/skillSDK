@@ -59,11 +59,11 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 }
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
-                          status:(nullable NSString *)status
-                            page:(nullable NSNumber *)page
-                            size:(nullable NSNumber *)size
-                         success:(WLAgentSkillsHTTPSuccessBlock)success
-                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
+                           status:(nullable NSString *)status
+                             page:(nullable NSNumber *)page
+                             size:(nullable NSNumber *)size
+                          success:(WLAgentSkillsHTTPSuccessBlock)success
+                          failure:(WLAgentSkillsHTTPFailureBlock)failure {
   NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
   if (imGroupId.length > 0) {
     parameters[@"imGroupId"] = imGroupId;
@@ -79,6 +79,13 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
   }
 
   [self GET:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
+}
+
+- (void)getSessionWithSessionId:(NSNumber *)welinkSessionId
+                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+  NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@", welinkSessionId];
+  [self GET:path parameters:nil success:success failure:failure];
 }
 
 - (void)getMessagesWithSessionId:(NSNumber *)welinkSessionId
@@ -125,11 +132,15 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 }
 
 - (void)sendToIMWithSessionId:(NSNumber *)welinkSessionId
-                      content:(NSString *)content
-                      success:(WLAgentSkillsHTTPSuccessBlock)success
-                      failure:(WLAgentSkillsHTTPFailureBlock)failure {
+                       content:(NSString *)content
+                        chatId:(nullable NSString *)chatId
+                       success:(WLAgentSkillsHTTPSuccessBlock)success
+                       failure:(WLAgentSkillsHTTPFailureBlock)failure {
   NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/send-to-im", welinkSessionId];
-  NSDictionary *parameters = @{ @"content" : content };
+  NSMutableDictionary *parameters = [@{ @"content" : content } mutableCopy];
+  if (chatId.length > 0) {
+    parameters[@"chatId"] = chatId;
+  }
   [self POST:path parameters:parameters success:success failure:failure];
 }
 

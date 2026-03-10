@@ -21,7 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
                                                                  sessionId:(NSNumber *)welinkSessionId;
 
 - (nullable NSString *)latestCompletedContentForSessionId:(NSNumber *)welinkSessionId
-                                                 messageId:(nullable NSNumber *)messageId;
+                                                  messageId:(nullable NSString *)messageId;
 
 - (nullable NSString *)lastUserMessageContentForSessionId:(NSNumber *)welinkSessionId;
 

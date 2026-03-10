@@ -23,11 +23,15 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
-                          status:(nullable NSString *)status
-                            page:(nullable NSNumber *)page
-                            size:(nullable NSNumber *)size
-                         success:(WLAgentSkillsHTTPSuccessBlock)success
-                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
+                           status:(nullable NSString *)status
+                             page:(nullable NSNumber *)page
+                             size:(nullable NSNumber *)size
+                          success:(WLAgentSkillsHTTPSuccessBlock)success
+                          failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)getSessionWithSessionId:(NSNumber *)welinkSessionId
+                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                        failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)getMessagesWithSessionId:(NSNumber *)welinkSessionId
                             page:(NSNumber *)page
@@ -52,9 +56,10 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                              failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)sendToIMWithSessionId:(NSNumber *)welinkSessionId
-                      content:(NSString *)content
-                      success:(WLAgentSkillsHTTPSuccessBlock)success
-                      failure:(WLAgentSkillsHTTPFailureBlock)failure;
+                       content:(NSString *)content
+                        chatId:(nullable NSString *)chatId
+                       success:(WLAgentSkillsHTTPSuccessBlock)success
+                       failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 @end
 

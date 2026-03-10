@@ -218,39 +218,48 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
     [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
     return;
   }
+  if (params.messageId != nil && params.messageId.length == 0) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: messageId cannot be empty."];
+    return;
+  }
+  if (params.chatId != nil && params.chatId.length == 0) {
+    [self dispatchFailure:failure code:1000 message:@"Invalid params: chatId cannot be empty."];
+    return;
+  }
 
   __weak typeof(self) weakSelf = self;
   void (^sendWithContent)(NSString *) = ^(NSString *content) {
     [[WLAgentSkillsHTTPClient sharedClient] sendToIMWithSessionId:params.welinkSessionId
-                                                           content:content
-                                                           success:^(id  _Nullable responseObject) {
-      WLAgentSkillsSendMessageToIMResult *result = [[WLAgentSkillsSendMessageToIMResult alloc] init];
+                                                          content:content
+                                                           chatId:params.chatId
+                                                          success:^(id  _Nullable responseObject) {
+        WLAgentSkillsSendMessageToIMResult *result = [[WLAgentSkillsSendMessageToIMResult alloc] init];
 
-      if ([responseObject isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *dict = responseObject;
-        if (dict[@"status"] != nil) {
-          result.status = [dict[@"status"] description];
-        } else if (dict[@"success"] != nil) {
-          BOOL ok = [dict[@"success"] boolValue];
-          result.status = ok ? @"success" : @"failed";
+        if ([responseObject isKindOfClass:[NSDictionary class]]) {
+          NSDictionary *dict = responseObject;
+          if (dict[@"status"] != nil) {
+            result.status = [dict[@"status"] description];
+          } else if (dict[@"success"] != nil) {
+            BOOL ok = [dict[@"success"] boolValue];
+            result.status = ok ? @"success" : @"failed";
+          } else {
+            result.status = @"success";
+          }
+          if (dict[@"chatId"] != nil) {
+            result.chatId = [dict[@"chatId"] description];
+          }
+          if (dict[@"contentLength"] != nil) {
+            result.contentLength = @([dict[@"contentLength"] integerValue]);
+          }
         } else {
           result.status = @"success";
         }
-        if (dict[@"chatId"] != nil) {
-          result.chatId = [dict[@"chatId"] description];
-        }
-        if (dict[@"contentLength"] != nil) {
-          result.contentLength = @([dict[@"contentLength"] integerValue]);
-        }
-      } else {
-        result.status = @"success";
-      }
 
-      if (success) {
-        success(result);
+        if (success) {
+          success(result);
+        }
       }
-    }
-                                                           failure:^(NSError * _Nonnull error) {
+                                                          failure:^(NSError * _Nonnull error) {
       [weakSelf dispatchFailureObject:failure error:error];
     }];
   };

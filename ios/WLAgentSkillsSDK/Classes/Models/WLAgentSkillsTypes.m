@@ -129,6 +129,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     _toolStatus = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
     _toolInput = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
     _toolOutput = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
+    _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
     _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
@@ -168,6 +169,9 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
   if (self.toolOutput.length > 0) {
     dictionary[@"toolOutput"] = self.toolOutput;
   }
+  if (self.header.length > 0) {
+    dictionary[@"header"] = self.header;
+  }
   if (self.question.length > 0) {
     dictionary[@"question"] = self.question;
   }
@@ -196,7 +200,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
   self = [super init];
   if (self) {
-    _messageId = WLAgentSkillsNumberValue(dictionary[@"id"], @0);
+    _messageId = WLAgentSkillsStringValue(dictionary[@"id"], @"");
     _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
     if ([dictionary[@"userId"] isKindOfClass:[NSNull class]]) {
       _userId = nil;
@@ -207,6 +211,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     _content = WLAgentSkillsStringValue(dictionary[@"content"], @"");
     _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], @0);
     _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
+    _contentType = WLAgentSkillsStringValue(dictionary[@"contentType"], nil);
 
     NSMutableArray<WLAgentSkillsSessionMessagePart *> *parts = [NSMutableArray array];
     for (NSDictionary *part in WLAgentSkillsArrayValue(dictionary[@"parts"])) {
@@ -226,14 +231,15 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     [parts addObject:[part toDictionary]];
   }
   return @{
-    @"id" : self.messageId ?: @0,
+    @"id" : self.messageId ?: @"",
     @"welinkSessionId" : self.welinkSessionId ?: @0,
     @"userId" : self.userId ?: [NSNull null],
     @"role" : self.role ?: @"",
     @"content" : self.content ?: @"",
     @"messageSeq" : self.messageSeq ?: @0,
     @"parts" : parts,
-    @"createdAt" : self.createdAt ?: @""
+    @"createdAt" : self.createdAt ?: @"",
+    @"contentType" : self.contentType ?: [NSNull null]
   };
 }
 
