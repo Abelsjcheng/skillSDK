@@ -22,8 +22,8 @@ module.exports = {
           options: {
             presets: [
               ['@babel/preset-env', { 
-                targets: '>0.5%, last 2 versions, IE 11, not dead',
-                useBuiltIns: 'entry',
+                targets: '>0.5%, last 2 versions, not dead',
+                useBuiltIns: 'usage',
                 corejs: '3.36',
               }],
               ['@babel/preset-react', { runtime: 'automatic' }],
@@ -38,9 +38,11 @@ module.exports = {
       },
       {
         test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
-        type: 'asset/resource',
-        generator: {
-          filename: 'assets/[name].[hash][ext]',
+        type: 'asset',
+        parser: {
+          dataUrlCondition: {
+            maxSize: 8192,
+          },
         },
       },
     ],
@@ -60,6 +62,20 @@ module.exports = {
       ],
     }),
   ],
+  optimization: {
+    minimize: true,
+    usedExports: true,
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+      },
+    },
+  },
   devServer: {
     static: path.join(__dirname, 'public'),
     compress: true,
@@ -68,4 +84,7 @@ module.exports = {
     historyApiFallback: true,
   },
   devtool: 'source-map',
+  performance: {
+    hints: false,
+  },
 };

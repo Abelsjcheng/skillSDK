@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createHighlighter, type Highlighter } from 'shiki';
+import React, { useRef, useState, useCallback } from 'react';
 
 interface CodeBlockProps {
   code: string;
@@ -33,95 +32,22 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '2px 8px',
     fontSize: 11,
+    transition: 'all 0.2s',
   },
   pre: {
     margin: 0,
     padding: 12,
     overflowX: 'auto',
-  },
-  fallbackCode: {
-    margin: 0,
-    padding: 12,
-    overflowX: 'auto',
     color: '#cdd6f4',
-    fontFamily: 'Consolas, "Courier New", monospace',
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-all',
+    fontFamily: 'Consolas, "Courier New", Monaco, monospace',
+    whiteSpace: 'pre',
+    tabSize: 2,
   },
 };
 
-let highlighterPromise: Promise<Highlighter> | null = null;
-
-function getOrCreateHighlighter(): Promise<Highlighter> {
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ['catppuccin-mocha'],
-      langs: [
-        'javascript',
-        'typescript',
-        'json',
-        'html',
-        'css',
-        'python',
-        'java',
-        'go',
-        'rust',
-        'bash',
-        'sql',
-        'yaml',
-        'markdown',
-        'tsx',
-        'jsx',
-      ],
-    });
-  }
-  return highlighterPromise;
-}
-
 export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
-  const [html, setHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const highlighter = await getOrCreateHighlighter();
-        const langs = highlighter.getLoadedLanguages();
-        const lang = language && langs.includes(language) ? language : 'text';
-
-        if (language && !langs.includes(language)) {
-          try {
-            await highlighter.loadLanguage(language as Parameters<Highlighter['loadLanguage']>[0]);
-            if (!cancelled) {
-              const result = highlighter.codeToHtml(code, {
-                lang: language,
-                theme: 'catppuccin-mocha',
-              });
-              setHtml(result);
-              return;
-            }
-          } catch {
-            /* fall through to default */
-          }
-        }
-
-        if (!cancelled) {
-          const result = highlighter.codeToHtml(code, {
-            lang,
-            theme: 'catppuccin-mocha',
-          });
-          setHtml(result);
-        }
-      } catch {
-        /* highlighter failed; fall back to plain text */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [code, language]);
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(code).then(() => {
@@ -141,16 +67,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
           {copied ? '已复制!' : '复制'}
         </button>
       </div>
-      {html ? (
-        <div
-          style={styles.pre}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <pre style={styles.fallbackCode}>
-          <code>{code}</code>
-        </pre>
-      )}
+      <pre style={styles.pre}>
+        <code>{code}</code>
+      </pre>
     </div>
   );
 };
