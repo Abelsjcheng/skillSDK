@@ -1,22 +1,36 @@
-import React, { useState, KeyboardEvent, useEffect, useRef } from 'react';
+﻿import React, { useState, KeyboardEvent, useEffect, useRef } from 'react';
 import '../styles/Footer.less';
 
+export type FooterMode = 'generate' | 'generating' | 'regenerate';
+
 interface FooterProps {
-  isStreaming: boolean;
-  onSend: (message: string) => void;
+  mode: FooterMode;
+  onGenerate: (message: string) => void;
   onStop: () => void;
+  onRegenerate: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  isStreaming,
-  onSend,
+  mode,
+  onGenerate,
   onStop,
+  onRegenerate,
 }) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const showInput = mode === 'generate';
+
   useEffect(() => {
+    if (!showInput) {
+      setIsFocused(false);
+    }
+  }, [showInput]);
+
+  useEffect(() => {
+    if (!showInput) return undefined;
+
     const handleResize = () => {
       if (isFocused && inputRef.current) {
         inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -25,12 +39,12 @@ export const Footer: React.FC<FooterProps> = ({
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isFocused]);
+  }, [isFocused, showInput]);
 
-  const handleSend = () => {
+  const handleGenerate = () => {
     const trimmedValue = value.trim();
     if (trimmedValue) {
-      onSend(trimmedValue);
+      onGenerate(trimmedValue);
       setValue('');
     }
   };
@@ -38,7 +52,7 @@ export const Footer: React.FC<FooterProps> = ({
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleGenerate();
     }
   };
 
@@ -55,52 +69,79 @@ export const Footer: React.FC<FooterProps> = ({
     setIsFocused(false);
   };
 
-  return (
-    <div className={`footer-container ${isFocused ? 'footer-focused' : ''}`}>
-      <input
-        ref={inputRef}
-        type="text"
-        className="footer-input"
-        placeholder="请输入您的问题..."
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        disabled={isStreaming}
-      />
-      {isStreaming ? (
+  const renderActionButton = () => {
+    if (mode === 'generating') {
+      return (
         <button
           className="stop-icon-btn"
           onClick={onStop}
           title="停止生成"
         >
-          <span className="stop-btn-text">⏹ 停止</span>
+          <span className="stop-btn-text">停止生成</span>
         </button>
-      ) : (
+      );
+    }
+
+    if (mode === 'regenerate') {
+      return (
         <button
-          className="send-icon-btn"
-          onClick={handleSend}
-          disabled={!value.trim()}
-          title="生成"
+          className="regenerate-icon-btn"
+          onClick={onRegenerate}
+          title="重新生成"
         >
-          <svg
-            className="send-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span className="send-btn-text">生成</span>
+          <span className="regenerate-btn-text">重新生成</span>
         </button>
+      );
+    }
+
+    return (
+      <button
+        className="send-icon-btn"
+        onClick={handleGenerate}
+        disabled={!value.trim()}
+        title="生成"
+      >
+        <svg
+          className="send-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="send-btn-text">生成</span>
+      </button>
+    );
+  };
+
+  return (
+    <div
+      className={[
+        'footer-container',
+        showInput ? '' : 'footer-without-input',
+        showInput && isFocused ? 'footer-focused' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      {showInput && (
+        <input
+          ref={inputRef}
+          type="text"
+          className="footer-input"
+          placeholder="请输入您的问题..."
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+        />
       )}
+      {renderActionButton()}
     </div>
   );
 };

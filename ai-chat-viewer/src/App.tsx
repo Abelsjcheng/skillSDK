@@ -1,18 +1,19 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Content } from './components/Content';
-import { Footer } from './components/Footer';
+import { Footer, FooterMode } from './components/Footer';
 import { StreamAssembler } from './protocol/StreamAssembler';
-import type { 
-  Message, 
-  StreamMessage, 
-  SessionMessage, 
-  SessionStatus 
+import type {
+  Message,
+  StreamMessage,
+  SessionMessage,
+  SessionStatus,
 } from './types';
 import {
   parseWelinkSessionId,
   getSessionMessage,
   sendMessage as sendMessageApi,
+  regenerateAnswer,
   stopSkill,
   sendMessageToIM,
   controlSkillWeCode,
@@ -33,7 +34,7 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
     content: sm.content,
     timestamp: new Date(sm.createdAt).getTime(),
     isStreaming: false,
-    parts: sm.parts?.map(p => ({
+    parts: sm.parts?.map((p) => ({
       partId: p.partId,
       type: p.type,
       content: p.content ?? '',
@@ -58,15 +59,37 @@ function App() {
   const [welinkSessionId, setWelinkSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
+  const [footerMode, setFooterMode] = useState<FooterMode>('generate');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
+  const awaitingFinalResultRef = useRef(false);
+
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
   const onErrorRef = useRef<((err: { errorCode: number; errorMessage: string }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
+
+  const finalizeStreamingMessage = useCallback(() => {
+    assemblerRef.current.complete();
+
+    if (streamingMsgIdRef.current) {
+      const finalId = streamingMsgIdRef.current;
+      const finalParts = assemblerRef.current.getParts();
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === finalId
+            ? { ...m, isStreaming: false, parts: [...finalParts] }
+            : m,
+        ),
+      );
+    }
+
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
+  }, []);
 
   useEffect(() => {
     const sessionId = parseWelinkSessionId();
@@ -88,8 +111,7 @@ function App() {
           page: 0,
           size: 50,
         });
-        const convertedMessages = result.content.map(sessionMessageToMessage);
-        setMessages(convertedMessages);
+        setMessages(result.content.map(sessionMessageToMessage));
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -156,23 +178,13 @@ function App() {
 
         case 'session.status': {
           if (msg.sessionStatus === 'idle') {
-            assemblerRef.current.complete();
             setSessionStatus('idle');
+            finalizeStreamingMessage();
 
-            if (streamingMsgIdRef.current) {
-              const finalId = streamingMsgIdRef.current;
-              const finalParts = assemblerRef.current.getParts();
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === finalId
-                    ? { ...m, isStreaming: false, parts: [...finalParts] }
-                    : m,
-                ),
-              );
+            if (awaitingFinalResultRef.current) {
+              setFooterMode('generate');
             }
-
-            assemblerRef.current.reset();
-            streamingMsgIdRef.current = null;
+            awaitingFinalResultRef.current = false;
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
@@ -184,12 +196,15 @@ function App() {
         case 'session.error':
           setSessionStatus('error');
           setError(msg.error ?? '会话错误');
-          assemblerRef.current.reset();
-          streamingMsgIdRef.current = null;
+          setFooterMode('generate');
+          awaitingFinalResultRef.current = false;
+          finalizeStreamingMessage();
           break;
 
         case 'error':
           setError(msg.error ?? '未知错误');
+          setFooterMode('generate');
+          awaitingFinalResultRef.current = false;
           break;
 
         case 'snapshot':
@@ -220,7 +235,7 @@ function App() {
           }
           break;
 
-case 'streaming':
+        case 'streaming':
           if (msg.parts && msg.parts.length > 0) {
             setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
             const id = genId();
@@ -269,12 +284,12 @@ case 'streaming':
       await loadMessages();
       setIsLoading(false);
 
-      if (!listenerRegisteredRef.current && welinkSessionId) {
+      if (!listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
         registerSessionListener({
           welinkSessionId,
-          onMessage: (msg) => onMessageRef.current?.(msg),
-          onError: (err) => onErrorRef.current?.(err),
-          onClose: (reason) => onCloseRef.current?.(reason),
+          onMessage: onMessageRef.current,
+          onError: onErrorRef.current ?? undefined,
+          onClose: onCloseRef.current ?? undefined,
         });
         listenerRegisteredRef.current = true;
       }
@@ -293,11 +308,15 @@ case 'streaming':
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId]);
+  }, [welinkSessionId, finalizeStreamingMessage]);
 
-  const handleSendMessage = useCallback(async (content: string) => {
+  const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
+
     setError(null);
+    setSessionStatus('busy');
+    setFooterMode('generating');
+    awaitingFinalResultRef.current = true;
 
     const userMsg: Message = {
       id: genId(),
@@ -313,6 +332,9 @@ case 'streaming':
         content: content.trim(),
       });
     } catch (err) {
+      awaitingFinalResultRef.current = false;
+      setSessionStatus('idle');
+      setFooterMode('generate');
       const message = err instanceof Error ? err.message : '发送消息失败';
       setError(message);
     }
@@ -320,12 +342,38 @@ case 'streaming':
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
+
+    setError(null);
+    awaitingFinalResultRef.current = false;
+    setFooterMode('regenerate');
+
     try {
       await stopSkill({ welinkSessionId });
-      assemblerRef.current.complete();
       setSessionStatus('idle');
+      finalizeStreamingMessage();
     } catch (err) {
       console.error('Failed to stop skill:', err);
+      setFooterMode('generating');
+      setError('停止生成失败');
+    }
+  }, [welinkSessionId, finalizeStreamingMessage]);
+
+  const handleRegenerate = useCallback(async () => {
+    if (!welinkSessionId) return;
+
+    setError(null);
+    setSessionStatus('busy');
+    setFooterMode('generating');
+    awaitingFinalResultRef.current = true;
+
+    try {
+      await regenerateAnswer({ welinkSessionId });
+    } catch (err) {
+      awaitingFinalResultRef.current = false;
+      setSessionStatus('idle');
+      setFooterMode('regenerate');
+      const message = err instanceof Error ? err.message : '重新生成失败';
+      setError(message);
     }
   }, [welinkSessionId]);
 
@@ -383,8 +431,6 @@ case 'streaming':
     }, 2000);
   };
 
-  const isStreaming = sessionStatus === 'busy';
-
   return (
     <div className="app-container">
       <div className="header-wrapper">
@@ -410,9 +456,10 @@ case 'streaming':
       </div>
       <div className="footer-wrapper">
         <Footer
-          isStreaming={isStreaming}
-          onSend={handleSendMessage}
+          mode={footerMode}
+          onGenerate={handleGenerate}
           onStop={handleStop}
+          onRegenerate={handleRegenerate}
         />
       </div>
     </div>
