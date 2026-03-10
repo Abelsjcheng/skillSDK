@@ -13,6 +13,8 @@
     "build": "webpack --mode production",
     "build:lib": "webpack --config webpack.lib.config.js --mode production && tsc --emitDeclarationOnly --declaration --outDir dist",
     "build:all": "npm run build && npm run build:lib",
+    "build:require-demo": "npm run build:lib && webpack --config example/require-demo/webpack.config.js --mode production",
+    "serve:require-demo": "webpack serve --config example/require-demo/webpack.config.js --mode development --open",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "keywords": [

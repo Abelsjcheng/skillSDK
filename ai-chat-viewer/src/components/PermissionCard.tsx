@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { MessagePart } from '../types';
+import { replyPermission } from '../utils/hwext';
 
 interface PermissionCardProps {
   part: MessagePart;
@@ -28,7 +29,6 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
     if (resolved || submitting || !part.permissionId) return;
     setSubmitting(true);
     try {
-      const { replyPermission } = await import('../utils/hwext');
       await replyPermission({
         welinkSessionId,
         permId: part.permissionId,

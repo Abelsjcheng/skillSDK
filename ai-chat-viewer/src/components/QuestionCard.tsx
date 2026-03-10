@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { MessagePart } from '../types';
+import { sendMessage } from '../utils/hwext';
 
 interface QuestionCardProps {
   part: MessagePart;
@@ -20,7 +21,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     if (answered || submitting) return;
     setSubmitting(true);
     try {
-      const { sendMessage } = await import('../utils/hwext');
       await sendMessage({
         welinkSessionId,
         content: option,
@@ -39,7 +39,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     if (answered || submitting || !customInput.trim()) return;
     setSubmitting(true);
     try {
-      const { sendMessage } = await import('../utils/hwext');
       await sendMessage({
         welinkSessionId,
         content: customInput.trim(),
