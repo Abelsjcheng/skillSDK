@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import type { MessagePart } from '../types';
 
 interface ThinkingBlockProps {
@@ -30,7 +34,10 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
 
       {expanded && (
         <div className="thinking-block__content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
+          >
             {part.content}
           </ReactMarkdown>
           {part.isStreaming && <span className="streaming-cursor" />}

@@ -1,6 +1,10 @@
 import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
 import { CodeBlock } from './CodeBlock';
 import { ToolCard } from './ToolCard';
@@ -8,6 +12,7 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import type { Message, MessagePart } from '../types';
+import 'katex/dist/katex.min.css';
 
 interface MessageBubbleProps {
   message: Message;
@@ -107,7 +112,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       default:
         return (
           <div key={part.partId} className="text-part">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+              rehypePlugins={[rehypeRaw, rehypeKatex]}
+              components={markdownComponents}
+            >
               {part.content}
             </ReactMarkdown>
             {part.isStreaming && <span className="streaming-cursor" />}
@@ -128,7 +137,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (message.role === 'assistant' || message.role === 'tool') {
       return (
         <>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
+            components={markdownComponents}
+          >
             {message.content}
           </ReactMarkdown>
           {message.isStreaming && <span className="streaming-cursor" />}

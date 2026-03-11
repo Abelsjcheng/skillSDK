@@ -9,6 +9,8 @@ interface CodeBlockProps {
 }
 
 function normalizeLanguage(language?: string): string {
+  console.log('language', language);
+  
   if (!language) return 'text';
   return language.toLowerCase();
 }

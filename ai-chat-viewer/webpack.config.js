@@ -33,6 +33,10 @@ module.exports = {
         },
       },
       {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
+      },
+      {
         test: /\.less$/,
         use: ['style-loader', 'css-loader', 'less-loader'],
       },
@@ -63,7 +67,7 @@ module.exports = {
     }),
   ],
   optimization: {
-    minimize: true,
+    minimize: false,
     usedExports: true,
     splitChunks: {
       chunks: 'all',
@@ -83,7 +87,7 @@ module.exports = {
     hot: true,
     historyApiFallback: true,
   },
-  devtool: false,
+  devtool: "source-map",
   performance: {
     hints: false,
   },

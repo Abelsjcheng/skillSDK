@@ -285,12 +285,28 @@ function App() {
       setIsLoading(false);
 
       if (!listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
-        registerSessionListener({
-          welinkSessionId,
-          onMessage: onMessageRef.current,
-          onError: onErrorRef.current ?? undefined,
-          onClose: onCloseRef.current ?? undefined,
-        });
+        const ws = new WebSocket('ws://localhost:8001/ws/skill/stream')
+        ws.onopen = () => {
+          console.log('onopen');
+        }
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data)
+          console.log('onmessage', msg);
+
+          onMessageRef.current?.(msg)
+        }
+        ws.onclose = (event) => {
+          console.log('onclose', event);
+        }
+        ws.onerror = (err) => {
+          console.log('onerror', err);
+        }
+        // registerSessionListener({
+        //   welinkSessionId,
+        //   onMessage: onMessageRef.current,
+        //   onError: onErrorRef.current ?? undefined,
+        //   onClose: onCloseRef.current ?? undefined,
+        // });
         listenerRegisteredRef.current = true;
       }
     };
@@ -327,10 +343,10 @@ function App() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      await sendMessageApi({
-        welinkSessionId,
-        content: content.trim(),
-      });
+      // await sendMessageApi({
+      //   welinkSessionId,
+      //   content: content.trim(),
+      // });
     } catch (err) {
       awaitingFinalResultRef.current = false;
       setSessionStatus('idle');

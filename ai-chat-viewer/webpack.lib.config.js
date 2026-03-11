@@ -33,6 +33,13 @@ module.exports = {
         },
       },
       {
+        test: /\.css$/,
+        use: [
+          { loader: 'style-loader', options: { insert: 'head', injectType: 'singletonStyleTag' } },
+          'css-loader',
+        ],
+      },
+      {
         test: /\.less$/,
         use: [
           { loader: 'style-loader', options: { insert: 'head', injectType: 'singletonStyleTag' } },

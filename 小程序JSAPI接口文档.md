@@ -753,19 +753,6 @@ window.HWH5EXT.controlSkillWeCode(params)
 ### 调用示例
 
 ```javascript
-// 监听小程序状态变化
-window.HWH5EXT.onSkillWecodeStatusChange((status) => {
-  if (status === 'closed') {
-    console.log('小程序已关闭');
-    // 上层应用决定是否调用 closeSkill 关闭会话
-    window.HWH5EXT.closeSkill();
-  } else if (status === 'minimized') {
-    console.log('小程序已最小化');
-    // 上层应用根据需要决定是否调用 stopSkill 停止 AI 生成
-    window.HWH5EXT.stopSkill({ welinkSessionId: 42 });
-  }
-});
-
 // 关闭小程序
 try {
   await window.HWH5EXT.controlSkillWeCode({

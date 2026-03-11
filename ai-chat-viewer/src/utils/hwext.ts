@@ -56,8 +56,6 @@ export interface ControlSkillWeCodeParams {
   action: 'close' | 'minimize';
 }
 
-export type SkillWeCodeStatusChangeCallback = (status: 'closed' | 'minimized') => void;
-
 export interface HWH5EXT {
   regenerateAnswer(params: RegenerateAnswerParams): Promise<RegenerateAnswerResponse>;
   sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResponse>;
@@ -68,7 +66,6 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
-  onSkillWecodeStatusChange?: (callback: SkillWeCodeStatusChangeCallback) => void;
 }
 
 declare global {
@@ -118,13 +115,6 @@ export async function replyPermission(params: ReplyPermissionParams): Promise<Re
 
 export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse> {
   return getHWH5EXT().controlSkillWeCode(params);
-}
-
-export function onSkillWecodeStatusChange(callback: SkillWeCodeStatusChangeCallback): void {
-  const ext = getHWH5EXT();
-  if (ext.onSkillWecodeStatusChange) {
-    ext.onSkillWecodeStatusChange(callback);
-  }
 }
 
 export function parseWelinkSessionId(): number | null {
