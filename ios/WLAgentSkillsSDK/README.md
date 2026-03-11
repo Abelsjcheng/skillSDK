@@ -59,6 +59,8 @@ createParams.imGroupId = @"group_abc123";
 
   [sdk sendMessage:sendParams
            success:^(WLAgentSkillsSendMessageResult * _Nonnull result) {
+             // SendMessageResult 字段与服务端/SDK文档一致：id, welinkSessionId, userId...
+             NSLog(@"sendMessage id=%@", result.id);
            }
            failure:^(NSError * _Nonnull error) {
            }];
@@ -138,7 +140,10 @@ WLAgentSkillsGetSessionMessageParams *p = [WLAgentSkillsGetSessionMessageParams 
 p.welinkSessionId = sessionId;
 p.page = @0;
 p.size = @50;
-[sdk getSessionMessage:p success:^(WLAgentSkillsPageResult *result) {} failure:^(NSError *error) {}];
+[sdk getSessionMessage:p success:^(WLAgentSkillsPageResult *result) {
+  WLAgentSkillsSessionMessage *first = result.content.firstObject;
+  NSLog(@"session message id=%@", first.id);
+} failure:^(NSError *error) {}];
 ```
 
 ### 9) `registerSessionListener:`
@@ -173,7 +178,9 @@ WLAgentSkillsSendMessageParams *p = [WLAgentSkillsSendMessageParams new];
 p.welinkSessionId = sessionId;
 p.content = @"继续";
 p.toolCallId = nil;
-[sdk sendMessage:p success:^(WLAgentSkillsSendMessageResult *result) {} failure:^(NSError *error) {}];
+[sdk sendMessage:p success:^(WLAgentSkillsSendMessageResult *result) {
+  NSLog(@"message id=%@", result.id);
+} failure:^(NSError *error) {}];
 ```
 
 ### 12) `replyPermission:success:failure:`
