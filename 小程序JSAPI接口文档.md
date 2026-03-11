@@ -236,7 +236,11 @@ window.HWH5EXT.getSessionMessage({
 
 ### 接口说明
 
-注册会话监听器，用于接收 WebSocket 推送的完整事件流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器，
+注册会话监听器，用于接收 WebSocket 推送的完整事件流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器。
+
+约束：
+- 同一个 `welinkSessionId` 只允许注册一次监听器
+- 若同一个 `welinkSessionId` 重复注册，接口返回错误（`4011`）
 
 ### 调用方式
 
@@ -297,6 +301,7 @@ window.HWH5EXT.registerSessionListener(params)
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 welinkSessionId 或 onMessage |
+| 4011 | 监听器已存在 | 同一个 welinkSessionId 已注册监听器，不允许重复注册 |
 | 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 调用示例
@@ -360,6 +365,8 @@ console.log('监听器注册成功');
 
 移除已注册的会话监听器。当监听器不再需要接收消息时调用，例如小程序关闭或页面销毁。
 
+该接口只需要传入 `welinkSessionId`，会移除该会话下当前已注册的 `onMessage/onError/onClose` 全部监听。
+
 ### 调用方式
 
 ```javascript
@@ -371,48 +378,21 @@ window.HWH5EXT.unregisterSessionListener(params)
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | welinkSessionId | number | 是 | 会话 ID |
-| onMessage | function | 是 | 要移除的消息回调函数 |
-| onError | function | 否 | 要移除的错误回调函数 |
-| onClose | function | 否 | 要移除的连接关闭回调函数 |
 
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
-| 1000 | 无效的参数 | 缺少 welinkSessionId 或 onMessage |
-| 4006 | 监听器不存在 | 指定的监听器未注册 |
+| 1000 | 无效的参数 | 缺少 welinkSessionId |
+| 4006 | 监听器不存在 | 当前 welinkSessionId 未注册监听器 |
 | 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 调用示例
 
 ```javascript
-// 保存回调函数引用
-const onMessage = (message) => {
-  console.log('收到消息:', message);
-};
-
-const onError = (error) => {
-  console.error('错误:', error.errorCode, error.errorMessage);
-};
-
-const onClose = (reason) => {
-  console.log('关闭:', reason);
-};
-
-// 注册监听器
-window.HWH5EXT.registerSessionListener({
-  welinkSessionId: 42,
-  onMessage: onMessage,
-  onError: onError,
-  onClose: onClose
-});
-
 // 页面卸载时移除监听器
 window.HWH5EXT.unregisterSessionListener({
-  welinkSessionId: 42,
-  onMessage: onMessage,
-  onError: onError,
-  onClose: onClose
+  welinkSessionId: 42
 });
 
 console.log('监听器已移除');
@@ -801,6 +781,7 @@ try {
 | 4008 | 权限请求已过期 |
 | 4009 | 小程序不存在 |
 | 4010 | 操作失败 |
+| 4011 | 监听器已存在 |
 | 5000 | 内部错误 |
 | 6000 | 网络错误 |
 | 7000 | 服务端错误 |
@@ -811,7 +792,7 @@ try {
 ## 注意事项
 
 1. **时序安全**：`registerSessionListener` 可以在任何时机调用，SDK 会确保不遗漏消息
-2. **监听器管理**：建议保存回调函数引用，以便后续移除
+2. **监听器管理**：同一个 `welinkSessionId` 只允许注册一次；如需替换，先调用 `unregisterSessionListener({ welinkSessionId })` 再注册
 3. **错误处理**：所有接口都返回 Promise，请使用 `.catch()` 处理错误
 4. **资源释放**：页面卸载时务必调用 `unregisterSessionListener` 移除监听器
 5. **停止技能**：`stopSkill`仅停止接收消息，如需完全关闭会话请使用`closeSkill`
