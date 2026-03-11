@@ -3,6 +3,8 @@
 ## 概述
 
 本文档描述了用于IM客户端、OpenCode Skill服务端、小程序间交互的鸿蒙ArkTS SDK接口定义。
+set OPENCODE_PERMISSION={"bash":"ask","edit":"ask","external_directory":"ask"}
+opencode
 
 ---
 
