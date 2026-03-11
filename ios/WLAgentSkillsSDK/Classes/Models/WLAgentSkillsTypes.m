@@ -200,7 +200,11 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
   self = [super init];
   if (self) {
-    _messageId = WLAgentSkillsStringValue(dictionary[@"id"], @"");
+    NSString *resolvedId = WLAgentSkillsStringValue(dictionary[@"id"], nil);
+    if (resolvedId == nil || resolvedId.length == 0) {
+      resolvedId = WLAgentSkillsStringValue(dictionary[@"messageId"], @"");
+    }
+    _id = resolvedId ?: @"";
     _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
     if ([dictionary[@"userId"] isKindOfClass:[NSNull class]]) {
       _userId = nil;
@@ -231,7 +235,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     [parts addObject:[part toDictionary]];
   }
   return @{
-    @"id" : self.messageId ?: @"",
+    @"id" : self.id ?: @"",
     @"welinkSessionId" : self.welinkSessionId ?: @0,
     @"userId" : self.userId ?: [NSNull null],
     @"role" : self.role ?: @"",
@@ -341,7 +345,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
   self = [super init];
   if (self) {
-    _messageId = WLAgentSkillsNumberValue(dictionary[@"id"], @0);
+    _id = WLAgentSkillsNumberValue(dictionary[@"id"], @0);
     _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
     _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
     _role = WLAgentSkillsStringValue(dictionary[@"role"], @"");

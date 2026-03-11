@@ -73,12 +73,12 @@
 }
 
 - (void)cacheSendMessageResult:(WLAgentSkillsSendMessageResult *)result {
-  if (result.welinkSessionId == nil || result.messageId == nil) {
+  if (result.welinkSessionId == nil || result.id == nil) {
     return;
   }
 
   NSString *sessionKey = result.welinkSessionId.stringValue;
-  NSString *messageId = result.messageId.stringValue;
+  NSString *messageId = result.id.stringValue;
   @synchronized(self) {
     NSMutableDictionary *messageStore = [self ensureMessageStoreForSession:sessionKey
                                                                  messageId:messageId
@@ -102,7 +102,7 @@
   NSString *sessionKey = welinkSessionId.stringValue;
   @synchronized(self) {
     for (WLAgentSkillsSessionMessage *message in messages) {
-      NSString *messageId = [self normalizedMessageIdValue:message.messageId];
+      NSString *messageId = [self normalizedMessageIdValue:message.id];
       NSMutableDictionary *messageStore = [self ensureMessageStoreForSession:sessionKey
                                                                    messageId:messageId
                                                                   messageSeq:message.messageSeq

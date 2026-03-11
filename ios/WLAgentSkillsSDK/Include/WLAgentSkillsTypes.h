@@ -145,7 +145,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsSessionMessage : NSObject
-@property (nonatomic, copy) NSString *messageId;
+@property (nonatomic, copy) NSString *id;
 @property (nonatomic, strong) NSNumber *welinkSessionId;
 @property (nonatomic, copy, nullable) NSString *userId;
 @property (nonatomic, copy) NSString *role;
@@ -222,7 +222,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 #pragma mark - Result Models
 
 @interface WLAgentSkillsSendMessageResult : NSObject
-@property (nonatomic, strong) NSNumber *messageId;
+@property (nonatomic, strong) NSNumber *id;
 @property (nonatomic, strong) NSNumber *welinkSessionId;
 @property (nonatomic, copy) NSString *userId;
 @property (nonatomic, copy) NSString *role;
