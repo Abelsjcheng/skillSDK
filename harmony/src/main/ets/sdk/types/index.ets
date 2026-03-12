@@ -312,9 +312,6 @@ export interface RegisterSessionListenerParams {
 
 export interface UnregisterSessionListenerParams {
   welinkSessionId: number;
-  onMessage: (message: StreamMessage) => void;
-  onError?: (error: SessionError) => void;
-  onClose?: (reason: string) => void;
 }
 
 export interface SendMessageParams {

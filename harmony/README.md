@@ -138,7 +138,7 @@ const page = await sdk.getSessionMessage({ welinkSessionId, page: 0, size: 50 })
 ```
 
 ### 9) `registerSessionListener(params)`
-注册流式监听器。
+注册流式监听器。同一个 `welinkSessionId` 只允许注册一次，重复注册会抛出 `4011`。
 
 ```ts
 sdk.registerSessionListener({
@@ -150,14 +150,11 @@ sdk.registerSessionListener({
 ```
 
 ### 10) `unregisterSessionListener(params)`
-移除监听器，需传入同一个回调引用。
+按 `welinkSessionId` 移除该会话下当前注册的全部监听回调。
 
 ```ts
 sdk.unregisterSessionListener({
-  welinkSessionId,
-  onMessage,
-  onError,
-  onClose
+  welinkSessionId
 });
 ```
 

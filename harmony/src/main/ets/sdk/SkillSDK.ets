@@ -316,15 +316,7 @@ export class SkillSDK {
   unregisterSessionListener(params: UnregisterSessionListenerParams): void {
     Validator.requireObject(params, 'params');
     Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
-    Validator.requireFunction(params.onMessage, 'onMessage');
-    Validator.optionalFunction(params.onError, 'onError');
-    Validator.optionalFunction(params.onClose, 'onClose');
-
-    this.wsManager.unregisterSessionListener(params.welinkSessionId, {
-      onMessage: params.onMessage,
-      onError: params.onError,
-      onClose: params.onClose
-    });
+    this.wsManager.unregisterSessionListener(params.welinkSessionId);
   }
 
   // 11. sendMessage

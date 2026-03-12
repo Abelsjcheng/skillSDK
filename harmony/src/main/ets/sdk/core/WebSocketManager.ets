@@ -23,7 +23,7 @@ export class WebSocketManager {
   private readonly logger: Logger;
   private connected: boolean = false;
   private messageHandler: MessageHandler | null = null;
-  private listenersBySession: Map<string, SessionListener[]> = new Map();
+  private listenersBySession: Map<string, SessionListener> = new Map();
 
   private constructor(config: SkillSDKConfig) {
     this.wsUrl = this.resolveWsUrl(config);
@@ -112,28 +112,18 @@ export class WebSocketManager {
 
   registerSessionListener(sessionId: number, listener: SessionListener): void {
     const key = String(sessionId);
-    if (!this.listenersBySession.has(key)) {
-      this.listenersBySession.set(key, []);
+    if (this.listenersBySession.has(key)) {
+      throw new SkillSdkException(4011, 'Listener already exists for current welinkSessionId');
     }
-    const listeners = this.listenersBySession.get(key) as SessionListener[];
-    const exists = listeners.some((item: SessionListener) => item.onMessage === listener.onMessage);
-    if (!exists) {
-      listeners.push(listener);
-    }
+    this.listenersBySession.set(key, listener);
   }
 
-  unregisterSessionListener(sessionId: number, listener: Partial<SessionListener>): void {
+  unregisterSessionListener(sessionId: number): void {
     const key = String(sessionId);
-    const listeners = this.listenersBySession.get(key);
-    if (listeners === undefined) {
-      return;
+    if (!this.listenersBySession.has(key)) {
+      throw new SkillSdkException(4006, 'Listener does not exist');
     }
-    const next = listeners.filter((item: SessionListener) => item.onMessage !== listener.onMessage);
-    if (next.length === 0) {
-      this.listenersBySession.delete(key);
-      return;
-    }
-    this.listenersBySession.set(key, next);
+    this.listenersBySession.delete(key);
   }
 
   clearAllListeners(): void {
@@ -172,16 +162,14 @@ export class WebSocketManager {
       if (rawSessionId === undefined || rawSessionId === null || String(rawSessionId) === '') {
         return;
       }
-      const listeners = this.listenersBySession.get(String(rawSessionId));
-      if (listeners === undefined) {
+      const listener = this.listenersBySession.get(String(rawSessionId));
+      if (listener === undefined) {
         return;
       }
-      for (const listener of listeners) {
-        try {
-          listener.onMessage(parsed);
-        } catch (listenerError) {
-          this.logger.warn('listener onMessage failed', listenerError);
-        }
+      try {
+        listener.onMessage(parsed);
+      } catch (listenerError) {
+        this.logger.warn('listener onMessage failed', listenerError);
       }
     });
 
@@ -205,28 +193,24 @@ export class WebSocketManager {
       message,
       timestamp: Date.now()
     };
-    for (const listeners of this.listenersBySession.values()) {
-      for (const listener of listeners) {
-        if (listener.onError !== undefined) {
-          try {
-            listener.onError(payload);
-          } catch (error) {
-            this.logger.warn('listener onError failed', error);
-          }
+    for (const listener of this.listenersBySession.values()) {
+      if (listener.onError !== undefined) {
+        try {
+          listener.onError(payload);
+        } catch (error) {
+          this.logger.warn('listener onError failed', error);
         }
       }
     }
   }
 
   private broadcastClose(reason: string): void {
-    for (const listeners of this.listenersBySession.values()) {
-      for (const listener of listeners) {
-        if (listener.onClose !== undefined) {
-          try {
-            listener.onClose(reason);
-          } catch (error) {
-            this.logger.warn('listener onClose failed', error);
-          }
+    for (const listener of this.listenersBySession.values()) {
+      if (listener.onClose !== undefined) {
+        try {
+          listener.onClose(reason);
+        } catch (error) {
+          this.logger.warn('listener onClose failed', error);
         }
       }
     }
