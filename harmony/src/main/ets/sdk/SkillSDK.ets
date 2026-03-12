@@ -15,6 +15,7 @@ import {
   OnSkillWecodeStatusChangeParams,
   PageResult,
   RegisterSessionListenerParams,
+  RegisterSessionListenerResult,
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ReplyPermissionResult,
@@ -32,7 +33,8 @@ import {
   StopSkillParams,
   StopSkillResult,
   StreamMessage,
-  UnregisterSessionListenerParams
+  UnregisterSessionListenerParams,
+  UnregisterSessionListenerResult
 } from './types';
 
 /**
@@ -298,7 +300,7 @@ export class SkillSDK {
   }
 
   // 9. registerSessionListener
-  registerSessionListener(params: RegisterSessionListenerParams): void {
+  registerSessionListener(params: RegisterSessionListenerParams): RegisterSessionListenerResult {
     Validator.requireObject(params, 'params');
     Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
     Validator.requireFunction(params.onMessage, 'onMessage');
@@ -310,13 +312,15 @@ export class SkillSDK {
       onError: params.onError,
       onClose: params.onClose
     });
+    return { status: 'success' };
   }
 
   // 10. unregisterSessionListener
-  unregisterSessionListener(params: UnregisterSessionListenerParams): void {
+  unregisterSessionListener(params: UnregisterSessionListenerParams): UnregisterSessionListenerResult {
     Validator.requireObject(params, 'params');
     Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
     this.wsManager.unregisterSessionListener(params.welinkSessionId);
+    return { status: 'success' };
   }
 
   // 11. sendMessage
@@ -332,6 +336,7 @@ export class SkillSDK {
       if (!this.wsManager.isConnected()) {
         await this.wsManager.connect();
       }
+      this.sessionStateManager.markSendMessageTriggered(params.welinkSessionId);
 
       const payload: Record<string, unknown> = {
         content: params.content
@@ -348,6 +353,9 @@ export class SkillSDK {
       this.messageCacheManager.cacheSentUserMessage(result);
       return result;
     } catch (error) {
+      if (typeof params.welinkSessionId === 'number' && Number.isFinite(params.welinkSessionId)) {
+        this.sessionStateManager.clearSendMessageTrigger(params.welinkSessionId);
+      }
       throw this.normalizeError('sendMessage', error);
     }
   }

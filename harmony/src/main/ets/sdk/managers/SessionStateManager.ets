@@ -8,13 +8,14 @@ import {
 
 /**
  * Session status mapper:
- * - maps raw stream events to SDK status (`executing|stopped|completed`)
+ * - maps `session.status` stream events to SDK status (`executing|stopped|completed`)
  * - dispatches callbacks per session
  */
 export class SessionStateManager {
   private readonly logger: Logger;
   private readonly callbacks: Map<number, (result: SessionStatusResult) => void> = new Map();
   private readonly statuses: Map<number, SessionStatus> = new Map();
+  private readonly sendMessageTriggeredBySession: Map<number, boolean> = new Map();
 
   constructor(enableLog: boolean = false) {
     this.logger = new Logger('SessionStateManager', enableLog);
@@ -31,14 +32,27 @@ export class SessionStateManager {
   clearSession(sessionId: number): void {
     this.callbacks.delete(sessionId);
     this.statuses.delete(sessionId);
+    this.sendMessageTriggeredBySession.delete(sessionId);
   }
 
   clearAll(): void {
     this.callbacks.clear();
     this.statuses.clear();
+    this.sendMessageTriggeredBySession.clear();
+  }
+
+  markSendMessageTriggered(sessionId: number): void {
+    this.sendMessageTriggeredBySession.set(sessionId, true);
+  }
+
+  clearSendMessageTrigger(sessionId: number): void {
+    this.sendMessageTriggeredBySession.set(sessionId, false);
   }
 
   forceStatus(sessionId: number, status: SessionStatus): void {
+    if (status === SessionStatus.STOPPED) {
+      this.sendMessageTriggeredBySession.set(sessionId, false);
+    }
     this.emitIfChanged(sessionId, status);
   }
 
@@ -48,47 +62,31 @@ export class SessionStateManager {
       return;
     }
 
-    const mapped = this.mapStatus(message);
+    const mapped = this.mapStatus(sessionId, message);
     if (mapped === null) {
       return;
     }
     this.emitIfChanged(sessionId, mapped);
   }
 
-  private mapStatus(message: StreamMessage): SessionStatus | null {
-    switch (message.type) {
-      case 'step.start':
-      case 'text.delta':
-      case 'thinking.delta':
-      case 'tool.update':
-      case 'question':
-      case 'permission.ask':
-      case 'file':
-        return SessionStatus.EXECUTING;
-      case 'session.status':
-        if (message.sessionStatus === 'busy' || message.sessionStatus === 'retry') {
-          return SessionStatus.EXECUTING;
-        }
-        if (message.sessionStatus === 'idle') {
-          return SessionStatus.COMPLETED;
-        }
-        return null;
-      case 'permission.reply':
-        if (message.response === 'reject') {
-          return SessionStatus.STOPPED;
-        }
-        return SessionStatus.EXECUTING;
-      case 'step.done':
-      case 'text.done':
-      case 'thinking.done':
-        return SessionStatus.COMPLETED;
-      case 'session.error':
-      case 'error':
-      case 'agent.offline':
-        return SessionStatus.STOPPED;
-      default:
-        return null;
+  private mapStatus(sessionId: number, message: StreamMessage): SessionStatus | null {
+    if (message.type !== 'session.status') {
+      return null;
     }
+
+    if (message.sessionStatus === 'busy' || message.sessionStatus === 'retry') {
+      if (this.sendMessageTriggeredBySession.get(sessionId) === true) {
+        return SessionStatus.EXECUTING;
+      }
+      return null;
+    }
+
+    if (message.sessionStatus === 'idle') {
+      this.sendMessageTriggeredBySession.set(sessionId, false);
+      return SessionStatus.COMPLETED;
+    }
+
+    return null;
   }
 
   private emitIfChanged(sessionId: number, status: SessionStatus): void {

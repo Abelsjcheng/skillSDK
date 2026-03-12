@@ -113,7 +113,7 @@ export class WebSocketManager {
   registerSessionListener(sessionId: number, listener: SessionListener): void {
     const key = String(sessionId);
     if (this.listenersBySession.has(key)) {
-      throw new SkillSdkException(4011, 'Listener already exists for current welinkSessionId');
+      return;
     }
     this.listenersBySession.set(key, listener);
   }

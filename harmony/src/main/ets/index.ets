@@ -17,6 +17,7 @@ export {
   PageResult,
   PermissionResponse,
   RegisterSessionListenerParams,
+  RegisterSessionListenerResult,
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ReplyPermissionResult,
@@ -45,5 +46,6 @@ export {
   StreamMessageType,
   StreamSnapshotMessage,
   StreamingPart,
-  UnregisterSessionListenerParams
+  UnregisterSessionListenerParams,
+  UnregisterSessionListenerResult
 } from './sdk/types';

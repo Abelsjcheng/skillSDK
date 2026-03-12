@@ -310,8 +310,16 @@ export interface RegisterSessionListenerParams {
   onClose?: (reason: string) => void;
 }
 
+export interface RegisterSessionListenerResult {
+  status: 'success';
+}
+
 export interface UnregisterSessionListenerParams {
   welinkSessionId: number;
+}
+
+export interface UnregisterSessionListenerResult {
+  status: 'success';
 }
 
 export interface SendMessageParams {
