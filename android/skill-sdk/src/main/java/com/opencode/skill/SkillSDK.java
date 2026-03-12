@@ -19,6 +19,7 @@ import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.RegisterSessionListenerParams;
+import com.opencode.skill.model.RegisterSessionListenerResult;
 import com.opencode.skill.model.ReplyPermissionParams;
 import com.opencode.skill.model.ReplyPermissionResult;
 import com.opencode.skill.model.RegenerateAnswerParams;
@@ -36,6 +37,7 @@ import com.opencode.skill.model.StopSkillParams;
 import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.StreamMessage;
 import com.opencode.skill.model.UnregisterSessionListenerParams;
+import com.opencode.skill.model.UnregisterSessionListenerResult;
 import com.opencode.skill.network.ApiClient;
 import com.opencode.skill.network.StreamingMessageCache;
 import com.opencode.skill.network.WebSocketManager;
@@ -67,6 +69,8 @@ public final class SkillSDK {
   private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
   @NonNull
   private final Map<Long, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
+  @NonNull
+  private final Map<Long, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
 
   @Nullable
   private SkillSDKConfig config;
@@ -188,6 +192,7 @@ public final class SkillSDK {
       webSocketManager.clearAllListeners();
       listenerBindings.clear();
       sessionStatusCallbacks.clear();
+      awaitingExecutingBySession.clear();
       streamingMessageCache.clearAll();
       callback.onSuccess(new CloseSkillResult("success"));
     } catch (Exception e) {
@@ -212,6 +217,7 @@ public final class SkillSDK {
         StopSkillResult resolved = result == null
             ? new StopSkillResult(params.getWelinkSessionId(), "aborted")
             : result;
+        awaitingExecutingBySession.put(params.getWelinkSessionId(), Boolean.FALSE);
         emitSessionStatus(params.getWelinkSessionId(), SessionStatus.STOPPED);
         callback.onSuccess(resolved);
       }
@@ -361,7 +367,7 @@ public final class SkillSDK {
   }
 
   // 9. registerSessionListener
-  public void registerSessionListener(@NonNull RegisterSessionListenerParams params) {
+  public RegisterSessionListenerResult registerSessionListener(@NonNull RegisterSessionListenerParams params) {
     ensureInitializedForVoid();
     if (params.getWelinkSessionId() <= 0 || params.getOnMessage() == null) {
       throw error(1000, "welinkSessionId and onMessage are required");
@@ -391,13 +397,14 @@ public final class SkillSDK {
     ListenerBinding binding = new ListenerBinding(listener);
     ListenerBinding previous = listenerBindings.putIfAbsent(params.getWelinkSessionId(), binding);
     if (previous != null) {
-      throw error(4011, "Listener already exists for current welinkSessionId");
+      return new RegisterSessionListenerResult("success");
     }
     webSocketManager.registerListener(params.getWelinkSessionId(), listener);
+    return new RegisterSessionListenerResult("success");
   }
 
   // 10. unregisterSessionListener
-  public void unregisterSessionListener(@NonNull UnregisterSessionListenerParams params) {
+  public UnregisterSessionListenerResult unregisterSessionListener(@NonNull UnregisterSessionListenerParams params) {
     ensureInitializedForVoid();
     if (params.getWelinkSessionId() <= 0) {
       throw error(1000, "welinkSessionId is required");
@@ -409,9 +416,7 @@ public final class SkillSDK {
     }
 
     webSocketManager.unregisterListener(params.getWelinkSessionId(), binding.sessionListener);
-    if (config != null && config.isAutoDisconnectWhenNoListener() && !webSocketManager.hasAnySessionListeners()) {
-      webSocketManager.disconnect();
-    }
+    return new UnregisterSessionListenerResult("success");
   }
 
   // 11. sendMessage
@@ -494,15 +499,20 @@ public final class SkillSDK {
     listenerBindings.clear();
     sessionStatusCallbacks.clear();
     wecodeStatusCallbacks.clear();
+    awaitingExecutingBySession.clear();
     streamingMessageCache.clearAll();
     config = null;
   }
 
   private void sendMessageInternal(long welinkSessionId, @NonNull String content, @Nullable String toolCallId,
       @NonNull SkillCallback<SendMessageResult> callback) {
+    awaitingExecutingBySession.put(welinkSessionId, Boolean.TRUE);
     apiClient.sendMessage(welinkSessionId, content, toolCallId, new SkillCallback<SendMessageResult>() {
       @Override
       public void onSuccess(@Nullable SendMessageResult result) {
+        if (result == null) {
+          awaitingExecutingBySession.put(welinkSessionId, Boolean.FALSE);
+        }
         if (result != null) {
           streamingMessageCache.recordUserMessage(result);
         }
@@ -511,6 +521,7 @@ public final class SkillSDK {
 
       @Override
       public void onError(@NonNull Throwable error) {
+        awaitingExecutingBySession.put(welinkSessionId, Boolean.FALSE);
         callback.onError(wrapError(error));
       }
     });
@@ -569,7 +580,7 @@ public final class SkillSDK {
     if (sessionId == null) {
       return;
     }
-    SessionStatus mapped = mapStatus(message);
+    SessionStatus mapped = mapStatus(sessionId, message);
     if (mapped == null) {
       return;
     }
@@ -595,44 +606,24 @@ public final class SkillSDK {
   }
 
   @Nullable
-  private SessionStatus mapStatus(@NonNull StreamMessage message) {
+  private SessionStatus mapStatus(long sessionId, @NonNull StreamMessage message) {
     String type = message.getType();
     if (type == null) {
       return null;
     }
     switch (type) {
-      case MessageType.STEP_START:
-      case MessageType.TEXT_DELTA:
-      case MessageType.THINKING_DELTA:
-      case MessageType.TOOL_UPDATE:
-      case MessageType.QUESTION:
-      case MessageType.PERMISSION_ASK:
-      case MessageType.FILE:
-        return SessionStatus.EXECUTING;
-      case MessageType.STEP_DONE:
-      case MessageType.TEXT_DONE:
-      case MessageType.THINKING_DONE:
-        return SessionStatus.COMPLETED;
       case MessageType.SESSION_STATUS:
         if ("busy".equalsIgnoreCase(message.getSessionStatus()) || "retry".equalsIgnoreCase(message.getSessionStatus())) {
-          return SessionStatus.EXECUTING;
+          if (Boolean.TRUE.equals(awaitingExecutingBySession.get(sessionId))) {
+            return SessionStatus.EXECUTING;
+          }
+          return null;
         }
         if ("idle".equalsIgnoreCase(message.getSessionStatus())) {
+          awaitingExecutingBySession.put(sessionId, Boolean.FALSE);
           return SessionStatus.COMPLETED;
         }
         return null;
-      case MessageType.PERMISSION_REPLY:
-        if ("reject".equalsIgnoreCase(message.getResponse())) {
-          return SessionStatus.STOPPED;
-        }
-        if ("once".equalsIgnoreCase(message.getResponse()) || "always".equalsIgnoreCase(message.getResponse())) {
-          return SessionStatus.EXECUTING;
-        }
-        return null;
-      case MessageType.SESSION_ERROR:
-      case MessageType.ERROR:
-      case MessageType.AGENT_OFFLINE:
-        return SessionStatus.STOPPED;
       default:
         return null;
     }
