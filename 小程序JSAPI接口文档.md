@@ -34,6 +34,12 @@
 window.HWH5EXT.regenerateAnswer(params)
 ```
 
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'regenerateAnswer', params})
+```
+
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
@@ -92,6 +98,12 @@ window.HWH5EXT.regenerateAnswer({
 window.HWH5EXT.sendMessageToIM(params)
 ```
 
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessageToIM', params})
+```
+
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
@@ -147,6 +159,12 @@ window.HWH5EXT.sendMessageToIM({
 
 ```javascript
 window.HWH5EXT.getSessionMessage(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSessionMessage', params})
 ```
 
 ### 参数说明
@@ -246,6 +264,12 @@ window.HWH5EXT.getSessionMessage({
 
 ```javascript
 window.HWH5EXT.registerSessionListener(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSessionListener', params})
 ```
 
 ### 参数说明
@@ -373,6 +397,12 @@ console.log('监听器注册成功');
 window.HWH5EXT.unregisterSessionListener(params)
 ```
 
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'unregisterSessionListener', params})
+```
+
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
@@ -410,6 +440,12 @@ console.log('监听器已移除');
 
 ```javascript
 window.HWH5EXT.sendMessage(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessage', params})
 ```
 
 ### 参数说明
@@ -495,6 +531,12 @@ window.HWH5EXT.sendMessage({
 window.HWH5EXT.stopSkill(params)
 ```
 
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'stopSkill', params})
+```
+
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
@@ -557,6 +599,12 @@ window.HWH5EXT.stopSkill({
 
 ```javascript
 window.HWH5EXT.replyPermission(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'replyPermission', params})
 ```
 
 ### 参数说明
@@ -706,6 +754,12 @@ window.HWH5EXT.registerSessionListener({
 
 ```javascript
 window.HWH5EXT.controlSkillWeCode(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'controlSkillWeCode', params})
 ```
 
 ### 参数说明
