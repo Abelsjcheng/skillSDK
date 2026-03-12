@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import AIChatViewer, { AIChatViewerProps } from './AIChatViewer';
+import App from '../App';
 import type {
   Message,
   MessagePart,
@@ -10,7 +10,6 @@ import type {
   AgentStatus,
 } from '../types';
 
-export type { AIChatViewerProps };
 export type {
   Message,
   MessagePart,
@@ -22,17 +21,14 @@ export type {
 
 const rootMap = new WeakMap<Element, Root>();
 
-export function mountAIChatViewer(
-  container: Element,
-  props: AIChatViewerProps,
-): Root {
+export function mountAIChatViewer(container: Element): Root {
   let root = rootMap.get(container);
   if (!root) {
     root = createRoot(container);
     rootMap.set(container, root);
   }
 
-  root.render(React.createElement(AIChatViewer, props));
+  root.render(React.createElement(App));
   return root;
 }
 
@@ -43,18 +39,19 @@ export function unmountAIChatViewer(container: Element): void {
   rootMap.delete(container);
 }
 
-type AIChatViewerExport = typeof AIChatViewer & {
+type AppExport = typeof App & {
   mount: typeof mountAIChatViewer;
   unmount: typeof unmountAIChatViewer;
 };
 
-const AIChatViewerWithMount = Object.assign(
-  AIChatViewer,
+const AppWithMount = Object.assign(
+  App,
   {
     mount: mountAIChatViewer,
     unmount: unmountAIChatViewer,
   },
-) as AIChatViewerExport;
+) as AppExport;
 
-export { AIChatViewerWithMount as AIChatViewer };
-export default AIChatViewerWithMount;
+export { AppWithMount as App };
+export { AppWithMount as AIChatViewer };
+export default AppWithMount;

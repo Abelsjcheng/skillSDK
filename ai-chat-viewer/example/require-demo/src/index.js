@@ -33,6 +33,14 @@ if (typeof unmountAIChatViewer !== 'function') {
 }
 
 const HWH5EXT = createMockHwh5ext();
+window.HWH5EXT = HWH5EXT;
+if (!window.HWH5) {
+  window.HWH5 = {
+    close: function close() {
+      console.log('[require-demo] window.HWH5.close called');
+    },
+  };
+}
 let sessionSeed = 20260310;
 let mounted = false;
 
@@ -41,22 +49,16 @@ function setStatus(text) {
   statusElement.textContent = '[require-demo] ' + text;
 }
 
-function buildProps() {
+function injectSessionIdToUrl() {
   sessionSeed += 1;
-  return {
-    welinkSessionId: sessionSeed,
-    HWH5EXT: HWH5EXT,
-    onMinimize: function onMinimize() {
-      console.log('[require-demo] minimize callback');
-    },
-    onClose: function onClose() {
-      console.log('[require-demo] close callback');
-    },
-  };
+  var url = new URL(window.location.href);
+  url.searchParams.set('welinkSessionId', String(sessionSeed));
+  window.history.replaceState({}, '', url.toString());
 }
 
 function mount() {
-  mountAIChatViewer(rootElement, buildProps());
+  injectSessionIdToUrl();
+  mountAIChatViewer(rootElement);
   mounted = true;
   setStatus('mounted');
 }
