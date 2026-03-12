@@ -308,6 +308,11 @@ IM 客户端调用
 - 该接口依赖已建立的 WebSocket 连接
 - 服务端原始状态为 `busy / idle / retry`
 - 客户端 SDK 继续向上层暴露 `executing / stopped / completed` 三态
+- 发送消息后，SDK 仅通过 WebSocket `onmessage` 报文中的 `session.status` 判断会话状态
+- 当 `session.status=busy` 或 `session.status=retry` 时，返回 `executing`
+- 当 `session.status=idle` 时，返回 `completed`
+- 调用 `stopSkill()` 成功后，触发 `onSessionStatusChange` 的 `stopped` 状态
+- 当重新执行 `sendMessage` 后，若 WebSocket 再次返回 `session.status=busy/retry`，再返回 `executing`
 
 ### 接口名
 
@@ -330,34 +335,18 @@ onSessionStatusChange(params: OnSessionStatusChangeParams): void
 
 ### 状态映射
 
-| WebSocket 消息 `type` | 附加条件 | SDK 状态 | 说明 |
-|----------------------|----------|----------|------|
-| `step.start` | 无 | `executing` | 一轮推理开始 |
-| `session.status` | `sessionStatus = busy` | `executing` | 会话处理中 |
-| `session.status` | `sessionStatus = retry` | `executing` | 会话重试中 |
-| `text.delta` | 无 | `executing` | 正在流式输出文本 |
-| `thinking.delta` | 无 | `executing` | 正在流式输出思维链 |
-| `tool.update` | 无 | `executing` | 工具调用进行中或状态更新中 |
-| `question` | 无 | `executing` | 当前轮进入提问交互，尚未结束 |
-| `permission.ask` | 无 | `executing` | 当前轮进入权限确认，尚未结束 |
-| `permission.reply` | `response = once` 或 `always` | `executing` | 权限已处理，执行继续 |
-| `file` | 无 | `executing` | 文件/附件属于当前轮输出中的内容事件，不视为结束 |
-| `step.done` | 无 | `completed` | 当前推理步骤完成 |
+| WebSocket 消息 `type` / 触发 | 附加条件 | SDK 状态 | 说明 |
+|-----------------------------|----------|----------|------|
+| `session.status` | `sessionStatus = busy` 或 `retry`（在 `sendMessage` 之后收到） | `executing` | 发送消息后会话处理中或重试中 |
 | `session.status` | `sessionStatus = idle` | `completed` | 会话回到空闲，表示当前轮完成 |
-| `text.done` | 无 | `completed` | 文本部件完成 |
-| `thinking.done` | 无 | `completed` | 思维链部件完成 |
-| `permission.reply` | `response = reject` | `stopped` | 权限被拒绝，当前执行路径中断 |
-| `session.error` | 无 | `stopped` | 会话级异常中断 |
-| `error` | 无 | `stopped` | 系统级异常中断 |
-| `agent.offline` | 无 | `stopped` | Agent 下线，当前轮无法继续 |
+| SDK 本地触发 | 调用 `stopSkill()` 成功 | `stopped` | 触发 `onSessionStatusChange` 的 `stopped` 状态 |
 
 ### 补充说明
 
 - `session.title` 暂不参与状态映射
-- `text.done`、`thinking.done` 属于部件级完成信号，会先映射为 `completed`
-- 如果后续再次收到 `executing` 类事件，例如新的 `tool.update`、`text.delta` 或 `session.status=busy`，状态可再次切回 `executing`
-- 更稳定的整轮完成信号优先看 `step.done` 或 `session.status=idle`
-- `stopSkill()` 成功后，SDK 仍会额外触发一次 `stopped`，这是客户端补充行为，不属于服务端流式事件映射本身
+- 仅 `session.status` 参与状态映射，其他流式事件（如 `text.delta`、`tool.update`、`step.done` 等）不改变状态
+- `stopSkill()` 成功触发 `stopped` 后，状态不会自动回到 `executing`
+- 只有重新执行 `sendMessage`，且后续收到 `session.status=busy/retry` 时，才再次回到 `executing`
 
 ### 错误处理
 
