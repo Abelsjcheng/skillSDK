@@ -151,7 +151,7 @@ sdk.getSessionMessage(
 ```
 
 ### 9) `registerSessionListener`
-注册流式消息监听器。
+注册流式消息监听器。同一个 `welinkSessionId` 只允许注册一次，重复注册会抛出 `4011`。
 
 ```java
 SessionMessageCallback onMessage = message -> {};
@@ -164,11 +164,11 @@ sdk.registerSessionListener(
 ```
 
 ### 10) `unregisterSessionListener`
-移除监听器。必须传入与注册时同一个回调实例。
+按 `welinkSessionId` 移除该会话下当前注册的全部监听回调。
 
 ```java
 sdk.unregisterSessionListener(
-    new UnregisterSessionListenerParams(welinkSessionId, onMessage, onError, onClose)
+    new UnregisterSessionListenerParams(welinkSessionId)
 );
 ```
 

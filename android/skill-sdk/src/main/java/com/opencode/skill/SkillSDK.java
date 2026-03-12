@@ -3,10 +3,7 @@ package com.opencode.skill;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.opencode.skill.callback.SessionCloseCallback;
-import com.opencode.skill.callback.SessionErrorCallback;
 import com.opencode.skill.callback.SessionListener;
-import com.opencode.skill.callback.SessionMessageCallback;
 import com.opencode.skill.callback.SessionStatusCallback;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.callback.SkillWecodeStatusCallback;
@@ -69,7 +66,7 @@ public final class SkillSDK {
   @NonNull
   private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
   @NonNull
-  private final Map<Long, CopyOnWriteArrayList<ListenerBinding>> listenerBindings = new ConcurrentHashMap<>();
+  private final Map<Long, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
 
   @Nullable
   private SkillSDKConfig config;
@@ -391,39 +388,27 @@ public final class SkillSDK {
       }
     };
 
-    ListenerBinding binding = new ListenerBinding(params.getOnMessage(), params.getOnError(), params.getOnClose(), listener);
-    listenerBindings.computeIfAbsent(params.getWelinkSessionId(), key -> new CopyOnWriteArrayList<>()).add(binding);
+    ListenerBinding binding = new ListenerBinding(listener);
+    ListenerBinding previous = listenerBindings.putIfAbsent(params.getWelinkSessionId(), binding);
+    if (previous != null) {
+      throw error(4011, "Listener already exists for current welinkSessionId");
+    }
     webSocketManager.registerListener(params.getWelinkSessionId(), listener);
   }
 
   // 10. unregisterSessionListener
   public void unregisterSessionListener(@NonNull UnregisterSessionListenerParams params) {
     ensureInitializedForVoid();
-    if (params.getWelinkSessionId() <= 0 || params.getOnMessage() == null) {
-      throw error(1000, "welinkSessionId and onMessage are required");
+    if (params.getWelinkSessionId() <= 0) {
+      throw error(1000, "welinkSessionId is required");
     }
 
-    CopyOnWriteArrayList<ListenerBinding> bindings = listenerBindings.get(params.getWelinkSessionId());
-    if (bindings == null || bindings.isEmpty()) {
+    ListenerBinding binding = listenerBindings.remove(params.getWelinkSessionId());
+    if (binding == null) {
       throw error(4006, "Listener does not exist");
     }
 
-    ListenerBinding matched = null;
-    for (ListenerBinding binding : bindings) {
-      if (binding.matches(params.getOnMessage(), params.getOnError(), params.getOnClose())) {
-        matched = binding;
-        break;
-      }
-    }
-    if (matched == null) {
-      throw error(4006, "Listener does not exist");
-    }
-
-    webSocketManager.unregisterListener(params.getWelinkSessionId(), matched.sessionListener);
-    bindings.remove(matched);
-    if (bindings.isEmpty()) {
-      listenerBindings.remove(params.getWelinkSessionId());
-    }
+    webSocketManager.unregisterListener(params.getWelinkSessionId(), binding.sessionListener);
     if (config != null && config.isAutoDisconnectWhenNoListener() && !webSocketManager.hasAnySessionListeners()) {
       webSocketManager.disconnect();
     }
@@ -712,25 +697,10 @@ public final class SkillSDK {
 
   private static final class ListenerBinding {
     @NonNull
-    private final SessionMessageCallback onMessage;
-    @Nullable
-    private final SessionErrorCallback onError;
-    @Nullable
-    private final SessionCloseCallback onClose;
-    @NonNull
     private final SessionListener sessionListener;
 
-    private ListenerBinding(@NonNull SessionMessageCallback onMessage, @Nullable SessionErrorCallback onError,
-        @Nullable SessionCloseCallback onClose, @NonNull SessionListener sessionListener) {
-      this.onMessage = onMessage;
-      this.onError = onError;
-      this.onClose = onClose;
+    private ListenerBinding(@NonNull SessionListener sessionListener) {
       this.sessionListener = sessionListener;
-    }
-
-    private boolean matches(@NonNull SessionMessageCallback onMessage, @Nullable SessionErrorCallback onError,
-        @Nullable SessionCloseCallback onClose) {
-      return this.onMessage == onMessage && this.onError == onError && this.onClose == onClose;
     }
   }
 }
