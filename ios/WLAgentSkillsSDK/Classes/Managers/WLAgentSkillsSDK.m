@@ -14,6 +14,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 @interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
 
 @property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSessionStatusCallback> *sessionStatusCallbacks;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *sendMessageTriggeredBySession;
 @property (nonatomic, copy, nullable) WLAgentSkillsWecodeStatusCallback wecodeStatusCallback;
 
 @end
@@ -43,6 +44,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
   self = [super init];
   if (self) {
     _sessionStatusCallbacks = [NSMutableDictionary dictionary];
+    _sendMessageTriggeredBySession = [NSMutableDictionary dictionary];
     [WLAgentSkillsWebSocketManager sharedManager].delegate = self;
   }
   return self;
@@ -111,6 +113,9 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
   [manager disconnect];
   [[WLAgentSkillsStreamingCache sharedCache] clearAllCache];
+  @synchronized(self) {
+    [self.sendMessageTriggeredBySession removeAllObjects];
+  }
 
   WLAgentSkillsCloseSkillResult *result = [[WLAgentSkillsCloseSkillResult alloc] init];
   result.status = @"success";
@@ -134,6 +139,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                                                              success:^(id  _Nullable responseObject) {
     NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
     WLAgentSkillsStopSkillResult *result = [[WLAgentSkillsStopSkillResult alloc] initWithDictionary:data];
+    [weakSelf setSendMessageTriggered:NO sessionId:params.welinkSessionId];
     [weakSelf emitSessionStatus:WLAgentSkillsClientSessionStatusStopped
                       sessionId:params.welinkSessionId];
     if (success) {
@@ -357,30 +363,25 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
 #pragma mark - 9. registerSessionListener
 
-- (void)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params {
+- (WLAgentSkillsRegisterSessionListenerResult *)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params {
   if (params == nil || params.welinkSessionId == nil || params.onMessage == nil) {
-    return;
+    return [self buildRegisterSessionListenerResult];
   }
 
-  BOOL added = [[WLAgentSkillsWebSocketManager sharedManager] addListenerForSessionId:params.welinkSessionId
-                                                                             onMessage:params.onMessage
-                                                                               onError:params.onError
-                                                                               onClose:params.onClose];
-  if (!added && params.onError != nil) {
-    WLAgentSkillsSessionError *error = [[WLAgentSkillsSessionError alloc] initWithCode:@"4011"
-                                                                                message:@"Listener already exists for current welinkSessionId"];
-    params.onError(error);
-  }
+  [[WLAgentSkillsWebSocketManager sharedManager] addListenerForSessionId:params.welinkSessionId
+                                                                onMessage:params.onMessage
+                                                                  onError:params.onError
+                                                                  onClose:params.onClose];
+  return [self buildRegisterSessionListenerResult];
 }
 
 #pragma mark - 10. unregisterSessionListener
 
-- (void)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params {
-  if (params == nil || params.welinkSessionId == nil) {
-    return;
+- (WLAgentSkillsUnregisterSessionListenerResult *)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params {
+  if (params != nil && params.welinkSessionId != nil) {
+    [[WLAgentSkillsWebSocketManager sharedManager] removeListenerForSessionId:params.welinkSessionId];
   }
-
-  [[WLAgentSkillsWebSocketManager sharedManager] removeListenerForSessionId:params.welinkSessionId];
+  return [self buildUnregisterSessionListenerResult];
 }
 
 #pragma mark - 11. sendMessage
@@ -475,13 +476,13 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
   [[WLAgentSkillsStreamingCache sharedCache] updateWithStreamMessage:message];
 
-  NSInteger mappedStatus = [self mapStreamMessageToSessionStatus:message];
-  if (mappedStatus == NSNotFound) {
+  NSNumber *sessionId = @([message.welinkSessionId longLongValue]);
+  if (sessionId.longLongValue <= 0) {
     return;
   }
 
-  NSNumber *sessionId = @([message.welinkSessionId longLongValue]);
-  if (sessionId.longLongValue <= 0) {
+  NSInteger mappedStatus = [self mapStreamMessageToSessionStatus:message sessionId:sessionId];
+  if (mappedStatus == NSNotFound) {
     return;
   }
 
@@ -495,6 +496,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                       toolCallId:(nullable NSString *)toolCallId
                          success:(void (^)(WLAgentSkillsSendMessageResult *result))success
                          failure:(void (^)(NSError *error))failure {
+  [self setSendMessageTriggered:YES sessionId:welinkSessionId];
   [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
   __weak typeof(self) weakSelf = self;
@@ -509,7 +511,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
       success(result);
     }
   }
-                                                            failure:^(NSError * _Nonnull error) {
+                                                             failure:^(NSError * _Nonnull error) {
+    [weakSelf setSendMessageTriggered:NO sessionId:welinkSessionId];
     [weakSelf dispatchFailureObject:failure error:error];
   }];
 }
@@ -561,47 +564,24 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
   return latest;
 }
 
-- (NSInteger)mapStreamMessageToSessionStatus:(WLAgentSkillsStreamMessage *)message {
+- (NSInteger)mapStreamMessageToSessionStatus:(WLAgentSkillsStreamMessage *)message
+                                    sessionId:(NSNumber *)sessionId {
   NSString *type = message.type ?: @"";
 
-  if ([type isEqualToString:@"step.start"] ||
-      [type isEqualToString:@"text.delta"] ||
-      [type isEqualToString:@"thinking.delta"] ||
-      [type isEqualToString:@"tool.update"] ||
-      [type isEqualToString:@"question"] ||
-      [type isEqualToString:@"permission.ask"] ||
-      [type isEqualToString:@"file"]) {
-    return WLAgentSkillsClientSessionStatusExecuting;
+  if (![type isEqualToString:@"session.status"]) {
+    return NSNotFound;
   }
 
-  if ([type isEqualToString:@"permission.reply"]) {
-    if ([message.response isEqualToString:@"reject"]) {
-      return WLAgentSkillsClientSessionStatusStopped;
-    }
-    if ([message.response isEqualToString:@"once"] || [message.response isEqualToString:@"always"]) {
+  if ([message.sessionStatus isEqualToString:@"busy"] || [message.sessionStatus isEqualToString:@"retry"]) {
+    if ([self isSendMessageTriggeredForSessionId:sessionId]) {
       return WLAgentSkillsClientSessionStatusExecuting;
     }
+    return NSNotFound;
   }
 
-  if ([type isEqualToString:@"session.status"]) {
-    if ([message.sessionStatus isEqualToString:@"busy"] || [message.sessionStatus isEqualToString:@"retry"]) {
-      return WLAgentSkillsClientSessionStatusExecuting;
-    }
-    if ([message.sessionStatus isEqualToString:@"idle"]) {
-      return WLAgentSkillsClientSessionStatusCompleted;
-    }
-  }
-
-  if ([type isEqualToString:@"step.done"] ||
-      [type isEqualToString:@"text.done"] ||
-      [type isEqualToString:@"thinking.done"]) {
+  if ([message.sessionStatus isEqualToString:@"idle"]) {
+    [self setSendMessageTriggered:NO sessionId:sessionId];
     return WLAgentSkillsClientSessionStatusCompleted;
-  }
-
-  if ([type isEqualToString:@"session.error"] ||
-      [type isEqualToString:@"error"] ||
-      [type isEqualToString:@"agent.offline"]) {
-    return WLAgentSkillsClientSessionStatusStopped;
   }
 
   return NSNotFound;
@@ -620,6 +600,38 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
   WLAgentSkillsSessionStatusResult *result = [[WLAgentSkillsSessionStatusResult alloc] init];
   result.status = status;
   callback(result);
+}
+
+- (WLAgentSkillsRegisterSessionListenerResult *)buildRegisterSessionListenerResult {
+  WLAgentSkillsRegisterSessionListenerResult *result = [[WLAgentSkillsRegisterSessionListenerResult alloc] init];
+  result.status = @"success";
+  return result;
+}
+
+- (WLAgentSkillsUnregisterSessionListenerResult *)buildUnregisterSessionListenerResult {
+  WLAgentSkillsUnregisterSessionListenerResult *result = [[WLAgentSkillsUnregisterSessionListenerResult alloc] init];
+  result.status = @"success";
+  return result;
+}
+
+- (void)setSendMessageTriggered:(BOOL)triggered sessionId:(NSNumber *)sessionId {
+  if (sessionId == nil) {
+    return;
+  }
+
+  @synchronized(self) {
+    self.sendMessageTriggeredBySession[sessionId.stringValue] = @(triggered);
+  }
+}
+
+- (BOOL)isSendMessageTriggeredForSessionId:(NSNumber *)sessionId {
+  if (sessionId == nil) {
+    return NO;
+  }
+
+  @synchronized(self) {
+    return [self.sendMessageTriggeredBySession[sessionId.stringValue] boolValue];
+  }
 }
 
 - (void)dispatchFailure:(void (^)(NSError *error))failure

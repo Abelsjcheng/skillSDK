@@ -237,6 +237,14 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 @end
 
+@interface WLAgentSkillsRegisterSessionListenerResult : NSObject
+@property (nonatomic, copy) NSString *status;
+@end
+
+@interface WLAgentSkillsUnregisterSessionListenerResult : NSObject
+@property (nonatomic, copy) NSString *status;
+@end
+
 @interface WLAgentSkillsCloseSkillResult : NSObject
 @property (nonatomic, copy) NSString *status;
 @end

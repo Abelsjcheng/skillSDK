@@ -371,6 +371,12 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 
 @end
 
+@implementation WLAgentSkillsRegisterSessionListenerResult
+@end
+
+@implementation WLAgentSkillsUnregisterSessionListenerResult
+@end
+
 @implementation WLAgentSkillsCloseSkillResult
 @end
 

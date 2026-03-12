@@ -51,10 +51,10 @@ NS_ASSUME_NONNULL_BEGIN
                   failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 9. 注册会话监听器
-- (void)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params;
+- (WLAgentSkillsRegisterSessionListenerResult *)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params;
 
 #pragma mark - 10. 移除会话监听器
-- (void)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params;
+- (WLAgentSkillsUnregisterSessionListenerResult *)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params;
 
 #pragma mark - 11. 发送消息
 - (void)sendMessage:(WLAgentSkillsSendMessageParams *)params

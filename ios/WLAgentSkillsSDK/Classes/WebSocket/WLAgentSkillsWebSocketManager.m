@@ -113,9 +113,6 @@
       return NO;
     }
     [self.listeners removeObjectForKey:key];
-    if (self.listeners.count == 0) {
-      [self disconnect];
-    }
   }
   return YES;
 }
@@ -127,9 +124,6 @@
 
   @synchronized(self) {
     [self.listeners removeObjectForKey:welinkSessionId.stringValue];
-    if (self.listeners.count == 0) {
-      [self disconnect];
-    }
   }
 }
 
