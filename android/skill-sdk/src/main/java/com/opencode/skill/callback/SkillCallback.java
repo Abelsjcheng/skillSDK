@@ -4,10 +4,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * Generic async callback.
- */
+* Generic async callback.
+*/
 public interface SkillCallback<T> {
-  void onSuccess(@Nullable T result);
+    void onSuccess(@Nullable T result);
 
-  void onError(@NonNull Throwable error);
+    void onError(@NonNull Throwable error);
 }

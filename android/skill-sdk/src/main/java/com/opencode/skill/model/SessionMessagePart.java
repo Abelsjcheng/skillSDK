@@ -1,5 +1,6 @@
 package com.opencode.skill.model;
 
+import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonElement;
@@ -7,181 +8,182 @@ import com.google.gson.JsonElement;
 import java.util.ArrayList;
 import java.util.List;
 
+@Keep
 public class SessionMessagePart {
-  @Nullable
-  private String partId;
-  @Nullable
-  private Integer partSeq;
-  @Nullable
-  private String type;
-  @Nullable
-  private String content;
-  @Nullable
-  private String toolName;
-  @Nullable
-  private String toolCallId;
-  @Nullable
-  private String toolStatus;
-  @Nullable
-  private JsonElement toolInput;
-  @Nullable
-  private String toolOutput;
-  @Nullable
-  private String question;
-  @Nullable
-  private String header;
-  @Nullable
-  private List<String> options = new ArrayList<>();
-  @Nullable
-  private String permissionId;
-  @Nullable
-  private String fileName;
-  @Nullable
-  private String fileUrl;
-  @Nullable
-  private String fileMime;
+    @Nullable
+    private String partId;
+    @Nullable
+    private Integer partSeq;
+    @Nullable
+    private String type;
+    @Nullable
+    private String content;
+    @Nullable
+    private String toolName;
+    @Nullable
+    private String toolCallId;
+    @Nullable
+    private String toolStatus;
+    @Nullable
+    private JsonElement toolInput;
+    @Nullable
+    private String toolOutput;
+    @Nullable
+    private String question;
+    @Nullable
+    private String header;
+    @Nullable
+    private List<String> options = new ArrayList<>();
+    @Nullable
+    private String permissionId;
+    @Nullable
+    private String fileName;
+    @Nullable
+    private String fileUrl;
+    @Nullable
+    private String fileMime;
 
-  @Nullable
-  public String getPartId() {
-    return partId;
-  }
+    @Nullable
+    public String getPartId() {
+        return partId;
+    }
 
-  public void setPartId(@Nullable String partId) {
-    this.partId = partId;
-  }
+    public void setPartId(@Nullable String partId) {
+        this.partId = partId;
+    }
 
-  @Nullable
-  public Integer getPartSeq() {
-    return partSeq;
-  }
+    @Nullable
+    public Integer getPartSeq() {
+        return partSeq;
+    }
 
-  public void setPartSeq(@Nullable Integer partSeq) {
-    this.partSeq = partSeq;
-  }
+    public void setPartSeq(@Nullable Integer partSeq) {
+        this.partSeq = partSeq;
+    }
 
-  @Nullable
-  public String getType() {
-    return type;
-  }
+    @Nullable
+    public String getType() {
+        return type;
+    }
 
-  public void setType(@Nullable String type) {
-    this.type = type;
-  }
+    public void setType(@Nullable String type) {
+        this.type = type;
+    }
 
-  @Nullable
-  public String getContent() {
-    return content;
-  }
+    @Nullable
+    public String getContent() {
+        return content;
+    }
 
-  public void setContent(@Nullable String content) {
-    this.content = content;
-  }
+    public void setContent(@Nullable String content) {
+        this.content = content;
+    }
 
-  @Nullable
-  public String getToolName() {
-    return toolName;
-  }
+    @Nullable
+    public String getToolName() {
+        return toolName;
+    }
 
-  public void setToolName(@Nullable String toolName) {
-    this.toolName = toolName;
-  }
+    public void setToolName(@Nullable String toolName) {
+        this.toolName = toolName;
+    }
 
-  @Nullable
-  public String getToolCallId() {
-    return toolCallId;
-  }
+    @Nullable
+    public String getToolCallId() {
+        return toolCallId;
+    }
 
-  public void setToolCallId(@Nullable String toolCallId) {
-    this.toolCallId = toolCallId;
-  }
+    public void setToolCallId(@Nullable String toolCallId) {
+        this.toolCallId = toolCallId;
+    }
 
-  @Nullable
-  public String getToolStatus() {
-    return toolStatus;
-  }
+    @Nullable
+    public String getToolStatus() {
+        return toolStatus;
+    }
 
-  public void setToolStatus(@Nullable String toolStatus) {
-    this.toolStatus = toolStatus;
-  }
+    public void setToolStatus(@Nullable String toolStatus) {
+        this.toolStatus = toolStatus;
+    }
 
-  @Nullable
-  public JsonElement getToolInput() {
-    return toolInput;
-  }
+    @Nullable
+    public JsonElement getToolInput() {
+        return toolInput;
+    }
 
-  public void setToolInput(@Nullable JsonElement toolInput) {
-    this.toolInput = toolInput;
-  }
+    public void setToolInput(@Nullable JsonElement toolInput) {
+        this.toolInput = toolInput;
+    }
 
-  @Nullable
-  public String getToolOutput() {
-    return toolOutput;
-  }
+    @Nullable
+    public String getToolOutput() {
+        return toolOutput;
+    }
 
-  public void setToolOutput(@Nullable String toolOutput) {
-    this.toolOutput = toolOutput;
-  }
+    public void setToolOutput(@Nullable String toolOutput) {
+        this.toolOutput = toolOutput;
+    }
 
-  @Nullable
-  public String getQuestion() {
-    return question;
-  }
+    @Nullable
+    public String getQuestion() {
+        return question;
+    }
 
-  public void setQuestion(@Nullable String question) {
-    this.question = question;
-  }
+    public void setQuestion(@Nullable String question) {
+        this.question = question;
+    }
 
-  @Nullable
-  public String getHeader() {
-    return header;
-  }
+    @Nullable
+    public String getHeader() {
+        return header;
+    }
 
-  public void setHeader(@Nullable String header) {
-    this.header = header;
-  }
+    public void setHeader(@Nullable String header) {
+        this.header = header;
+    }
 
-  @Nullable
-  public List<String> getOptions() {
-    return options;
-  }
+    @Nullable
+    public List<String> getOptions() {
+        return options;
+    }
 
-  public void setOptions(@Nullable List<String> options) {
-    this.options = options;
-  }
+    public void setOptions(@Nullable List<String> options) {
+        this.options = options;
+    }
 
-  @Nullable
-  public String getPermissionId() {
-    return permissionId;
-  }
+    @Nullable
+    public String getPermissionId() {
+        return permissionId;
+    }
 
-  public void setPermissionId(@Nullable String permissionId) {
-    this.permissionId = permissionId;
-  }
+    public void setPermissionId(@Nullable String permissionId) {
+        this.permissionId = permissionId;
+    }
 
-  @Nullable
-  public String getFileName() {
-    return fileName;
-  }
+    @Nullable
+    public String getFileName() {
+        return fileName;
+    }
 
-  public void setFileName(@Nullable String fileName) {
-    this.fileName = fileName;
-  }
+    public void setFileName(@Nullable String fileName) {
+        this.fileName = fileName;
+    }
 
-  @Nullable
-  public String getFileUrl() {
-    return fileUrl;
-  }
+    @Nullable
+    public String getFileUrl() {
+        return fileUrl;
+    }
 
-  public void setFileUrl(@Nullable String fileUrl) {
-    this.fileUrl = fileUrl;
-  }
+    public void setFileUrl(@Nullable String fileUrl) {
+        this.fileUrl = fileUrl;
+    }
 
-  @Nullable
-  public String getFileMime() {
-    return fileMime;
-  }
+    @Nullable
+    public String getFileMime() {
+        return fileMime;
+    }
 
-  public void setFileMime(@Nullable String fileMime) {
-    this.fileMime = fileMime;
-  }
+    public void setFileMime(@Nullable String fileMime) {
+        this.fileMime = fileMime;
+    }
 }

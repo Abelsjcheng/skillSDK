@@ -1,25 +1,27 @@
 package com.opencode.skill.model;
 
+import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 import com.opencode.skill.callback.SessionStatusCallback;
 
+@Keep
 public class OnSessionStatusChangeParams {
-  private final long welinkSessionId;
-  @NonNull
-  private final SessionStatusCallback callback;
+    private final long welinkSessionId;
+    @NonNull
+    private final SessionStatusCallback callback;
 
-  public OnSessionStatusChangeParams(long welinkSessionId, @NonNull SessionStatusCallback callback) {
-    this.welinkSessionId = welinkSessionId;
-    this.callback = callback;
-  }
+    public OnSessionStatusChangeParams(long welinkSessionId, @NonNull SessionStatusCallback callback) {
+        this.welinkSessionId = welinkSessionId;
+        this.callback = callback;
+    }
 
-  public long getWelinkSessionId() {
-    return welinkSessionId;
-  }
+    public long getWelinkSessionId() {
+        return welinkSessionId;
+    }
 
-  @NonNull
-  public SessionStatusCallback getCallback() {
-    return callback;
-  }
+    @NonNull
+    public SessionStatusCallback getCallback() {
+        return callback;
+    }
 }
