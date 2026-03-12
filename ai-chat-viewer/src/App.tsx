@@ -71,6 +71,13 @@ function App() {
   const onErrorRef = useRef<((err: { errorCode: number; errorMessage: string }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
 
+  const closeHwh5 = () => {
+    const hwh5 = (window as unknown as { HWH5?: { close?: () => void } }).HWH5;
+    if (typeof hwh5?.close === 'function') {
+      hwh5.close();
+    }
+  };
+
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
 
@@ -386,6 +393,8 @@ function App() {
       await controlSkillWeCode({ action: 'minimize' });
     } catch (err) {
       console.error('Failed to minimize:', err);
+    } finally {
+      closeHwh5();
     }
   }, []);
 
@@ -394,6 +403,8 @@ function App() {
       await controlSkillWeCode({ action: 'close' });
     } catch (err) {
       console.error('Failed to close:', err);
+    } finally {
+      closeHwh5();
     }
   }, []);
 

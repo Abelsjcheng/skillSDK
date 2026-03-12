@@ -4,28 +4,13 @@ import { Content } from '../components/Content';
 import { Footer, FooterMode } from '../components/Footer';
 import { StreamAssembler } from '../protocol/StreamAssembler';
 import type { Message, StreamMessage, SessionMessage, SessionStatus } from '../types';
+import { resolveJsApi } from '../utils/hwext';
 import '../styles/App.less';
 
 export interface AIChatViewerProps {
   welinkSessionId: number;
   onMinimize?: () => void;
   onClose?: () => void;
-  HWH5EXT?: {
-    getSessionMessage: (params: { welinkSessionId: number; page?: number; size?: number }) => Promise<{ content: SessionMessage[] }>;
-    sendMessage: (params: { welinkSessionId: number; content: string }) => Promise<unknown>;
-    regenerateAnswer: (params: { welinkSessionId: number }) => Promise<unknown>;
-    stopSkill: (params: { welinkSessionId: number }) => Promise<unknown>;
-    sendMessageToIM: (params: { welinkSessionId: number }) => Promise<unknown>;
-    controlSkillWeCode: (params: { action: 'close' | 'minimize' }) => Promise<unknown>;
-    replyPermission: (params: { welinkSessionId: number; permId: string; response: 'once' | 'always' | 'reject' }) => Promise<unknown>;
-    registerSessionListener: (params: {
-      welinkSessionId: number;
-      onMessage: (msg: StreamMessage) => void;
-      onError?: (err: { errorCode: number; errorMessage: string }) => void;
-      onClose?: (reason: string) => void;
-    }) => void;
-    unregisterSessionListener: (params: { welinkSessionId: number }) => void;
-  };
 }
 
 let nextMsgId = 1;
@@ -65,7 +50,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
   welinkSessionId,
   onMinimize,
   onClose,
-  HWH5EXT,
 }) => {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = React.useState<SessionStatus>('idle');
@@ -77,9 +61,18 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
   const listenerRegisteredRef = React.useRef(false);
   const awaitingFinalResultRef = React.useRef(false);
 
-  const hw = HWH5EXT || (typeof window !== 'undefined'
-    ? (window as unknown as { HWH5EXT?: AIChatViewerProps['HWH5EXT'] }).HWH5EXT
-    : null);
+  const hw = React.useMemo(() => resolveJsApi(), []);
+  const closeHwh5 = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const hwh5 = (window as unknown as { HWH5?: { close?: () => void } }).HWH5;
+    if (typeof hwh5?.close === 'function') {
+      try {
+        hwh5.close();
+      } catch (err) {
+        console.error('window.HWH5.close failed:', err);
+      }
+    }
+  }, []);
 
   const finalizeStreamingMessage = React.useCallback(() => {
     assemblerRef.current.complete();
@@ -218,7 +211,7 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
 
     return () => {
       if (listenerRegisteredRef.current && hw) {
-        hw.unregisterSessionListener({ welinkSessionId });
+        hw.unregisterSessionListener({ welinkSessionId, onMessage: handleMessage });
         listenerRegisteredRef.current = false;
       }
     };
@@ -300,10 +293,12 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
         await hw.controlSkillWeCode({ action: 'minimize' });
       } catch {
         // noop
+      } finally {
+        closeHwh5();
       }
     }
     onMinimize?.();
-  }, [hw, onMinimize]);
+  }, [hw, onMinimize, closeHwh5]);
 
   const handleClose = React.useCallback(async () => {
     if (hw) {
@@ -311,10 +306,12 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
         await hw.controlSkillWeCode({ action: 'close' });
       } catch {
         // noop
+      } finally {
+        closeHwh5();
       }
     }
     onClose?.();
-  }, [hw, onClose]);
+  }, [hw, onClose, closeHwh5]);
 
   return (
     <div className="ai-chat-viewer-container">

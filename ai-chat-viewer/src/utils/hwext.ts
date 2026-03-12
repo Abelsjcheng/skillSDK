@@ -68,10 +68,62 @@ export interface HWH5EXT {
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
 }
 
+interface Pedestal {
+  callMethod: (method: string, payload: { funName: string; params: unknown }) => Promise<unknown> | unknown;
+}
+
 declare global {
   interface Window {
-    HWH5EXT: HWH5EXT;
+    HWH5EXT?: HWH5EXT;
+    Pedestal?: Pedestal;
   }
+}
+
+const PC_UA_REGEX = /Windows NT|Macintosh|X11|Linux/i;
+const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
+
+export function isPcMiniApp(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (!ua) return false;
+  return PC_UA_REGEX.test(ua);
+}
+
+function tryGetPedestal(): Pedestal | null {
+  if (typeof window === 'undefined') return null;
+  if (window.Pedestal && typeof window.Pedestal.callMethod === 'function') {
+    return window.Pedestal;
+  }
+  return null;
+}
+
+function getPedestalOrThrow(): Pedestal {
+  const pedestal = tryGetPedestal();
+  if (pedestal) return pedestal;
+  throw new Error('Pedestal.callMethod is not available. This code must run in PC miniapp environment.');
+}
+
+function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
+  const call = <T>(funName: string, params: unknown) => Promise.resolve(pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T);
+  return {
+    regenerateAnswer: (params) => call<RegenerateAnswerResponse>('regenerateAnswer', params),
+    sendMessageToIM: (params) => call<SendMessageToIMResponse>('sendMessageToIM', params),
+    getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
+    registerSessionListener: (params) => {
+      void call<void>('registerSessionListener', params).catch((err) => {
+        console.error('registerSessionListener failed:', err);
+      });
+    },
+    unregisterSessionListener: (params) => {
+      void call<void>('unregisterSessionListener', params).catch((err) => {
+        console.error('unregisterSessionListener failed:', err);
+      });
+    },
+    sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
+    stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
+    replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
+    controlSkillWeCode: (params) => call<ControlSkillWeCodeResponse>('controlSkillWeCode', params),
+  };
 }
 
 function getHWH5EXT(): HWH5EXT {
@@ -81,40 +133,56 @@ function getHWH5EXT(): HWH5EXT {
   throw new Error('HWH5EXT is not available. This code must run in WeLink miniapp environment.');
 }
 
+export function resolveJsApi(): HWH5EXT | null {
+  if (typeof window === 'undefined') return null;
+  if (isPcMiniApp()) {
+    const pedestal = tryGetPedestal();
+    return pedestal ? createPedestalAdapter(pedestal) : null;
+  }
+  return window.HWH5EXT ?? null;
+}
+
+function getJsApiOrThrow(): HWH5EXT {
+  if (isPcMiniApp()) {
+    return createPedestalAdapter(getPedestalOrThrow());
+  }
+  return getHWH5EXT();
+}
+
 export async function regenerateAnswer(params: RegenerateAnswerParams): Promise<RegenerateAnswerResponse> {
-  return getHWH5EXT().regenerateAnswer(params);
+  return getJsApiOrThrow().regenerateAnswer(params);
 }
 
 export async function sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResponse> {
-  return getHWH5EXT().sendMessageToIM(params);
+  return getJsApiOrThrow().sendMessageToIM(params);
 }
 
 export async function getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse> {
-  return getHWH5EXT().getSessionMessage(params);
+  return getJsApiOrThrow().getSessionMessage(params);
 }
 
 export function registerSessionListener(params: RegisterSessionListenerParams): void {
-  return getHWH5EXT().registerSessionListener(params);
+  return getJsApiOrThrow().registerSessionListener(params);
 }
 
 export function unregisterSessionListener(params: RegisterSessionListenerParams): void {
-  return getHWH5EXT().unregisterSessionListener(params);
+  return getJsApiOrThrow().unregisterSessionListener(params);
 }
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
-  return getHWH5EXT().sendMessage(params);
+  return getJsApiOrThrow().sendMessage(params);
 }
 
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
-  return getHWH5EXT().stopSkill(params);
+  return getJsApiOrThrow().stopSkill(params);
 }
 
 export async function replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse> {
-  return getHWH5EXT().replyPermission(params);
+  return getJsApiOrThrow().replyPermission(params);
 }
 
 export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse> {
-  return getHWH5EXT().controlSkillWeCode(params);
+  return getJsApiOrThrow().controlSkillWeCode(params);
 }
 
 export function parseWelinkSessionId(): number | null {
