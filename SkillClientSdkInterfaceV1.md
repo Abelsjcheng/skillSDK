@@ -267,7 +267,6 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 | 4001 | 会话已关闭 | 会话已被关闭，无法停止 |
 | 6000 | 网络错误 | 网络请求失败 |
 | 7000 | 服务端错误 | 服务端处理失败 |
@@ -353,7 +352,7 @@ onSessionStatusChange(params: OnSessionStatusChangeParams): void
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 `welinkSessionId` 或 `callback` |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
+
 | 3000 | 未建立连接 | WebSocket 连接未建立 |
 
 ### 组合调用场景
@@ -511,7 +510,6 @@ regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult>
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 | 4001 | 会话已关闭 | 会话已被关闭，无法重新生成 |
 | 4002 | 无用户消息 | 会话中没有用户消息可用于重新生成 |
 | 6000 | 网络错误 | 网络请求失败 |
@@ -663,7 +661,6 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 | 4003 | 消息不存在 | 请求的消息在缓存中不存在 |
 | 4004 | 消息未完成 | 请求的消息尚未收到完成事件 |
 | 4005 | 无最终消息 | 会话中没有已完成的消息 |
@@ -863,7 +860,6 @@ interface MessageCache {
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 | 6000 | 网络错误 | 网络请求失败 |
 | 7000 | 服务端错误 | 服务端处理失败 |
 
@@ -982,7 +978,6 @@ interface SessionError {
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 `welinkSessionId` 或 `onMessage` |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 组合调用场景
 
@@ -1088,7 +1083,6 @@ unregisterSessionListener(params: UnregisterSessionListenerParams): UnregisterSe
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 `welinkSessionId` |
 | 4006 | 监听器不存在 | 当前 `welinkSessionId` 未注册监听器 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 组合调用场景
 
@@ -1168,7 +1162,6 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 或 `content` 缺失或格式错误 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 | 4001 | 会话已关闭 | 会话已被关闭，无法发送消息 |
 | 6000 | 网络错误 | 网络请求失败 |
 | 7000 | 服务端错误 | 服务端处理失败 |
@@ -1272,7 +1265,6 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 `welinkSessionId`、`permId` 或 `response` 无效 |
-| 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 | 4007 | 权限请求不存在 | 指定的权限请求 ID 不存在 |
 | 4008 | 权限请求已过期 | 权限请求已超时或已处理 |
 | 6000 | 网络错误 | 网络请求失败 |
