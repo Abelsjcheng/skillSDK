@@ -1,4 +1,4 @@
-﻿//
+//
 //  WLAgentSkillsStreamingCache.h
 //  WLAgentSkillsSDK
 //
@@ -15,13 +15,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)updateWithStreamMessage:(WLAgentSkillsStreamMessage *)message;
 - (void)cacheSendMessageResult:(WLAgentSkillsSendMessageResult *)result;
 - (void)cacheHistoryMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
-               forSessionId:(NSNumber *)welinkSessionId;
+                                                            forSessionId:(NSNumber *)welinkSessionId;
 
 - (NSArray<WLAgentSkillsSessionMessage *> *)mergedMessagesWithServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
-                                                                 sessionId:(NSNumber *)welinkSessionId;
+                                                                                                                                                                                                                                                                    sessionId:(NSNumber *)welinkSessionId;
 
 - (nullable NSString *)latestCompletedContentForSessionId:(NSNumber *)welinkSessionId
-                                                  messageId:(nullable NSString *)messageId;
+                                                                                                                                                                                                        messageId:(nullable NSString *)messageId;
 
 - (nullable NSString *)lastUserMessageContentForSessionId:(NSNumber *)welinkSessionId;
 

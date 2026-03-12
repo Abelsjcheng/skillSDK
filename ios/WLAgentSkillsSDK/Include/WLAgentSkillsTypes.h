@@ -11,19 +11,19 @@ FOUNDATION_EXPORT NSString * const WLAgentSkillsErrorCodeKey;
 FOUNDATION_EXPORT NSString * const WLAgentSkillsErrorMessageKey;
 
 typedef NS_ENUM(NSInteger, WLAgentSkillsClientSessionStatus) {
-  WLAgentSkillsClientSessionStatusExecuting = 0,
-  WLAgentSkillsClientSessionStatusStopped,
-  WLAgentSkillsClientSessionStatusCompleted,
+    WLAgentSkillsClientSessionStatusExecuting = 0,
+    WLAgentSkillsClientSessionStatusStopped,
+    WLAgentSkillsClientSessionStatusCompleted,
 };
 
 typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeStatus) {
-  WLAgentSkillsWecodeStatusClosed = 0,
-  WLAgentSkillsWecodeStatusMinimized,
+    WLAgentSkillsWecodeStatusClosed = 0,
+    WLAgentSkillsWecodeStatusMinimized,
 };
 
 typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeAction) {
-  WLAgentSkillsWecodeActionClose = 0,
-  WLAgentSkillsWecodeActionMinimize,
+    WLAgentSkillsWecodeActionClose = 0,
+    WLAgentSkillsWecodeActionMinimize,
 };
 
 @class WLAgentSkillsSessionError;

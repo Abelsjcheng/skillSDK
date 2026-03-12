@@ -1,4 +1,4 @@
-﻿//
+//
 //  WLAgentSkillsWebSocketManager.h
 //  WLAgentSkillsSDK
 //
@@ -26,9 +26,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)disconnect;
 
 - (BOOL)addListenerForSessionId:(NSNumber *)welinkSessionId
-                      onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
-                        onError:(nullable WLAgentSkillsSessionErrorCallback)onError
-                        onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
+                                            onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                                                onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                                                onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
 
 - (BOOL)removeListenerForSessionId:(NSNumber *)welinkSessionId;
 
