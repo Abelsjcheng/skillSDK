@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { MessageBubble } from './MessageBubble';
 import type { Message } from '../types';
 import '../styles/Content.less';
@@ -18,14 +18,26 @@ export const Content: React.FC<ContentProps> = ({
   onCopy,
   onSendToIM,
 }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const scrollToBottom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, []);
+
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+    scrollToBottom();
+
+    // Run again in the next frame and a short delay to absorb layout changes.
+    const rafId = window.requestAnimationFrame(scrollToBottom);
+    const timerId = window.setTimeout(scrollToBottom, 80);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timerId);
+    };
+  }, [messages, scrollToBottom]);
 
   if (isLoading) {
     return (
@@ -63,7 +75,6 @@ export const Content: React.FC<ContentProps> = ({
             onSendToIM={onSendToIM}
           />
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

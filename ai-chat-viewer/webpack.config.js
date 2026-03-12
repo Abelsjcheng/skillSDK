@@ -7,6 +7,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'js/bundle.[contenthash].js',
+    assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
     clean: true,
   },
   resolve: {
@@ -60,6 +61,12 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         {
+          from: '**/*.js',
+          context: path.resolve(__dirname, 'public'),
+          to: 'js/[path][name][ext]',
+          noErrorOnMissing: true,
+        },
+        {
           from: '.wecode/plugin.json',
           to: 'plugin.json',
           noErrorOnMissing: true,
@@ -68,7 +75,7 @@ module.exports = {
     }),
   ],
   optimization: {
-    minimize: false,
+    minimize: true,
     usedExports: true,
     splitChunks: {
       chunks: 'all',
@@ -88,7 +95,7 @@ module.exports = {
     hot: true,
     historyApiFallback: true,
   },
-  devtool: "source-map",
+  devtool: false,
   performance: {
     hints: false,
   },

@@ -52,3 +52,13 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+// iOS Safari zooms the page when focusing form controls with font-size < 16px.
+// Apply only on iOS-like WebKit environments to prevent focus zoom.
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
