@@ -904,7 +904,7 @@ we码调用
 
 注册会话监听器，用于接收 WebSocket 推送的完整事件流、错误信息和连接关闭事件。该接口独立于消息发送操作，支持在任何时机注册监听器，SDK 会确保不会因调用时序问题遗漏消息。
 
-同一个 `welinkSessionId` 只允许注册一次监听；若已注册，再次注册会返回错误。
+同一个 `welinkSessionId` 只允许注册一次监听；若已注册，再次注册不做任何处理，仍返回 `status: success`。
 
 SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，覆盖以下事件：
 
@@ -930,7 +930,7 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 ### 接口名
 
 ```typescript
-registerSessionListener(params: RegisterSessionListenerParams): void
+registerSessionListener(params: RegisterSessionListenerParams): RegisterSessionListenerResult
 ```
 
 ### 入参
@@ -941,6 +941,12 @@ registerSessionListener(params: RegisterSessionListenerParams): void
 | onMessage | function | 是 | 消息回调函数，接收 `StreamMessage` |
 | onError | function | 否 | 错误回调函数，接收错误信息 |
 | onClose | function | 否 | 连接关闭回调函数 |
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 操作结果，固定为 `success` |
 
 ### SessionListener 类型定义
 
@@ -965,7 +971,7 @@ interface SessionError {
 ### 实现方法
 
 1. SDK 内部维护每个会话唯一监听器（`onMessage`/`onError`/`onClose`）记录
-2. 同一 `welinkSessionId` 仅允许注册一次；重复注册返回错误
+2. 同一 `welinkSessionId` 仅允许注册一次；重复注册不做任何处理并返回 `status: success`
 3. 若 WebSocket 已建立，则监听器立即生效
 4. 若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
 5. 连接错误时触发 `onError`
@@ -976,7 +982,6 @@ interface SessionError {
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 `welinkSessionId` 或 `onMessage` |
-| 4011 | 监听器已存在 | 同一个 `welinkSessionId` 已注册监听器，不允许重复注册 |
 | 4000 | 会话不存在 | 指定的会话 ID 不存在 |
 
 ### 组合调用场景
@@ -988,6 +993,7 @@ interface SessionError {
 ### 注意事项
 
 - 回调注册是异步安全的，可在任何时机调用
+- 同一个 `welinkSessionId` 重复注册时，SDK 不做任何处理并返回 `status: success`
 - 如需替换监听器，需先调用 `unregisterSessionListener({ welinkSessionId })` 清理后再注册
 
 ### 调用示例
@@ -1051,11 +1057,12 @@ we码调用
 移除已注册的会话监听器。当监听器不再需要接收消息时调用，例如小程序关闭或页面销毁。
 
 该接口只需要 `welinkSessionId`，SDK 会移除该会话下当前已注册的 `onMessage` / `onError` / `onClose` 全部监听。
+该接口仅移除监听器，不会执行关闭 WebSocket 连接操作。
 
 ### 接口名
 
 ```typescript
-unregisterSessionListener(params: UnregisterSessionListenerParams): void
+unregisterSessionListener(params: UnregisterSessionListenerParams): UnregisterSessionListenerResult
 ```
 
 ### 入参
@@ -1064,10 +1071,16 @@ unregisterSessionListener(params: UnregisterSessionListenerParams): void
 |--------|------|------|------|
 | welinkSessionId | number | 是 | 会话 ID |
 
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 操作结果，固定为 `success` |
+
 ### 实现方法
 
 1. 根据 `welinkSessionId` 移除该会话已注册的全部监听器（`onMessage` / `onError` / `onClose`）
-2. 如果移除后该会话无剩余监听器，且 SDK 配置为自动断开，则关闭 WebSocket 连接
+2. 不执行 WebSocket 连接关闭操作；连接生命周期由 `closeSkill` 独立管理
 
 ### 错误处理
 
@@ -1433,7 +1446,7 @@ try {
 | onError | function | 否 | 错误回调 |
 | onClose | function | 否 | 连接关闭回调 |
 
-> 约束：同一个 `welinkSessionId` 只允许注册一次。
+> 约束：同一个 `welinkSessionId` 只允许注册一次；重复注册不做任何处理并返回 `status: success`。
 
 ### UnregisterSessionListenerParams
 
@@ -1706,6 +1719,18 @@ try {
 |------|------|------|
 | welinkSessionId | number | 会话 ID |
 | status | string | 中止结果，成功时为 `aborted` |
+
+### RegisterSessionListenerResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 操作结果，固定为 `success` |
+
+### UnregisterSessionListenerResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 操作结果，固定为 `success` |
 
 ### CloseSkillResult
 
