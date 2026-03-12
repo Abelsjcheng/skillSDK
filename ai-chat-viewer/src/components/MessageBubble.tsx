@@ -34,7 +34,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onCopy,
   onSendToIM,
 }) => {
-  const isUser = message.role === 'user';
+  const normalizedRole = String(message.role ?? '').trim().toLowerCase();
+  const isUser = normalizedRole === 'user';
 
   const markdownComponents: Components = useMemo(
     () => ({
@@ -134,7 +135,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (message.role === 'assistant' || message.role === 'tool') {
+    if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
       return (
         <>
           <ReactMarkdown
@@ -156,7 +157,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       <div className="message-content">
         {!isUser && (
           <div className="message-role-label">
-            {roleLabels[message.role] ?? message.role}
+            {roleLabels[normalizedRole] ?? message.role}
           </div>
         )}
         {renderContent()}

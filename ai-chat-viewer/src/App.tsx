@@ -27,10 +27,23 @@ function genId(): string {
   return `msg_${Date.now()}_${nextMsgId++}`;
 }
 
+function normalizeRole(role: unknown): Message['role'] {
+  const normalized = String(role ?? '').trim().toLowerCase();
+  if (
+    normalized === 'user' ||
+    normalized === 'assistant' ||
+    normalized === 'system' ||
+    normalized === 'tool'
+  ) {
+    return normalized;
+  }
+  return 'assistant';
+}
+
 function sessionMessageToMessage(sm: SessionMessage): Message {
   return {
     id: String(sm.id),
-    role: sm.role,
+    role: normalizeRole(sm.role),
     content: sm.content,
     timestamp: new Date(sm.createdAt).getTime(),
     isStreaming: false,
@@ -217,7 +230,7 @@ function App() {
           if (msg.messages && msg.messages.length > 0) {
             const snapshotMessages: Message[] = msg.messages.map((sm) => ({
               id: sm.id,
-              role: sm.role as Message['role'],
+              role: normalizeRole(sm.role),
               content: sm.content,
               timestamp: sm.createdAt ? new Date(sm.createdAt).getTime() : Date.now(),
               isStreaming: false,
@@ -248,7 +261,7 @@ function App() {
             streamingMsgIdRef.current = id;
             const streamingMsg: Message = {
               id,
-              role: (msg.role as Message['role']) ?? 'assistant',
+              role: normalizeRole(msg.role),
               content: '',
               timestamp: Date.now(),
               isStreaming: true,
