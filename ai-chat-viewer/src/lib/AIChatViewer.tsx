@@ -71,7 +71,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
   const [sessionStatus, setSessionStatus] = React.useState<SessionStatus>('idle');
   const [footerMode, setFooterMode] = React.useState<FooterMode>('generate');
   const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
 
   const assemblerRef = React.useRef(new StreamAssembler());
   const streamingMsgIdRef = React.useRef<string | null>(null);
@@ -159,14 +158,14 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
 
         case 'session.error':
           setSessionStatus('error');
-          setError(msg.error ?? '会话错误');
+          console.error(msg.error ?? '会话错误');
           setFooterMode('generate');
           awaitingFinalResultRef.current = false;
           finalizeStreamingMessage();
           break;
 
         case 'error':
-          setError(msg.error ?? '未知错误');
+          console.error(msg.error ?? '未知错误');
           setFooterMode('generate');
           awaitingFinalResultRef.current = false;
           break;
@@ -207,8 +206,9 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
         hw.registerSessionListener({
           welinkSessionId,
           onMessage: handleMessage,
-          onError: (err: { errorCode: number; errorMessage: string }) =>
-            setError(`${err.errorCode}: ${err.errorMessage}`),
+          onError: (err: { errorCode: number; errorMessage: string }) => {
+            console.error('Session listener error:', `${err.errorCode}: ${err.errorMessage}`);
+          },
         });
         listenerRegisteredRef.current = true;
       }
@@ -227,7 +227,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
   const handleGenerate = React.useCallback(async (content: string) => {
     if (!welinkSessionId || !hw || !content.trim()) return;
 
-    setError(null);
     setSessionStatus('busy');
     setFooterMode('generating');
     awaitingFinalResultRef.current = true;
@@ -240,14 +239,13 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
       awaitingFinalResultRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
-      setError(err instanceof Error ? err.message : '发送消息失败');
+      console.error('发送消息失败:', err);
     }
   }, [welinkSessionId, hw]);
 
   const handleStop = React.useCallback(async () => {
     if (!welinkSessionId || !hw) return;
 
-    setError(null);
     awaitingFinalResultRef.current = false;
     setFooterMode('regenerate');
 
@@ -258,7 +256,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
     } catch (err) {
       console.error('Failed to stop skill:', err);
       setFooterMode('generating');
-      setError('停止生成失败');
     }
   }, [welinkSessionId, hw, finalizeStreamingMessage]);
 
@@ -266,11 +263,10 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
     if (!welinkSessionId || !hw) return;
 
     if (typeof hw.regenerateAnswer !== 'function') {
-      setError('当前环境不支持重新生成');
+      console.error('当前环境不支持重新生成');
       return;
     }
 
-    setError(null);
     setSessionStatus('busy');
     setFooterMode('generating');
     awaitingFinalResultRef.current = true;
@@ -281,7 +277,7 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
       awaitingFinalResultRef.current = false;
       setSessionStatus('idle');
       setFooterMode('regenerate');
-      setError(err instanceof Error ? err.message : '重新生成失败');
+      console.error('重新生成失败:', err);
     }
   }, [welinkSessionId, hw]);
 
@@ -289,8 +285,8 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
     if (!welinkSessionId || !hw) return;
     try {
       await hw.sendMessageToIM({ welinkSessionId });
-    } catch {
-      setError('发送到IM失败');
+    } catch (err) {
+      console.error('发送到IM失败:', err);
     }
   }, [welinkSessionId, hw]);
 
@@ -323,12 +319,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
   return (
     <div className="ai-chat-viewer-container">
       <Header onMinimize={handleMinimize} onClose={handleClose} />
-      {error && (
-        <div className="error-banner">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}>✕</button>
-        </div>
-      )}
       <Content
         messages={messages}
         welinkSessionId={welinkSessionId}

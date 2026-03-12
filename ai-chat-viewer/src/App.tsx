@@ -61,7 +61,6 @@ function App() {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
   const [footerMode, setFooterMode] = useState<FooterMode>('generate');
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -96,7 +95,7 @@ function App() {
     if (sessionId) {
       setWelinkSessionId(sessionId);
     } else {
-      setError('缺少 welinkSessionId 参数');
+      console.error('缺少 welinkSessionId 参数');
       setIsLoading(false);
     }
   }, []);
@@ -195,14 +194,14 @@ function App() {
 
         case 'session.error':
           setSessionStatus('error');
-          setError(msg.error ?? '会话错误');
+          console.error(msg.error ?? '会话错误');
           setFooterMode('generate');
           awaitingFinalResultRef.current = false;
           finalizeStreamingMessage();
           break;
 
         case 'error':
-          setError(msg.error ?? '未知错误');
+          console.error(msg.error ?? '未知错误');
           setFooterMode('generate');
           awaitingFinalResultRef.current = false;
           break;
@@ -272,8 +271,7 @@ function App() {
     };
 
     onErrorRef.current = (err) => {
-      console.error('Session listener error:', err);
-      setError(`${err.errorCode}: ${err.errorMessage}`);
+      console.error('Session listener error:', `${err.errorCode}: ${err.errorMessage}`);
     };
 
     onCloseRef.current = (reason) => {
@@ -285,28 +283,12 @@ function App() {
       setIsLoading(false);
 
       if (!listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
-        const ws = new WebSocket('ws://localhost:8001/ws/skill/stream')
-        ws.onopen = () => {
-          console.log('onopen');
-        }
-        ws.onmessage = (event) => {
-          const msg = JSON.parse(event.data)
-          console.log('onmessage', msg);
-
-          onMessageRef.current?.(msg)
-        }
-        ws.onclose = (event) => {
-          console.log('onclose', event);
-        }
-        ws.onerror = (err) => {
-          console.log('onerror', err);
-        }
-        // registerSessionListener({
-        //   welinkSessionId,
-        //   onMessage: onMessageRef.current,
-        //   onError: onErrorRef.current ?? undefined,
-        //   onClose: onCloseRef.current ?? undefined,
-        // });
+        registerSessionListener({
+          welinkSessionId,
+          onMessage: onMessageRef.current,
+          onError: onErrorRef.current ?? undefined,
+          onClose: onCloseRef.current ?? undefined,
+        });
         listenerRegisteredRef.current = true;
       }
     };
@@ -329,7 +311,6 @@ function App() {
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
 
-    setError(null);
     setSessionStatus('busy');
     setFooterMode('generating');
     awaitingFinalResultRef.current = true;
@@ -343,23 +324,21 @@ function App() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      // await sendMessageApi({
-      //   welinkSessionId,
-      //   content: content.trim(),
-      // });
+      await sendMessageApi({
+        welinkSessionId,
+        content: content.trim(),
+      });
     } catch (err) {
       awaitingFinalResultRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
-      const message = err instanceof Error ? err.message : '发送消息失败';
-      setError(message);
+      console.error('发送消息失败:', err);
     }
   }, [welinkSessionId]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
 
-    setError(null);
     awaitingFinalResultRef.current = false;
     setFooterMode('regenerate');
 
@@ -370,14 +349,12 @@ function App() {
     } catch (err) {
       console.error('Failed to stop skill:', err);
       setFooterMode('generating');
-      setError('停止生成失败');
     }
   }, [welinkSessionId, finalizeStreamingMessage]);
 
   const handleRegenerate = useCallback(async () => {
     if (!welinkSessionId) return;
 
-    setError(null);
     setSessionStatus('busy');
     setFooterMode('generating');
     awaitingFinalResultRef.current = true;
@@ -388,8 +365,7 @@ function App() {
       awaitingFinalResultRef.current = false;
       setSessionStatus('idle');
       setFooterMode('regenerate');
-      const message = err instanceof Error ? err.message : '重新生成失败';
-      setError(message);
+      console.error('重新生成失败:', err);
     }
   }, [welinkSessionId]);
 
@@ -402,7 +378,6 @@ function App() {
       showToast('已发送到IM');
     } catch (err) {
       console.error('Failed to send to IM:', err);
-      setError('发送到IM失败');
     }
   }, [welinkSessionId]);
 
@@ -455,12 +430,6 @@ function App() {
           onClose={handleClose}
         />
       </div>
-      {error && (
-        <div className="error-banner">
-          {error}
-          <button onClick={() => setError(null)}>✕</button>
-        </div>
-      )}
       <div className="content-wrapper">
         <Content
           messages={messages}

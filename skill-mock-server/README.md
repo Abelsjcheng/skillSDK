@@ -69,6 +69,7 @@ set PORT=9000 && npm start
 - `step.start`, `step.done`
 - `session.status`, `session.title`, `session.error`
 - `agent.online`, `agent.offline`
+- `error`
 - `snapshot`, `streaming`
 
 ## 5. 快速联调示例
@@ -123,6 +124,9 @@ curl -X POST "http://localhost:8088/api/skill/sessions/1/send-to-im" ^
 - 包含 `权限` / `permission` / `bash`：触发权限请求
 - 包含 `选择` / `question`：触发 question 事件
 - 包含 `文件` / `file` / `图片`：触发 file 事件
+- 包含 `tool error` / `工具失败` / `执行失败`：触发 `tool.update` 的 `status=error` 与 `error` 字段
+- 包含 `session error` / `会话错误`：触发 `session.error`
+- 包含 `ws error` / `system error` / `gateway`：触发 `error`
 
 ## 7. 说明
 
