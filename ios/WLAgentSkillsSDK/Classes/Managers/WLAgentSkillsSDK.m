@@ -362,23 +362,25 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
     return;
   }
 
-  [[WLAgentSkillsWebSocketManager sharedManager] addListenerForSessionId:params.welinkSessionId
-                                                                onMessage:params.onMessage
-                                                                  onError:params.onError
-                                                                  onClose:params.onClose];
+  BOOL added = [[WLAgentSkillsWebSocketManager sharedManager] addListenerForSessionId:params.welinkSessionId
+                                                                             onMessage:params.onMessage
+                                                                               onError:params.onError
+                                                                               onClose:params.onClose];
+  if (!added && params.onError != nil) {
+    WLAgentSkillsSessionError *error = [[WLAgentSkillsSessionError alloc] initWithCode:@"4011"
+                                                                                message:@"Listener already exists for current welinkSessionId"];
+    params.onError(error);
+  }
 }
 
 #pragma mark - 10. unregisterSessionListener
 
 - (void)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params {
-  if (params == nil || params.welinkSessionId == nil || params.onMessage == nil) {
+  if (params == nil || params.welinkSessionId == nil) {
     return;
   }
 
-  [[WLAgentSkillsWebSocketManager sharedManager] removeListenerForSessionId:params.welinkSessionId
-                                                                   onMessage:params.onMessage
-                                                                     onError:params.onError
-                                                                     onClose:params.onClose];
+  [[WLAgentSkillsWebSocketManager sharedManager] removeListenerForSessionId:params.welinkSessionId];
 }
 
 #pragma mark - 11. sendMessage

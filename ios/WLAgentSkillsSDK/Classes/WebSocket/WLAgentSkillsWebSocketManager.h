@@ -25,15 +25,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)connectIfNeeded;
 - (void)disconnect;
 
-- (void)addListenerForSessionId:(NSNumber *)welinkSessionId
+- (BOOL)addListenerForSessionId:(NSNumber *)welinkSessionId
                       onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
                         onError:(nullable WLAgentSkillsSessionErrorCallback)onError
                         onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
 
-- (void)removeListenerForSessionId:(NSNumber *)welinkSessionId
-                         onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
-                           onError:(nullable WLAgentSkillsSessionErrorCallback)onError
-                           onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
+- (BOOL)removeListenerForSessionId:(NSNumber *)welinkSessionId;
 
 - (void)removeAllListenersForSessionId:(NSNumber *)welinkSessionId;
 - (BOOL)hasListenerForSessionId:(NSNumber *)welinkSessionId;

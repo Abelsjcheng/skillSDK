@@ -85,9 +85,6 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsUnregisterSessionListenerParams : NSObject
 @property (nonatomic, strong) NSNumber *welinkSessionId;
-@property (nonatomic, copy) WLAgentSkillsSessionMessageCallback onMessage;
-@property (nonatomic, copy, nullable) WLAgentSkillsSessionErrorCallback onError;
-@property (nonatomic, copy, nullable) WLAgentSkillsSessionCloseCallback onClose;
 @end
 
 @interface WLAgentSkillsSendMessageParams : NSObject

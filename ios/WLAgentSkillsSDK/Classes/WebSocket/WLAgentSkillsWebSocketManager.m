@@ -19,7 +19,7 @@
 @interface WLAgentSkillsWebSocketManager () <SRWebSocketDelegate>
 
 @property (nonatomic, strong, nullable) SRWebSocket *webSocket;
-@property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray<WLAgentSkillsSocketListener *> *> *listeners;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSocketListener *> *listeners;
 @property (nonatomic, assign, readwrite) BOOL isConnected;
 @property (nonatomic, assign) BOOL isConnecting;
 
@@ -77,12 +77,12 @@
   }
 }
 
-- (void)addListenerForSessionId:(NSNumber *)welinkSessionId
+- (BOOL)addListenerForSessionId:(NSNumber *)welinkSessionId
                       onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
                         onError:(nullable WLAgentSkillsSessionErrorCallback)onError
                         onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
   if (welinkSessionId == nil || onMessage == nil) {
-    return;
+    return NO;
   }
 
   NSString *key = welinkSessionId.stringValue;
@@ -92,54 +92,32 @@
   listener.onClose = onClose;
 
   @synchronized(self) {
-    NSMutableArray<WLAgentSkillsSocketListener *> *listeners = self.listeners[key];
-    if (listeners == nil) {
-      listeners = [NSMutableArray array];
-      self.listeners[key] = listeners;
+    if (self.listeners[key] != nil) {
+      return NO;
     }
-    [listeners addObject:listener];
+    self.listeners[key] = listener;
   }
 
   [self connectIfNeeded];
+  return YES;
 }
 
-- (void)removeListenerForSessionId:(NSNumber *)welinkSessionId
-                         onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
-                           onError:(nullable WLAgentSkillsSessionErrorCallback)onError
-                           onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
-  if (welinkSessionId == nil || onMessage == nil) {
-    return;
+- (BOOL)removeListenerForSessionId:(NSNumber *)welinkSessionId {
+  if (welinkSessionId == nil) {
+    return NO;
   }
 
   NSString *key = welinkSessionId.stringValue;
   @synchronized(self) {
-    NSMutableArray<WLAgentSkillsSocketListener *> *listeners = self.listeners[key];
-    if (listeners.count == 0) {
-      return;
+    if (self.listeners[key] == nil) {
+      return NO;
     }
-
-    NSIndexSet *indexes = [listeners indexesOfObjectsPassingTest:^BOOL(WLAgentSkillsSocketListener *obj, NSUInteger idx, BOOL *stop) {
-      BOOL onMessageEqual = (obj.onMessage == onMessage);
-      if (!onMessageEqual) {
-        return NO;
-      }
-      BOOL onErrorEqual = (onError == nil) || (obj.onError == onError);
-      BOOL onCloseEqual = (onClose == nil) || (obj.onClose == onClose);
-      return onErrorEqual && onCloseEqual;
-    }];
-
-    if (indexes.count > 0) {
-      [listeners removeObjectsAtIndexes:indexes];
-    }
-
-    if (listeners.count == 0) {
-      [self.listeners removeObjectForKey:key];
-    }
-
+    [self.listeners removeObjectForKey:key];
     if (self.listeners.count == 0) {
       [self disconnect];
     }
   }
+  return YES;
 }
 
 - (void)removeAllListenersForSessionId:(NSNumber *)welinkSessionId {
@@ -160,7 +138,7 @@
     return NO;
   }
   @synchronized(self) {
-    return self.listeners[welinkSessionId.stringValue].count > 0;
+    return self.listeners[welinkSessionId.stringValue] != nil;
   }
 }
 
@@ -246,15 +224,13 @@
     return;
   }
 
-  NSArray<WLAgentSkillsSocketListener *> *listeners = nil;
+  WLAgentSkillsSocketListener *listener = nil;
   @synchronized(self) {
-    listeners = [self.listeners[sessionKey] copy];
+    listener = self.listeners[sessionKey];
   }
 
-  for (WLAgentSkillsSocketListener *listener in listeners) {
-    if (listener.onMessage != nil) {
-      listener.onMessage(streamMessage);
-    }
+  if (listener.onMessage != nil) {
+    listener.onMessage(streamMessage);
   }
 }
 
@@ -281,8 +257,8 @@
 - (NSArray<WLAgentSkillsSocketListener *> *)flattenedListeners {
   NSMutableArray<WLAgentSkillsSocketListener *> *result = [NSMutableArray array];
   @synchronized(self) {
-    for (NSArray<WLAgentSkillsSocketListener *> *value in self.listeners.allValues) {
-      [result addObjectsFromArray:value];
+    for (WLAgentSkillsSocketListener *value in self.listeners.allValues) {
+      [result addObject:value];
     }
   }
   return result;

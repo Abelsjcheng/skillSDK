@@ -147,7 +147,7 @@ p.size = @50;
 ```
 
 ### 9) `registerSessionListener:`
-注册会话监听器。
+注册会话监听器。同一个 `welinkSessionId` 只允许注册一次，重复注册会返回 `4011`（通过 `onError` 回调）。
 
 ```objective-c
 WLAgentSkillsRegisterSessionListenerParams *p = [WLAgentSkillsRegisterSessionListenerParams new];
@@ -159,14 +159,11 @@ p.onClose = ^(NSString *reason) {};
 ```
 
 ### 10) `unregisterSessionListener:`
-移除监听器，需使用同一组 block 引用。
+按 `welinkSessionId` 移除该会话下当前注册的全部监听回调。
 
 ```objective-c
 WLAgentSkillsUnregisterSessionListenerParams *p = [WLAgentSkillsUnregisterSessionListenerParams new];
 p.welinkSessionId = sessionId;
-p.onMessage = onMessage;
-p.onError = onError;
-p.onClose = onClose;
 [sdk unregisterSessionListener:p];
 ```
 
