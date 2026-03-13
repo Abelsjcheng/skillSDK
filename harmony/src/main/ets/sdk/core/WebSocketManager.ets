@@ -110,19 +110,16 @@ export class WebSocketManager {
     this.socket = null;
   }
 
-  registerSessionListener(sessionId: number, listener: SessionListener): void {
-    const key = String(sessionId);
+  registerSessionListener(sessionId: string, listener: SessionListener): void {
+    const key = sessionId;
     if (this.listenersBySession.has(key)) {
       return;
     }
     this.listenersBySession.set(key, listener);
   }
 
-  unregisterSessionListener(sessionId: number): void {
-    const key = String(sessionId);
-    if (!this.listenersBySession.has(key)) {
-      throw new SkillSdkException(4006, 'Listener does not exist');
-    }
+  unregisterSessionListener(sessionId: string): void {
+    const key = sessionId;
     this.listenersBySession.delete(key);
   }
 

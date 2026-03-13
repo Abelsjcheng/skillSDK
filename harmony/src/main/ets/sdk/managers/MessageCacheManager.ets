@@ -12,15 +12,16 @@ import {
 
 interface LocalMessageState {
   messageSeq: number;
-  messageId?: number | string;
+  messageId?: string;
   stableMessageId?: string;
   role: MessageRole;
   content: string;
   parts: SessionMessagePart[];
   createdAt: string;
   final: boolean;
-  userId: string | null;
   contentType?: MessageContentType;
+  seq?: number | null;
+  meta?: Record<string, any> | null;
 }
 
 interface SessionCacheState {
@@ -37,7 +38,7 @@ interface SessionCacheState {
  */
 export class MessageCacheManager {
   private readonly logger: Logger;
-  private readonly sessions: Map<number, SessionCacheState> = new Map();
+  private readonly sessions: Map<string, SessionCacheState> = new Map();
 
   constructor(enableLog: boolean = false) {
     this.logger = new Logger('MessageCacheManager', enableLog);
@@ -47,7 +48,7 @@ export class MessageCacheManager {
     this.logger.setEnabled(enable);
   }
 
-  clearSession(sessionId: number): void {
+  clearSession(sessionId: string): void {
     this.sessions.delete(sessionId);
   }
 
@@ -55,7 +56,7 @@ export class MessageCacheManager {
     this.sessions.clear();
   }
 
-  cacheHistory(sessionId: number, messages: SessionMessage[]): void {
+  cacheHistory(sessionId: string, messages: SessionMessage[]): void {
     const state = this.ensureSessionState(sessionId);
     for (const message of messages) {
       const normalized = this.normalizeHistoryMessage(message);
@@ -67,22 +68,24 @@ export class MessageCacheManager {
   cacheSentUserMessage(result: SendMessageResult): void {
     const state = this.ensureSessionState(result.welinkSessionId);
     const local: LocalMessageState = {
-      messageSeq: result.messageSeq,
+      messageSeq: result.messageSeq ?? this.resolveFallbackMessageSeq(state),
       messageId: result.id,
       role: 'user',
-      content: result.content,
-      parts: [],
+      content: result.content ?? '',
+      parts: (result.parts ?? []).map((part: SessionMessagePart) => this.normalizePart(part)),
       createdAt: result.createdAt,
       final: true,
-      userId: result.userId
+      contentType: result.contentType ?? undefined,
+      seq: result.seq ?? undefined,
+      meta: result.meta ?? undefined
     };
     state.bySeq.set(local.messageSeq, local);
     this.indexMessageIds(state, local);
   }
 
   onStreamMessage(message: StreamMessage): void {
-    const sessionId = this.parseSessionId(message.welinkSessionId);
-    if (sessionId === null) {
+    const sessionId = message.welinkSessionId?.trim();
+    if (sessionId === undefined || sessionId === '') {
       return;
     }
     const state = this.ensureSessionState(sessionId);
@@ -116,7 +119,7 @@ export class MessageCacheManager {
     this.indexMessageIds(state, local, message.messageId);
   }
 
-  getLastUserMessageContent(sessionId: number): string | null {
+  getLastUserMessageContent(sessionId: string): string | null {
     const state = this.sessions.get(sessionId);
     if (state === undefined) {
       return null;
@@ -131,7 +134,7 @@ export class MessageCacheManager {
     return null;
   }
 
-  getFinalMessageContent(sessionId: number, messageId?: string): string | null {
+  getFinalMessageContent(sessionId: string, messageId?: string): string | null {
     const state = this.sessions.get(sessionId);
     if (state === undefined) {
       return null;
@@ -159,7 +162,35 @@ export class MessageCacheManager {
     return null;
   }
 
-  mergeWithHistory(sessionId: number, history: SessionMessage[]): SessionMessage[] {
+  hasMessage(sessionId: string, messageId: string): boolean {
+    if (messageId.trim() === '') {
+      return false;
+    }
+    const state = this.sessions.get(sessionId);
+    if (state === undefined) {
+      return false;
+    }
+    const seq = this.resolveMessageSeqById(state, messageId);
+    return seq !== null && state.bySeq.has(seq);
+  }
+
+  isMessageCompleted(sessionId: string, messageId: string): boolean {
+    if (messageId.trim() === '') {
+      return false;
+    }
+    const state = this.sessions.get(sessionId);
+    if (state === undefined) {
+      return false;
+    }
+    const seq = this.resolveMessageSeqById(state, messageId);
+    if (seq === null) {
+      return false;
+    }
+    const target = state.bySeq.get(seq);
+    return target !== undefined && target.final;
+  }
+
+  mergeWithHistory(sessionId: string, history: SessionMessage[]): SessionMessage[] {
     const state = this.sessions.get(sessionId);
     if (state === undefined) {
       return history;
@@ -167,7 +198,7 @@ export class MessageCacheManager {
 
     const historyBySeq = new Map<number, SessionMessage>();
     for (const message of history) {
-      historyBySeq.set(message.messageSeq, message);
+      historyBySeq.set(message.messageSeq ?? 0, message);
     }
 
     const merged: SessionMessage[] = [...history];
@@ -179,22 +210,23 @@ export class MessageCacheManager {
       merged.push(this.toSessionMessage(sessionId, local));
     }
 
-    merged.sort((a: SessionMessage, b: SessionMessage) => a.messageSeq - b.messageSeq);
+    merged.sort((a: SessionMessage, b: SessionMessage) => this.compareSessionMessages(a, b));
     return merged;
   }
 
   private normalizeHistoryMessage(message: SessionMessage): LocalMessageState {
     return {
-      messageSeq: message.messageSeq,
+      messageSeq: message.messageSeq ?? 0,
       messageId: message.id,
-      stableMessageId: typeof message.id === 'string' ? message.id : undefined,
+      stableMessageId: message.id,
       role: message.role,
-      content: message.content,
+      content: message.content ?? '',
       parts: (message.parts ?? []).map((part: SessionMessagePart) => this.normalizePart(part)),
       createdAt: message.createdAt,
       final: true,
-      userId: message.userId,
-      contentType: message.contentType
+      contentType: message.contentType ?? undefined,
+      seq: message.seq ?? undefined,
+      meta: message.meta ?? undefined
     };
   }
 
@@ -208,20 +240,21 @@ export class MessageCacheManager {
   private applySnapshot(state: SessionCacheState, messages: StreamSnapshotMessage[]): void {
     for (const item of messages) {
       const stableMessageId = item.id.trim();
-      const messageId: number | string = stableMessageId !== ''
+      const messageId: string = stableMessageId !== ''
         ? stableMessageId
-        : this.allocateFallbackMessageId(state, item.seq);
+        : String(this.allocateFallbackMessageId(state, item.messageSeq ?? item.seq ?? undefined));
       const local: LocalMessageState = {
-        messageSeq: item.seq,
+        messageSeq: item.messageSeq ?? item.seq ?? this.resolveFallbackMessageSeq(state),
         messageId: messageId,
         stableMessageId: stableMessageId !== '' ? stableMessageId : undefined,
         role: item.role,
-        content: item.content,
+        content: item.content ?? '',
         parts: (item.parts ?? []).map((part: SessionMessagePart) => this.normalizePart(part)),
         createdAt: item.createdAt ?? new Date().toISOString(),
         final: true,
-        userId: item.role === 'user' ? '' : null,
-        contentType: item.contentType
+        contentType: item.contentType ?? undefined,
+        seq: item.seq ?? undefined,
+        meta: item.meta ?? undefined
       };
       state.bySeq.set(local.messageSeq, local);
       this.indexMessageIds(state, local, stableMessageId !== '' ? stableMessageId : undefined);
@@ -248,7 +281,7 @@ export class MessageCacheManager {
     }
     if (message.messageId !== undefined && message.messageId.trim() !== '') {
       local.stableMessageId = message.messageId.trim();
-      if (typeof local.messageId === 'number' || local.messageId === undefined) {
+      if (local.messageId === undefined || local.messageId.trim() === '') {
         local.messageId = local.stableMessageId;
       }
     }
@@ -304,37 +337,42 @@ export class MessageCacheManager {
 
   private upsertToolPart(local: LocalMessageState, message: StreamMessage): void {
     const part = this.ensurePart(local, message.partId, message.partSeq, 'tool');
-    part.toolName = message.toolName;
-    part.toolCallId = message.toolCallId;
-    part.toolStatus = message.status;
-    part.toolInput = message.input;
-    part.toolOutput = message.output;
-    part.toolError = message.error;
+    part.toolName = message.toolName ?? undefined;
+    part.toolCallId = message.toolCallId ?? undefined;
+    part.status = message.status ?? undefined;
+    part.input = message.input ?? undefined;
+    part.output = message.output ?? undefined;
+    part.error = message.error ?? undefined;
+    part.title = message.title ?? undefined;
   }
 
   private upsertQuestionPart(local: LocalMessageState, message: StreamMessage): void {
     const part = this.ensurePart(local, message.partId, message.partSeq, 'question');
-    part.toolName = message.toolName;
-    part.toolCallId = message.toolCallId;
-    part.toolStatus = message.status;
-    part.header = message.header;
-    part.question = message.question;
-    part.options = message.options;
+    part.toolName = message.toolName ?? undefined;
+    part.toolCallId = message.toolCallId ?? undefined;
+    part.status = message.status ?? undefined;
+    part.input = message.input ?? undefined;
+    part.header = message.header ?? undefined;
+    part.question = message.question ?? undefined;
+    part.options = message.options ?? undefined;
   }
 
   private upsertPermissionPart(local: LocalMessageState, message: StreamMessage): void {
     const part = this.ensurePart(local, message.partId, message.partSeq, 'permission');
-    part.permissionId = message.permissionId;
-    part.permissionResponse = message.response;
-    part.toolName = message.permType;
-    part.content = message.title;
+    part.permissionId = message.permissionId ?? undefined;
+    part.response = message.response ?? undefined;
+    part.permType = message.permType ?? undefined;
+    part.metadata = message.metadata ?? undefined;
+    part.title = message.title ?? undefined;
+    part.content = message.title ?? undefined;
+    part.status = message.status ?? undefined;
   }
 
   private upsertFilePart(local: LocalMessageState, message: StreamMessage): void {
     const part = this.ensurePart(local, message.partId, message.partSeq, 'file');
-    part.fileName = message.fileName;
-    part.fileUrl = message.fileUrl;
-    part.fileMime = message.fileMime;
+    part.fileName = message.fileName ?? undefined;
+    part.fileUrl = message.fileUrl ?? undefined;
+    part.fileMime = message.fileMime ?? undefined;
   }
 
   private ensurePart(
@@ -385,13 +423,18 @@ export class MessageCacheManager {
       content: part.content,
       toolName: part.toolName,
       toolCallId: part.toolCallId,
-      toolStatus: part.status,
-      toolInput: part.input,
-      toolOutput: part.output,
+      status: part.status,
+      input: part.input,
+      output: part.output,
+      error: part.error,
+      title: part.title,
       header: part.header,
       question: part.question,
       options: part.options,
       permissionId: part.permissionId,
+      permType: part.permType,
+      metadata: part.metadata,
+      response: part.response,
       fileName: part.fileName,
       fileUrl: part.fileUrl,
       fileMime: part.fileMime
@@ -419,33 +462,65 @@ export class MessageCacheManager {
 
   private toOrderedMessages(state: SessionCacheState): LocalMessageState[] {
     const ordered = Array.from(state.bySeq.values());
-    ordered.sort((a: LocalMessageState, b: LocalMessageState) => a.messageSeq - b.messageSeq);
+    ordered.sort((a: LocalMessageState, b: LocalMessageState) => this.compareLocalMessages(a, b));
     return ordered;
   }
 
-  private toSessionMessage(sessionId: number, local: LocalMessageState): SessionMessage {
+  private compareLocalMessages(left: LocalMessageState, right: LocalMessageState): number {
+    const seqCompare = this.compareNullableNumber(left.seq, right.seq);
+    if (seqCompare !== 0) {
+      return seqCompare;
+    }
+    const messageSeqCompare = this.compareNullableNumber(left.messageSeq, right.messageSeq);
+    if (messageSeqCompare !== 0) {
+      return messageSeqCompare;
+    }
+    const leftId = left.messageId ?? '';
+    const rightId = right.messageId ?? '';
+    return leftId.localeCompare(rightId);
+  }
+
+  private compareSessionMessages(left: SessionMessage, right: SessionMessage): number {
+    const seqCompare = this.compareNullableNumber(left.seq, right.seq);
+    if (seqCompare !== 0) {
+      return seqCompare;
+    }
+    const messageSeqCompare = this.compareNullableNumber(left.messageSeq, right.messageSeq);
+    if (messageSeqCompare !== 0) {
+      return messageSeqCompare;
+    }
+    return (left.id ?? '').localeCompare(right.id ?? '');
+  }
+
+  private compareNullableNumber(left?: number | null, right?: number | null): number {
+    if (left !== null && left !== undefined && right !== null && right !== undefined) {
+      return left - right;
+    }
+    if (left !== null && left !== undefined) {
+      return -1;
+    }
+    if (right !== null && right !== undefined) {
+      return 1;
+    }
+    return 0;
+  }
+
+  private toSessionMessage(sessionId: string, local: LocalMessageState): SessionMessage {
     return {
-      id: local.messageId ?? local.messageSeq,
+      id: local.messageId ?? String(local.messageSeq),
+      seq: local.seq ?? null,
       welinkSessionId: sessionId,
-      userId: local.userId,
       role: local.role,
       content: local.content,
       messageSeq: local.messageSeq,
       parts: local.parts,
       createdAt: local.createdAt,
-      contentType: local.contentType
+      contentType: local.contentType,
+      meta: local.meta ?? null
     };
   }
 
-  private parseSessionId(welinkSessionId: string): number | null {
-    const parsed = Number(welinkSessionId);
-    if (Number.isNaN(parsed)) {
-      return null;
-    }
-    return parsed;
-  }
-
-  private ensureSessionState(sessionId: number): SessionCacheState {
+  private ensureSessionState(sessionId: string): SessionCacheState {
     let state = this.sessions.get(sessionId);
     if (state !== undefined) {
       return state;
@@ -469,7 +544,7 @@ export class MessageCacheManager {
     if (existing !== undefined) {
       if (messageId !== undefined && messageId.trim() !== '') {
         existing.stableMessageId = messageId.trim();
-        if (typeof existing.messageId === 'number' || existing.messageId === undefined) {
+        if (existing.messageId === undefined || existing.messageId.trim() === '') {
           existing.messageId = existing.stableMessageId;
         }
       }
@@ -479,14 +554,13 @@ export class MessageCacheManager {
     const stableMessageId = messageId !== undefined && messageId.trim() !== '' ? messageId.trim() : undefined;
     const created: LocalMessageState = {
       messageSeq,
-      messageId: stableMessageId ?? this.allocateFallbackMessageId(state, messageSeq),
+      messageId: stableMessageId ?? String(this.allocateFallbackMessageId(state, messageSeq)),
       stableMessageId,
       role,
       content: '',
       parts: [],
       createdAt: new Date().toISOString(),
-      final: false,
-      userId: role === 'user' ? '' : null
+      final: false
     };
     state.bySeq.set(messageSeq, created);
     return created;
@@ -499,6 +573,12 @@ export class MessageCacheManager {
     const id = state.nextSyntheticMessageId;
     state.nextSyntheticMessageId -= 1;
     return id;
+  }
+
+  private resolveFallbackMessageSeq(state: SessionCacheState): number {
+    const id = state.nextSyntheticMessageId;
+    state.nextSyntheticMessageId -= 1;
+    return Math.abs(id);
   }
 
   private indexMessageIds(

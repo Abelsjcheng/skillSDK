@@ -118,32 +118,42 @@ export class SkillSDK {
   async createSession(params: CreateSessionParams): Promise<SkillSession> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireString(params.ak, 'ak');
       Validator.requireString(params.imGroupId, 'imGroupId');
+      const ak = this.normalizeOptionalString(params.ak);
+      const imGroupId = params.imGroupId.trim();
+      if (params.ak !== undefined && ak === undefined) {
+        throw new SkillSdkException(1000, 'ak must be a non-empty string');
+      }
       if (params.title !== undefined) {
         Validator.requireString(params.title, 'title');
       }
 
       await this.wsManager.connect();
 
-      const sessionList = await this.httpClient.get<PageResult<SkillSession>>('/api/skill/sessions', {
-        imGroupId: params.imGroupId,
-        ak: params.ak,
+      const query: Record<string, string | number> = {
+        imGroupId,
         status: 'ACTIVE',
         page: 0,
         size: 20
-      });
-
+      };
+      if (ak !== undefined) {
+        query.ak = ak;
+      }
+      const sessionList = await this.httpClient.get<PageResult<SkillSession>>('/api/skill/sessions', query);
       const active = sessionList.content ?? [];
       if (active.length > 0) {
         return this.pickLatestSession(active);
       }
 
-      return await this.httpClient.post<SkillSession>('/api/skill/sessions', {
-        ak: params.ak,
-        title: params.title,
-        imGroupId: params.imGroupId
-      });
+      const payload: Record<string, unknown> = {};
+      if (ak !== undefined) {
+        payload.ak = ak;
+      }
+      if (params.title !== undefined) {
+        payload.title = params.title;
+      }
+      payload.imGroupId = imGroupId;
+      return await this.httpClient.post<SkillSession>('/api/skill/sessions', payload);
     } catch (error) {
       throw this.normalizeError('createSession', error);
     }
@@ -170,7 +180,7 @@ export class SkillSDK {
   async stopSkill(params: StopSkillParams): Promise<StopSkillResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
 
       const result = await this.httpClient.post<StopSkillResult>(
         `/api/skill/sessions/${params.welinkSessionId}/abort`
@@ -185,7 +195,7 @@ export class SkillSDK {
   // 4. onSessionStatusChange
   onSessionStatusChange(params: OnSessionStatusChangeParams): void {
     Validator.requireObject(params, 'params');
-    Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+    Validator.requireString(params.welinkSessionId, 'welinkSessionId');
     Validator.requireFunction(params.callback, 'callback');
     this.sessionStateManager.register(params);
   }
@@ -201,7 +211,7 @@ export class SkillSDK {
   async regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
 
       let content = this.messageCacheManager.getLastUserMessageContent(params.welinkSessionId);
       if (content === null) {
@@ -227,28 +237,53 @@ export class SkillSDK {
   async sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       if (params.messageId !== undefined) {
-        Validator.requireString(params.messageId, 'messageId');
+        if (typeof params.messageId !== 'string') {
+          throw new SkillSdkException(1000, 'messageId must be a string');
+        }
       }
       if (params.chatId !== undefined) {
-        Validator.requireString(params.chatId, 'chatId');
+        if (typeof params.chatId !== 'string') {
+          throw new SkillSdkException(1000, 'chatId must be a string');
+        }
       }
+      const messageId = this.normalizeOptionalString(params.messageId);
+      const chatId = this.normalizeOptionalString(params.chatId);
 
       const content = this.messageCacheManager.getFinalMessageContent(
         params.welinkSessionId,
-        params.messageId
+        messageId
       );
-      if (content === null) {
-        if (params.messageId !== undefined) {
-          throw new SkillSdkException(4003, 'Message not found in local cache');
+      let resolvedContent = content;
+      if (resolvedContent === null) {
+        const history = await this.fetchServerMessages(params.welinkSessionId, 0, 100);
+        this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
+        resolvedContent = this.messageCacheManager.getFinalMessageContent(
+          params.welinkSessionId,
+          messageId
+        );
+      }
+      if (resolvedContent === null) {
+        if (messageId !== undefined) {
+          const exists = this.messageCacheManager.hasMessage(params.welinkSessionId, messageId);
+          if (!exists) {
+            throw new SkillSdkException(4003, 'Message not found in local cache');
+          }
+          const completed = this.messageCacheManager.isMessageCompleted(
+            params.welinkSessionId,
+            messageId
+          );
+          if (!completed) {
+            throw new SkillSdkException(4004, 'Message is not completed');
+          }
         }
         throw new SkillSdkException(4005, 'No finalized message in local cache');
       }
 
-      const payload: Record<string, unknown> = { content };
-      if (params.chatId !== undefined) {
-        payload.chatId = params.chatId;
+      const payload: Record<string, unknown> = { content: resolvedContent };
+      if (chatId !== undefined) {
+        payload.chatId = chatId;
       }
 
       let raw: Record<string, unknown>;
@@ -276,7 +311,7 @@ export class SkillSDK {
   async getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMessage>> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.optionalNonNegativeInteger(params.page, 'page');
       Validator.optionalPositiveInteger(params.size, 'size');
 
@@ -292,7 +327,7 @@ export class SkillSDK {
       return {
         ...history,
         content: mergedContent,
-        total: Math.max(history.total, mergedContent.length)
+        totalElements: Math.max(history.totalElements, mergedContent.length)
       };
     } catch (error) {
       throw this.normalizeError('getSessionMessage', error);
@@ -302,7 +337,7 @@ export class SkillSDK {
   // 9. registerSessionListener
   registerSessionListener(params: RegisterSessionListenerParams): RegisterSessionListenerResult {
     Validator.requireObject(params, 'params');
-    Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+    Validator.requireString(params.welinkSessionId, 'welinkSessionId');
     Validator.requireFunction(params.onMessage, 'onMessage');
     Validator.optionalFunction(params.onError, 'onError');
     Validator.optionalFunction(params.onClose, 'onClose');
@@ -318,7 +353,7 @@ export class SkillSDK {
   // 10. unregisterSessionListener
   unregisterSessionListener(params: UnregisterSessionListenerParams): UnregisterSessionListenerResult {
     Validator.requireObject(params, 'params');
-    Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+    Validator.requireString(params.welinkSessionId, 'welinkSessionId');
     this.wsManager.unregisterSessionListener(params.welinkSessionId);
     return { status: 'success' };
   }
@@ -327,7 +362,7 @@ export class SkillSDK {
   async sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.requireString(params.content, 'content');
       if (params.toolCallId !== undefined) {
         Validator.requireString(params.toolCallId, 'toolCallId');
@@ -353,7 +388,7 @@ export class SkillSDK {
       this.messageCacheManager.cacheSentUserMessage(result);
       return result;
     } catch (error) {
-      if (typeof params.welinkSessionId === 'number' && Number.isFinite(params.welinkSessionId)) {
+      if (typeof params.welinkSessionId === 'string' && params.welinkSessionId.trim() !== '') {
         this.sessionStateManager.clearSendMessageTrigger(params.welinkSessionId);
       }
       throw this.normalizeError('sendMessage', error);
@@ -364,7 +399,7 @@ export class SkillSDK {
   async replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requirePositiveInteger(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.requireString(params.permId, 'permId');
       Validator.requireEnum(params.response, ['once', 'always', 'reject'], 'response');
 
@@ -402,7 +437,7 @@ export class SkillSDK {
   }
 
   private async fetchServerMessages(
-    welinkSessionId: number,
+    welinkSessionId: string,
     page: number,
     size: number
   ): Promise<PageResult<SessionMessage>> {
@@ -412,9 +447,9 @@ export class SkillSDK {
     );
     return {
       content: result.content ?? [],
-      page: result.page ?? page,
+      number: result.number ?? page,
       size: result.size ?? size,
-      total: result.total ?? 0
+      totalElements: result.totalElements ?? 0
     };
   }
 
@@ -433,37 +468,18 @@ export class SkillSDK {
       const data = (typeof payload.data === 'object' && payload.data !== null)
         ? (payload.data as Record<string, unknown>)
         : {};
-      let status: 'success' | 'failed' = 'success';
-      if ('status' in data) {
-        status = String(data.status) === 'success' ? 'success' : 'failed';
-      } else if ('success' in data) {
-        status = Boolean(data.success) ? 'success' : 'failed';
-      }
-      return {
-        status,
-        chatId: data.chatId === undefined ? undefined : String(data.chatId),
-        contentLength:
-          data.contentLength === undefined ? undefined : Number(data.contentLength)
-      };
+      const success = ('success' in data)
+        ? Boolean(data.success)
+        : ('status' in data ? String(data.status) === 'success' : true);
+      return { success };
     }
 
     if ('success' in payload) {
-      const success = Boolean(payload.success);
-      return {
-        status: success ? 'success' : 'failed',
-        chatId: payload.chatId === undefined ? undefined : String(payload.chatId),
-        contentLength:
-          payload.contentLength === undefined ? undefined : Number(payload.contentLength)
-      };
+      return { success: Boolean(payload.success) };
     }
 
     if ('status' in payload) {
-      return {
-        status: String(payload.status) === 'success' ? 'success' : 'failed',
-        chatId: payload.chatId === undefined ? undefined : String(payload.chatId),
-        contentLength:
-          payload.contentLength === undefined ? undefined : Number(payload.contentLength)
-      };
+      return { success: String(payload.status) === 'success' };
     }
 
     throw new SkillSdkException(7000, 'Unexpected send-to-im response schema');
@@ -476,6 +492,14 @@ export class SkillSDK {
       return right - left;
     });
     return sorted[0];
+  }
+
+  private normalizeOptionalString(value?: string): string | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
   }
 
   private validateConfig(config: SkillSDKConfig): void {

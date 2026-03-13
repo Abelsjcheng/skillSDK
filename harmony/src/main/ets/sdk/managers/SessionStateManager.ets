@@ -13,9 +13,9 @@ import {
  */
 export class SessionStateManager {
   private readonly logger: Logger;
-  private readonly callbacks: Map<number, (result: SessionStatusResult) => void> = new Map();
-  private readonly statuses: Map<number, SessionStatus> = new Map();
-  private readonly sendMessageTriggeredBySession: Map<number, boolean> = new Map();
+  private readonly callbacks: Map<string, (result: SessionStatusResult) => void> = new Map();
+  private readonly statuses: Map<string, SessionStatus> = new Map();
+  private readonly sendMessageTriggeredBySession: Map<string, boolean> = new Map();
 
   constructor(enableLog: boolean = false) {
     this.logger = new Logger('SessionStateManager', enableLog);
@@ -29,7 +29,7 @@ export class SessionStateManager {
     this.callbacks.set(params.welinkSessionId, params.callback);
   }
 
-  clearSession(sessionId: number): void {
+  clearSession(sessionId: string): void {
     this.callbacks.delete(sessionId);
     this.statuses.delete(sessionId);
     this.sendMessageTriggeredBySession.delete(sessionId);
@@ -41,15 +41,15 @@ export class SessionStateManager {
     this.sendMessageTriggeredBySession.clear();
   }
 
-  markSendMessageTriggered(sessionId: number): void {
+  markSendMessageTriggered(sessionId: string): void {
     this.sendMessageTriggeredBySession.set(sessionId, true);
   }
 
-  clearSendMessageTrigger(sessionId: number): void {
+  clearSendMessageTrigger(sessionId: string): void {
     this.sendMessageTriggeredBySession.set(sessionId, false);
   }
 
-  forceStatus(sessionId: number, status: SessionStatus): void {
+  forceStatus(sessionId: string, status: SessionStatus): void {
     if (status === SessionStatus.STOPPED) {
       this.sendMessageTriggeredBySession.set(sessionId, false);
     }
@@ -57,8 +57,8 @@ export class SessionStateManager {
   }
 
   onStreamMessage(message: StreamMessage): void {
-    const sessionId = this.parseSessionId(message.welinkSessionId);
-    if (sessionId === null) {
+    const sessionId = message.welinkSessionId?.trim();
+    if (sessionId === undefined || sessionId === '') {
       return;
     }
 
@@ -69,7 +69,7 @@ export class SessionStateManager {
     this.emitIfChanged(sessionId, mapped);
   }
 
-  private mapStatus(sessionId: number, message: StreamMessage): SessionStatus | null {
+  private mapStatus(sessionId: string, message: StreamMessage): SessionStatus | null {
     if (message.type !== 'session.status') {
       return null;
     }
@@ -89,7 +89,7 @@ export class SessionStateManager {
     return null;
   }
 
-  private emitIfChanged(sessionId: number, status: SessionStatus): void {
+  private emitIfChanged(sessionId: string, status: SessionStatus): void {
     const current = this.statuses.get(sessionId);
     if (current === status) {
       return;
@@ -106,13 +106,5 @@ export class SessionStateManager {
     } catch (error) {
       this.logger.warn(`status callback failed for session=${sessionId}`, error);
     }
-  }
-
-  private parseSessionId(welinkSessionId: string): number | null {
-    const parsed = Number(welinkSessionId);
-    if (Number.isNaN(parsed)) {
-      return null;
-    }
-    return parsed;
   }
 }
