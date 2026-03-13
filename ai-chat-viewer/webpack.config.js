@@ -1,6 +1,11 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const {
+  RESOLVE_EXTENSIONS,
+  BASE_OPTIMIZATION,
+  createModuleRules,
+} = require('./webpack.shared');
 
 module.exports = {
   entry: './src/index.tsx',
@@ -11,47 +16,10 @@ module.exports = {
     clean: true,
   },
   resolve: {
-    extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    extensions: RESOLVE_EXTENSIONS,
   },
   module: {
-    rules: [
-      {
-        test: /\.(ts|tsx|js|jsx)$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: [
-              ['@babel/preset-env', { 
-                targets: '>0.5%, last 2 versions, not dead',
-                useBuiltIns: 'usage',
-                corejs: '3.36',
-              }],
-              ['@babel/preset-react', { runtime: 'automatic' }],
-              '@babel/preset-typescript',
-            ],
-            plugins: ['@babel/plugin-proposal-optional-chaining'],
-          },
-        },
-      },
-      {
-        test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
-      },
-      {
-        test: /\.less$/,
-        use: ['style-loader', 'css-loader', 'less-loader'],
-      },
-      {
-        test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
-        type: 'asset',
-        parser: {
-          dataUrlCondition: {
-            maxSize: 8192,
-          },
-        },
-      },
-    ],
+    rules: createModuleRules({ includePolyfills: true }),
   },
   plugins: [
     new HtmlWebpackPlugin({
@@ -75,8 +43,7 @@ module.exports = {
     }),
   ],
   optimization: {
-    minimize: true,
-    usedExports: true,
+    ...BASE_OPTIMIZATION,
     splitChunks: {
       chunks: 'all',
       cacheGroups: {

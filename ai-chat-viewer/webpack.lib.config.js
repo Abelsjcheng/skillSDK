@@ -1,4 +1,9 @@
 const path = require('path');
+const {
+  RESOLVE_EXTENSIONS,
+  BASE_OPTIMIZATION,
+  createModuleRules,
+} = require('./webpack.shared');
 
 module.exports = {
   mode: 'production',
@@ -13,52 +18,16 @@ module.exports = {
     },
     globalObject: 'this',
     clean: true,
+    publicPath: ''
   },
   resolve: {
-    extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    extensions: RESOLVE_EXTENSIONS,
   },
   module: {
-    rules: [
-      {
-        test: /\.(ts|tsx|js|jsx)$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: [
-              ['@babel/preset-env', { targets: '>0.5%, last 2 versions, not dead' }],
-              ['@babel/preset-react', { runtime: 'automatic' }],
-              '@babel/preset-typescript',
-            ],
-            plugins: ['@babel/plugin-proposal-optional-chaining'],
-          },
-        },
-      },
-      {
-        test: /\.css$/,
-        use: [
-          { loader: 'style-loader', options: { insert: 'head', injectType: 'singletonStyleTag' } },
-          'css-loader',
-        ],
-      },
-      {
-        test: /\.less$/,
-        use: [
-          { loader: 'style-loader', options: { insert: 'head', injectType: 'singletonStyleTag' } },
-          'css-loader',
-          'less-loader',
-        ],
-      },
-      {
-        test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
-        type: 'asset',
-        parser: { dataUrlCondition: { maxSize: 8192 } },
-      },
-    ],
+    rules: createModuleRules({ singletonStyleTag: true }),
   },
   optimization: {
-    minimize: true,
-    usedExports: true,
+    ...BASE_OPTIMIZATION,
   },
   devtool: false,
   performance: { hints: false },
