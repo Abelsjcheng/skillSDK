@@ -5,6 +5,9 @@ import { Footer, FooterMode } from './components/Footer';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   Message,
+  MessagePart,
+  MessagePartSnapshot,
+  SessionMessagePart,
   StreamMessage,
   SessionMessage,
   SessionStatus,
@@ -44,6 +47,38 @@ function normalizeRole(role: unknown): Message['role'] {
   return 'assistant';
 }
 
+type RawPart = SessionMessagePart | MessagePartSnapshot;
+
+function mapRawPartToMessagePart(rawPart: RawPart, isStreaming: boolean): MessagePart {
+  return {
+    partId: rawPart.partId,
+    type: rawPart.type,
+    content: rawPart.content ?? '',
+    isStreaming,
+    toolName: rawPart.toolName ?? undefined,
+    toolCallId: rawPart.toolCallId ?? undefined,
+    status: (rawPart.status as 'pending' | 'running' | 'completed' | 'error' | undefined) ?? undefined,
+    input: rawPart.input ?? undefined,
+    output: rawPart.output ?? undefined,
+    title: rawPart.title ?? undefined,
+    header: rawPart.header ?? undefined,
+    question: rawPart.question ?? undefined,
+    options: rawPart.options ?? undefined,
+    permissionId: rawPart.permissionId ?? undefined,
+    permType: rawPart.permType ?? undefined,
+    fileName: rawPart.fileName ?? undefined,
+    fileUrl: rawPart.fileUrl ?? undefined,
+    fileMime: rawPart.fileMime ?? undefined,
+  };
+}
+
+function mapRawParts(rawParts: RawPart[] | null | undefined, isStreaming: boolean): MessagePart[] | undefined {
+  if (!rawParts || rawParts.length === 0) {
+    return undefined;
+  }
+  return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming));
+}
+
 function sessionMessageToMessage(sm: SessionMessage): Message {
   return {
     id: String(sm.id),
@@ -51,26 +86,7 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
     content: sm.content ?? '',
     timestamp: new Date(sm.createdAt).getTime(),
     isStreaming: false,
-    parts: sm.parts?.map((p) => ({
-      partId: p.partId,
-      type: p.type,
-      content: p.content ?? '',
-      isStreaming: false,
-      toolName: p.toolName ?? undefined,
-      toolCallId: p.toolCallId ?? undefined,
-      status: (p.status as 'pending' | 'running' | 'completed' | 'error' | undefined) ?? undefined,
-      input: p.input ?? undefined,
-      output: p.output ?? undefined,
-      title: p.title ?? undefined,
-      header: p.header ?? undefined,
-      question: p.question ?? undefined,
-      options: p.options ?? undefined,
-      permissionId: p.permissionId ?? undefined,
-      permType: p.permType ?? undefined,
-      fileName: p.fileName ?? undefined,
-      fileUrl: p.fileUrl ?? undefined,
-      fileMime: p.fileMime ?? undefined,
-    })),
+    parts: mapRawParts(sm.parts, false),
   };
 }
 
@@ -260,26 +276,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
               content: sm.content ?? '',
               timestamp: sm.createdAt ? new Date(sm.createdAt).getTime() : Date.now(),
               isStreaming: false,
-              parts: sm.parts?.map((p) => ({
-                partId: p.partId,
-                type: p.type,
-                content: p.content ?? '',
-                isStreaming: false,
-                toolName: p.toolName ?? undefined,
-                toolCallId: p.toolCallId ?? undefined,
-                status: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
-                input: p.input ?? undefined,
-                output: p.output ?? undefined,
-                title: p.title ?? undefined,
-                header: p.header ?? undefined,
-                question: p.question ?? undefined,
-                options: p.options ?? undefined,
-                permissionId: p.permissionId ?? undefined,
-                permType: p.permType ?? undefined,
-                fileName: p.fileName ?? undefined,
-                fileUrl: p.fileUrl ?? undefined,
-                fileMime: p.fileMime ?? undefined,
-              })),
+              parts: mapRawParts(sm.parts, false),
             }));
             setMessages(snapshotMessages);
           }
@@ -296,26 +293,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
               content: '',
               timestamp: Date.now(),
               isStreaming: true,
-              parts: msg.parts.map((p) => ({
-                partId: p.partId,
-                type: p.type,
-                content: p.content ?? '',
-                isStreaming: true,
-                toolName: p.toolName ?? undefined,
-                toolCallId: p.toolCallId ?? undefined,
-                status: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
-                input: p.input ?? undefined,
-                output: p.output ?? undefined,
-                title: p.title ?? undefined,
-                header: p.header ?? undefined,
-                question: p.question ?? undefined,
-                options: p.options ?? undefined,
-                permissionId: p.permissionId ?? undefined,
-                permType: p.permType ?? undefined,
-                fileName: p.fileName ?? undefined,
-                fileUrl: p.fileUrl ?? undefined,
-                fileMime: p.fileMime ?? undefined,
-              })),
+              parts: mapRawParts(msg.parts, true),
             };
             setMessages((prev) => [...prev, streamingMsg]);
           }
