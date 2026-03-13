@@ -51,8 +51,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
-* Singleton SDK exposing 13 public APIs from SkillClientSdkInterfaceV1.md.
-*/
+ * Singleton SDK exposing 13 public APIs from SkillClientSdkInterfaceV1.md.
+ */
 public final class SkillSDK {
     private static volatile SkillSDK instance;
 

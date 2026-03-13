@@ -24,8 +24,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
-* Local cache for server history + websocket streaming events.
-*/
+ * Local cache for server history + websocket streaming events.
+ */
 public class StreamingMessageCache {
     private static final Comparator<SessionMessagePart> PART_COMPARATOR =
             Comparator.comparing((SessionMessagePart p) -> p.getPartSeq() == null ? Integer.MAX_VALUE : p.getPartSeq());
@@ -643,91 +643,92 @@ public class StreamingMessageCache {
 
     private void mergePart(@NonNull SessionMessage message, @NonNull Map<String, SessionMessagePart> currentParts,
             @NonNull SessionMessagePart incoming) {
-        SessionMessagePart target = null;
+        SessionMessagePart target = resolveMergeTarget(message, currentParts, incoming);
+        mergePartFields(target, incoming);
+
+        String partId = target.getPartId();
+        if (partId != null && !partId.isEmpty()) {
+            currentParts.put(partId, target);
+        }
+    }
+
+    @NonNull
+    private SessionMessagePart resolveMergeTarget(@NonNull SessionMessage message,
+            @NonNull Map<String, SessionMessagePart> currentParts, @NonNull SessionMessagePart incoming) {
         String incomingPartId = incoming.getPartId();
         if (incomingPartId != null && !incomingPartId.isEmpty()) {
-            target = currentParts.get(incomingPartId);
-        }
-        if (target == null && incoming.getPartSeq() != null) {
-            for (SessionMessagePart existing : ensureParts(message)) {
-                if (incoming.getPartSeq().equals(existing.getPartSeq())) {
-                    target = existing;
-                    break;
-                }
+            SessionMessagePart byId = currentParts.get(incomingPartId);
+            if (byId != null) {
+                return byId;
             }
         }
-        if (target == null) {
-            target = new SessionMessagePart();
-            ensureParts(message).add(target);
+
+        SessionMessagePart bySeq = findPartBySeq(message, incoming.getPartSeq());
+        if (bySeq != null) {
+            return bySeq;
         }
 
-        if (incoming.getPartId() != null) {
-            target.setPartId(incoming.getPartId());
-        }
-        if (incoming.getPartSeq() != null) {
-            target.setPartSeq(incoming.getPartSeq());
-        }
-        if (incoming.getType() != null) {
-            target.setType(incoming.getType());
-        }
-        if (incoming.getContent() != null) {
-            target.setContent(incoming.getContent());
-        }
-        if (incoming.getToolName() != null) {
-            target.setToolName(incoming.getToolName());
-        }
-        if (incoming.getToolCallId() != null) {
-            target.setToolCallId(incoming.getToolCallId());
-        }
-        if (incoming.getStatus() != null) {
-            target.setStatus(incoming.getStatus());
-        }
-        if (incoming.getInput() != null && !incoming.getInput().isJsonNull()) {
-            target.setInput(incoming.getInput());
-        }
-        if (incoming.getOutput() != null) {
-            target.setOutput(incoming.getOutput());
-        }
-        if (incoming.getError() != null) {
-            target.setError(incoming.getError());
-        }
-        if (incoming.getTitle() != null) {
-            target.setTitle(incoming.getTitle());
-        }
-        if (incoming.getQuestion() != null) {
-            target.setQuestion(incoming.getQuestion());
-        }
-        if (incoming.getHeader() != null) {
-            target.setHeader(incoming.getHeader());
-        }
-        if (incoming.getOptions() != null && !incoming.getOptions().isEmpty()) {
-            target.setOptions(incoming.getOptions());
-        }
-        if (incoming.getPermissionId() != null) {
-            target.setPermissionId(incoming.getPermissionId());
-        }
-        if (incoming.getPermType() != null) {
-            target.setPermType(incoming.getPermType());
-        }
-        if (incoming.getMetadata() != null) {
-            target.setMetadata(incoming.getMetadata());
-        }
-        if (incoming.getResponse() != null) {
-            target.setResponse(incoming.getResponse());
-        }
-        if (incoming.getFileName() != null) {
-            target.setFileName(incoming.getFileName());
-        }
-        if (incoming.getFileUrl() != null) {
-            target.setFileUrl(incoming.getFileUrl());
-        }
-        if (incoming.getFileMime() != null) {
-            target.setFileMime(incoming.getFileMime());
-        }
+        SessionMessagePart created = new SessionMessagePart();
+        ensureParts(message).add(created);
+        return created;
+    }
 
-        if (target.getPartId() != null && !target.getPartId().isEmpty()) {
-            currentParts.put(target.getPartId(), target);
+    @Nullable
+    private SessionMessagePart findPartBySeq(@NonNull SessionMessage message, @Nullable Integer partSeq) {
+        if (partSeq == null) {
+            return null;
         }
+        for (SessionMessagePart existing : ensureParts(message)) {
+            if (partSeq.equals(existing.getPartSeq())) {
+                return existing;
+            }
+        }
+        return null;
+    }
+
+    private void mergePartFields(@NonNull SessionMessagePart target, @NonNull SessionMessagePart incoming) {
+        target.setPartId(mergeNullableValue(target.getPartId(), incoming.getPartId()));
+        target.setPartSeq(mergeNullableValue(target.getPartSeq(), incoming.getPartSeq()));
+        target.setType(mergeNullableValue(target.getType(), incoming.getType()));
+        target.setContent(mergeNullableValue(target.getContent(), incoming.getContent()));
+        target.setToolName(mergeNullableValue(target.getToolName(), incoming.getToolName()));
+        target.setToolCallId(mergeNullableValue(target.getToolCallId(), incoming.getToolCallId()));
+        target.setStatus(mergeNullableValue(target.getStatus(), incoming.getStatus()));
+        target.setInput(mergeNonNullJson(target.getInput(), incoming.getInput()));
+        target.setOutput(mergeNullableValue(target.getOutput(), incoming.getOutput()));
+        target.setError(mergeNullableValue(target.getError(), incoming.getError()));
+        target.setTitle(mergeNullableValue(target.getTitle(), incoming.getTitle()));
+        target.setQuestion(mergeNullableValue(target.getQuestion(), incoming.getQuestion()));
+        target.setHeader(mergeNullableValue(target.getHeader(), incoming.getHeader()));
+        target.setOptions(mergeNonEmptyList(target.getOptions(), incoming.getOptions()));
+        target.setPermissionId(mergeNullableValue(target.getPermissionId(), incoming.getPermissionId()));
+        target.setPermType(mergeNullableValue(target.getPermType(), incoming.getPermType()));
+        target.setMetadata(mergeNullableValue(target.getMetadata(), incoming.getMetadata()));
+        target.setResponse(mergeNullableValue(target.getResponse(), incoming.getResponse()));
+        target.setFileName(mergeNullableValue(target.getFileName(), incoming.getFileName()));
+        target.setFileUrl(mergeNullableValue(target.getFileUrl(), incoming.getFileUrl()));
+        target.setFileMime(mergeNullableValue(target.getFileMime(), incoming.getFileMime()));
+    }
+
+    @Nullable
+    private static <T> T mergeNullableValue(@Nullable T current, @Nullable T incoming) {
+        return incoming != null ? incoming : current;
+    }
+
+    @Nullable
+    private static JsonElement mergeNonNullJson(@Nullable JsonElement current, @Nullable JsonElement incoming) {
+        if (incoming == null || incoming.isJsonNull()) {
+            return current;
+        }
+        return incoming;
+    }
+
+    @Nullable
+    private static List<String> mergeNonEmptyList(@Nullable List<String> current, @Nullable List<String> incoming) {
+        if (incoming == null || incoming.isEmpty()) {
+            return current;
+        }
+        return incoming;
     }
 
     @Nullable

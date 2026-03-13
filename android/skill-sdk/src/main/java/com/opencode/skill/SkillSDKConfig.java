@@ -8,8 +8,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
-* Skill SDK configuration.
-*/
+ * Skill SDK configuration.
+ */
 public class SkillSDKConfig {
 
     @NonNull

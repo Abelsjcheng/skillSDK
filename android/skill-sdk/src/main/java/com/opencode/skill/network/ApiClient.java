@@ -166,38 +166,11 @@ public class ApiClient {
         executeRaw(request, new SkillCallback<JsonObject>() {
             @Override
             public void onSuccess(@Nullable JsonObject result) {
-                if (result == null) {
-                    callback.onSuccess(new SendMessageToIMResult(false));
-                    return;
+                try {
+                    callback.onSuccess(resolveSendMessageToIMResult(result));
+                } catch (SkillSdkException exception) {
+                    callback.onError(exception);
                 }
-
-                if (result.has("code")) {
-                    int code = result.get("code").getAsInt();
-                    if (code != 0) {
-                        callback.onError(new SkillSdkException(code, getString(result, "errormsg", "Server error")));
-                        return;
-                    }
-
-                    JsonElement data = result.get("data");
-                    if (data != null && data.isJsonObject()) {
-                        JsonObject dataObj = data.getAsJsonObject();
-                        boolean success = true;
-                        if (dataObj.has("success") && dataObj.get("success").isJsonPrimitive()) {
-                            success = dataObj.get("success").getAsBoolean();
-                        } else if (dataObj.has("status") && dataObj.get("status").isJsonPrimitive()) {
-                            success = "success".equalsIgnoreCase(dataObj.get("status").getAsString());
-                        }
-                        callback.onSuccess(new SendMessageToIMResult(success));
-                        return;
-                    }
-
-                    callback.onSuccess(new SendMessageToIMResult(true));
-                    return;
-                }
-
-                boolean success = result.has("success") && result.get("success").isJsonPrimitive()
-                        && result.get("success").getAsBoolean();
-                callback.onSuccess(new SendMessageToIMResult(success));
             }
 
             @Override
@@ -205,6 +178,39 @@ public class ApiClient {
                 callback.onError(error);
             }
         });
+    }
+
+    @NonNull
+    private SendMessageToIMResult resolveSendMessageToIMResult(@Nullable JsonObject result) {
+        if (result == null) {
+            return new SendMessageToIMResult(false);
+        }
+        if (!result.has("code")) {
+            return new SendMessageToIMResult(readBoolean(result, "success", false));
+        }
+
+        int code = result.get("code").getAsInt();
+        if (code != 0) {
+            throw new SkillSdkException(code, getString(result, "errormsg", "Server error"));
+        }
+
+        JsonObject dataObj = readObject(result, "data");
+        if (dataObj == null) {
+            return new SendMessageToIMResult(true);
+        }
+        return new SendMessageToIMResult(resolveSendToImDataSuccess(dataObj));
+    }
+
+    private static boolean resolveSendToImDataSuccess(@NonNull JsonObject dataObj) {
+        Boolean success = readOptionalBoolean(dataObj, "success");
+        if (success != null) {
+            return success;
+        }
+        String status = getString(dataObj, "status", "");
+        if (!status.isEmpty()) {
+            return "success".equalsIgnoreCase(status);
+        }
+        return true;
     }
 
     public synchronized void shutdown() {
@@ -334,6 +340,35 @@ public class ApiClient {
             return value.substring(0, value.length() - 1);
         }
         return value;
+    }
+
+    @Nullable
+    private static JsonObject readObject(@NonNull JsonObject object, @NonNull String key) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            return null;
+        }
+        JsonElement value = object.get(key);
+        if (!value.isJsonObject()) {
+            return null;
+        }
+        return value.getAsJsonObject();
+    }
+
+    private static boolean readBoolean(@NonNull JsonObject object, @NonNull String key, boolean fallback) {
+        Boolean value = readOptionalBoolean(object, key);
+        return value != null ? value : fallback;
+    }
+
+    @Nullable
+    private static Boolean readOptionalBoolean(@NonNull JsonObject object, @NonNull String key) {
+        if (!object.has(key) || object.get(key).isJsonNull() || !object.get(key).isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return object.get(key).getAsBoolean();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @NonNull

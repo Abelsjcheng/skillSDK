@@ -3,8 +3,8 @@ package com.opencode.skill.constant;
 import androidx.annotation.NonNull;
 
 /**
-* SDK exposed session status.
-*/
+ * SDK exposed session status.
+ */
 public enum SessionStatus {
     EXECUTING("executing"),
     STOPPED("stopped"),

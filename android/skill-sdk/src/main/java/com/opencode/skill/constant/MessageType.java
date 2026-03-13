@@ -5,8 +5,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
-* WebSocket event types from service protocol.
-*/
+ * WebSocket event types from service protocol.
+ */
 public final class MessageType {
     public static final String TEXT_DELTA = "text.delta";
     public static final String TEXT_DONE = "text.done";

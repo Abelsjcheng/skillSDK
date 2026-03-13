@@ -4,8 +4,8 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 /**
-* SDK error model (errorCode + errorMessage).
-*/
+ * SDK error model (errorCode + errorMessage).
+ */
 @Keep
 public class SkillSdkException extends RuntimeException {
     private final int errorCode;
