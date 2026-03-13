@@ -1,16 +1,19 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 
 @Keep
 public class UnregisterSessionListenerParams {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
 
-    public UnregisterSessionListenerParams(long welinkSessionId) {
+    public UnregisterSessionListenerParams(@NonNull String welinkSessionId) {
         this.welinkSessionId = welinkSessionId;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 }

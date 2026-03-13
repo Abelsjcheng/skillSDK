@@ -1,27 +1,30 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 @Keep
 public class SendMessageToIMParams {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
     @Nullable
     private final String messageId;
     @Nullable
     private final String chatId;
 
-    public SendMessageToIMParams(long welinkSessionId, @Nullable String messageId) {
+    public SendMessageToIMParams(@NonNull String welinkSessionId, @Nullable String messageId) {
         this(welinkSessionId, messageId, null);
     }
 
-    public SendMessageToIMParams(long welinkSessionId, @Nullable String messageId, @Nullable String chatId) {
+    public SendMessageToIMParams(@NonNull String welinkSessionId, @Nullable String messageId, @Nullable String chatId) {
         this.welinkSessionId = welinkSessionId;
         this.messageId = messageId;
         this.chatId = chatId;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 

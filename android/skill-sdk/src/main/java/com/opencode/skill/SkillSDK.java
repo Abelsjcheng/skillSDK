@@ -64,13 +64,13 @@ public final class SkillSDK {
     private final StreamingMessageCache streamingMessageCache = new StreamingMessageCache();
 
     @NonNull
-    private final Map<Long, CopyOnWriteArrayList<SessionStatusCallback>> sessionStatusCallbacks = new ConcurrentHashMap<>();
+    private final Map<String, CopyOnWriteArrayList<SessionStatusCallback>> sessionStatusCallbacks = new ConcurrentHashMap<>();
     @NonNull
     private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
     @NonNull
-    private final Map<Long, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
+    private final Map<String, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
     @NonNull
-    private final Map<Long, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
 
     @Nullable
     private SkillSDKConfig config;
@@ -127,15 +127,16 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getAk().trim().isEmpty() || params.getImGroupId().trim().isEmpty()) {
-            callback.onError(error(1000, "ak and imGroupId are required"));
+        if (isBlank(params.getImGroupId())) {
+            callback.onError(error(1000, "imGroupId is required"));
             return;
         }
 
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean result) {
-                apiClient.listSessions(params.getImGroupId(), params.getAk(), "ACTIVE", 0, 20,
+                String optionalAk = normalizeOptionalString(params.getAk());
+                apiClient.listSessions(params.getImGroupId(), optionalAk, "ACTIVE", 0, 20,
                         new SkillCallback<PageResult<SkillSession>>() {
                             @Override
                             public void onSuccess(@Nullable PageResult<SkillSession> pageResult) {
@@ -206,7 +207,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getWelinkSessionId() <= 0) {
+        if (isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
@@ -232,7 +233,7 @@ public final class SkillSDK {
     // 4. onSessionStatusChange
     public void onSessionStatusChange(@NonNull OnSessionStatusChangeParams params) {
         ensureInitializedForVoid();
-        if (params.getWelinkSessionId() <= 0 || params.getCallback() == null) {
+        if (isBlank(params.getWelinkSessionId()) || params.getCallback() == null) {
             throw error(1000, "welinkSessionId and callback are required");
         }
         if (!webSocketManager.isConnected()) {
@@ -257,7 +258,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getWelinkSessionId() <= 0) {
+        if (isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
@@ -295,19 +296,10 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getWelinkSessionId() <= 0) {
+        if (isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
-        if (params.getMessageId() != null && params.getMessageId().trim().isEmpty()) {
-            callback.onError(error(1000, "messageId cannot be empty"));
-            return;
-        }
-        if (params.getChatId() != null && params.getChatId().trim().isEmpty()) {
-            callback.onError(error(1000, "chatId cannot be empty"));
-            return;
-        }
-
         tryResolveSendToImContent(params, new SkillCallback<String>() {
             @Override
             public void onSuccess(@Nullable String content) {
@@ -319,7 +311,7 @@ public final class SkillSDK {
                         new SkillCallback<SendMessageToIMResult>() {
                     @Override
                     public void onSuccess(@Nullable SendMessageToIMResult result) {
-                        callback.onSuccess(result == null ? new SendMessageToIMResult("failed", null, null, "Empty response") : result);
+                        callback.onSuccess(result == null ? new SendMessageToIMResult(false) : result);
                     }
 
                     @Override
@@ -343,7 +335,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getWelinkSessionId() <= 0) {
+        if (isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
@@ -369,7 +361,7 @@ public final class SkillSDK {
     // 9. registerSessionListener
     public RegisterSessionListenerResult registerSessionListener(@NonNull RegisterSessionListenerParams params) {
         ensureInitializedForVoid();
-        if (params.getWelinkSessionId() <= 0 || params.getOnMessage() == null) {
+        if (isBlank(params.getWelinkSessionId()) || params.getOnMessage() == null) {
             throw error(1000, "welinkSessionId and onMessage are required");
         }
 
@@ -406,16 +398,14 @@ public final class SkillSDK {
     // 10. unregisterSessionListener
     public UnregisterSessionListenerResult unregisterSessionListener(@NonNull UnregisterSessionListenerParams params) {
         ensureInitializedForVoid();
-        if (params.getWelinkSessionId() <= 0) {
+        if (isBlank(params.getWelinkSessionId())) {
             throw error(1000, "welinkSessionId is required");
         }
 
         ListenerBinding binding = listenerBindings.remove(params.getWelinkSessionId());
-        if (binding == null) {
-            throw error(4006, "Listener does not exist");
+        if (binding != null) {
+            webSocketManager.unregisterListener(params.getWelinkSessionId(), binding.sessionListener);
         }
-
-        webSocketManager.unregisterListener(params.getWelinkSessionId(), binding.sessionListener);
         return new UnregisterSessionListenerResult("success");
     }
 
@@ -425,7 +415,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getWelinkSessionId() <= 0 || params.getContent().trim().isEmpty()) {
+        if (isBlank(params.getWelinkSessionId()) || params.getContent().trim().isEmpty()) {
             callback.onError(error(1000, "welinkSessionId and content are required"));
             return;
         }
@@ -450,7 +440,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getWelinkSessionId() <= 0 || params.getPermId().trim().isEmpty() || params.getResponse().trim().isEmpty()) {
+        if (isBlank(params.getWelinkSessionId()) || params.getPermId().trim().isEmpty() || params.getResponse().trim().isEmpty()) {
             callback.onError(error(1000, "welinkSessionId, permId and response are required"));
             return;
         }
@@ -504,7 +494,7 @@ public final class SkillSDK {
         config = null;
     }
 
-    private void sendMessageInternal(long welinkSessionId, @NonNull String content, @Nullable String toolCallId,
+    private void sendMessageInternal(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,
             @NonNull SkillCallback<SendMessageResult> callback) {
         awaitingExecutingBySession.put(welinkSessionId, Boolean.TRUE);
         apiClient.sendMessage(welinkSessionId, content, toolCallId, new SkillCallback<SendMessageResult>() {
@@ -546,7 +536,7 @@ public final class SkillSDK {
                     return;
                 }
 
-                if (params.getMessageId() != null) {
+                if (!isBlank(params.getMessageId())) {
                     String messageId = params.getMessageId();
                     if (!streamingMessageCache.hasMessage(params.getWelinkSessionId(), messageId)) {
                         callback.onError(error(4003, "Message does not exist"));
@@ -576,7 +566,7 @@ public final class SkillSDK {
     }
 
     private void emitSessionStatusByEvent(@NonNull StreamMessage message) {
-        Long sessionId = parseLong(message.getWelinkSessionId());
+        String sessionId = normalizeOptionalString(message.getWelinkSessionId());
         if (sessionId == null) {
             return;
         }
@@ -587,7 +577,7 @@ public final class SkillSDK {
         emitSessionStatus(sessionId, mapped);
     }
 
-    private void emitSessionStatus(long sessionId, @NonNull SessionStatus status) {
+    private void emitSessionStatus(@NonNull String sessionId, @NonNull SessionStatus status) {
         List<SessionStatusCallback> callbacks = sessionStatusCallbacks.get(sessionId);
         if (callbacks == null || callbacks.isEmpty()) {
             return;
@@ -606,7 +596,7 @@ public final class SkillSDK {
     }
 
     @Nullable
-    private SessionStatus mapStatus(long sessionId, @NonNull StreamMessage message) {
+    private SessionStatus mapStatus(@NonNull String sessionId, @NonNull StreamMessage message) {
         String type = message.getType();
         if (type == null) {
             return null;
@@ -634,12 +624,22 @@ public final class SkillSDK {
         if (sessions == null || sessions.isEmpty()) {
             return null;
         }
+        String expectedAk = normalizeOptionalString(params.getAk());
         return sessions.stream()
                 .filter(session -> "ACTIVE".equalsIgnoreCase(session.getStatus()))
-                .filter(session -> params.getAk().equals(session.getAk()))
+                .filter(session -> expectedAk == null || expectedAk.equals(session.getAk()))
                 .filter(session -> params.getImGroupId().equals(session.getImGroupId()))
                 .max(Comparator.comparing(this::safeUpdatedAt))
                 .orElse(null);
+    }
+
+    @Nullable
+    private static String normalizeOptionalString(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @NonNull
@@ -674,16 +674,8 @@ public final class SkillSDK {
         return "once".equalsIgnoreCase(value) || "always".equalsIgnoreCase(value) || "reject".equalsIgnoreCase(value);
     }
 
-    @Nullable
-    private static Long parseLong(@Nullable String value) {
-        if (value == null || value.isEmpty()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
+    private static boolean isBlank(@Nullable String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static final class ListenerBinding {

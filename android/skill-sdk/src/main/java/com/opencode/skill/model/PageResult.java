@@ -1,4 +1,4 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
@@ -10,9 +10,9 @@ import java.util.List;
 public class PageResult<T> {
     @NonNull
     private List<T> content = new ArrayList<>();
-    private int page;
+    private int number;
     private int size;
-    private long total;
+    private long totalElements;
 
     @NonNull
     public List<T> getContent() {
@@ -23,12 +23,12 @@ public class PageResult<T> {
         this.content = content;
     }
 
-    public int getPage() {
-        return page;
+    public int getNumber() {
+        return number;
     }
 
-    public void setPage(int page) {
-        this.page = page;
+    public void setNumber(int number) {
+        this.number = number;
     }
 
     public int getSize() {
@@ -39,11 +39,31 @@ public class PageResult<T> {
         this.size = size;
     }
 
-    public long getTotal() {
-        return total;
+    public long getTotalElements() {
+        return totalElements;
     }
 
+    public void setTotalElements(long totalElements) {
+        this.totalElements = totalElements;
+    }
+
+    @Deprecated
+    public int getPage() {
+        return number;
+    }
+
+    @Deprecated
+    public void setPage(int page) {
+        this.number = page;
+    }
+
+    @Deprecated
+    public long getTotal() {
+        return totalElements;
+    }
+
+    @Deprecated
     public void setTotal(long total) {
-        this.total = total;
+        this.totalElements = total;
     }
 }

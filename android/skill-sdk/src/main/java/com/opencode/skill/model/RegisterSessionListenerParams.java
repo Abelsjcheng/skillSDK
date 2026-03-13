@@ -1,4 +1,4 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
@@ -10,7 +10,8 @@ import com.opencode.skill.callback.SessionMessageCallback;
 
 @Keep
 public class RegisterSessionListenerParams {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
     @NonNull
     private final SessionMessageCallback onMessage;
     @Nullable
@@ -18,7 +19,7 @@ public class RegisterSessionListenerParams {
     @Nullable
     private final SessionCloseCallback onClose;
 
-    public RegisterSessionListenerParams(long welinkSessionId, @NonNull SessionMessageCallback onMessage,
+    public RegisterSessionListenerParams(@NonNull String welinkSessionId, @NonNull SessionMessageCallback onMessage,
             @Nullable SessionErrorCallback onError, @Nullable SessionCloseCallback onClose) {
         this.welinkSessionId = welinkSessionId;
         this.onMessage = onMessage;
@@ -26,7 +27,8 @@ public class RegisterSessionListenerParams {
         this.onClose = onClose;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 

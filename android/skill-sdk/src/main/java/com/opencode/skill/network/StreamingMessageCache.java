@@ -30,17 +30,24 @@ public class StreamingMessageCache {
     private static final Comparator<SessionMessagePart> PART_COMPARATOR =
             Comparator.comparing((SessionMessagePart p) -> p.getPartSeq() == null ? Integer.MAX_VALUE : p.getPartSeq());
 
-    private static final Comparator<SessionMessage> MESSAGE_COMPARATOR = Comparator
-            .comparingInt(SessionMessage::getMessageSeq)
-            .thenComparing(SessionMessage::getCreatedAt)
-            .thenComparing(SessionMessage::getId);
+    private static final Comparator<SessionMessage> MESSAGE_COMPARATOR = (left, right) -> {
+        int cmp = compareNullableInt(left.getSeq(), right.getSeq());
+        if (cmp != 0) {
+            return cmp;
+        }
+        cmp = compareNullableInt(left.getMessageSeq(), right.getMessageSeq());
+        if (cmp != 0) {
+            return cmp;
+        }
+        return left.getId().compareTo(right.getId());
+    };
 
     @NonNull
     private final Gson gson = new Gson();
     @NonNull
-    private final Map<Long, SessionCache> sessionCaches = new ConcurrentHashMap<>();
+    private final Map<String, SessionCache> sessionCaches = new ConcurrentHashMap<>();
 
-    public void ingestServerMessages(long welinkSessionId, @NonNull List<SessionMessage> messages) {
+    public void ingestServerMessages(@NonNull String welinkSessionId, @NonNull List<SessionMessage> messages) {
         SessionCache cache = sessionCache(welinkSessionId);
         synchronized (cache) {
             for (SessionMessage message : messages) {
@@ -63,15 +70,18 @@ public class StreamingMessageCache {
     public void recordUserMessage(@NonNull SendMessageResult message) {
         SessionCache cache = sessionCache(message.getWelinkSessionId());
         synchronized (cache) {
-            long numericMessageId = message.getId();
+            long numericMessageId = resolveNumericMessageId(cache, message.getId(), message.getMessageSeq());
             CachedMessage cached = cache.byNumericId.computeIfAbsent(numericMessageId, k -> new CachedMessage());
             SessionMessage sessionMessage = cached.message;
-            sessionMessage.setId(String.valueOf(message.getId()));
+            sessionMessage.setId(message.getId());
             sessionMessage.setWelinkSessionId(message.getWelinkSessionId());
-            sessionMessage.setUserId(message.getUserId());
             sessionMessage.setRole(message.getRole());
             sessionMessage.setContent(message.getContent());
+            sessionMessage.setSeq(message.getSeq());
             sessionMessage.setMessageSeq(message.getMessageSeq());
+            sessionMessage.setMeta(message.getMeta());
+            sessionMessage.setContentType(message.getContentType());
+            sessionMessage.setParts(message.getParts());
             sessionMessage.setCreatedAt(message.getCreatedAt());
             cached.completed = true;
             cached.updatedAt = System.currentTimeMillis();
@@ -79,7 +89,7 @@ public class StreamingMessageCache {
     }
 
     @Nullable
-    public String findLastUserMessageContent(long welinkSessionId) {
+    public String findLastUserMessageContent(@NonNull String welinkSessionId) {
         SessionCache cache = sessionCaches.get(welinkSessionId);
         if (cache == null) {
             return null;
@@ -100,8 +110,8 @@ public class StreamingMessageCache {
     }
 
     public void ingestStreamMessage(@NonNull StreamMessage event) {
-        Long sessionId = parseLong(event.getWelinkSessionId());
-        if (sessionId == null) {
+        String sessionId = event.getWelinkSessionId();
+        if (sessionId == null || sessionId.trim().isEmpty()) {
             return;
         }
         SessionCache cache = sessionCache(sessionId);
@@ -132,7 +142,7 @@ public class StreamingMessageCache {
     }
 
     @NonNull
-    public PageResult<SessionMessage> mergeWithLocalCache(long welinkSessionId, int page, int size,
+    public PageResult<SessionMessage> mergeWithLocalCache(@NonNull String welinkSessionId, int page, int size,
             @NonNull PageResult<SessionMessage> serverPage) {
         ingestServerMessages(welinkSessionId, serverPage.getContent());
 
@@ -151,15 +161,15 @@ public class StreamingMessageCache {
         List<SessionMessage> pageContent = from >= merged.size() ? new ArrayList<>() : new ArrayList<>(merged.subList(from, to));
 
         PageResult<SessionMessage> result = new PageResult<>();
-        result.setPage(Math.max(page, 0));
+        result.setNumber(Math.max(page, 0));
         result.setSize(safeSize);
-        result.setTotal(merged.size());
+        result.setTotalElements(merged.size());
         result.setContent(pageContent);
         return result;
     }
 
     @Nullable
-    public String getCompletedMessageContent(long welinkSessionId, @Nullable String messageId) {
+    public String getCompletedMessageContent(@NonNull String welinkSessionId, @Nullable String messageId) {
         SessionCache cache = sessionCaches.get(welinkSessionId);
         if (cache == null) {
             return null;
@@ -190,7 +200,7 @@ public class StreamingMessageCache {
         }
     }
 
-    public boolean hasMessage(long welinkSessionId, @NonNull String messageId) {
+    public boolean hasMessage(@NonNull String welinkSessionId, @NonNull String messageId) {
         if (messageId.trim().isEmpty()) {
             return false;
         }
@@ -204,7 +214,7 @@ public class StreamingMessageCache {
         }
     }
 
-    public boolean isMessageCompleted(long welinkSessionId, @NonNull String messageId) {
+    public boolean isMessageCompleted(@NonNull String welinkSessionId, @NonNull String messageId) {
         if (messageId.trim().isEmpty()) {
             return false;
         }
@@ -222,7 +232,7 @@ public class StreamingMessageCache {
         }
     }
 
-    public void clearSession(long welinkSessionId) {
+    public void clearSession(@NonNull String welinkSessionId) {
         sessionCaches.remove(welinkSessionId);
     }
 
@@ -231,7 +241,7 @@ public class StreamingMessageCache {
     }
 
     @NonNull
-    private SessionCache sessionCache(long sessionId) {
+    private SessionCache sessionCache(@NonNull String sessionId) {
         return sessionCaches.computeIfAbsent(sessionId, key -> new SessionCache());
     }
 
@@ -282,7 +292,7 @@ public class StreamingMessageCache {
     }
 
     @NonNull
-    private CachedMessage getOrCreateCachedMessage(@NonNull SessionCache cache, long welinkSessionId,
+    private CachedMessage getOrCreateCachedMessage(@NonNull SessionCache cache, @NonNull String welinkSessionId,
             @NonNull StreamMessage event) {
         long numericId = resolveNumericMessageId(cache, event.getMessageId(), event.getMessageSeq());
         CachedMessage cached = cache.byNumericId.computeIfAbsent(numericId, key -> new CachedMessage());
@@ -406,13 +416,19 @@ public class StreamingMessageCache {
             target.setToolCallId(event.getToolCallId());
         }
         if (event.getStatus() != null) {
-            target.setToolStatus(event.getStatus());
+            target.setStatus(event.getStatus());
         }
         if (event.getInput() != null) {
-            target.setToolInput(event.getInput());
+            target.setInput(event.getInput());
         }
         if (event.getOutput() != null) {
-            target.setToolOutput(event.getOutput());
+            target.setOutput(event.getOutput());
+        }
+        if (event.getError() != null) {
+            target.setError(event.getError());
+        }
+        if (event.getTitle() != null) {
+            target.setTitle(event.getTitle());
         }
         if (event.getQuestion() != null) {
             target.setQuestion(event.getQuestion());
@@ -425,6 +441,15 @@ public class StreamingMessageCache {
         }
         if (event.getPermissionId() != null) {
             target.setPermissionId(event.getPermissionId());
+        }
+        if (event.getPermType() != null) {
+            target.setPermType(event.getPermType());
+        }
+        if (event.getMetadata() != null) {
+            target.setMetadata(event.getMetadata());
+        }
+        if (event.getResponse() != null) {
+            target.setResponse(event.getResponse());
         }
         if (event.getFileName() != null) {
             target.setFileName(event.getFileName());
@@ -441,7 +466,7 @@ public class StreamingMessageCache {
     private SessionMessagePart findOrCreatePart(@NonNull SessionMessage message, @NonNull StreamMessage event) {
         String incomingPartId = event.getPartId();
         Integer incomingPartSeq = event.getPartSeq();
-        for (SessionMessagePart existing : message.getParts()) {
+        for (SessionMessagePart existing : ensureParts(message)) {
             if (incomingPartId != null && incomingPartId.equals(existing.getPartId())) {
                 return existing;
             }
@@ -453,14 +478,14 @@ public class StreamingMessageCache {
         SessionMessagePart created = new SessionMessagePart();
         created.setPartId(incomingPartId);
         created.setPartSeq(incomingPartSeq);
-        message.getParts().add(created);
+        ensureParts(message).add(created);
         return created;
     }
 
     private void recalculateContent(@NonNull SessionMessage message) {
-        message.getParts().sort(PART_COMPARATOR);
+        ensureParts(message).sort(PART_COMPARATOR);
         StringBuilder builder = new StringBuilder();
-        for (SessionMessagePart part : message.getParts()) {
+        for (SessionMessagePart part : ensureParts(message)) {
             if (part.getContent() != null) {
                 builder.append(part.getContent());
             }
@@ -470,7 +495,7 @@ public class StreamingMessageCache {
         }
     }
 
-    private void mergeSnapshot(@NonNull SessionCache cache, long welinkSessionId, @Nullable JsonArray snapshotMessages) {
+    private void mergeSnapshot(@NonNull SessionCache cache, @NonNull String welinkSessionId, @Nullable JsonArray snapshotMessages) {
         if (snapshotMessages == null) {
             return;
         }
@@ -493,7 +518,7 @@ public class StreamingMessageCache {
         }
     }
 
-    private void mergeStreaming(@NonNull SessionCache cache, long welinkSessionId, @NonNull StreamMessage event) {
+    private void mergeStreaming(@NonNull SessionCache cache, @NonNull String welinkSessionId, @NonNull StreamMessage event) {
         if ((event.getMessageId() == null || event.getMessageId().trim().isEmpty()) && event.getMessageSeq() == null) {
             return;
         }
@@ -502,7 +527,7 @@ public class StreamingMessageCache {
         JsonArray parts = event.getParts();
         if (parts != null) {
             Map<String, SessionMessagePart> currentParts = new HashMap<>();
-            for (SessionMessagePart part : message.getParts()) {
+            for (SessionMessagePart part : ensureParts(message)) {
                 if (part.getPartId() != null) {
                     currentParts.put(part.getPartId(), part);
                 }
@@ -524,9 +549,13 @@ public class StreamingMessageCache {
     }
 
     @Nullable
-    private SessionMessage parseSnapshotMessage(@NonNull SessionCache cache, long welinkSessionId, @NonNull JsonObject item) {
+    private SessionMessage parseSnapshotMessage(@NonNull SessionCache cache, @NonNull String welinkSessionId, @NonNull JsonObject item) {
         String stableMessageId = getString(item, "id");
-        Integer messageSeq = getInteger(item, "seq");
+        Integer messageSeq = getInteger(item, "messageSeq");
+        Integer seq = getInteger(item, "seq");
+        if (messageSeq == null) {
+            messageSeq = seq;
+        }
         Long numericId = resolveNumericMessageIdIfPresent(cache, stableMessageId, messageSeq);
         if (numericId == null) {
             return null;
@@ -539,9 +568,11 @@ public class StreamingMessageCache {
             message.setId(String.valueOf(numericId));
         }
         message.setWelinkSessionId(welinkSessionId);
+        message.setSeq(seq);
         message.setRole(defaultString(getString(item, "role"), "assistant"));
-        message.setMessageSeq(messageSeq == null ? 0 : messageSeq);
+        message.setMessageSeq(messageSeq);
         message.setContentType(getString(item, "contentType"));
+        message.setMeta(getObject(item, "meta"));
 
         String content = getString(item, "content");
         message.setContent(content == null ? "" : content);
@@ -556,12 +587,12 @@ public class StreamingMessageCache {
                 }
                 SessionMessagePart parsedPart = parsePartFromJson(partItem.getAsJsonObject());
                 if (parsedPart != null) {
-                    message.getParts().add(parsedPart);
+                    ensureParts(message).add(parsedPart);
                 }
             }
         }
 
-        if ((message.getContent() == null || message.getContent().isEmpty()) && !message.getParts().isEmpty()) {
+        if ((message.getContent() == null || message.getContent().isEmpty()) && !ensureParts(message).isEmpty()) {
             recalculateContent(message);
         }
         return message;
@@ -577,28 +608,33 @@ public class StreamingMessageCache {
         part.setToolName(getString(json, "toolName"));
         part.setToolCallId(getString(json, "toolCallId"));
 
-        String toolStatus = getString(json, "toolStatus");
-        if (toolStatus == null || toolStatus.isEmpty()) {
-            toolStatus = getString(json, "status");
+        String status = getString(json, "status");
+        if (status == null || status.isEmpty()) {
+            status = getString(json, "toolStatus");
         }
-        part.setToolStatus(toolStatus);
+        part.setStatus(status);
 
-        JsonElement toolInput = getElement(json, "toolInput");
-        if (toolInput == null || toolInput.isJsonNull()) {
-            toolInput = getElement(json, "input");
+        JsonElement input = getElement(json, "input");
+        if (input == null || input.isJsonNull()) {
+            input = getElement(json, "toolInput");
         }
-        part.setToolInput(toolInput);
+        part.setInput(input);
 
-        String toolOutput = getString(json, "toolOutput");
-        if (toolOutput == null || toolOutput.isEmpty()) {
-            toolOutput = getString(json, "output");
+        String output = getString(json, "output");
+        if (output == null || output.isEmpty()) {
+            output = getString(json, "toolOutput");
         }
-        part.setToolOutput(toolOutput);
+        part.setOutput(output);
 
+        part.setError(getString(json, "error"));
+        part.setTitle(getString(json, "title"));
         part.setQuestion(getString(json, "question"));
         part.setHeader(getString(json, "header"));
         part.setOptions(getStringList(json, "options"));
         part.setPermissionId(getString(json, "permissionId"));
+        part.setPermType(getString(json, "permType"));
+        part.setMetadata(getObject(json, "metadata"));
+        part.setResponse(getString(json, "response"));
         part.setFileName(getString(json, "fileName"));
         part.setFileUrl(getString(json, "fileUrl"));
         part.setFileMime(getString(json, "fileMime"));
@@ -613,7 +649,7 @@ public class StreamingMessageCache {
             target = currentParts.get(incomingPartId);
         }
         if (target == null && incoming.getPartSeq() != null) {
-            for (SessionMessagePart existing : message.getParts()) {
+            for (SessionMessagePart existing : ensureParts(message)) {
                 if (incoming.getPartSeq().equals(existing.getPartSeq())) {
                     target = existing;
                     break;
@@ -622,7 +658,7 @@ public class StreamingMessageCache {
         }
         if (target == null) {
             target = new SessionMessagePart();
-            message.getParts().add(target);
+            ensureParts(message).add(target);
         }
 
         if (incoming.getPartId() != null) {
@@ -643,14 +679,20 @@ public class StreamingMessageCache {
         if (incoming.getToolCallId() != null) {
             target.setToolCallId(incoming.getToolCallId());
         }
-        if (incoming.getToolStatus() != null) {
-            target.setToolStatus(incoming.getToolStatus());
+        if (incoming.getStatus() != null) {
+            target.setStatus(incoming.getStatus());
         }
-        if (incoming.getToolInput() != null && !incoming.getToolInput().isJsonNull()) {
-            target.setToolInput(incoming.getToolInput());
+        if (incoming.getInput() != null && !incoming.getInput().isJsonNull()) {
+            target.setInput(incoming.getInput());
         }
-        if (incoming.getToolOutput() != null) {
-            target.setToolOutput(incoming.getToolOutput());
+        if (incoming.getOutput() != null) {
+            target.setOutput(incoming.getOutput());
+        }
+        if (incoming.getError() != null) {
+            target.setError(incoming.getError());
+        }
+        if (incoming.getTitle() != null) {
+            target.setTitle(incoming.getTitle());
         }
         if (incoming.getQuestion() != null) {
             target.setQuestion(incoming.getQuestion());
@@ -663,6 +705,15 @@ public class StreamingMessageCache {
         }
         if (incoming.getPermissionId() != null) {
             target.setPermissionId(incoming.getPermissionId());
+        }
+        if (incoming.getPermType() != null) {
+            target.setPermType(incoming.getPermType());
+        }
+        if (incoming.getMetadata() != null) {
+            target.setMetadata(incoming.getMetadata());
+        }
+        if (incoming.getResponse() != null) {
+            target.setResponse(incoming.getResponse());
         }
         if (incoming.getFileName() != null) {
             target.setFileName(incoming.getFileName());
@@ -694,7 +745,7 @@ public class StreamingMessageCache {
             return message.getContent();
         }
         StringBuilder builder = new StringBuilder();
-        List<SessionMessagePart> parts = new ArrayList<>(message.getParts());
+        List<SessionMessagePart> parts = new ArrayList<>(ensureParts(message));
         parts.sort(PART_COMPARATOR);
         for (SessionMessagePart part : parts) {
             if (part.getContent() != null) {
@@ -778,6 +829,15 @@ public class StreamingMessageCache {
     }
 
     @Nullable
+    private static JsonObject getObject(@NonNull JsonObject object, @NonNull String key) {
+        JsonElement value = getElement(object, key);
+        if (value == null || !value.isJsonObject()) {
+            return null;
+        }
+        return value.getAsJsonObject();
+    }
+
+    @Nullable
     private static Integer getInteger(@NonNull JsonObject object, @NonNull String key) {
         JsonElement value = getElement(object, key);
         if (value == null || !value.isJsonPrimitive()) {
@@ -817,6 +877,30 @@ public class StreamingMessageCache {
             result.add(item.getAsString());
         }
         return result;
+    }
+
+    private static int compareNullableInt(@Nullable Integer left, @Nullable Integer right) {
+        if (left != null && right != null) {
+            return Integer.compare(left, right);
+        }
+        if (left != null) {
+            return -1;
+        }
+        if (right != null) {
+            return 1;
+        }
+        return 0;
+    }
+
+    @NonNull
+    private static List<SessionMessagePart> ensureParts(@NonNull SessionMessage message) {
+        List<SessionMessagePart> parts = message.getParts();
+        if (parts != null) {
+            return parts;
+        }
+        List<SessionMessagePart> created = new ArrayList<>();
+        message.setParts(created);
+        return created;
     }
 
     private static final class SessionCache {

@@ -1,45 +1,70 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.google.gson.JsonObject;
+
+import java.util.List;
 
 @Keep
 public class SendMessageResult {
-    private long id;
-    private long welinkSessionId;
     @NonNull
-    private String userId = "";
+    private String id = "";
+    @NonNull
+    private String welinkSessionId = "";
+    @Nullable
+    private Integer seq;
+    @Nullable
+    private Integer messageSeq;
     @NonNull
     private String role = "user";
-    @NonNull
-    private String content = "";
-    private int messageSeq;
+    @Nullable
+    private String content;
+    @Nullable
+    private String contentType;
+    @Nullable
+    private JsonObject meta;
+    @Nullable
+    private List<SessionMessagePart> parts;
     @NonNull
     private String createdAt = "";
 
-    public long getId() {
+    @NonNull
+    public String getId() {
         return id;
     }
 
-    public void setId(long id) {
-        this.id = id;
-    }
-
-    public long getWelinkSessionId() {
-        return welinkSessionId;
-    }
-
-    public void setWelinkSessionId(long welinkSessionId) {
-        this.welinkSessionId = welinkSessionId;
+    public void setId(@NonNull String id) {
+        this.id = id == null ? "" : id;
     }
 
     @NonNull
-    public String getUserId() {
-        return userId;
+    public String getWelinkSessionId() {
+        return welinkSessionId;
     }
 
-    public void setUserId(@NonNull String userId) {
-        this.userId = userId;
+    public void setWelinkSessionId(@NonNull String welinkSessionId) {
+        this.welinkSessionId = welinkSessionId == null ? "" : welinkSessionId;
+    }
+
+    @Nullable
+    public Integer getSeq() {
+        return seq;
+    }
+
+    public void setSeq(@Nullable Integer seq) {
+        this.seq = seq;
+    }
+
+    @Nullable
+    public Integer getMessageSeq() {
+        return messageSeq;
+    }
+
+    public void setMessageSeq(@Nullable Integer messageSeq) {
+        this.messageSeq = messageSeq;
     }
 
     @NonNull
@@ -48,24 +73,43 @@ public class SendMessageResult {
     }
 
     public void setRole(@NonNull String role) {
-        this.role = role;
+        this.role = role == null ? "" : role;
     }
 
-    @NonNull
+    @Nullable
     public String getContent() {
         return content;
     }
 
-    public void setContent(@NonNull String content) {
+    public void setContent(@Nullable String content) {
         this.content = content;
     }
 
-    public int getMessageSeq() {
-        return messageSeq;
+    @Nullable
+    public String getContentType() {
+        return contentType;
     }
 
-    public void setMessageSeq(int messageSeq) {
-        this.messageSeq = messageSeq;
+    public void setContentType(@Nullable String contentType) {
+        this.contentType = contentType;
+    }
+
+    @Nullable
+    public JsonObject getMeta() {
+        return meta;
+    }
+
+    public void setMeta(@Nullable JsonObject meta) {
+        this.meta = meta;
+    }
+
+    @Nullable
+    public List<SessionMessagePart> getParts() {
+        return parts;
+    }
+
+    public void setParts(@Nullable List<SessionMessagePart> parts) {
+        this.parts = parts;
     }
 
     @NonNull
@@ -74,6 +118,6 @@ public class SendMessageResult {
     }
 
     public void setCreatedAt(@NonNull String createdAt) {
-        this.createdAt = createdAt;
+        this.createdAt = createdAt == null ? "" : createdAt;
     }
 }

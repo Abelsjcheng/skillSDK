@@ -1,4 +1,4 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
@@ -6,19 +6,21 @@ import androidx.annotation.Nullable;
 
 @Keep
 public class SendMessageParams {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
     @NonNull
     private final String content;
     @Nullable
     private final String toolCallId;
 
-    public SendMessageParams(long welinkSessionId, @NonNull String content, @Nullable String toolCallId) {
+    public SendMessageParams(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId) {
         this.welinkSessionId = welinkSessionId;
         this.content = content;
         this.toolCallId = toolCallId;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 

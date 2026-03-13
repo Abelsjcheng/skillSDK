@@ -1,23 +1,25 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 @Keep
 public class ReplyPermissionResult {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
     @NonNull
     private final String permissionId;
     @NonNull
     private final String response;
 
-    public ReplyPermissionResult(long welinkSessionId, @NonNull String permissionId, @NonNull String response) {
+    public ReplyPermissionResult(@NonNull String welinkSessionId, @NonNull String permissionId, @NonNull String response) {
         this.welinkSessionId = welinkSessionId;
         this.permissionId = permissionId;
         this.response = response;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 

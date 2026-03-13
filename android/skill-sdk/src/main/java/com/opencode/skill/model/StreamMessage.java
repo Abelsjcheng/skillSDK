@@ -26,6 +26,8 @@ public class StreamMessage {
     @Nullable
     private String messageId;
     @Nullable
+    private String sourceMessageId;
+    @Nullable
     private Integer messageSeq;
     @Nullable
     private String role;
@@ -135,6 +137,15 @@ public class StreamMessage {
 
     public void setMessageId(@Nullable String messageId) {
         this.messageId = messageId;
+    }
+
+    @Nullable
+    public String getSourceMessageId() {
+        return sourceMessageId;
+    }
+
+    public void setSourceMessageId(@Nullable String sourceMessageId) {
+        this.sourceMessageId = sourceMessageId;
     }
 
     @Nullable

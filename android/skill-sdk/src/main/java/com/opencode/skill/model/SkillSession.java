@@ -1,4 +1,4 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
@@ -6,15 +6,16 @@ import androidx.annotation.Nullable;
 
 @Keep
 public class SkillSession {
-    private long welinkSessionId;
+    @NonNull
+    private String welinkSessionId = "";
     @NonNull
     private String userId = "";
-    @NonNull
-    private String ak = "";
+    @Nullable
+    private String ak;
     @Nullable
     private String title;
-    @NonNull
-    private String imGroupId = "";
+    @Nullable
+    private String imGroupId;
     @NonNull
     private String status = "ACTIVE";
     @Nullable
@@ -24,11 +25,12 @@ public class SkillSession {
     @NonNull
     private String updatedAt = "";
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 
-    public void setWelinkSessionId(long welinkSessionId) {
+    public void setWelinkSessionId(@NonNull String welinkSessionId) {
         this.welinkSessionId = welinkSessionId;
     }
 
@@ -41,12 +43,12 @@ public class SkillSession {
         this.userId = userId;
     }
 
-    @NonNull
+    @Nullable
     public String getAk() {
         return ak;
     }
 
-    public void setAk(@NonNull String ak) {
+    public void setAk(@Nullable String ak) {
         this.ak = ak;
     }
 
@@ -59,12 +61,12 @@ public class SkillSession {
         this.title = title;
     }
 
-    @NonNull
+    @Nullable
     public String getImGroupId() {
         return imGroupId;
     }
 
-    public void setImGroupId(@NonNull String imGroupId) {
+    public void setImGroupId(@Nullable String imGroupId) {
         this.imGroupId = imGroupId;
     }
 

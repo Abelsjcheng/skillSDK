@@ -1,24 +1,27 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 
 @Keep
 public class GetSessionMessageParams {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
     private final int page;
     private final int size;
 
-    public GetSessionMessageParams(long welinkSessionId) {
+    public GetSessionMessageParams(@NonNull String welinkSessionId) {
         this(welinkSessionId, 0, 50);
     }
 
-    public GetSessionMessageParams(long welinkSessionId, int page, int size) {
+    public GetSessionMessageParams(@NonNull String welinkSessionId, int page, int size) {
         this.welinkSessionId = welinkSessionId;
         this.page = page;
         this.size = size;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 

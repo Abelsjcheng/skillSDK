@@ -1,20 +1,22 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 @Keep
 public class StopSkillResult {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
     @NonNull
     private final String status;
 
-    public StopSkillResult(long welinkSessionId, @NonNull String status) {
+    public StopSkillResult(@NonNull String welinkSessionId, @NonNull String status) {
         this.welinkSessionId = welinkSessionId;
         this.status = status;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 

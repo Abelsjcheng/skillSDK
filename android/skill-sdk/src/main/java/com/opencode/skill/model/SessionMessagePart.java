@@ -1,9 +1,10 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,19 +24,29 @@ public class SessionMessagePart {
     @Nullable
     private String toolCallId;
     @Nullable
-    private String toolStatus;
+    private JsonElement input;
     @Nullable
-    private JsonElement toolInput;
+    private String output;
     @Nullable
-    private String toolOutput;
+    private String error;
     @Nullable
-    private String question;
+    private String title;
     @Nullable
     private String header;
+    @Nullable
+    private String question;
     @Nullable
     private List<String> options = new ArrayList<>();
     @Nullable
     private String permissionId;
+    @Nullable
+    private String permType;
+    @Nullable
+    private JsonObject metadata;
+    @Nullable
+    private String response;
+    @Nullable
+    private String status;
     @Nullable
     private String fileName;
     @Nullable
@@ -98,39 +109,39 @@ public class SessionMessagePart {
     }
 
     @Nullable
-    public String getToolStatus() {
-        return toolStatus;
+    public JsonElement getInput() {
+        return input;
     }
 
-    public void setToolStatus(@Nullable String toolStatus) {
-        this.toolStatus = toolStatus;
-    }
-
-    @Nullable
-    public JsonElement getToolInput() {
-        return toolInput;
-    }
-
-    public void setToolInput(@Nullable JsonElement toolInput) {
-        this.toolInput = toolInput;
+    public void setInput(@Nullable JsonElement input) {
+        this.input = input;
     }
 
     @Nullable
-    public String getToolOutput() {
-        return toolOutput;
+    public String getOutput() {
+        return output;
     }
 
-    public void setToolOutput(@Nullable String toolOutput) {
-        this.toolOutput = toolOutput;
+    public void setOutput(@Nullable String output) {
+        this.output = output;
     }
 
     @Nullable
-    public String getQuestion() {
-        return question;
+    public String getError() {
+        return error;
     }
 
-    public void setQuestion(@Nullable String question) {
-        this.question = question;
+    public void setError(@Nullable String error) {
+        this.error = error;
+    }
+
+    @Nullable
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(@Nullable String title) {
+        this.title = title;
     }
 
     @Nullable
@@ -140,6 +151,15 @@ public class SessionMessagePart {
 
     public void setHeader(@Nullable String header) {
         this.header = header;
+    }
+
+    @Nullable
+    public String getQuestion() {
+        return question;
+    }
+
+    public void setQuestion(@Nullable String question) {
+        this.question = question;
     }
 
     @Nullable
@@ -158,6 +178,42 @@ public class SessionMessagePart {
 
     public void setPermissionId(@Nullable String permissionId) {
         this.permissionId = permissionId;
+    }
+
+    @Nullable
+    public String getPermType() {
+        return permType;
+    }
+
+    public void setPermType(@Nullable String permType) {
+        this.permType = permType;
+    }
+
+    @Nullable
+    public JsonObject getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(@Nullable JsonObject metadata) {
+        this.metadata = metadata;
+    }
+
+    @Nullable
+    public String getResponse() {
+        return response;
+    }
+
+    public void setResponse(@Nullable String response) {
+        this.response = response;
+    }
+
+    @Nullable
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(@Nullable String status) {
+        this.status = status;
     }
 
     @Nullable
@@ -185,5 +241,38 @@ public class SessionMessagePart {
 
     public void setFileMime(@Nullable String fileMime) {
         this.fileMime = fileMime;
+    }
+
+    @Deprecated
+    @Nullable
+    public String getToolStatus() {
+        return status;
+    }
+
+    @Deprecated
+    public void setToolStatus(@Nullable String toolStatus) {
+        this.status = toolStatus;
+    }
+
+    @Deprecated
+    @Nullable
+    public JsonElement getToolInput() {
+        return input;
+    }
+
+    @Deprecated
+    public void setToolInput(@Nullable JsonElement toolInput) {
+        this.input = toolInput;
+    }
+
+    @Deprecated
+    @Nullable
+    public String getToolOutput() {
+        return output;
+    }
+
+    @Deprecated
+    public void setToolOutput(@Nullable String toolOutput) {
+        this.output = toolOutput;
     }
 }

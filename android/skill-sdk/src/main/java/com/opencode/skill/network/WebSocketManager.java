@@ -31,8 +31,8 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /**
-* WebSocket connection + listener router.
-*/
+ * WebSocket connection + listener router.
+ */
 public final class WebSocketManager {
     public interface InternalListener {
         void onMessage(@NonNull StreamMessage message);
@@ -60,7 +60,7 @@ public final class WebSocketManager {
     private volatile boolean manualClose;
 
     @NonNull
-    private final Map<Long, CopyOnWriteArrayList<SessionListener>> sessionListeners = new ConcurrentHashMap<>();
+    private final Map<String, CopyOnWriteArrayList<SessionListener>> sessionListeners = new ConcurrentHashMap<>();
     @NonNull
     private final CopyOnWriteArrayList<InternalListener> internalListeners = new CopyOnWriteArrayList<>();
     @NonNull
@@ -139,11 +139,11 @@ public final class WebSocketManager {
         internalListeners.remove(listener);
     }
 
-    public void registerListener(long welinkSessionId, @NonNull SessionListener listener) {
+    public void registerListener(@NonNull String welinkSessionId, @NonNull SessionListener listener) {
         sessionListeners.computeIfAbsent(welinkSessionId, key -> new CopyOnWriteArrayList<>()).addIfAbsent(listener);
     }
 
-    public void unregisterListener(long welinkSessionId, @NonNull SessionListener listener) {
+    public void unregisterListener(@NonNull String welinkSessionId, @NonNull SessionListener listener) {
         CopyOnWriteArrayList<SessionListener> listeners = sessionListeners.get(welinkSessionId);
         if (listeners == null) {
             return;
@@ -154,7 +154,7 @@ public final class WebSocketManager {
         }
     }
 
-    public void clearSessionListeners(long welinkSessionId) {
+    public void clearSessionListeners(@NonNull String welinkSessionId) {
         sessionListeners.remove(welinkSessionId);
     }
 
@@ -196,8 +196,8 @@ public final class WebSocketManager {
             listener.onMessage(message);
         }
 
-        Long sessionId = parseSessionId(message.getWelinkSessionId());
-        if (sessionId == null) {
+        String sessionId = message.getWelinkSessionId();
+        if (sessionId == null || sessionId.trim().isEmpty()) {
             return;
         }
         List<SessionListener> listeners = sessionListeners.getOrDefault(sessionId, new CopyOnWriteArrayList<>());
@@ -224,6 +224,7 @@ public final class WebSocketManager {
         message.setEmittedAt(getString(json, "emittedAt"));
 
         message.setMessageId(getString(json, "messageId"));
+        message.setSourceMessageId(getString(json, "sourceMessageId"));
         message.setMessageSeq(getInteger(json, "messageSeq"));
         message.setRole(getString(json, "role"));
         message.setPartId(getString(json, "partId"));
@@ -254,18 +255,6 @@ public final class WebSocketManager {
         message.setMessages(getArray(json, "messages"));
         message.setParts(getArray(json, "parts"));
         return message;
-    }
-
-    @Nullable
-    private Long parseSessionId(@Nullable String sessionIdRaw) {
-        if (sessionIdRaw == null || sessionIdRaw.isEmpty()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(sessionIdRaw);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
     }
 
     private void notifyAllError(@NonNull SessionError error) {

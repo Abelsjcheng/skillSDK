@@ -1,16 +1,19 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 
 @Keep
 public class RegenerateAnswerParams {
-    private final long welinkSessionId;
+    @NonNull
+    private final String welinkSessionId;
 
-    public RegenerateAnswerParams(long welinkSessionId) {
+    public RegenerateAnswerParams(@NonNull String welinkSessionId) {
         this.welinkSessionId = welinkSessionId;
     }
 
-    public long getWelinkSessionId() {
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 }

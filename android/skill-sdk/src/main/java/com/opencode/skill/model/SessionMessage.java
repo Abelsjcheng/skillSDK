@@ -1,8 +1,10 @@
-package com.opencode.skill.model;
+﻿package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,17 +13,21 @@ import java.util.List;
 public class SessionMessage {
     @NonNull
     private String id = "";
-    private long welinkSessionId;
     @Nullable
-    private String userId;
+    private Integer seq;
+    @NonNull
+    private String welinkSessionId = "";
     @NonNull
     private String role = "assistant";
-    @NonNull
-    private String content = "";
+    @Nullable
+    private String content;
     @Nullable
     private String contentType;
-    private int messageSeq;
-    @NonNull
+    @Nullable
+    private JsonObject meta;
+    @Nullable
+    private Integer messageSeq;
+    @Nullable
     private List<SessionMessagePart> parts = new ArrayList<>();
     @NonNull
     private String createdAt = "";
@@ -35,21 +41,22 @@ public class SessionMessage {
         this.id = id == null ? "" : id;
     }
 
-    public long getWelinkSessionId() {
+    @Nullable
+    public Integer getSeq() {
+        return seq;
+    }
+
+    public void setSeq(@Nullable Integer seq) {
+        this.seq = seq;
+    }
+
+    @NonNull
+    public String getWelinkSessionId() {
         return welinkSessionId;
     }
 
-    public void setWelinkSessionId(long welinkSessionId) {
+    public void setWelinkSessionId(@NonNull String welinkSessionId) {
         this.welinkSessionId = welinkSessionId;
-    }
-
-    @Nullable
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(@Nullable String userId) {
-        this.userId = userId;
     }
 
     @NonNull
@@ -61,12 +68,12 @@ public class SessionMessage {
         this.role = role;
     }
 
-    @NonNull
+    @Nullable
     public String getContent() {
         return content;
     }
 
-    public void setContent(@NonNull String content) {
+    public void setContent(@Nullable String content) {
         this.content = content;
     }
 
@@ -79,20 +86,30 @@ public class SessionMessage {
         this.contentType = contentType;
     }
 
-    public int getMessageSeq() {
+    @Nullable
+    public JsonObject getMeta() {
+        return meta;
+    }
+
+    public void setMeta(@Nullable JsonObject meta) {
+        this.meta = meta;
+    }
+
+    @Nullable
+    public Integer getMessageSeq() {
         return messageSeq;
     }
 
-    public void setMessageSeq(int messageSeq) {
+    public void setMessageSeq(@Nullable Integer messageSeq) {
         this.messageSeq = messageSeq;
     }
 
-    @NonNull
+    @Nullable
     public List<SessionMessagePart> getParts() {
         return parts;
     }
 
-    public void setParts(@NonNull List<SessionMessagePart> parts) {
+    public void setParts(@Nullable List<SessionMessagePart> parts) {
         this.parts = parts;
     }
 

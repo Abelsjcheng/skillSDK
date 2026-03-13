@@ -6,20 +6,20 @@ import androidx.annotation.Nullable;
 
 @Keep
 public class CreateSessionParams {
-    @NonNull
+    @Nullable
     private final String ak;
     @Nullable
     private final String title;
     @NonNull
     private final String imGroupId;
 
-    public CreateSessionParams(@NonNull String ak, @Nullable String title, @NonNull String imGroupId) {
+    public CreateSessionParams(@Nullable String ak, @Nullable String title, @NonNull String imGroupId) {
         this.ak = ak;
         this.title = title;
         this.imGroupId = imGroupId;
     }
 
-    @NonNull
+    @Nullable
     public String getAk() {
         return ak;
     }

@@ -1,4 +1,4 @@
-package com.opencode.skill.network;
+﻿package com.opencode.skill.network;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -36,8 +36,8 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
-* HTTP client for skill server REST APIs.
-*/
+ * HTTP client for skill server REST APIs.
+ */
 public class ApiClient {
     private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
 
@@ -62,11 +62,15 @@ public class ApiClient {
 
     public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
         JsonObject body = new JsonObject();
-        body.addProperty("ak", params.getAk());
-        if (params.getTitle() != null && !params.getTitle().isEmpty()) {
-            body.addProperty("title", params.getTitle());
+        if (params.getAk() != null && !params.getAk().trim().isEmpty()) {
+            body.addProperty("ak", params.getAk().trim());
         }
-        body.addProperty("imGroupId", params.getImGroupId());
+        if (params.getTitle() != null && !params.getTitle().trim().isEmpty()) {
+            body.addProperty("title", params.getTitle().trim());
+        }
+        if (params.getImGroupId() != null && !params.getImGroupId().trim().isEmpty()) {
+            body.addProperty("imGroupId", params.getImGroupId().trim());
+        }
 
         Request request = newRequestBuilder("/api/skill/sessions")
                 .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
@@ -97,19 +101,19 @@ public class ApiClient {
         executeEnvelope(request, type, callback);
     }
 
-    public void getSession(long welinkSessionId, @NonNull SkillCallback<SkillSession> callback) {
+    public void getSession(@NonNull String welinkSessionId, @NonNull SkillCallback<SkillSession> callback) {
         Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId)
                 .get()
                 .build();
         executeEnvelope(request, SkillSession.class, callback);
     }
 
-    public void sendMessage(long welinkSessionId, @NonNull String content, @Nullable String toolCallId,
+    public void sendMessage(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,
             @NonNull SkillCallback<SendMessageResult> callback) {
         JsonObject body = new JsonObject();
         body.addProperty("content", content);
-        if (toolCallId != null && !toolCallId.isEmpty()) {
-            body.addProperty("toolCallId", toolCallId);
+        if (toolCallId != null && !toolCallId.trim().isEmpty()) {
+            body.addProperty("toolCallId", toolCallId.trim());
         }
 
         Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
@@ -118,14 +122,14 @@ public class ApiClient {
         executeEnvelope(request, SendMessageResult.class, callback);
     }
 
-    public void abortSession(long welinkSessionId, @NonNull SkillCallback<StopSkillResult> callback) {
+    public void abortSession(@NonNull String welinkSessionId, @NonNull SkillCallback<StopSkillResult> callback) {
         Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/abort")
                 .post(RequestBody.create("{}", JSON_MEDIA_TYPE))
                 .build();
         executeEnvelope(request, StopSkillResult.class, callback);
     }
 
-    public void getMessages(long welinkSessionId, int page, int size,
+    public void getMessages(@NonNull String welinkSessionId, int page, int size,
             @NonNull SkillCallback<PageResult<SessionMessage>> callback) {
         HttpUrl url = urlBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
                 .addQueryParameter("page", String.valueOf(page))
@@ -136,7 +140,7 @@ public class ApiClient {
         executeEnvelope(request, type, callback);
     }
 
-    public void replyPermission(long welinkSessionId, @NonNull String permId, @NonNull String response,
+    public void replyPermission(@NonNull String welinkSessionId, @NonNull String permId, @NonNull String response,
             @NonNull SkillCallback<ReplyPermissionResult> callback) {
         JsonObject body = new JsonObject();
         body.addProperty("response", response);
@@ -147,12 +151,12 @@ public class ApiClient {
         executeEnvelope(request, ReplyPermissionResult.class, callback);
     }
 
-    public void sendMessageToIM(long welinkSessionId, @NonNull String content, @Nullable String chatId,
+    public void sendMessageToIM(@NonNull String welinkSessionId, @NonNull String content, @Nullable String chatId,
             @NonNull SkillCallback<SendMessageToIMResult> callback) {
         JsonObject body = new JsonObject();
         body.addProperty("content", content);
         if (chatId != null && !chatId.trim().isEmpty()) {
-            body.addProperty("chatId", chatId);
+            body.addProperty("chatId", chatId.trim());
         }
 
         Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/send-to-im")
@@ -163,7 +167,7 @@ public class ApiClient {
             @Override
             public void onSuccess(@Nullable JsonObject result) {
                 if (result == null) {
-                    callback.onSuccess(new SendMessageToIMResult("failed", null, null, "Empty response"));
+                    callback.onSuccess(new SendMessageToIMResult(false));
                     return;
                 }
 
@@ -177,40 +181,23 @@ public class ApiClient {
                     JsonElement data = result.get("data");
                     if (data != null && data.isJsonObject()) {
                         JsonObject dataObj = data.getAsJsonObject();
-                        SendMessageToIMResult wrapped = gson.fromJson(dataObj, SendMessageToIMResult.class);
-                        String normalizedStatus = wrapped.getStatus();
-                        if (dataObj.has("status") && !dataObj.get("status").isJsonNull()) {
-                            normalizedStatus = dataObj.get("status").getAsString();
-                        } else if (dataObj.has("success") && dataObj.get("success").isJsonPrimitive()) {
-                            normalizedStatus = dataObj.get("success").getAsBoolean() ? "success" : "failed";
-                        } else if (normalizedStatus == null || normalizedStatus.trim().isEmpty()
-                                || "failed".equalsIgnoreCase(normalizedStatus)) {
-                            normalizedStatus = "success";
+                        boolean success = true;
+                        if (dataObj.has("success") && dataObj.get("success").isJsonPrimitive()) {
+                            success = dataObj.get("success").getAsBoolean();
+                        } else if (dataObj.has("status") && dataObj.get("status").isJsonPrimitive()) {
+                            success = "success".equalsIgnoreCase(dataObj.get("status").getAsString());
                         }
-                        wrapped.setStatus(normalizedStatus);
-                        callback.onSuccess(wrapped);
+                        callback.onSuccess(new SendMessageToIMResult(success));
                         return;
                     }
 
-                    callback.onSuccess(new SendMessageToIMResult("success", null, null, null));
+                    callback.onSuccess(new SendMessageToIMResult(true));
                     return;
                 }
 
-                // Compatibility for undocumented endpoint.
                 boolean success = result.has("success") && result.get("success").isJsonPrimitive()
                         && result.get("success").getAsBoolean();
-                SendMessageToIMResult compatibility = new SendMessageToIMResult();
-                compatibility.setStatus(success ? "success" : "failed");
-                if (result.has("chatId") && !result.get("chatId").isJsonNull()) {
-                    compatibility.setChatId(result.get("chatId").getAsString());
-                }
-                if (result.has("contentLength") && !result.get("contentLength").isJsonNull()) {
-                    compatibility.setContentLength(result.get("contentLength").getAsInt());
-                }
-                if (result.has("error") && !result.get("error").isJsonNull()) {
-                    compatibility.setErrorMessage(result.get("error").getAsString());
-                }
-                callback.onSuccess(compatibility);
+                callback.onSuccess(new SendMessageToIMResult(success));
             }
 
             @Override
