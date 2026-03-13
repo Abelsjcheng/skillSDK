@@ -15,17 +15,19 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)updateWithStreamMessage:(WLAgentSkillsStreamMessage *)message;
 - (void)cacheSendMessageResult:(WLAgentSkillsSendMessageResult *)result;
 - (void)cacheHistoryMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
-                                                            forSessionId:(NSNumber *)welinkSessionId;
+                                                            forSessionId:(NSString *)welinkSessionId;
 
 - (NSArray<WLAgentSkillsSessionMessage *> *)mergedMessagesWithServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
-                                                                                                                                                                                                                                                                    sessionId:(NSNumber *)welinkSessionId;
+                                                                                                                                                                                                                                                                    sessionId:(NSString *)welinkSessionId;
 
-- (nullable NSString *)latestCompletedContentForSessionId:(NSNumber *)welinkSessionId
+- (nullable NSString *)latestCompletedContentForSessionId:(NSString *)welinkSessionId
                                                                                                                                                                                                         messageId:(nullable NSString *)messageId;
+- (BOOL)hasMessageForSessionId:(NSString *)welinkSessionId messageId:(NSString *)messageId;
+- (BOOL)isMessageCompletedForSessionId:(NSString *)welinkSessionId messageId:(NSString *)messageId;
 
-- (nullable NSString *)lastUserMessageContentForSessionId:(NSNumber *)welinkSessionId;
+- (nullable NSString *)lastUserMessageContentForSessionId:(NSString *)welinkSessionId;
 
-- (void)clearCacheForSessionId:(NSNumber *)welinkSessionId;
+- (void)clearCacheForSessionId:(NSString *)welinkSessionId;
 - (void)clearAllCache;
 
 @end

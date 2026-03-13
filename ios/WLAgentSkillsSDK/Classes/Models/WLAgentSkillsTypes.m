@@ -100,11 +100,11 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
     if (self) {
-        _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+        _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
         _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
-        _ak = WLAgentSkillsStringValue(dictionary[@"ak"], @"");
+        _ak = WLAgentSkillsStringValue(dictionary[@"ak"], nil);
         _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
-        _imGroupId = WLAgentSkillsStringValue(dictionary[@"imGroupId"], @"");
+        _imGroupId = WLAgentSkillsStringValue(dictionary[@"imGroupId"], nil);
         _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
         _toolSessionId = WLAgentSkillsStringValue(dictionary[@"toolSessionId"], nil);
         _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
@@ -126,13 +126,27 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
         _content = WLAgentSkillsStringValue(dictionary[@"content"], nil);
         _toolName = WLAgentSkillsStringValue(dictionary[@"toolName"], nil);
         _toolCallId = WLAgentSkillsStringValue(dictionary[@"toolCallId"], nil);
-        _toolStatus = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
-        _toolInput = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
-        _toolOutput = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
+        _status = WLAgentSkillsStringValue(dictionary[@"status"], nil);
+        if (_status.length == 0) {
+            _status = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
+        }
+        _input = [dictionary[@"input"] isKindOfClass:[NSDictionary class]] ? dictionary[@"input"] : nil;
+        if (_input.count == 0) {
+            _input = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
+        }
+        _output = WLAgentSkillsStringValue(dictionary[@"output"], nil);
+        if (_output.length == 0) {
+            _output = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
+        }
+        _error = WLAgentSkillsStringValue(dictionary[@"error"], nil);
+        _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
         _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
         _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
         _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
         _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
+        _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
+        _metadata = [dictionary[@"metadata"] isKindOfClass:[NSDictionary class]] ? dictionary[@"metadata"] : nil;
+        _response = WLAgentSkillsStringValue(dictionary[@"response"], nil);
         _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
         _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
         _fileMime = WLAgentSkillsStringValue(dictionary[@"fileMime"], nil);
@@ -160,14 +174,20 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     if (self.toolCallId.length > 0) {
         dictionary[@"toolCallId"] = self.toolCallId;
     }
-    if (self.toolStatus.length > 0) {
-        dictionary[@"toolStatus"] = self.toolStatus;
+    if (self.status.length > 0) {
+        dictionary[@"status"] = self.status;
     }
-    if (self.toolInput.count > 0) {
-        dictionary[@"toolInput"] = self.toolInput;
+    if (self.input.count > 0) {
+        dictionary[@"input"] = self.input;
     }
-    if (self.toolOutput.length > 0) {
-        dictionary[@"toolOutput"] = self.toolOutput;
+    if (self.output.length > 0) {
+        dictionary[@"output"] = self.output;
+    }
+    if (self.error.length > 0) {
+        dictionary[@"error"] = self.error;
+    }
+    if (self.title.length > 0) {
+        dictionary[@"title"] = self.title;
     }
     if (self.header.length > 0) {
         dictionary[@"header"] = self.header;
@@ -180,6 +200,15 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     }
     if (self.permissionId.length > 0) {
         dictionary[@"permissionId"] = self.permissionId;
+    }
+    if (self.permType.length > 0) {
+        dictionary[@"permType"] = self.permType;
+    }
+    if (self.metadata.count > 0) {
+        dictionary[@"metadata"] = self.metadata;
+    }
+    if (self.response.length > 0) {
+        dictionary[@"response"] = self.response;
     }
     if (self.fileName.length > 0) {
         dictionary[@"fileName"] = self.fileName;
@@ -205,17 +234,17 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
             resolvedId = WLAgentSkillsStringValue(dictionary[@"messageId"], @"");
         }
         _id = resolvedId ?: @"";
-        _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
-        if ([dictionary[@"userId"] isKindOfClass:[NSNull class]]) {
-            _userId = nil;
-        } else {
-            _userId = WLAgentSkillsStringValue(dictionary[@"userId"], nil);
+        _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], nil);
+        _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
+        if (_welinkSessionId.length == 0) {
+            _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"sessionId"], @"");
         }
         _role = WLAgentSkillsStringValue(dictionary[@"role"], @"");
-        _content = WLAgentSkillsStringValue(dictionary[@"content"], @"");
-        _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], @0);
-        _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
+        _content = WLAgentSkillsStringValue(dictionary[@"content"], nil);
         _contentType = WLAgentSkillsStringValue(dictionary[@"contentType"], nil);
+        _meta = [dictionary[@"meta"] isKindOfClass:[NSDictionary class]] ? dictionary[@"meta"] : nil;
+        _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], nil);
+        _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
 
         NSMutableArray<WLAgentSkillsSessionMessagePart *> *parts = [NSMutableArray array];
         for (NSDictionary *part in WLAgentSkillsArrayValue(dictionary[@"parts"])) {
@@ -236,14 +265,15 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     }
     return @{
         @"id" : self.id ?: @"",
-        @"welinkSessionId" : self.welinkSessionId ?: @0,
-        @"userId" : self.userId ?: [NSNull null],
+        @"seq" : self.seq ?: [NSNull null],
+        @"welinkSessionId" : self.welinkSessionId ?: @"",
         @"role" : self.role ?: @"",
-        @"content" : self.content ?: @"",
-        @"messageSeq" : self.messageSeq ?: @0,
-        @"parts" : parts,
-        @"createdAt" : self.createdAt ?: @"",
-        @"contentType" : self.contentType ?: [NSNull null]
+        @"content" : self.content ?: [NSNull null],
+        @"contentType" : self.contentType ?: [NSNull null],
+        @"meta" : self.meta ?: [NSNull null],
+        @"messageSeq" : self.messageSeq ?: [NSNull null],
+        @"parts" : self.parts != nil ? parts : [NSNull null],
+        @"createdAt" : self.createdAt ?: @""
     };
 }
 
@@ -262,9 +292,12 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
             [messages addObject:[[WLAgentSkillsSessionMessage alloc] initWithDictionary:item]];
         }
         _content = [messages copy];
-        _page = WLAgentSkillsNumberValue(dictionary[@"page"], @0);
+        _number = WLAgentSkillsNumberValue(dictionary[@"number"], WLAgentSkillsNumberValue(dictionary[@"page"], @0));
         _size = WLAgentSkillsNumberValue(dictionary[@"size"], @50);
-        _total = WLAgentSkillsNumberValue(dictionary[@"total"], @((NSInteger)messages.count));
+        _totalElements = WLAgentSkillsNumberValue(
+                dictionary[@"totalElements"],
+                WLAgentSkillsNumberValue(dictionary[@"total"], @((NSInteger)messages.count))
+        );
     }
     return self;
 }
@@ -296,12 +329,16 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     self = [super init];
     if (self) {
         _type = WLAgentSkillsStringValue(dictionary[@"type"], @"");
-        _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], @0);
+        _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], nil);
         _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
+        if (_welinkSessionId.length == 0) {
+            _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"sessionId"], @"");
+        }
         _emittedAt = WLAgentSkillsStringValue(dictionary[@"emittedAt"], @"");
         _raw = [dictionary[@"raw"] isKindOfClass:[NSDictionary class]] ? dictionary[@"raw"] : nil;
 
         _messageId = WLAgentSkillsStringValue(dictionary[@"messageId"], nil);
+        _sourceMessageId = WLAgentSkillsStringValue(dictionary[@"sourceMessageId"], nil);
         _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], nil);
         _role = WLAgentSkillsStringValue(dictionary[@"role"], nil);
 
@@ -312,8 +349,17 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
         _toolName = WLAgentSkillsStringValue(dictionary[@"toolName"], nil);
         _toolCallId = WLAgentSkillsStringValue(dictionary[@"toolCallId"], nil);
         _status = WLAgentSkillsStringValue(dictionary[@"status"], nil);
+        if (_status.length == 0) {
+            _status = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
+        }
         _input = [dictionary[@"input"] isKindOfClass:[NSDictionary class]] ? dictionary[@"input"] : nil;
+        if (_input.count == 0) {
+            _input = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
+        }
         _output = WLAgentSkillsStringValue(dictionary[@"output"], nil);
+        if (_output.length == 0) {
+            _output = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
+        }
         _error = WLAgentSkillsStringValue(dictionary[@"error"], nil);
         _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
         _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
@@ -345,12 +391,25 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
     if (self) {
-        _id = WLAgentSkillsNumberValue(dictionary[@"id"], @0);
-        _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
-        _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
+        _id = WLAgentSkillsStringValue(dictionary[@"id"], @"");
+        if (_id.length == 0) {
+            _id = WLAgentSkillsStringValue(dictionary[@"messageId"], @"");
+        }
+        _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
+        _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], nil);
+        _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], nil);
         _role = WLAgentSkillsStringValue(dictionary[@"role"], @"");
-        _content = WLAgentSkillsStringValue(dictionary[@"content"], @"");
-        _messageSeq = WLAgentSkillsNumberValue(dictionary[@"messageSeq"], @0);
+        _content = WLAgentSkillsStringValue(dictionary[@"content"], nil);
+        _contentType = WLAgentSkillsStringValue(dictionary[@"contentType"], nil);
+        _meta = [dictionary[@"meta"] isKindOfClass:[NSDictionary class]] ? dictionary[@"meta"] : nil;
+        NSMutableArray<WLAgentSkillsSessionMessagePart *> *parts = [NSMutableArray array];
+        for (NSDictionary *part in WLAgentSkillsArrayValue(dictionary[@"parts"])) {
+            if (![part isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [parts addObject:[[WLAgentSkillsSessionMessagePart alloc] initWithDictionary:part]];
+        }
+        _parts = [parts copy];
         _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
     }
     return self;
@@ -363,7 +422,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
     if (self) {
-        _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+        _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
         _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
     }
     return self;
@@ -385,7 +444,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
     if (self) {
-        _welinkSessionId = WLAgentSkillsNumberValue(dictionary[@"welinkSessionId"], @0);
+        _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
         _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], @"");
         _response = WLAgentSkillsStringValue(dictionary[@"response"], @"");
     }

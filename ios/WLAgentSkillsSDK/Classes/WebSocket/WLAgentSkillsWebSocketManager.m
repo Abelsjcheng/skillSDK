@@ -77,15 +77,15 @@
     }
 }
 
-- (BOOL)addListenerForSessionId:(NSNumber *)welinkSessionId
+- (BOOL)addListenerForSessionId:(NSString *)welinkSessionId
                                             onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
                                                 onError:(nullable WLAgentSkillsSessionErrorCallback)onError
                                                 onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
-    if (welinkSessionId == nil || onMessage == nil) {
+    if (welinkSessionId.length == 0 || onMessage == nil) {
         return NO;
     }
 
-    NSString *key = welinkSessionId.stringValue;
+    NSString *key = welinkSessionId;
     WLAgentSkillsSocketListener *listener = [[WLAgentSkillsSocketListener alloc] init];
     listener.onMessage = onMessage;
     listener.onError = onError;
@@ -102,12 +102,12 @@
     return YES;
 }
 
-- (BOOL)removeListenerForSessionId:(NSNumber *)welinkSessionId {
-    if (welinkSessionId == nil) {
+- (BOOL)removeListenerForSessionId:(NSString *)welinkSessionId {
+    if (welinkSessionId.length == 0) {
         return NO;
     }
 
-    NSString *key = welinkSessionId.stringValue;
+    NSString *key = welinkSessionId;
     @synchronized(self) {
         if (self.listeners[key] == nil) {
             return NO;
@@ -117,22 +117,22 @@
     return YES;
 }
 
-- (void)removeAllListenersForSessionId:(NSNumber *)welinkSessionId {
-    if (welinkSessionId == nil) {
+- (void)removeAllListenersForSessionId:(NSString *)welinkSessionId {
+    if (welinkSessionId.length == 0) {
         return;
     }
 
     @synchronized(self) {
-        [self.listeners removeObjectForKey:welinkSessionId.stringValue];
+        [self.listeners removeObjectForKey:welinkSessionId];
     }
 }
 
-- (BOOL)hasListenerForSessionId:(NSNumber *)welinkSessionId {
-    if (welinkSessionId == nil) {
+- (BOOL)hasListenerForSessionId:(NSString *)welinkSessionId {
+    if (welinkSessionId.length == 0) {
         return NO;
     }
     @synchronized(self) {
-        return self.listeners[welinkSessionId.stringValue] != nil;
+        return self.listeners[welinkSessionId] != nil;
     }
 }
 

@@ -1,4 +1,4 @@
-﻿//
+//
 //  WLAgentSkillsTypes.h
 //  WLAgentSkillsSDK
 //
@@ -42,17 +42,17 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 #pragma mark - Param Models
 
 @interface WLAgentSkillsCreateSessionParams : NSObject
-@property (nonatomic, copy) NSString *ak;
+@property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy) NSString *imGroupId;
 @end
 
 @interface WLAgentSkillsStopSkillParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
 @interface WLAgentSkillsOnSessionStatusChangeParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) WLAgentSkillsSessionStatusCallback callback;
 @end
 
@@ -61,40 +61,40 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsRegenerateAnswerParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
 @interface WLAgentSkillsSendMessageToIMParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy, nullable) NSString *messageId;
 @property (nonatomic, copy, nullable) NSString *chatId;
 @end
 
 @interface WLAgentSkillsGetSessionMessageParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, strong, nullable) NSNumber *page;
 @property (nonatomic, strong, nullable) NSNumber *size;
 @end
 
 @interface WLAgentSkillsRegisterSessionListenerParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) WLAgentSkillsSessionMessageCallback onMessage;
 @property (nonatomic, copy, nullable) WLAgentSkillsSessionErrorCallback onError;
 @property (nonatomic, copy, nullable) WLAgentSkillsSessionCloseCallback onClose;
 @end
 
 @interface WLAgentSkillsUnregisterSessionListenerParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
 @interface WLAgentSkillsSendMessageParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *content;
 @property (nonatomic, copy, nullable) NSString *toolCallId;
 @end
 
 @interface WLAgentSkillsReplyPermissionParams : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *permId;
 @property (nonatomic, copy) NSString *response;
 @end
@@ -106,11 +106,11 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 #pragma mark - Data Models
 
 @interface WLAgentSkillsSkillSession : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *userId;
-@property (nonatomic, copy) NSString *ak;
+@property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
-@property (nonatomic, copy) NSString *imGroupId;
+@property (nonatomic, copy, nullable) NSString *imGroupId;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, copy, nullable) NSString *toolSessionId;
 @property (nonatomic, copy) NSString *createdAt;
@@ -126,13 +126,18 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy, nullable) NSString *content;
 @property (nonatomic, copy, nullable) NSString *toolName;
 @property (nonatomic, copy, nullable) NSString *toolCallId;
-@property (nonatomic, copy, nullable) NSString *toolStatus;
-@property (nonatomic, strong, nullable) NSDictionary *toolInput;
-@property (nonatomic, copy, nullable) NSString *toolOutput;
+@property (nonatomic, copy, nullable) NSString *status;
+@property (nonatomic, strong, nullable) NSDictionary *input;
+@property (nonatomic, copy, nullable) NSString *output;
+@property (nonatomic, copy, nullable) NSString *error;
+@property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy, nullable) NSString *header;
 @property (nonatomic, copy, nullable) NSString *question;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
 @property (nonatomic, copy, nullable) NSString *permissionId;
+@property (nonatomic, copy, nullable) NSString *permType;
+@property (nonatomic, strong, nullable) NSDictionary *metadata;
+@property (nonatomic, copy, nullable) NSString *response;
 @property (nonatomic, copy, nullable) NSString *fileName;
 @property (nonatomic, copy, nullable) NSString *fileUrl;
 @property (nonatomic, copy, nullable) NSString *fileMime;
@@ -143,14 +148,15 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsSessionMessage : NSObject
 @property (nonatomic, copy) NSString *id;
-@property (nonatomic, strong) NSNumber *welinkSessionId;
-@property (nonatomic, copy, nullable) NSString *userId;
+@property (nonatomic, strong, nullable) NSNumber *seq;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *role;
-@property (nonatomic, copy) NSString *content;
-@property (nonatomic, strong) NSNumber *messageSeq;
-@property (nonatomic, strong) NSArray<WLAgentSkillsSessionMessagePart *> *parts;
-@property (nonatomic, copy) NSString *createdAt;
+@property (nonatomic, copy, nullable) NSString *content;
 @property (nonatomic, copy, nullable) NSString *contentType;
+@property (nonatomic, strong, nullable) NSDictionary *meta;
+@property (nonatomic, strong, nullable) NSNumber *messageSeq;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsSessionMessagePart *> *parts;
+@property (nonatomic, copy) NSString *createdAt;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;
@@ -158,9 +164,9 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsPageResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsSessionMessage *> *content;
-@property (nonatomic, strong) NSNumber *page;
+@property (nonatomic, strong) NSNumber *number;
 @property (nonatomic, strong) NSNumber *size;
-@property (nonatomic, strong) NSNumber *total;
+@property (nonatomic, strong) NSNumber *totalElements;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 @end
@@ -182,6 +188,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, strong, nullable) NSDictionary *raw;
 
 @property (nonatomic, copy, nullable) NSString *messageId;
+@property (nonatomic, copy, nullable) NSString *sourceMessageId;
 @property (nonatomic, strong, nullable) NSNumber *messageSeq;
 @property (nonatomic, copy, nullable) NSString *role;
 
@@ -219,19 +226,22 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 #pragma mark - Result Models
 
 @interface WLAgentSkillsSendMessageResult : NSObject
-@property (nonatomic, strong) NSNumber *id;
-@property (nonatomic, strong) NSNumber *welinkSessionId;
-@property (nonatomic, copy) NSString *userId;
+@property (nonatomic, copy) NSString *id;
+@property (nonatomic, copy) NSString *welinkSessionId;
+@property (nonatomic, strong, nullable) NSNumber *seq;
+@property (nonatomic, strong, nullable) NSNumber *messageSeq;
 @property (nonatomic, copy) NSString *role;
-@property (nonatomic, copy) NSString *content;
-@property (nonatomic, strong) NSNumber *messageSeq;
+@property (nonatomic, copy, nullable) NSString *content;
+@property (nonatomic, copy, nullable) NSString *contentType;
+@property (nonatomic, strong, nullable) NSDictionary *meta;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsSessionMessagePart *> *parts;
 @property (nonatomic, copy) NSString *createdAt;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 @end
 
 @interface WLAgentSkillsStopSkillResult : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *status;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
@@ -250,7 +260,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsReplyPermissionResult : NSObject
-@property (nonatomic, strong) NSNumber *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *permissionId;
 @property (nonatomic, copy) NSString *response;
 
@@ -262,9 +272,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsSendMessageToIMResult : NSObject
-@property (nonatomic, copy) NSString *status;
-@property (nonatomic, copy, nullable) NSString *chatId;
-@property (nonatomic, strong, nullable) NSNumber *contentLength;
+@property (nonatomic, assign) BOOL success;
 @end
 
 @interface WLAgentSkillsSessionStatusResult : NSObject

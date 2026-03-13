@@ -16,7 +16,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 
 - (void)reloadConfiguration;
 
-- (void)createSessionWithAK:(NSString *)ak
+- (void)createSessionWithAK:(nullable NSString *)ak
                                                                                         title:(nullable NSString *)title
                                                                         imGroupId:(NSString *)imGroupId
                                                                                 success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -30,33 +30,33 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                                                                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)getSessionWithSessionId:(NSNumber *)welinkSessionId
+- (void)getSessionWithSessionId:(NSString *)welinkSessionId
                                                                                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                 failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)getMessagesWithSessionId:(NSNumber *)welinkSessionId
+- (void)getMessagesWithSessionId:(NSString *)welinkSessionId
                                                                                                                 page:(NSNumber *)page
                                                                                                                 size:(NSNumber *)size
                                                                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)sendMessageWithSessionId:(NSNumber *)welinkSessionId
+- (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                                                                     content:(NSString *)content
                                                                                         toolCallId:(nullable NSString *)toolCallId
                                                                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)abortSessionWithSessionId:(NSNumber *)welinkSessionId
+- (void)abortSessionWithSessionId:(NSString *)welinkSessionId
                                                                                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)replyPermissionWithSessionId:(NSNumber *)welinkSessionId
+- (void)replyPermissionWithSessionId:(NSString *)welinkSessionId
                                                                                                                         permId:(NSString *)permId
                                                                                                                 response:(NSString *)response
                                                                                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)sendToIMWithSessionId:(NSNumber *)welinkSessionId
+- (void)sendToIMWithSessionId:(NSString *)welinkSessionId
                                                                                             content:(NSString *)content
                                                                                                 chatId:(nullable NSString *)chatId
                                                                                             success:(WLAgentSkillsHTTPSuccessBlock)success

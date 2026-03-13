@@ -42,15 +42,15 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 
 #pragma mark - Public APIs
 
-- (void)createSessionWithAK:(NSString *)ak
+- (void)createSessionWithAK:(nullable NSString *)ak
                                                                                         title:(nullable NSString *)title
                                                                         imGroupId:(NSString *)imGroupId
                                                                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                 failure:(WLAgentSkillsHTTPFailureBlock)failure {
-        NSMutableDictionary *parameters = [@{
-                @"ak" : ak,
-                @"imGroupId" : imGroupId
-        } mutableCopy];
+        NSMutableDictionary *parameters = [@{ @"imGroupId" : imGroupId } mutableCopy];
+        if (ak.length > 0) {
+                parameters[@"ak"] = ak;
+        }
         if (title.length > 0) {
                 parameters[@"title"] = title;
         }
@@ -85,14 +85,14 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
         [self GET:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
 }
 
-- (void)getSessionWithSessionId:(NSNumber *)welinkSessionId
+- (void)getSessionWithSessionId:(NSString *)welinkSessionId
                                                                                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                 failure:(WLAgentSkillsHTTPFailureBlock)failure {
         NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@", welinkSessionId];
         [self GET:path parameters:nil success:success failure:failure];
 }
 
-- (void)getMessagesWithSessionId:(NSNumber *)welinkSessionId
+- (void)getMessagesWithSessionId:(NSString *)welinkSessionId
                                                                                                                 page:(NSNumber *)page
                                                                                                                 size:(NSNumber *)size
                                                                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -105,7 +105,7 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
         [self GET:path parameters:parameters success:success failure:failure];
 }
 
-- (void)sendMessageWithSessionId:(NSNumber *)welinkSessionId
+- (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                                                                     content:(NSString *)content
                                                                                         toolCallId:(nullable NSString *)toolCallId
                                                                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -118,14 +118,14 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
         [self POST:path parameters:parameters success:success failure:failure];
 }
 
-- (void)abortSessionWithSessionId:(NSNumber *)welinkSessionId
+- (void)abortSessionWithSessionId:(NSString *)welinkSessionId
                                                                                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                                                                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
         NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/abort", welinkSessionId];
         [self POST:path parameters:nil success:success failure:failure];
 }
 
-- (void)replyPermissionWithSessionId:(NSNumber *)welinkSessionId
+- (void)replyPermissionWithSessionId:(NSString *)welinkSessionId
                                                                                                                         permId:(NSString *)permId
                                                                                                                 response:(NSString *)response
                                                                                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -135,7 +135,7 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
         [self POST:path parameters:parameters success:success failure:failure];
 }
 
-- (void)sendToIMWithSessionId:(NSNumber *)welinkSessionId
+- (void)sendToIMWithSessionId:(NSString *)welinkSessionId
                                                                                             content:(NSString *)content
                                                                                                 chatId:(nullable NSString *)chatId
                                                                                             success:(WLAgentSkillsHTTPSuccessBlock)success

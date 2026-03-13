@@ -73,19 +73,23 @@
 }
 
 - (void)cacheSendMessageResult:(WLAgentSkillsSendMessageResult *)result {
-        if (result.welinkSessionId == nil || result.id == nil) {
+        if (result.welinkSessionId.length == 0 || result.id.length == 0) {
                 return;
         }
 
-        NSString *sessionKey = result.welinkSessionId.stringValue;
-        NSString *messageId = result.id.stringValue;
+        NSString *sessionKey = result.welinkSessionId;
+        NSString *messageId = result.id;
         @synchronized(self) {
                 NSMutableDictionary *messageStore = [self ensureMessageStoreForSession:sessionKey
                                                                                                                                                                                                                                                                     messageId:messageId
                                                                                                                                                                                                                                                                 messageSeq:result.messageSeq
                                                                                                                                                                                                                                                                                         role:result.role];
                 messageStore[@"welinkSessionId"] = result.welinkSessionId;
-                messageStore[@"userId"] = result.userId ?: @"";
+                if (result.seq != nil) {
+                        messageStore[@"seq"] = result.seq;
+                } else {
+                        [messageStore removeObjectForKey:@"seq"];
+                }
                 messageStore[@"content"] = result.content ?: @"";
                 messageStore[@"createdAt"] = result.createdAt ?: @"";
                 messageStore[@"completed"] = @YES;
@@ -94,12 +98,12 @@
 }
 
 - (void)cacheHistoryMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
-                                                            forSessionId:(NSNumber *)welinkSessionId {
-        if (welinkSessionId == nil) {
+                                                            forSessionId:(NSString *)welinkSessionId {
+        if (welinkSessionId.length == 0) {
                 return;
         }
 
-        NSString *sessionKey = welinkSessionId.stringValue;
+        NSString *sessionKey = welinkSessionId;
         @synchronized(self) {
                 for (WLAgentSkillsSessionMessage *message in messages) {
                         NSString *messageId = [self normalizedMessageIdValue:message.id];
@@ -108,7 +112,11 @@
                                                                                                                                                                                                                                                                         messageSeq:message.messageSeq
                                                                                                                                                                                                                                                                                                 role:message.role];
                         messageStore[@"welinkSessionId"] = welinkSessionId;
-                        messageStore[@"userId"] = message.userId ?: @"";
+                        if (message.seq != nil) {
+                                messageStore[@"seq"] = message.seq;
+                        } else {
+                                [messageStore removeObjectForKey:@"seq"];
+                        }
                         messageStore[@"content"] = message.content ?: @"";
                         messageStore[@"createdAt"] = message.createdAt ?: @"";
                         messageStore[@"completed"] = @YES;
@@ -134,23 +142,21 @@
 }
 
 - (NSArray<WLAgentSkillsSessionMessage *> *)mergedMessagesWithServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
-                                                                                                                                                                                                                                                                    sessionId:(NSNumber *)welinkSessionId {
-        if (welinkSessionId == nil) {
+                                                                                                                                                                                                                                                                    sessionId:(NSString *)welinkSessionId {
+        if (welinkSessionId.length == 0) {
                 return @[];
         }
 
         [self cacheHistoryMessages:serverMessages forSessionId:welinkSessionId];
 
-        NSString *sessionKey = welinkSessionId.stringValue;
+        NSString *sessionKey = welinkSessionId;
         NSMutableArray<WLAgentSkillsSessionMessage *> *result = [NSMutableArray array];
         @synchronized(self) {
                 NSDictionary<NSString *, NSMutableDictionary *> *messages = self.messagesBySession[sessionKey] ?: @{};
                 NSArray<NSMutableDictionary *> *sortedStores = [messages.allValues sortedArrayUsingComparator:^NSComparisonResult(NSMutableDictionary *lhs, NSMutableDictionary *rhs) {
-                        NSNumber *leftSeq = lhs[@"messageSeq"] ?: @0;
-                        NSNumber *rightSeq = rhs[@"messageSeq"] ?: @0;
-                        NSComparisonResult seqCompare = [leftSeq compare:rightSeq];
-                        if (seqCompare != NSOrderedSame) {
-                                return seqCompare;
+                        NSComparisonResult orderCompare = [self compareMessageStoreOrder:lhs other:rhs];
+                        if (orderCompare != NSOrderedSame) {
+                                return orderCompare;
                         }
                         NSNumber *leftUpdated = lhs[@"updatedAt"] ?: @0;
                         NSNumber *rightUpdated = rhs[@"updatedAt"] ?: @0;
@@ -164,13 +170,13 @@
         return result;
 }
 
-- (nullable NSString *)latestCompletedContentForSessionId:(NSNumber *)welinkSessionId
+- (nullable NSString *)latestCompletedContentForSessionId:(NSString *)welinkSessionId
                                                                                                                                                                                                         messageId:(nullable NSString *)messageId {
-        if (welinkSessionId == nil) {
+        if (welinkSessionId.length == 0) {
                 return nil;
         }
 
-        NSString *sessionKey = welinkSessionId.stringValue;
+        NSString *sessionKey = welinkSessionId;
         @synchronized(self) {
                 NSDictionary<NSString *, NSMutableDictionary *> *messages = self.messagesBySession[sessionKey];
                 if (messages.count == 0) {
@@ -191,11 +197,9 @@
                 }
 
                 NSArray<NSMutableDictionary *> *sortedStores = [messages.allValues sortedArrayUsingComparator:^NSComparisonResult(NSMutableDictionary *lhs, NSMutableDictionary *rhs) {
-                        NSNumber *leftSeq = lhs[@"messageSeq"] ?: @0;
-                        NSNumber *rightSeq = rhs[@"messageSeq"] ?: @0;
-                        NSComparisonResult seqCompare = [leftSeq compare:rightSeq];
-                        if (seqCompare != NSOrderedSame) {
-                                return seqCompare;
+                        NSComparisonResult orderCompare = [self compareMessageStoreOrder:lhs other:rhs];
+                        if (orderCompare != NSOrderedSame) {
+                                return orderCompare;
                         }
                         NSNumber *leftUpdated = lhs[@"updatedAt"] ?: @0;
                         NSNumber *rightUpdated = rhs[@"updatedAt"] ?: @0;
@@ -215,12 +219,50 @@
         return nil;
 }
 
-- (nullable NSString *)lastUserMessageContentForSessionId:(NSNumber *)welinkSessionId {
-        if (welinkSessionId == nil) {
+- (BOOL)hasMessageForSessionId:(NSString *)welinkSessionId messageId:(NSString *)messageId {
+        if (welinkSessionId.length == 0 || messageId.length == 0) {
+                return NO;
+        }
+        @synchronized(self) {
+                NSDictionary<NSString *, NSMutableDictionary *> *messages = self.messagesBySession[welinkSessionId];
+                if (messages.count == 0) {
+                        return NO;
+                }
+                NSString *messageKey = [self resolveMessageKeyForSession:welinkSessionId
+                                                                                                                                                messageId:messageId
+                                                                                                                                            messageSeq:nil
+                                                                                                                        createIfMissing:NO];
+                return messageKey.length > 0 && messages[messageKey] != nil;
+        }
+}
+
+- (BOOL)isMessageCompletedForSessionId:(NSString *)welinkSessionId messageId:(NSString *)messageId {
+        if (welinkSessionId.length == 0 || messageId.length == 0) {
+                return NO;
+        }
+        @synchronized(self) {
+                NSDictionary<NSString *, NSMutableDictionary *> *messages = self.messagesBySession[welinkSessionId];
+                if (messages.count == 0) {
+                        return NO;
+                }
+                NSString *messageKey = [self resolveMessageKeyForSession:welinkSessionId
+                                                                                                                                                messageId:messageId
+                                                                                                                                            messageSeq:nil
+                                                                                                                        createIfMissing:NO];
+                if (messageKey.length == 0) {
+                        return NO;
+                }
+                NSDictionary *store = messages[messageKey];
+                return [store[@"completed"] boolValue];
+        }
+}
+
+- (nullable NSString *)lastUserMessageContentForSessionId:(NSString *)welinkSessionId {
+        if (welinkSessionId.length == 0) {
                 return nil;
         }
 
-        NSString *sessionKey = welinkSessionId.stringValue;
+        NSString *sessionKey = welinkSessionId;
         @synchronized(self) {
                 NSDictionary<NSString *, NSMutableDictionary *> *messages = self.messagesBySession[sessionKey];
                 if (messages.count == 0) {
@@ -228,9 +270,7 @@
                 }
 
                 NSArray<NSMutableDictionary *> *sortedStores = [messages.allValues sortedArrayUsingComparator:^NSComparisonResult(NSMutableDictionary *lhs, NSMutableDictionary *rhs) {
-                        NSNumber *leftSeq = lhs[@"messageSeq"] ?: @0;
-                        NSNumber *rightSeq = rhs[@"messageSeq"] ?: @0;
-                        return [leftSeq compare:rightSeq];
+                        return [self compareMessageStoreOrder:lhs other:rhs];
                 }];
 
                 for (NSMutableDictionary *store in [sortedStores reverseObjectEnumerator]) {
@@ -247,11 +287,11 @@
         return nil;
 }
 
-- (void)clearCacheForSessionId:(NSNumber *)welinkSessionId {
-        if (welinkSessionId == nil) {
+- (void)clearCacheForSessionId:(NSString *)welinkSessionId {
+        if (welinkSessionId.length == 0) {
                 return;
         }
-        NSString *sessionKey = welinkSessionId.stringValue;
+        NSString *sessionKey = welinkSessionId;
         @synchronized(self) {
                 [self.messagesBySession removeObjectForKey:sessionKey];
                 [self.messageIdIndexBySession removeObjectForKey:sessionKey];
@@ -496,16 +536,19 @@
                         partStore[@"toolCallId"] = message.toolCallId;
                 }
                 if (message.status.length > 0) {
-                        partStore[@"toolStatus"] = message.status;
+                        partStore[@"status"] = message.status;
                 }
                 if (message.input.count > 0) {
-                        partStore[@"toolInput"] = message.input;
+                        partStore[@"input"] = message.input;
                 }
                 if (message.output.length > 0) {
-                        partStore[@"toolOutput"] = message.output;
+                        partStore[@"output"] = message.output;
                 }
                 if (message.error.length > 0) {
-                        partStore[@"toolOutput"] = message.error;
+                        partStore[@"error"] = message.error;
+                }
+                if (message.title.length > 0) {
+                        partStore[@"title"] = message.title;
                 }
                 return;
         }
@@ -516,7 +559,10 @@
                         partStore[@"toolCallId"] = message.toolCallId;
                 }
                 if (message.status.length > 0) {
-                        partStore[@"toolStatus"] = message.status;
+                        partStore[@"status"] = message.status;
+                }
+                if (message.input.count > 0) {
+                        partStore[@"input"] = message.input;
                 }
                 if (message.header.length > 0) {
                         partStore[@"header"] = message.header;
@@ -550,9 +596,16 @@
                         partStore[@"permissionId"] = message.permissionId;
                 }
                 if (message.permType.length > 0) {
-                        partStore[@"toolName"] = message.permType;
+                        partStore[@"permType"] = message.permType;
+                }
+                if (message.metadata.count > 0) {
+                        partStore[@"metadata"] = message.metadata;
+                }
+                if (message.response.length > 0) {
+                        partStore[@"response"] = message.response;
                 }
                 if (message.title.length > 0) {
+                        partStore[@"title"] = message.title;
                         partStore[@"content"] = message.title;
                 }
                 if ([message.type isEqualToString:@"permission.reply"] && message.response.length > 0) {
@@ -609,7 +662,7 @@
         for (NSDictionary *part in parts) {
                 NSString *content = part[@"content"];
                 if (content.length == 0) {
-                        content = part[@"toolOutput"];
+                        content = part[@"output"];
                 }
                 if (content.length > 0) {
                         [contentPieces addObject:content];
@@ -657,14 +710,12 @@
                         latest = store;
                         continue;
                 }
-                NSNumber *latestSeq = latest[@"messageSeq"] ?: @0;
-                NSNumber *currentSeq = store[@"messageSeq"] ?: @0;
-                NSComparisonResult seqCompare = [currentSeq compare:latestSeq];
-                if (seqCompare == NSOrderedDescending) {
+                NSComparisonResult orderCompare = [self compareMessageStoreOrder:store other:latest];
+                if (orderCompare == NSOrderedDescending) {
                         latest = store;
                         continue;
                 }
-                if (seqCompare == NSOrderedSame) {
+                if (orderCompare == NSOrderedSame) {
                         NSNumber *latestUpdated = latest[@"updatedAt"] ?: @0;
                         NSNumber *currentUpdated = store[@"updatedAt"] ?: @0;
                         if ([currentUpdated compare:latestUpdated] == NSOrderedDescending) {
@@ -703,20 +754,26 @@
         if ([part[@"toolCallId"] isKindOfClass:[NSString class]]) {
                 normalized[@"toolCallId"] = part[@"toolCallId"];
         }
-        if ([part[@"toolStatus"] isKindOfClass:[NSString class]]) {
-                normalized[@"toolStatus"] = part[@"toolStatus"];
-        } else if ([part[@"status"] isKindOfClass:[NSString class]]) {
-                normalized[@"toolStatus"] = part[@"status"];
+        if ([part[@"status"] isKindOfClass:[NSString class]]) {
+                normalized[@"status"] = part[@"status"];
+        } else if ([part[@"toolStatus"] isKindOfClass:[NSString class]]) {
+                normalized[@"status"] = part[@"toolStatus"];
         }
-        if ([part[@"toolInput"] isKindOfClass:[NSDictionary class]]) {
-                normalized[@"toolInput"] = part[@"toolInput"];
-        } else if ([part[@"input"] isKindOfClass:[NSDictionary class]]) {
-                normalized[@"toolInput"] = part[@"input"];
+        if ([part[@"input"] isKindOfClass:[NSDictionary class]]) {
+                normalized[@"input"] = part[@"input"];
+        } else if ([part[@"toolInput"] isKindOfClass:[NSDictionary class]]) {
+                normalized[@"input"] = part[@"toolInput"];
         }
-        if ([part[@"toolOutput"] isKindOfClass:[NSString class]]) {
-                normalized[@"toolOutput"] = part[@"toolOutput"];
-        } else if ([part[@"output"] isKindOfClass:[NSString class]]) {
-                normalized[@"toolOutput"] = part[@"output"];
+        if ([part[@"output"] isKindOfClass:[NSString class]]) {
+                normalized[@"output"] = part[@"output"];
+        } else if ([part[@"toolOutput"] isKindOfClass:[NSString class]]) {
+                normalized[@"output"] = part[@"toolOutput"];
+        }
+        if ([part[@"error"] isKindOfClass:[NSString class]]) {
+                normalized[@"error"] = part[@"error"];
+        }
+        if ([part[@"title"] isKindOfClass:[NSString class]]) {
+                normalized[@"title"] = part[@"title"];
         }
         if ([part[@"header"] isKindOfClass:[NSString class]]) {
                 normalized[@"header"] = part[@"header"];
@@ -729,6 +786,15 @@
         }
         if ([part[@"permissionId"] isKindOfClass:[NSString class]]) {
                 normalized[@"permissionId"] = part[@"permissionId"];
+        }
+        if ([part[@"permType"] isKindOfClass:[NSString class]]) {
+                normalized[@"permType"] = part[@"permType"];
+        }
+        if ([part[@"metadata"] isKindOfClass:[NSDictionary class]]) {
+                normalized[@"metadata"] = part[@"metadata"];
+        }
+        if ([part[@"response"] isKindOfClass:[NSString class]]) {
+                normalized[@"response"] = part[@"response"];
         }
         if ([part[@"fileName"] isKindOfClass:[NSString class]]) {
                 normalized[@"fileName"] = part[@"fileName"];
@@ -747,13 +813,21 @@
         NSString *sessionId = message.welinkSessionId;
         for (NSDictionary *snapshot in snapshotMessages) {
                 NSString *messageId = [self normalizedMessageIdValue:snapshot[@"id"]];
-                NSNumber *messageSeq = [snapshot[@"seq"] isKindOfClass:[NSNumber class]] ? snapshot[@"seq"] : @0;
+                NSNumber *messageSeq = [snapshot[@"messageSeq"] isKindOfClass:[NSNumber class]] ? snapshot[@"messageSeq"] : nil;
+                if (messageSeq == nil) {
+                        messageSeq = [snapshot[@"seq"] isKindOfClass:[NSNumber class]] ? snapshot[@"seq"] : @0;
+                }
                 NSString *role = [snapshot[@"role"] isKindOfClass:[NSString class]] ? snapshot[@"role"] : @"assistant";
 
                 NSMutableDictionary *messageStore = [self ensureMessageStoreForSession:sessionId
                                                                                                                                                                                                                                                                     messageId:messageId
                                                                                                                                                                                                                                                                 messageSeq:messageSeq
                                                                                                                                                                                                                                                                                         role:role];
+                if ([snapshot[@"seq"] isKindOfClass:[NSNumber class]]) {
+                        messageStore[@"seq"] = snapshot[@"seq"];
+                } else {
+                        [messageStore removeObjectForKey:@"seq"];
+                }
                 messageStore[@"content"] = [snapshot[@"content"] isKindOfClass:[NSString class]] ? snapshot[@"content"] : @"";
                 messageStore[@"completed"] = @YES;
                 messageStore[@"updatedAt"] = @([self currentTimestampMs]);
@@ -842,17 +916,50 @@
 
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
         dictionary[@"id"] = [self normalizedMessageIdValue:store[@"messageId"]];
-        dictionary[@"welinkSessionId"] = @([sessionKey longLongValue]);
-        dictionary[@"userId"] = store[@"userId"] ?: [NSNull null];
+        dictionary[@"seq"] = store[@"seq"] ?: [NSNull null];
+        dictionary[@"welinkSessionId"] = sessionKey;
         dictionary[@"role"] = store[@"role"] ?: @"assistant";
         dictionary[@"content"] = store[@"content"] ?: @"";
-        dictionary[@"messageSeq"] = store[@"messageSeq"] ?: @0;
+        dictionary[@"messageSeq"] = store[@"messageSeq"] ?: [NSNull null];
         dictionary[@"parts"] = parts;
         dictionary[@"createdAt"] = store[@"createdAt"] ?: @"";
         if ([store[@"contentType"] isKindOfClass:[NSString class]]) {
                 dictionary[@"contentType"] = store[@"contentType"];
         }
         return [[WLAgentSkillsSessionMessage alloc] initWithDictionary:dictionary];
+}
+
+- (NSComparisonResult)compareMessageStoreOrder:(NSDictionary *)leftStore other:(NSDictionary *)rightStore {
+        NSNumber *leftSeq = [leftStore[@"seq"] isKindOfClass:[NSNumber class]] ? leftStore[@"seq"] : nil;
+        NSNumber *rightSeq = [rightStore[@"seq"] isKindOfClass:[NSNumber class]] ? rightStore[@"seq"] : nil;
+        NSComparisonResult seqCompare = [self compareNullableNumber:leftSeq right:rightSeq];
+        if (seqCompare != NSOrderedSame) {
+                return seqCompare;
+        }
+
+        NSNumber *leftMessageSeq = [leftStore[@"messageSeq"] isKindOfClass:[NSNumber class]] ? leftStore[@"messageSeq"] : nil;
+        NSNumber *rightMessageSeq = [rightStore[@"messageSeq"] isKindOfClass:[NSNumber class]] ? rightStore[@"messageSeq"] : nil;
+        NSComparisonResult messageSeqCompare = [self compareNullableNumber:leftMessageSeq right:rightMessageSeq];
+        if (messageSeqCompare != NSOrderedSame) {
+                return messageSeqCompare;
+        }
+
+        NSString *leftId = [self normalizedMessageIdValue:leftStore[@"messageId"]];
+        NSString *rightId = [self normalizedMessageIdValue:rightStore[@"messageId"]];
+        return [leftId compare:rightId];
+}
+
+- (NSComparisonResult)compareNullableNumber:(nullable NSNumber *)left right:(nullable NSNumber *)right {
+        if (left != nil && right != nil) {
+                return [left compare:right];
+        }
+        if (left != nil) {
+                return NSOrderedAscending;
+        }
+        if (right != nil) {
+                return NSOrderedDescending;
+        }
+        return NSOrderedSame;
 }
 
 - (long long)currentTimestampMs {
