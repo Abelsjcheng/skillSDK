@@ -127,10 +127,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderContent = () => {
+    let toolCallId: string | undefined = undefined
     if (message.parts && message.parts.length > 0) {
       return (
         <div className="message-parts">
-          {message.parts.map(renderPart)}
+          {message.parts.map((part) => {
+            if(part.type = 'tool') {
+              toolCallId = part.toolCallId
+            }
+            part.toolCallId = toolCallId;
+            return renderPart(part)
+          })}
         </div>
       );
     }
@@ -164,15 +171,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
       {!isUser && !message.isStreaming && message.content && (
         <div className="message-actions">
-          <button 
-            className="action-btn copy-btn" 
+          <button
+            className="action-btn copy-btn"
             onClick={handleCopy}
             title="复制内容"
           >
             📋 复制
           </button>
-          <button 
-            className="action-btn send-btn" 
+          <button
+            className="action-btn send-btn"
             onClick={handleSendToIM}
             title="发送到聊天"
           >
