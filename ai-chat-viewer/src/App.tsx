@@ -22,6 +22,10 @@ import {
 } from './utils/hwext';
 import './styles/App.less';
 
+export interface AppProps {
+  welinkSessionId?: string;
+}
+
 let nextMsgId = 1;
 function genId(): string {
   return `msg_${Date.now()}_${nextMsgId++}`;
@@ -70,7 +74,7 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
   };
 }
 
-function App() {
+function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -119,14 +123,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof welinkSessionIdProp === 'string' && welinkSessionIdProp.trim()) {
+      setIsLoading(true);
+      setWelinkSessionId(welinkSessionIdProp.trim());
+      return;
+    }
+
     const sessionId = parseWelinkSessionId();
     if (sessionId) {
+      setIsLoading(true);
       setWelinkSessionId(sessionId);
     } else {
       console.error('缺少 welinkSessionId 参数');
       setIsLoading(false);
     }
-  }, []);
+  }, [welinkSessionIdProp]);
 
   useEffect(() => {
     if (!welinkSessionId) return;

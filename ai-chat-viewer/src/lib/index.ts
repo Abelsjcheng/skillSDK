@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import App from '../App';
+import App, { type AppProps } from '../App';
 import type {
   Message,
   MessagePart,
@@ -11,6 +11,7 @@ import type {
 } from '../types';
 
 export type {
+  AppProps,
   Message,
   MessagePart,
   StreamMessage,
@@ -21,14 +22,14 @@ export type {
 
 const rootMap = new WeakMap<Element, Root>();
 
-export function mountAIChatViewer(container: Element): Root {
+export function mountAIChatViewer(container: Element, props?: AppProps): Root {
   let root = rootMap.get(container);
   if (!root) {
     root = createRoot(container);
     rootMap.set(container, root);
   }
 
-  root.render(React.createElement(App));
+  root.render(React.createElement(App, props));
   return root;
 }
 

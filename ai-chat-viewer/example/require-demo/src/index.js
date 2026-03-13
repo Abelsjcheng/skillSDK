@@ -58,7 +58,9 @@ function injectSessionIdToUrl() {
 
 function mount() {
   injectSessionIdToUrl();
-  mountAIChatViewer(rootElement);
+  mountAIChatViewer(rootElement, {
+    welinkSessionId: String(sessionSeed),
+  });
   mounted = true;
   setStatus('mounted');
 }

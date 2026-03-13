@@ -89,7 +89,7 @@
       return Promise.resolve({
         content: [
           {
-            id: 1,
+            id: '1',
             welinkSessionId: params.welinkSessionId,
             role: 'assistant',
             content: 'This viewer is mounted from dist/lib/index.js via require().',
@@ -105,6 +105,9 @@
             ],
           },
         ],
+        number: 0,
+        size: 50,
+        totalElements: 1,
       });
     },
 
@@ -179,7 +182,7 @@
 
     sendMessageToIM: function sendMessageToIM() {
       window.alert('Mock: sent to IM');
-      return Promise.resolve({ status: 'success' });
+      return Promise.resolve({ success: true });
     },
 
     controlSkillWeCode: function controlSkillWeCode(params) {
