@@ -6,24 +6,24 @@ interface ToolCardProps {
 }
 
 const statusLabels: Record<string, string> = {
-  pending: '等待中',
-  running: '运行中...',
-  completed: '完成',
-  error: '错误',
+  pending: 'Pending',
+  running: 'Running',
+  completed: 'Completed',
+  error: 'Error',
 };
 
 const statusIcons: Record<string, string> = {
-  pending: '⏳',
-  running: '⚙️',
-  completed: '✅',
-  error: '❌',
+  pending: 'O',
+  running: '*',
+  completed: 'OK',
+  error: 'X',
 };
 
 export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
   const [expanded, setExpanded] = useState(false);
-  const status = part.toolStatus ?? 'pending';
+  const status = part.status ?? 'pending';
   const statusLabel = statusLabels[status] ?? status;
-  const statusIcon = statusIcons[status] ?? '🔧';
+  const statusIcon = statusIcons[status] ?? 'i';
 
   return (
     <div className={`tool-card tool-card--${status}`}>
@@ -34,35 +34,33 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
         tabIndex={0}
       >
         <span className="tool-card__icon">{statusIcon}</span>
-        <span className="tool-card__name">{part.toolName ?? '工具调用'}</span>
-        {part.toolTitle && (
-          <span className="tool-card__title">{part.toolTitle}</span>
+        <span className="tool-card__name">{part.toolName ?? 'Tool call'}</span>
+        {part.title && (
+          <span className="tool-card__title">{part.title}</span>
         )}
         <span className="tool-card__status">{statusLabel}</span>
         <span className={`tool-card__chevron ${expanded ? 'expanded' : ''}`}>
-          ▶
+          {'>'}
         </span>
       </div>
 
       {expanded && (
         <div className="tool-card__body">
-          {part.toolInput && (
+          {part.input && (
             <div className="tool-card__section">
-              <div className="tool-card__section-title">输入</div>
-              <pre className="tool-card__code">
-                {JSON.stringify(part.toolInput, null, 2)}
-              </pre>
+              <div className="tool-card__section-title">Input</div>
+              <pre className="tool-card__code">{JSON.stringify(part.input, null, 2)}</pre>
             </div>
           )}
-          {part.toolOutput && (
+          {part.output && (
             <div className="tool-card__section">
-              <div className="tool-card__section-title">输出</div>
-              <pre className="tool-card__code">{part.toolOutput}</pre>
+              <div className="tool-card__section-title">Output</div>
+              <pre className="tool-card__code">{part.output}</pre>
             </div>
           )}
           {status === 'error' && part.content && (
             <div className="tool-card__section tool-card__error">
-              <div className="tool-card__section-title">错误</div>
+              <div className="tool-card__section-title">Error</div>
               <pre className="tool-card__code">{part.content}</pre>
             </div>
           )}

@@ -5,7 +5,7 @@ import '../styles/Content.less';
 
 interface ContentProps {
   messages: Message[];
-  welinkSessionId: number;
+  welinkSessionId: string;
   isLoading: boolean;
   onCopy: (content: string) => void;
   onSendToIM: (content: string) => void;

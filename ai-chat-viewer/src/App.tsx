@@ -44,7 +44,7 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
   return {
     id: String(sm.id),
     role: normalizeRole(sm.role),
-    content: sm.content,
+    content: sm.content ?? '',
     timestamp: new Date(sm.createdAt).getTime(),
     isStreaming: false,
     parts: sm.parts?.map((p) => ({
@@ -52,24 +52,26 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
       type: p.type,
       content: p.content ?? '',
       isStreaming: false,
-      toolName: p.toolName,
-      toolCallId: p.toolCallId,
-      toolStatus: p.toolStatus,
-      toolInput: p.toolInput,
-      toolOutput: p.toolOutput,
-      header: p.header,
-      question: p.question,
-      options: p.options,
-      permissionId: p.permissionId,
-      fileName: p.fileName,
-      fileUrl: p.fileUrl,
-      fileMime: p.fileMime,
+      toolName: p.toolName ?? undefined,
+      toolCallId: p.toolCallId ?? undefined,
+      status: (p.status as 'pending' | 'running' | 'completed' | 'error' | undefined) ?? undefined,
+      input: p.input ?? undefined,
+      output: p.output ?? undefined,
+      title: p.title ?? undefined,
+      header: p.header ?? undefined,
+      question: p.question ?? undefined,
+      options: p.options ?? undefined,
+      permissionId: p.permissionId ?? undefined,
+      permType: p.permType ?? undefined,
+      fileName: p.fileName ?? undefined,
+      fileUrl: p.fileUrl ?? undefined,
+      fileMime: p.fileMime ?? undefined,
     })),
   };
 }
 
 function App() {
-  const [welinkSessionId, setWelinkSessionId] = useState<number | null>(null);
+  const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
   const [footerMode, setFooterMode] = useState<FooterMode>('generate');
@@ -81,7 +83,13 @@ function App() {
   const awaitingFinalResultRef = useRef(false);
 
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
-  const onErrorRef = useRef<((err: { errorCode: number; errorMessage: string }) => void) | null>(null);
+  const onErrorRef = useRef<((err: {
+    code?: string;
+    message?: string;
+    timestamp?: number;
+    errorCode?: number;
+    errorMessage?: string;
+  }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
 
   const closeHwh5 = () => {
@@ -188,7 +196,14 @@ function App() {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === finalId
-                  ? { ...m, meta: { ...m.meta, tokens: msg.tokens, cost: msg.cost } }
+                  ? {
+                    ...m,
+                    meta: {
+                      ...m.meta,
+                      tokens: msg.tokens ?? undefined,
+                      cost: msg.cost ?? undefined,
+                    },
+                  }
                   : m,
               ),
             );
@@ -231,7 +246,7 @@ function App() {
             const snapshotMessages: Message[] = msg.messages.map((sm) => ({
               id: sm.id,
               role: normalizeRole(sm.role),
-              content: sm.content,
+              content: sm.content ?? '',
               timestamp: sm.createdAt ? new Date(sm.createdAt).getTime() : Date.now(),
               isStreaming: false,
               parts: sm.parts?.map((p) => ({
@@ -239,15 +254,20 @@ function App() {
                 type: p.type,
                 content: p.content ?? '',
                 isStreaming: false,
-                toolName: p.toolName,
-                toolCallId: p.toolCallId,
-                toolStatus: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
-                header: p.header,
-                question: p.question,
-                options: p.options,
-                fileName: p.fileName,
-                fileUrl: p.fileUrl,
-                fileMime: p.fileMime,
+                toolName: p.toolName ?? undefined,
+                toolCallId: p.toolCallId ?? undefined,
+                status: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
+                input: p.input ?? undefined,
+                output: p.output ?? undefined,
+                title: p.title ?? undefined,
+                header: p.header ?? undefined,
+                question: p.question ?? undefined,
+                options: p.options ?? undefined,
+                permissionId: p.permissionId ?? undefined,
+                permType: p.permType ?? undefined,
+                fileName: p.fileName ?? undefined,
+                fileUrl: p.fileUrl ?? undefined,
+                fileMime: p.fileMime ?? undefined,
               })),
             }));
             setMessages(snapshotMessages);
@@ -270,15 +290,20 @@ function App() {
                 type: p.type,
                 content: p.content ?? '',
                 isStreaming: true,
-                toolName: p.toolName,
-                toolCallId: p.toolCallId,
-                toolStatus: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
-                header: p.header,
-                question: p.question,
-                options: p.options,
-                fileName: p.fileName,
-                fileUrl: p.fileUrl,
-                fileMime: p.fileMime,
+                toolName: p.toolName ?? undefined,
+                toolCallId: p.toolCallId ?? undefined,
+                status: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
+                input: p.input ?? undefined,
+                output: p.output ?? undefined,
+                title: p.title ?? undefined,
+                header: p.header ?? undefined,
+                question: p.question ?? undefined,
+                options: p.options ?? undefined,
+                permissionId: p.permissionId ?? undefined,
+                permType: p.permType ?? undefined,
+                fileName: p.fileName ?? undefined,
+                fileUrl: p.fileUrl ?? undefined,
+                fileMime: p.fileMime ?? undefined,
               })),
             };
             setMessages((prev) => [...prev, streamingMsg]);
@@ -291,7 +316,9 @@ function App() {
     };
 
     onErrorRef.current = (err) => {
-      console.error('Session listener error:', `${err.errorCode}: ${err.errorMessage}`);
+      const errorCode = err.code ?? (err.errorCode !== undefined ? String(err.errorCode) : 'unknown');
+      const errorMessage = err.message ?? err.errorMessage ?? 'unknown error';
+      console.error('Session listener error:', `${errorCode}: ${errorMessage}`);
     };
 
     onCloseRef.current = (reason) => {
@@ -319,9 +346,6 @@ function App() {
       if (listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
         unregisterSessionListener({
           welinkSessionId,
-          onMessage: onMessageRef.current,
-          onError: onErrorRef.current ?? undefined,
-          onClose: onCloseRef.current ?? undefined,
         });
         listenerRegisteredRef.current = false;
       }
@@ -389,7 +413,7 @@ function App() {
     }
   }, [welinkSessionId]);
 
-  const handleSendToIM = useCallback(async (content: string) => {
+  const handleSendToIM = useCallback(async (_content: string) => {
     if (!welinkSessionId) return;
     try {
       await sendMessageToIM({
@@ -457,7 +481,7 @@ function App() {
       <div className="content-wrapper">
         <Content
           messages={messages}
-          welinkSessionId={welinkSessionId ?? 0}
+          welinkSessionId={welinkSessionId ?? ''}
           isLoading={isLoading}
           onCopy={handleCopy}
           onSendToIM={handleSendToIM}

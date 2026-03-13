@@ -4,7 +4,7 @@ import { replyPermission } from '../utils/hwext';
 
 interface PermissionCardProps {
   part: MessagePart;
-  welinkSessionId: number;
+  welinkSessionId: string;
   onResolved?: () => void;
 }
 

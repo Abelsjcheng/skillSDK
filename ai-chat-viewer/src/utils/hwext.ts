@@ -10,46 +10,54 @@ import type {
 } from '../types';
 
 export interface HWH5EXTError {
-  errorCode: number;
-  errorMessage: string;
+  code?: string;
+  message?: string;
+  timestamp?: number;
+  errorCode?: number;
+  errorMessage?: string;
 }
 
 export interface RegisterSessionListenerParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   onMessage: (message: StreamMessage) => void;
   onError?: (error: HWH5EXTError) => void;
   onClose?: (reason: string) => void;
 }
 
+export interface UnregisterSessionListenerParams {
+  welinkSessionId: string;
+}
+
 export interface SendMessageParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   content: string;
   toolCallId?: string;
 }
 
 export interface GetSessionMessageParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   page?: number;
   size?: number;
 }
 
 export interface StopSkillParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
 }
 
 export interface SendMessageToIMParams {
-  welinkSessionId: number;
-  messageId?: number;
+  welinkSessionId: string;
+  messageId?: string;
+  chatId?: string;
 }
 
 export interface ReplyPermissionParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   permId: string;
   response: 'once' | 'always' | 'reject';
 }
 
 export interface RegenerateAnswerParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
 }
 
 export interface ControlSkillWeCodeParams {
@@ -61,7 +69,7 @@ export interface HWH5EXT {
   sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResponse>;
   getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse>;
   registerSessionListener(params: RegisterSessionListenerParams): void;
-  unregisterSessionListener(params: RegisterSessionListenerParams): void;
+  unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
@@ -79,14 +87,11 @@ declare global {
   }
 }
 
-const PC_UA_REGEX = /Windows NT|Macintosh|X11|Linux/i;
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 
 export function isPcMiniApp(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  if (!ua) return false;
-  return PC_UA_REGEX.test(ua);
+  if (typeof window === 'undefined') return false;
+  return typeof window.Pedestal?.callMethod === 'function';
 }
 
 function tryGetPedestal(): Pedestal | null {
@@ -104,7 +109,9 @@ function getPedestalOrThrow(): Pedestal {
 }
 
 function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
-  const call = <T>(funName: string, params: unknown) => Promise.resolve(pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T);
+  const call = <T>(funName: string, params: unknown) =>
+    Promise.resolve(pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T);
+
   return {
     regenerateAnswer: (params) => call<RegenerateAnswerResponse>('regenerateAnswer', params),
     sendMessageToIM: (params) => call<SendMessageToIMResponse>('sendMessageToIM', params),
@@ -122,7 +129,12 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
-    controlSkillWeCode: (params) => call<ControlSkillWeCodeResponse>('controlSkillWeCode', params),
+    controlSkillWeCode: (params) => {
+      window.dispatchEvent(new CustomEvent('agentSkills_controlSkillWecode', {
+        detail: { action: params.action }
+      }))
+      return call<ControlSkillWeCodeResponse>('controlSkillWeCode', params)
+    },
   };
 }
 
@@ -165,7 +177,7 @@ export function registerSessionListener(params: RegisterSessionListenerParams): 
   return getJsApiOrThrow().registerSessionListener(params);
 }
 
-export function unregisterSessionListener(params: RegisterSessionListenerParams): void {
+export function unregisterSessionListener(params: UnregisterSessionListenerParams): void {
   return getJsApiOrThrow().unregisterSessionListener(params);
 }
 
@@ -185,13 +197,11 @@ export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Prom
   return getJsApiOrThrow().controlSkillWeCode(params);
 }
 
-export function parseWelinkSessionId(): number | null {
+export function parseWelinkSessionId(): string | null {
   if (typeof window === 'undefined') return null;
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('welinkSessionId');
-  if (sessionId) {
-    const parsed = parseInt(sessionId, 10);
-    return isNaN(parsed) ? null : parsed;
-  }
-  return null;
+  if (!sessionId) return null;
+  const normalized = sessionId.trim();
+  return normalized.length > 0 ? normalized : null;
 }

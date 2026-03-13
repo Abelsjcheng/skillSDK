@@ -16,7 +16,7 @@ import 'katex/dist/katex.min.css';
 
 interface MessageBubbleProps {
   message: Message;
-  welinkSessionId: number;
+  welinkSessionId: string;
   onCopy?: (content: string) => void;
   onSendToIM?: (content: string) => void;
 }

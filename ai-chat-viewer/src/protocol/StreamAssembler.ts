@@ -82,24 +82,42 @@ export class StreamAssembler {
       case 'tool.update': {
         const id = msg.partId || this.genPartId('tool');
         const part = this.getOrCreatePart(id, 'tool');
-        part.toolName = msg.toolName;
-        part.toolCallId = msg.toolCallId;
-        part.toolStatus = msg.status;
-        part.toolTitle = msg.title;
-        if (msg.input) part.toolInput = msg.input;
-        if (msg.output) part.toolOutput = msg.output;
+        part.toolName = msg.toolName ?? undefined;
+        part.toolCallId = msg.toolCallId ?? undefined;
+        const status = msg.status;
+        part.status =
+          status === 'pending' || status === 'running' || status === 'completed' || status === 'error'
+            ? status
+            : undefined;
+        part.title = msg.title ?? undefined;
+        if (msg.input) part.input = msg.input;
+        if (msg.output != null) part.output = msg.output;
         if (msg.error) part.content = msg.error;
         part.isStreaming = msg.status === 'pending' || msg.status === 'running';
         break;
       }
 
       case 'question': {
-        const id = msg.partId || this.genPartId('question');
+        const questionPart = msg.parts?.find((p) =>
+          msg.partId ? p.partId === msg.partId : p.type === 'question',
+        );
+        const id = msg.partId || questionPart?.partId || this.genPartId('question');
         const part = this.getOrCreatePart(id, 'question');
-        part.toolName = msg.toolName;
-        part.header = msg.header;
-        part.question = msg.question;
-        part.options = msg.options;
+        part.toolName = msg.toolName ?? questionPart?.toolName ?? part.toolName;
+        part.toolCallId = msg.toolCallId ?? questionPart?.toolCallId ?? part.toolCallId;
+
+        const status = msg.status ?? questionPart?.status;
+        if (status === 'pending' || status === 'running' || status === 'completed' || status === 'error') {
+          part.status = status;
+        }
+
+        part.header = msg.header ?? questionPart?.header ?? part.header;
+        part.question = msg.question ?? questionPart?.question ?? part.question;
+        part.options = msg.options ?? questionPart?.options ?? part.options;
+        part.content = msg.content ?? questionPart?.content ?? part.content;
+        if (!part.content && part.question) {
+          part.content = part.question;
+        }
         part.isStreaming = false;
         break;
       }
@@ -107,9 +125,9 @@ export class StreamAssembler {
       case 'permission.ask': {
         const id = msg.partId || msg.permissionId || this.genPartId('perm');
         const part = this.getOrCreatePart(id, 'permission');
-        part.permissionId = msg.permissionId;
-        part.permType = msg.permType;
-        part.toolName = msg.toolName;
+        part.permissionId = msg.permissionId ?? undefined;
+        part.permType = msg.permType ?? undefined;
+        part.toolName = msg.toolName ?? undefined;
         part.content = msg.content ?? '';
         part.isStreaming = false;
         break;
@@ -118,9 +136,9 @@ export class StreamAssembler {
       case 'file': {
         const id = msg.partId || this.genPartId('file');
         const part = this.getOrCreatePart(id, 'file');
-        part.fileName = msg.fileName;
-        part.fileUrl = msg.fileUrl;
-        part.fileMime = msg.fileMime;
+        part.fileName = msg.fileName ?? undefined;
+        part.fileUrl = msg.fileUrl ?? undefined;
+        part.fileMime = msg.fileMime ?? undefined;
         part.isStreaming = false;
         break;
       }

@@ -4,7 +4,7 @@ import { sendMessage } from '../utils/hwext';
 
 interface QuestionCardProps {
   part: MessagePart;
-  welinkSessionId: number;
+  welinkSessionId: string;
   onAnswered?: () => void;
 }
 

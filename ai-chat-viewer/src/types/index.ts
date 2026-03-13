@@ -1,6 +1,6 @@
 // ============================================================
 // StreamMessage Protocol Type Definitions
-// Based on 小程序JSAPI接口文档.md & 01-layer1-miniapp-skill-api.md
+// Based on 小程序JSAPI接口文档.md & SkillClientSdkInterfaceV1.md
 // ============================================================
 
 /** All supported StreamMessage type strings */
@@ -25,84 +25,83 @@ export type StreamMessageType =
   | 'snapshot'
   | 'streaming';
 
-/**
- * StreamMessage delivered from SessionListener onMessage callback.
- * 参考: 小程序JSAPI接口文档.md - registerSessionListener
- */
+/** StreamMessage delivered from SessionListener onMessage callback. */
 export interface StreamMessage {
-  // 传输层字段 (所有消息都有)
+  // transport-level fields
   type: StreamMessageType;
-  seq: number;
+  seq: number | null;
   welinkSessionId: string;
-  emittedAt: string;
+  emittedAt: string | null;
   raw?: object;
 
-  // 消息层字段 (归属到某条聊天气泡的事件)
-  messageId?: string;
-  messageSeq?: number;
-  role?: 'user' | 'assistant' | 'system' | 'tool';
+  // message-level fields
+  messageId?: string | null;
+  sourceMessageId?: string | null;
+  messageSeq?: number | null;
+  role?: 'user' | 'assistant' | 'system' | 'tool' | string;
 
-  // Part 层字段 (归属到消息中某个部件的事件)
-  partId?: string;
-  partSeq?: number;
-  content?: string;
+  // part-level fields
+  partId?: string | null;
+  partSeq?: number | null;
+  content?: string | null;
 
-  // Tool fields (tool.update)
-  toolName?: string;
-  toolCallId?: string;
-  status?: 'pending' | 'running' | 'completed' | 'error';
-  input?: object;
-  output?: string;
-  error?: string;
-  title?: string;
+  // tool fields
+  toolName?: string | null;
+  toolCallId?: string | null;
+  status?: 'pending' | 'running' | 'completed' | 'error' | string | null;
+  input?: object | null;
+  output?: string | null;
+  error?: string | null;
+  title?: string | null;
 
-  // Question fields
-  header?: string;
-  question?: string;
-  options?: string[];
+  // question fields
+  header?: string | null;
+  question?: string | null;
+  options?: string[] | null;
 
-  // Permission fields
-  permissionId?: string;
-  permType?: string;
-  metadata?: object;
-  response?: 'once' | 'always' | 'reject';
+  // permission fields
+  permissionId?: string | null;
+  permType?: string | null;
+  metadata?: object | null;
+  response?: 'once' | 'always' | 'reject' | string | null;
 
-  // Session status
-  sessionStatus?: 'busy' | 'idle' | 'retry';
+  // session status
+  sessionStatus?: 'busy' | 'idle' | 'retry' | string | null;
 
-  // Step fields
+  // step fields
   tokens?: {
     input?: number;
     output?: number;
     reasoning?: number;
     cache?: { read?: number; write?: number };
-  };
-  cost?: number;
-  reason?: string;
+  } | null;
+  cost?: number | null;
+  reason?: string | null;
 
-  // File fields
-  fileName?: string;
-  fileUrl?: string;
-  fileMime?: string;
+  // file fields
+  fileName?: string | null;
+  fileUrl?: string | null;
+  fileMime?: string | null;
 
-  // Snapshot/Streaming fields
-  messages?: SessionMessageSnapshot[];
-  parts?: MessagePartSnapshot[];
+  // snapshot/streaming fields
+  messages?: SessionMessageSnapshot[] | null;
+  parts?: MessagePartSnapshot[] | null;
 }
 
 // ============================================================
-// SessionMessage - 历史消息结构
-// 参考: 小程序JSAPI接口文档.md - getSessionMessage
+// SessionMessage - history message structure
 // ============================================================
 
 export interface SessionMessage {
-  id: number;
-  welinkSessionId: number;
-  userId: string | null;
-  role: 'user' | 'assistant' | 'system' | 'tool';
-  content: string;
-  messageSeq: number;
-  parts: SessionMessagePart[];
+  id: string;
+  seq?: number | null;
+  welinkSessionId: string;
+  role: 'user' | 'assistant' | string;
+  content: string | null;
+  contentType?: 'plain' | 'markdown' | string | null;
+  meta?: object | null;
+  messageSeq?: number | null;
+  parts?: SessionMessagePart[] | null;
   createdAt: string;
 }
 
@@ -110,27 +109,32 @@ export interface SessionMessagePart {
   partId: string;
   partSeq: number;
   type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
-  content: string;
+  content: string | null;
 
-  // Tool-specific
-  toolName?: string;
-  toolCallId?: string;
-  toolStatus?: 'pending' | 'running' | 'completed' | 'error';
-  toolInput?: object;
-  toolOutput?: string;
+  // tool/question fields
+  toolName?: string | null;
+  toolCallId?: string | null;
+  status?: string | null;
+  input?: object | null;
+  output?: string | null;
+  error?: string | null;
+  title?: string | null;
 
-  // Question-specific
-  header?: string;
-  question?: string;
-  options?: string[];
+  // question fields
+  header?: string | null;
+  question?: string | null;
+  options?: string[] | null;
 
-  // Permission-specific
-  permissionId?: string;
+  // permission fields
+  permissionId?: string | null;
+  permType?: string | null;
+  metadata?: object | null;
+  response?: 'once' | 'always' | 'reject' | string | null;
 
-  // File-specific
-  fileName?: string;
-  fileUrl?: string;
-  fileMime?: string;
+  // file fields
+  fileName?: string | null;
+  fileUrl?: string | null;
+  fileMime?: string | null;
 }
 
 // ============================================================
@@ -144,26 +148,26 @@ export interface MessagePart {
   content: string;
   isStreaming: boolean;
 
-  // Tool-specific
+  // tool/question fields (align with JSAPI field names)
   toolName?: string;
   toolCallId?: string;
-  toolStatus?: 'pending' | 'running' | 'completed' | 'error';
-  toolInput?: object;
-  toolOutput?: string;
-  toolTitle?: string;
+  status?: 'pending' | 'running' | 'completed' | 'error';
+  input?: object;
+  output?: string;
+  title?: string;
 
-  // Question-specific
+  // question-specific
   header?: string;
   question?: string;
   options?: string[];
   answered?: boolean;
 
-  // Permission-specific
+  // permission-specific
   permissionId?: string;
   permType?: string;
   permResolved?: boolean;
 
-  // File-specific
+  // file-specific
   fileName?: string;
   fileUrl?: string;
   fileMime?: string;
@@ -190,10 +194,13 @@ export type AgentStatus = 'online' | 'offline' | 'unknown';
 /** Snapshot message for reconnect recovery */
 export interface SessionMessageSnapshot {
   id: string;
-  seq: number;
+  welinkSessionId?: string;
+  seq: number | null;
+  messageSeq?: number | null;
   role: string;
-  content: string;
-  contentType?: 'plain' | 'markdown' | 'code';
+  content: string | null;
+  contentType?: 'plain' | 'markdown' | 'code' | string | null;
+  meta?: object | null;
   createdAt?: string;
   parts?: MessagePartSnapshot[];
 }
@@ -203,16 +210,24 @@ export interface MessagePartSnapshot {
   partId: string;
   partSeq?: number;
   type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
-  content?: string;
-  toolName?: string;
-  toolCallId?: string;
-  status?: string;
-  header?: string;
-  question?: string;
-  options?: string[];
-  fileName?: string;
-  fileUrl?: string;
-  fileMime?: string;
+  content?: string | null;
+  toolName?: string | null;
+  toolCallId?: string | null;
+  status?: string | null;
+  input?: object | null;
+  output?: string | null;
+  error?: string | null;
+  title?: string | null;
+  header?: string | null;
+  question?: string | null;
+  options?: string[] | null;
+  permissionId?: string | null;
+  permType?: string | null;
+  metadata?: object | null;
+  response?: string | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  fileMime?: string | null;
 }
 
 // ============================================================
@@ -220,7 +235,7 @@ export interface MessagePartSnapshot {
 // ============================================================
 
 export interface ChatState {
-  welinkSessionId: number | null;
+  welinkSessionId: string | null;
   title: string;
   messages: Message[];
   sessionStatus: SessionStatus;
@@ -241,45 +256,51 @@ export interface ApiResponse<T> {
 }
 
 export interface SendMessageResponse {
-  id: number;
-  welinkSessionId: number;
-  userId: string;
-  role: 'user';
-  content: string;
-  messageSeq: number;
+  id: string;
+  welinkSessionId: string;
+  seq: number | null;
+  messageSeq: number | null;
+  role: 'user' | 'assistant' | string;
+  content: string | null;
+  contentType: 'plain' | 'markdown' | string | null;
   createdAt: string;
+  meta: object | null;
+  parts: SessionMessagePart[] | null;
 }
 
 export interface GetSessionMessageResponse {
   content: SessionMessage[];
-  page: number;
+  number: number;
   size: number;
-  total: number;
+  totalElements: number;
 }
 
 export interface StopSkillResponse {
-  welinkSessionId: number;
+  welinkSessionId: string;
   status: 'aborted';
 }
 
 export interface SendMessageToIMResponse {
-  status: 'success' | 'failed';
+  success: boolean;
 }
 
 export interface ReplyPermissionResponse {
-  welinkSessionId: number;
+  welinkSessionId: string;
   permissionId: string;
   response: 'once' | 'always' | 'reject';
 }
 
 export interface RegenerateAnswerResponse {
-  id: number;
-  welinkSessionId: number;
-  userId: string;
-  role: 'user';
-  content: string;
-  messageSeq: number;
+  id: string;
+  welinkSessionId: string;
+  seq: number | null;
+  messageSeq: number | null;
+  role: 'user' | 'assistant' | string;
+  content: string | null;
+  contentType: 'plain' | 'markdown' | string | null;
   createdAt: string;
+  meta: object | null;
+  parts: SessionMessagePart[] | null;
 }
 
 export interface ControlSkillWeCodeResponse {
