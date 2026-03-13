@@ -212,15 +212,25 @@ public final class SkillSDK {
             return;
         }
 
-        apiClient.abortSession(params.getWelinkSessionId(), new SkillCallback<StopSkillResult>() {
+        ensureConnected(new SkillCallback<Boolean>() {
             @Override
-            public void onSuccess(@Nullable StopSkillResult result) {
-                StopSkillResult resolved = result == null
-                        ? new StopSkillResult(params.getWelinkSessionId(), "aborted")
-                        : result;
-                awaitingExecutingBySession.put(params.getWelinkSessionId(), Boolean.FALSE);
-                emitSessionStatus(params.getWelinkSessionId(), SessionStatus.STOPPED);
-                callback.onSuccess(resolved);
+            public void onSuccess(@Nullable Boolean connected) {
+                apiClient.abortSession(params.getWelinkSessionId(), new SkillCallback<StopSkillResult>() {
+                    @Override
+                    public void onSuccess(@Nullable StopSkillResult result) {
+                        StopSkillResult resolved = result == null
+                                ? new StopSkillResult(params.getWelinkSessionId(), "aborted")
+                                : result;
+                        awaitingExecutingBySession.put(params.getWelinkSessionId(), Boolean.FALSE);
+                        emitSessionStatus(params.getWelinkSessionId(), SessionStatus.STOPPED);
+                        callback.onSuccess(resolved);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
             }
 
             @Override
@@ -263,23 +273,33 @@ public final class SkillSDK {
             return;
         }
 
-        String cached = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
-        if (cached != null && !cached.trim().isEmpty()) {
-            sendMessageInternal(params.getWelinkSessionId(), cached, null, callback);
-            return;
-        }
-
-        apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
+        ensureConnected(new SkillCallback<Boolean>() {
             @Override
-            public void onSuccess(@Nullable PageResult<SessionMessage> result) {
-                PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
-                streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), page.getContent());
-                String latest = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
-                if (latest == null || latest.trim().isEmpty()) {
-                    callback.onError(error(4002, "No user message to regenerate"));
+            public void onSuccess(@Nullable Boolean connected) {
+                String cached = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
+                if (cached != null && !cached.trim().isEmpty()) {
+                    sendMessageInternal(params.getWelinkSessionId(), cached, null, callback);
                     return;
                 }
-                sendMessageInternal(params.getWelinkSessionId(), latest, null, callback);
+
+                apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
+                    @Override
+                    public void onSuccess(@Nullable PageResult<SessionMessage> result) {
+                        PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
+                        streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), page.getContent());
+                        String latest = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
+                        if (latest == null || latest.trim().isEmpty()) {
+                            callback.onError(error(4002, "No user message to regenerate"));
+                            return;
+                        }
+                        sendMessageInternal(params.getWelinkSessionId(), latest, null, callback);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
             }
 
             @Override
@@ -300,18 +320,28 @@ public final class SkillSDK {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
-        tryResolveSendToImContent(params, new SkillCallback<String>() {
+        ensureConnected(new SkillCallback<Boolean>() {
             @Override
-            public void onSuccess(@Nullable String content) {
-                if (content == null || content.trim().isEmpty()) {
-                    callback.onError(error(4005, "No completed message content found"));
-                    return;
-                }
-                apiClient.sendMessageToIM(params.getWelinkSessionId(), content, params.getChatId(),
-                        new SkillCallback<SendMessageToIMResult>() {
+            public void onSuccess(@Nullable Boolean connected) {
+                tryResolveSendToImContent(params, new SkillCallback<String>() {
                     @Override
-                    public void onSuccess(@Nullable SendMessageToIMResult result) {
-                        callback.onSuccess(result == null ? new SendMessageToIMResult(false) : result);
+                    public void onSuccess(@Nullable String content) {
+                        if (content == null || content.trim().isEmpty()) {
+                            callback.onError(error(4005, "No completed message content found"));
+                            return;
+                        }
+                        apiClient.sendMessageToIM(params.getWelinkSessionId(), content, params.getChatId(),
+                                new SkillCallback<SendMessageToIMResult>() {
+                            @Override
+                            public void onSuccess(@Nullable SendMessageToIMResult result) {
+                                callback.onSuccess(result == null ? new SendMessageToIMResult(false) : result);
+                            }
+
+                            @Override
+                            public void onError(@NonNull Throwable error) {
+                                callback.onError(wrapError(error));
+                            }
+                        });
                     }
 
                     @Override
@@ -342,13 +372,23 @@ public final class SkillSDK {
         int page = Math.max(params.getPage(), 0);
         int size = params.getSize() <= 0 ? 50 : params.getSize();
 
-        apiClient.getMessages(params.getWelinkSessionId(), page, size, new SkillCallback<PageResult<SessionMessage>>() {
+        ensureConnected(new SkillCallback<Boolean>() {
             @Override
-            public void onSuccess(@Nullable PageResult<SessionMessage> result) {
-                PageResult<SessionMessage> serverPage = result == null ? new PageResult<>() : result;
-                PageResult<SessionMessage> merged = streamingMessageCache.mergeWithLocalCache(params.getWelinkSessionId(), page, size,
-                        serverPage);
-                callback.onSuccess(merged);
+            public void onSuccess(@Nullable Boolean connected) {
+                apiClient.getMessages(params.getWelinkSessionId(), page, size, new SkillCallback<PageResult<SessionMessage>>() {
+                    @Override
+                    public void onSuccess(@Nullable PageResult<SessionMessage> result) {
+                        PageResult<SessionMessage> serverPage = result == null ? new PageResult<>() : result;
+                        PageResult<SessionMessage> merged = streamingMessageCache.mergeWithLocalCache(
+                                params.getWelinkSessionId(), page, size, serverPage);
+                        callback.onSuccess(merged);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
             }
 
             @Override
@@ -449,18 +489,28 @@ public final class SkillSDK {
             return;
         }
 
-        apiClient.replyPermission(params.getWelinkSessionId(), params.getPermId(), params.getResponse(),
-                new SkillCallback<ReplyPermissionResult>() {
-                    @Override
-                    public void onSuccess(@Nullable ReplyPermissionResult result) {
-                        callback.onSuccess(result);
-                    }
+        ensureConnected(new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean connected) {
+                apiClient.replyPermission(params.getWelinkSessionId(), params.getPermId(), params.getResponse(),
+                        new SkillCallback<ReplyPermissionResult>() {
+                            @Override
+                            public void onSuccess(@Nullable ReplyPermissionResult result) {
+                                callback.onSuccess(result);
+                            }
 
-                    @Override
-                    public void onError(@NonNull Throwable error) {
-                        callback.onError(wrapError(error));
-                    }
-                });
+                            @Override
+                            public void onError(@NonNull Throwable error) {
+                                callback.onError(wrapError(error));
+                            }
+                        });
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
     }
 
     // 13. controlSkillWeCode
