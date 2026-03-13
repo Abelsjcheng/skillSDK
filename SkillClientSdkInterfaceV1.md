@@ -113,11 +113,15 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
         "imGroupId": "group_abc123",
         "ak": "ak_xxxxxxxx",
         "status": "ACTIVE"
-      }
+     }
      ```
    - 若 `createSession` 传入了 `ak`，查询时必须使用 `imGroupId + ak + status=ACTIVE` 组合条件
    - 若 `createSession` 未传入 `ak`，则按 `imGroupId + status=ACTIVE` 查询
-3. 若不存在活跃会话，则调用 `POST /api/skill/sessions` 新建会话：
+3. 对查询结果 `content` 按 `updatedAt` 倒序排序，取最新的一条活跃会话作为当前会话：
+   - 排序字段：`updatedAt`（ISO-8601 时间）
+   - 排序规则：最新时间优先（降序）
+   - 若查询结果为空，则进入新建流程
+4. 若不存在可复用的活跃会话，则调用 `POST /api/skill/sessions` 新建会话：
    - **请求体**:
      ```json
      {
@@ -126,9 +130,9 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
        "imGroupId": "group_abc123"
      }
      ```
-4. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
-5. 若监听器先于 `createSession` 注册，则先暂存，待连接建立后自动生效
-6. `createSession` 只负责创建会话和建立连接，不发送消息；发送消息需要调用 `sendMessage` 接口
+5. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
+6. 若监听器先于 `createSession` 注册，则先暂存，待连接建立后自动生效
+7. `createSession` 只负责创建会话和建立连接，不发送消息；发送消息需要调用 `sendMessage` 接口
 
 ### 错误处理
 
@@ -137,8 +141,6 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 | 1000 | 无效的参数 | 缺少必填参数或参数格式错误 |
 | 6000 | 网络错误 | WebSocket 连接失败或网络请求失败 |
 | 7000 | 服务端错误 | 服务端创建会话失败 |
-| 2000 | Agent 离线 | 对应的 Agent 未在线 |
-| 2001 | 超出速率限制 | 短时间内创建会话过于频繁 |
 
 ### 组合调用场景
 
@@ -319,7 +321,7 @@ try {
 IM 客户端调用
 ### 接口说明
 
-监听会话状态变更。该接口是对通用 `registerSessionListener` 的二次封装，供 Mini Bar 或会话状态 UI 直接消费。
+监听会话状态变更。
 
 **重要说明**：
 
@@ -372,7 +374,6 @@ onSessionStatusChange(params: OnSessionStatusChangeParams): void
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | 缺少 `welinkSessionId` 或 `callback` |
-
 | 3000 | 未建立连接 | WebSocket 连接未建立 |
 
 ### 组合调用场景
