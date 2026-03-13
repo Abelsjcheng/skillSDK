@@ -142,6 +142,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                 return;
         }
 
+        [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
+
         __weak typeof(self) weakSelf = self;
         [[WLAgentSkillsHTTPClient sharedClient] abortSessionWithSessionId:params.welinkSessionId
                                                                                                                                                                                                                                                     success:^(id  _Nullable responseObject) {
@@ -188,6 +190,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                 [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
                 return;
         }
+
+        [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
         NSString *cachedContent = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
         if (cachedContent.length > 0) {
@@ -237,6 +241,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         }
         NSString *normalizedMessageId = [self normalizedOptionalString:params.messageId];
         NSString *normalizedChatId = [self normalizedOptionalString:params.chatId];
+
+        [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
         __weak typeof(self) weakSelf = self;
         void (^sendWithContent)(NSString *) = ^(NSString *content) {
@@ -324,6 +330,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                 [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
                 return;
         }
+
+        [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
         NSNumber *page = params.page ?: @0;
         NSNumber *size = params.size ?: @50;
@@ -426,6 +434,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                 [self dispatchFailure:failure code:1000 message:@"response must be once/always/reject."];
                 return;
         }
+
+        [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
         __weak typeof(self) weakSelf = self;
         [[WLAgentSkillsHTTPClient sharedClient] replyPermissionWithSessionId:params.welinkSessionId
