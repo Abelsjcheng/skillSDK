@@ -8,22 +8,27 @@ interface QuestionCardProps {
   onAnswered?: () => void;
 }
 
-export const QuestionCard: React.FC<QuestionCardProps> = ({ 
-  part, 
+export const QuestionCard: React.FC<QuestionCardProps> = ({
+  part,
   welinkSessionId,
-  onAnswered 
+  onAnswered,
 }) => {
   const [customInput, setCustomInput] = useState('');
   const [answered, setAnswered] = useState(part.answered ?? false);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSelect = async (option: string) => {
-    if (answered || submitting) return;
+  const isLocked = answered || submitting;
+  const trimmedInput = customInput.trim();
+
+  const submitAnswer = async (value: string) => {
+    const content = value.trim();
+    if (!content || isLocked) return;
+
     setSubmitting(true);
     try {
       await sendMessage({
         welinkSessionId,
-        content: option,
+        content,
         toolCallId: part.toolCallId,
       });
       setAnswered(true);
@@ -35,22 +40,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     }
   };
 
-  const handleSubmit = async () => {
-    if (answered || submitting || !customInput.trim()) return;
-    setSubmitting(true);
-    try {
-      await sendMessage({
-        welinkSessionId,
-        content: customInput.trim(),
-        toolCallId: part.toolCallId,
-      });
-      setAnswered(true);
-      onAnswered?.();
-    } catch (err) {
-      console.error('Failed to submit answer:', err);
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSelect = (option: string) => {
+    void submitAnswer(option);
+  };
+
+  const handleSubmit = () => {
+    void submitAnswer(customInput);
   };
 
   return (
@@ -70,7 +65,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               key={i}
               className="question-card__option"
               onClick={() => handleSelect(opt)}
-              disabled={answered || submitting}
+              disabled={isLocked}
             >
               {opt}
             </button>
@@ -86,12 +81,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          disabled={answered || submitting}
+          disabled={isLocked}
         />
         <button
           className="question-card__submit"
           onClick={handleSubmit}
-          disabled={answered || submitting || !customInput.trim()}
+          disabled={isLocked || !trimmedInput}
         >
           提交
         </button>

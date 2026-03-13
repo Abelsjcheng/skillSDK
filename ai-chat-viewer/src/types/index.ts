@@ -25,8 +25,48 @@ export type StreamMessageType =
   | 'snapshot'
   | 'streaming';
 
+export type MessagePartType = 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+export type PartStatus = 'pending' | 'running' | 'completed' | 'error';
+export type PermissionResponse = 'once' | 'always' | 'reject';
+
+interface ToolPartFields<TValue, TStatus> {
+  toolName?: TValue;
+  toolCallId?: TValue;
+  status?: TStatus;
+  input?: object | null;
+  output?: TValue;
+  error?: TValue;
+  title?: TValue;
+}
+
+interface QuestionPartFields<TValue, TOptions> {
+  header?: TValue;
+  question?: TValue;
+  options?: TOptions;
+}
+
+interface PermissionCoreFields<TValue> {
+  permissionId?: TValue;
+  permType?: TValue;
+}
+
+interface PermissionPartFields<TValue, TResponse> extends PermissionCoreFields<TValue> {
+  metadata?: object | null;
+  response?: TResponse;
+}
+
+interface FilePartFields<TValue> {
+  fileName?: TValue;
+  fileUrl?: TValue;
+  fileMime?: TValue;
+}
+
 /** StreamMessage delivered from SessionListener onMessage callback. */
-export interface StreamMessage {
+export interface StreamMessage
+  extends ToolPartFields<string | null, PartStatus | string | null>,
+  QuestionPartFields<string | null, string[] | null>,
+  PermissionPartFields<string | null, PermissionResponse | string | null>,
+  FilePartFields<string | null> {
   // transport-level fields
   type: StreamMessageType;
   seq: number | null;
@@ -45,26 +85,6 @@ export interface StreamMessage {
   partSeq?: number | null;
   content?: string | null;
 
-  // tool fields
-  toolName?: string | null;
-  toolCallId?: string | null;
-  status?: 'pending' | 'running' | 'completed' | 'error' | string | null;
-  input?: object | null;
-  output?: string | null;
-  error?: string | null;
-  title?: string | null;
-
-  // question fields
-  header?: string | null;
-  question?: string | null;
-  options?: string[] | null;
-
-  // permission fields
-  permissionId?: string | null;
-  permType?: string | null;
-  metadata?: object | null;
-  response?: 'once' | 'always' | 'reject' | string | null;
-
   // session status
   sessionStatus?: 'busy' | 'idle' | 'retry' | string | null;
 
@@ -77,11 +97,6 @@ export interface StreamMessage {
   } | null;
   cost?: number | null;
   reason?: string | null;
-
-  // file fields
-  fileName?: string | null;
-  fileUrl?: string | null;
-  fileMime?: string | null;
 
   // snapshot/streaming fields
   messages?: SessionMessageSnapshot[] | null;
@@ -105,36 +120,15 @@ export interface SessionMessage {
   createdAt: string;
 }
 
-export interface SessionMessagePart {
+export interface SessionMessagePart
+  extends ToolPartFields<string | null, string | null>,
+  QuestionPartFields<string | null, string[] | null>,
+  PermissionPartFields<string | null, PermissionResponse | string | null>,
+  FilePartFields<string | null> {
   partId: string;
   partSeq: number;
-  type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+  type: MessagePartType;
   content: string | null;
-
-  // tool/question fields
-  toolName?: string | null;
-  toolCallId?: string | null;
-  status?: string | null;
-  input?: object | null;
-  output?: string | null;
-  error?: string | null;
-  title?: string | null;
-
-  // question fields
-  header?: string | null;
-  question?: string | null;
-  options?: string[] | null;
-
-  // permission fields
-  permissionId?: string | null;
-  permType?: string | null;
-  metadata?: object | null;
-  response?: 'once' | 'always' | 'reject' | string | null;
-
-  // file fields
-  fileName?: string | null;
-  fileUrl?: string | null;
-  fileMime?: string | null;
 }
 
 // ============================================================
@@ -142,35 +136,17 @@ export interface SessionMessagePart {
 // ============================================================
 
 /** A structured part within an assistant message */
-export interface MessagePart {
+export interface MessagePart
+  extends ToolPartFields<string, PartStatus>,
+  QuestionPartFields<string, string[]>,
+  PermissionCoreFields<string>,
+  FilePartFields<string> {
   partId: string;
-  type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+  type: MessagePartType;
   content: string;
   isStreaming: boolean;
-
-  // tool/question fields (align with JSAPI field names)
-  toolName?: string;
-  toolCallId?: string;
-  status?: 'pending' | 'running' | 'completed' | 'error';
-  input?: object;
-  output?: string;
-  title?: string;
-
-  // question-specific
-  header?: string;
-  question?: string;
-  options?: string[];
   answered?: boolean;
-
-  // permission-specific
-  permissionId?: string;
-  permType?: string;
   permResolved?: boolean;
-
-  // file-specific
-  fileName?: string;
-  fileUrl?: string;
-  fileMime?: string;
 }
 
 /** A single message in the conversation */
@@ -206,28 +182,15 @@ export interface SessionMessageSnapshot {
 }
 
 /** Part snapshot for streaming recovery */
-export interface MessagePartSnapshot {
+export interface MessagePartSnapshot
+  extends ToolPartFields<string | null, string | null>,
+  QuestionPartFields<string | null, string[] | null>,
+  PermissionPartFields<string | null, string | null>,
+  FilePartFields<string | null> {
   partId: string;
   partSeq?: number;
-  type: 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+  type: MessagePartType;
   content?: string | null;
-  toolName?: string | null;
-  toolCallId?: string | null;
-  status?: string | null;
-  input?: object | null;
-  output?: string | null;
-  error?: string | null;
-  title?: string | null;
-  header?: string | null;
-  question?: string | null;
-  options?: string[] | null;
-  permissionId?: string | null;
-  permType?: string | null;
-  metadata?: object | null;
-  response?: string | null;
-  fileName?: string | null;
-  fileUrl?: string | null;
-  fileMime?: string | null;
 }
 
 // ============================================================
@@ -287,7 +250,7 @@ export interface SendMessageToIMResponse {
 export interface ReplyPermissionResponse {
   welinkSessionId: string;
   permissionId: string;
-  response: 'once' | 'always' | 'reject';
+  response: PermissionResponse;
 }
 
 export interface RegenerateAnswerResponse {
