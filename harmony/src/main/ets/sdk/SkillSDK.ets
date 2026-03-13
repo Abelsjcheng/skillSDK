@@ -181,6 +181,7 @@ export class SkillSDK {
     try {
       Validator.requireObject(params, 'params');
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
+      await this.ensureWebSocketConnected();
 
       const result = await this.httpClient.post<StopSkillResult>(
         `/api/skill/sessions/${params.welinkSessionId}/abort`
@@ -212,6 +213,7 @@ export class SkillSDK {
     try {
       Validator.requireObject(params, 'params');
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
+      await this.ensureWebSocketConnected();
 
       let content = this.messageCacheManager.getLastUserMessageContent(params.welinkSessionId);
       if (content === null) {
@@ -257,6 +259,7 @@ export class SkillSDK {
       );
       let resolvedContent = content;
       if (resolvedContent === null) {
+        await this.ensureWebSocketConnected();
         const history = await this.fetchServerMessages(params.welinkSessionId, 0, 100);
         this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
         resolvedContent = this.messageCacheManager.getFinalMessageContent(
@@ -286,6 +289,8 @@ export class SkillSDK {
         payload.chatId = chatId;
       }
 
+      await this.ensureWebSocketConnected();
+
       let raw: Record<string, unknown>;
       try {
         raw = await this.httpClient.post<Record<string, unknown>>(
@@ -314,6 +319,7 @@ export class SkillSDK {
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.optionalNonNegativeInteger(params.page, 'page');
       Validator.optionalPositiveInteger(params.size, 'size');
+      await this.ensureWebSocketConnected();
 
       const page = params.page ?? 0;
       const size = params.size ?? 50;
@@ -402,6 +408,7 @@ export class SkillSDK {
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.requireString(params.permId, 'permId');
       Validator.requireEnum(params.response, ['once', 'always', 'reject'], 'response');
+      await this.ensureWebSocketConnected();
 
       return await this.httpClient.post<ReplyPermissionResult>(
         `/api/skill/sessions/${params.welinkSessionId}/permissions/${params.permId}`,
@@ -492,6 +499,12 @@ export class SkillSDK {
       return right - left;
     });
     return sorted[0];
+  }
+
+  private async ensureWebSocketConnected(): Promise<void> {
+    if (!this.wsManager.isConnected()) {
+      await this.wsManager.connect();
+    }
   }
 
   private normalizeOptionalString(value?: string): string | undefined {
