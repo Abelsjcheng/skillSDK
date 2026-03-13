@@ -105,7 +105,7 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 1. 建立 WebSocket 连接，若当前用户已有连接则复用，否则新建：
    - **URL**: `ws://host/ws/skill/stream`
    - 用于接收服务端推送的完整事件流
-2. 调用服务端 REST API 查询会话列表，根据入参组合查询活跃会话：
+2. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连；然后查询会话列表：
    - **URL**: `GET /api/skill/sessions`
    - **查询参数**:
      ```json
@@ -280,9 +280,10 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 
 ### 实现方法
 
-1. 调用服务端 REST API：
+1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+2. 调用服务端 REST API：
    - **URL**: `POST /api/skill/sessions/{welinkSessionId}/abort`
-2. SDK收到成功响应后，触发 `onSessionStatusChange` 的 `stopped` 状态
+3. SDK收到成功响应后，触发 `onSessionStatusChange` 的 `stopped` 状态
 
 ### 错误处理
 
@@ -519,15 +520,16 @@ regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult>
 1. 根据 `welinkSessionId` 找到最后一条用户消息
 2. 若 SDK 本地已缓存用户消息，则优先复用本地缓存
 3. 若本地缓存不存在，可先从历史消息中定位最后一条 `role=user` 的消息
-4. 调用服务端 REST API：
+4. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+5. 调用服务端 REST API：
    - **URL**: `POST /api/skill/sessions/{welinkSessionId}/messages`
    - **请求体**:
-     ```json
-     {
-       "content": "{最后一条用户消息内容}"
-     }
-     ```
-5. 通过 WebSocket 继续接收本轮新的流式回答
+      ```json
+      {
+        "content": "{最后一条用户消息内容}"
+      }
+      ```
+6. 通过 WebSocket 继续接收本轮新的流式回答
 
 ### 错误处理
 
@@ -624,19 +626,20 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 3. SDK 调用 Skill 服务端“发送到 IM”接口时，会传入：
    - `content`：从 SDK 缓存中获取的完成的消息内容
    - `chatId`：若入参提供则原样透传；若未提供则不由 SDK 补齐，按服务端接口规则处理
-调用服务端 REST API 发送消息到 IM：
-- **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
-- **请求体**:
-  ```json
-  {
-    "content": "代码重构已完成，请查看 PR #42",
-    "chatId": "group_abc123"
-  }
-  ```
-- **响应**:
-  ```json
-  { "success": true }
-  ```
+4. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+5. 调用服务端 REST API 发送消息到 IM：
+   - **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
+   - **请求体**:
+     ```json
+     {
+       "content": "代码重构已完成，请查看 PR #42",
+       "chatId": "group_abc123"
+     }
+     ```
+   - **响应**:
+     ```json
+     { "success": true }
+     ```
 
 ### 缓存管理
 
@@ -773,7 +776,7 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMe
 
 #### 1. 获取历史消息
 
-调用服务端 REST API：
+调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连，然后再请求历史消息：
 
 - **URL**: `GET /api/skill/sessions/{welinkSessionId}/messages`
 
@@ -1165,7 +1168,7 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 
 ### 实现方法
 
-1. 检查 WebSocket 连接状态，若未建立则自动建立：
+1. 检查 WebSocket 连接状态，若未连接则自动重连：
    - **URL**: `ws://host/ws/skill/stream`
    - 用于接收服务端推送的完整事件流
 2. 调用服务端 REST API 发送消息：
@@ -1273,15 +1276,15 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 
 ### 实现方法
 
-调用服务端 REST API：
-
-- **URL**: `POST /api/skill/sessions/{welinkSessionId}/permissions/{permId}`
-- **请求体**:
-  ```json
-  {
-    "response": "once"
-  }
-  ```
+1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+2. 调用服务端 REST API：
+   - **URL**: `POST /api/skill/sessions/{welinkSessionId}/permissions/{permId}`
+   - **请求体**:
+     ```json
+     {
+       "response": "once"
+     }
+     ```
 
 ### 错误处理
 
