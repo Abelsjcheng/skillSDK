@@ -1,1133 +1,671 @@
-# 层① 接口协议：Miniapp ↔ Skill Server
+# Layer① 协议：Miniapp ↔ Skill Server
 
-> 版本：1.1  
-> 日期：2026-03-08  
-> 状态：待实现
+> 本文档基于代码实现逐项核对，确保协议描述与实际行为一致。
 
----
+## 概述
 
-## 全局约定
+| 方向 | 传输方式 | 端点 |
+|---|---|---|
+| Miniapp → Skill Server | REST API (HTTP) | `/api/skill/**` |
+| Skill Server → Miniapp | WebSocket | `ws://{host}/ws/skill/stream` |
 
-### ID 命名规范
+**认证方式**：Cookie `userId`（所有接口统一）
 
-| 名称              | 说明                           |
-| ----------------- | ------------------------------ |
-| `welinkSessionId` | Skill Server 内部分配的会话 ID |
-| `toolSessionId`   | OpenCode SDK 分配的会话 ID     |
-
-### 会话状态枚举
-
-| 状态     | 说明                             |
-| -------- | -------------------------------- |
-| `ACTIVE` | 会话活跃中，可收发消息           |
-| `IDLE`   | 会话超时闲置，由定时任务自动标记 |
-| `CLOSED` | 会话已关闭，不可再发送消息       |
-
-### REST API 响应格式
-
-所有 REST 接口统一返回 HTTP `200 OK`，响应体结构如下：
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": { ... }
-}
-```
-
-| 字段       | 类型          | 说明                                   |
-| ---------- | ------------- | -------------------------------------- |
-| `code`     | Integer       | 结果返回码，`0` 表示成功，非零表示错误 |
-| `errormsg` | String        | 错误信息，成功时为空字符串             |
-| `data`     | Object / null | 正常返回内容，错误时为 `null`          |
+> [!IMPORTANT]
+> `welinkSessionId` 在所有 JSON 传输中必须编码为 **字符串**，禁止使用 JSON 数字类型。
+> 后端通过 `@JsonSerialize(using = ToStringSerializer.class)` 保证；前端显式转为 string。
 
 ---
 
-## 一、REST API
+## 一、REST API（Miniapp → Skill Server）
 
-> 基础路径：`/api/skill`  
-> 认证方式：Cookie（所有接口从 Cookie 中解析 `userId`，类型 `String`）  
-> Content-Type：`application/json`
+### 通用响应包装
+
+所有 REST API 返回 HTTP 200，通过 `ApiResponse` 包装（`@JsonInclude(NON_NULL)`）：
+
+```json
+// 成功
+{ "code": 0, "data": { ... } }
+// 失败
+{ "code": 400, "errormsg": "错误描述" }
+```
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `code` | int | ✅ | 状态码，`0` = 成功，非零 = 错误码 |
+| `errormsg` | string | ❌ | 错误描述，仅失败时返回；成功时为 `null` 不输出 |
+| `data` | object | ❌ | 业务数据，仅成功时返回；失败时为 `null` 不输出 |
 
 ---
 
-### 1. 创建会话
+### API-1：创建会话
 
-**POST** `/api/skill/sessions`
-
-#### 请求
-
-| 字段        | 类型   | 必填  | 说明                                                |
-| ----------- | ------ | :---: | --------------------------------------------------- |
-| `ak`        | String |   ✅   | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
-| `title`     | String |   ❌   | 会话标题，不填则由 AI 自动生成                      |
-| `imGroupId` | String |   ✅   | 关联的 IM 群组 ID                                   |
-
-```json
-{
-  "ak": "ak_xxxxxxxx",
-  "title": "帮我创建一个React项目",
-  "imGroupId": "group_abc123"
-}
+```
+POST /api/skill/sessions
 ```
 
-#### 响应
+**请求 Body**：
 
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "welinkSessionId": 42,
-    "userId": "10001",
-    "ak": "ak_xxxxxxxx",
-    "title": "帮我创建一个React项目",
-    "imGroupId": "group_abc123",
-    "status": "ACTIVE",
-    "toolSessionId": null,
-    "createdAt": "2026-03-08T00:15:00",
-    "updatedAt": "2026-03-08T00:15:00"
-  }
-}
-```
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `ak` | string | 否 | Agent 的 Access Key，决定是否触发 Gateway 建会话 |
+| `title` | string | 否 | 会话标题，可选初始标题 |
+| `imGroupId` | string | 否 | 关联的 IM 群组 ID，用于 send-to-im 回退 |
 
-| data 字段         | 类型   | 说明                                           |
-| ----------------- | ------ | ---------------------------------------------- |
-| `welinkSessionId` | Long   | 会话 ID                                        |
-| `userId`          | String | 用户 ID（从 Cookie 解析）                      |
-| `ak`              | String | Access Key                                     |
-| `title`           | String | 会话标题                                       |
-| `imGroupId`       | String | IM 群组 ID                                     |
-| `status`          | String | 会话状态：`ACTIVE`                             |
-| `toolSessionId`   | String | OpenCode Session ID，创建时为 `null`，异步填充 |
-| `createdAt`       | String | 创建时间，ISO-8601                             |
-| `updatedAt`       | String | 更新时间，ISO-8601                             |
+**响应 `data`** — `SkillSession` 对象（无 `@JsonInclude(NON_NULL)`，**所有字段均返回**，null 字段显示为 `null`）：
 
-#### 内部副作用
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `welinkSessionId` | string | ✅ | 会话 ID（Java `Long` → String 序列化，雪花 ID） |
+| `userId` | string | ✅ | 拥有该会话的用户 ID |
+| `ak` | string | ❌ | Agent Access Key，未关联 Agent 时为 `null` |
+| `toolSessionId` | string | ❌ | OpenCode 侧的 session ID，创建后由 Gateway 回填，初始为 `null` |
+| `title` | string | ❌ | 会话标题，未设置时为 `null` |
+| `status` | string | ✅ | 会话状态：`ACTIVE` / `IDLE` / `CLOSED`，默认 `ACTIVE` |
+| `imGroupId` | string | ❌ | 关联的 IM 群组 ID，未设置时为 `null` |
+| `createdAt` | string | ✅ | 创建时间（ISO 8601） |
+| `updatedAt` | string | ✅ | 最后活跃时间（Java 字段名 `lastActiveAt`，JSON 序列化为 `updatedAt`） |
 
-1. 创建 `SkillSession` 记录（`status=ACTIVE`，`toolSessionId=null`）
-2. 订阅 Redis `session:{welinkSessionId}` 广播频道
-3. 若通过 `ak` 找到在线 Agent → 向 Gateway 发送 `invoke.create_session`
+**副作用**：若 `ak` 非空，发送 `create_session` invoke 到 AI-Gateway。
+
+**代码**：[SkillSessionController.java L53-75](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillSessionController.java#L53-L75)
 
 ---
 
-### 2. 发送消息
+### API-2：会话列表
 
-**POST** `/api/skill/sessions/{welinkSessionId}/messages`
-
-#### 路径参数
-
-| 参数              | 类型 | 说明    |
-| ----------------- | ---- | ------- |
-| `welinkSessionId` | Long | 会话 ID |
-
-#### 请求
-
-| 字段         | 类型   | 必填  | 说明                                                           |
-| ------------ | ------ | :---: | -------------------------------------------------------------- |
-| `content`    | String |   ✅   | 用户消息文本                                                   |
-| `toolCallId` | String |   ❌   | 回答 AI question 时携带对应的工具调用 ID。不带则按普通消息处理 |
-
-```json
-{
-  "content": "帮我创建一个React项目"
-}
+```
+GET /api/skill/sessions?page=0&size=20&status=ACTIVE&ak=xxx&imGroupId=yyy
 ```
 
-回答 AI question 时：
+**Query 参数**：
 
-```json
-{
-  "content": "Vite",
-  "toolCallId": "call_2"
-}
-```
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `page` | int | `0` | 页码（从 0 开始） |
+| `size` | int | `20` | 每页条数 |
+| `status` | string | — | 按状态过滤（`ACTIVE` / `IDLE` / `CLOSED`） |
+| `ak` | string | — | 按 Agent AK 过滤 |
+| `imGroupId` | string | — | 按 IM 群组 ID 过滤 |
 
-#### 响应
+**响应 `data`** — `PageResult<SkillSession>`：
 
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "id": 101,
-    "welinkSessionId": 42,
-    "userId": "10001",
-    "role": "user",
-    "content": "帮我创建一个React项目",
-    "messageSeq": 3,
-    "createdAt": "2026-03-08T00:16:00"
-  }
-}
-```
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `content` | array | ✅ | `SkillSession` 对象数组（字段同 API-1） |
+| `totalElements` | long | ✅ | 满足条件的总记录数 |
+| `number` | int | ✅ | 当前页码（从 0 开始） |
+| `size` | int | ✅ | 每页大小 |
 
-| data 字段         | 类型    | 说明                   |
-| ----------------- | ------- | ---------------------- |
-| `id`              | Long    | 消息 ID                |
-| `welinkSessionId` | Long    | 所属会话 ID            |
-| `userId`          | String  | 发送用户 ID            |
-| `role`            | String  | 角色，固定 `"user"`    |
-| `content`         | String  | 消息内容               |
-| `messageSeq`      | Integer | 该消息在会话内的顺序号 |
-| `createdAt`       | String  | 创建时间，ISO-8601     |
-
-#### 内部副作用
-
-1. 从 Cookie 解析 `userId`，持久化 user message 到 MySQL（含 `userId`）
-2. 查询 session 记录获取 `toolSessionId`
-3. 根据是否携带 `toolCallId` 分支处理：
-   - **无 `toolCallId`**：构建 `invoke.chat` payload（`{ toolSessionId, text: content }`）发送至 Gateway
-   - **有 `toolCallId`**：构建 `invoke.question_reply` payload（`{ toolSessionId, toolCallId, answer: content }`）发送至 Gateway
+**代码**：[SkillSessionController.java L81-94](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillSessionController.java#L81-L94)
 
 ---
 
-### 3. 回复权限请求
+### API-3：查询单个会话
 
-**POST** `/api/skill/sessions/{welinkSessionId}/permissions/{permId}`
-
-#### 路径参数
-
-| 参数              | 类型   | 说明        |
-| ----------------- | ------ | ----------- |
-| `welinkSessionId` | Long   | 会话 ID     |
-| `permId`          | String | 权限请求 ID |
-
-#### 请求
-
-| 字段       | 类型   | 必填  | 值域                         | 说明                           |
-| ---------- | ------ | :---: | ---------------------------- | ------------------------------ |
-| `response` | String |   ✅   | `once` / `always` / `reject` | 直接使用 OpenCode SDK 定义的值 |
-
-含义：
-
-- `once` — 仅本次允许
-- `always` — 永久允许（同类操作不再询问）
-- `reject` — 拒绝
-
-```json
-{
-  "response": "once"
-}
+```
+GET /api/skill/sessions/{id}
 ```
 
-#### 响应
+**路径参数**：`id` — welinkSessionId
 
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "welinkSessionId": 42,
-    "permissionId": "perm_1",
-    "response": "once"
-  }
-}
-```
+**响应 `data`** — `SkillSession` 对象（字段同 API-1）。
 
-| data 字段         | 类型   | 说明        |
-| ----------------- | ------ | ----------- |
-| `welinkSessionId` | Long   | 会话 ID     |
-| `permissionId`    | String | 权限请求 ID |
-| `response`        | String | 回复值      |
-
-#### 内部副作用
-
-1. 构建 `invoke.permission_reply` payload（`{ toolSessionId, permissionId, response }`）发送至 Gateway
-2. PC Agent 直接将 `response` 原值透传给 OpenCode SDK，无需转换
+**代码**：[SkillSessionController.java](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillSessionController.java)
 
 ---
 
-### 4. 中止会话执行
+### API-4：关闭会话
 
-**POST** `/api/skill/sessions/{welinkSessionId}/abort`
-
-#### 路径参数
-
-| 参数              | 类型 | 说明    |
-| ----------------- | ---- | ------- |
-| `welinkSessionId` | Long | 会话 ID |
-
-#### 请求
-
-无请求体。
-
-#### 响应
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "welinkSessionId": 42,
-    "status": "aborted"
-  }
-}
+```
+DELETE /api/skill/sessions/{id}
 ```
 
-#### 内部副作用
+**响应 `data`**：
 
-1. 向 Gateway 发送 `invoke.abort_session`（`{ toolSessionId }`）
-2. PC Agent 调用 `session.abort()` 中止当前执行
-3. Skill Session 状态**不变**（仍为 `ACTIVE`），可以继续发消息
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `status` | string | ✅ | 固定值 `"closed"` |
+| `welinkSessionId` | string | ✅ | 被关闭的会话 ID |
+
+**副作用**：
+1. 状态改为 `CLOSED`
+2. 若 `ak != null && toolSessionId != null`，发送 `close_session` invoke 到 Gateway
+
+**代码**：[SkillSessionController.java L118-147](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillSessionController.java#L118-L147)
 
 ---
 
-### 5. 关闭并删除会话
+### API-5：中止会话
 
-**DELETE** `/api/skill/sessions/{welinkSessionId}`
-
-#### 路径参数
-
-| 参数              | 类型 | 说明    |
-| ----------------- | ---- | ------- |
-| `welinkSessionId` | Long | 会话 ID |
-
-#### 请求
-
-无请求体。
-
-#### 响应
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "welinkSessionId": 42,
-    "status": "closed"
-  }
-}
+```
+POST /api/skill/sessions/{id}/abort
 ```
 
-#### 内部副作用
+**响应 `data`**：
 
-1. 向 Gateway 发送 `invoke.close_session`（`{ toolSessionId }`）
-2. PC Agent 调用 `session.delete()` 删除 OpenCode session
-3. 更新 `SkillSession.status = CLOSED`
-4. 取消订阅 Redis `session:{welinkSessionId}` 广播频道
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `status` | string | ✅ | 固定值 `"aborted"` |
+| `welinkSessionId` | string | ✅ | 被中止的会话 ID |
+
+**错误**：`409` — 会话已关闭
+
+**副作用**：若 `ak != null && toolSessionId != null`，发送 `abort_session` invoke 到 Gateway（不改变 session 状态）。
+
+**代码**：[SkillSessionController.java L154-188](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillSessionController.java#L154-L188)
 
 ---
 
-### 6. 查询历史消息
+### API-6：发送消息
 
-**GET** `/api/skill/sessions/{welinkSessionId}/messages`
-
-#### 路径参数
-
-| 参数              | 类型 | 说明    |
-| ----------------- | ---- | ------- |
-| `welinkSessionId` | Long | 会话 ID |
-
-#### 查询参数
-
-| 参数   | 类型 | 默认值 | 说明     |
-| ------ | ---- | :----: | -------- |
-| `page` | int  |   0    | 页码     |
-| `size` | int  |   50   | 每页条数 |
-
-#### 响应
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "content": [
-      {
-        "id": 101,
-        "welinkSessionId": 42,
-        "userId": "10001",
-        "role": "user",
-        "content": "帮我创建一个React项目",
-        "messageSeq": 1,
-        "parts": [],
-        "createdAt": "2026-03-08T00:15:00"
-      },
-      {
-        "id": 102,
-        "welinkSessionId": 42,
-        "userId": null,
-        "role": "assistant",
-        "content": "好的，我来帮你创建...",
-        "messageSeq": 2,
-        "parts": [
-          {
-            "partId": "p_1",
-            "partSeq": 1,
-            "type": "text",
-            "content": "好的，我来帮你创建..."
-          },
-          {
-            "partId": "p_2",
-            "partSeq": 2,
-            "type": "tool",
-            "toolName": "bash",
-            "toolStatus": "completed",
-            "toolInput": { "command": "npx create-vite" },
-            "toolOutput": "Done."
-          }
-        ],
-        "createdAt": "2026-03-08T00:15:05"
-      }
-    ],
-    "page": 0,
-    "size": 50,
-    "total": 2
-  }
-}
+```
+POST /api/skill/sessions/{sessionId}/messages
 ```
 
+**请求 Body**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `content` | string | 是 | 消息文本 |
+| `toolCallId` | string | 否 | 存在时走 `question_reply` 路由，对应 WS-6 中的 `toolCallId` |
+
+**响应 `data`** — `ProtocolMessageView` 对象（见下方定义）。
+
+**三条分支**：
+1. `toolSessionId == null` → 触发 `rebuildToolSession()`
+2. `toolCallId` 有值 → `question_reply` action
+3. 否则 → `chat` action
+
+**错误**：`400` content 为空 / `409` 会话已关闭
+
+**代码**：[SkillMessageController.java L75-139](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillMessageController.java#L75-L139)
+
 ---
 
-### 7. 查询会话列表
+### API-7：消息历史
 
-**GET** `/api/skill/sessions`
-
-#### 查询参数
-
-| 参数        | 类型   | 必填  | 默认值 | 说明                                        |
-| ----------- | ------ | :---: | :----: | ------------------------------------------- |
-| `imGroupId` | String |   ❌   |   —    | 按 IM 群组 ID 过滤                          |
-| `ak`        | String |   ❌   |   —    | 按 Access Key 过滤                          |
-| `page`      | int    |   ❌   |   0    | 页码                                        |
-| `size`      | int    |   ❌   |   20   | 每页条数                                    |
-| `status`    | String |   ❌   |   —    | 可选过滤：`ACTIVE` / `CLOSED`，不传返回全部 |
-
-#### 响应
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "content": [
-      {
-        "welinkSessionId": 42,
-        "userId": "10001",
-        "ak": "ak_xxxxxxxx",
-        "title": "帮我创建一个React项目",
-        "imGroupId": "group_abc123",
-        "status": "ACTIVE",
-        "toolSessionId": "ses_abc",
-        "createdAt": "2026-03-08T00:15:00",
-        "updatedAt": "2026-03-08T00:16:00"
-      }
-    ],
-    "page": 0,
-    "size": 20,
-    "total": 1
-  }
-}
+```
+GET /api/skill/sessions/{sessionId}/messages?page=0&size=50
 ```
 
+**响应 `data`** — `PageResult<ProtocolMessageView>`（分页字段同 API-2）。
+
+#### ProtocolMessageView 结构（`@JsonInclude(NON_NULL)`，null 字段不输出）
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `id` | string | ✅ | 消息 ID（优先 `messageId`，回退 DB 自增 `id`） |
+| `welinkSessionId` | string | ✅ | 所属会话 ID |
+| `seq` | int | ❌ | 消息在数据库中的排序序号，用户消息时可能为 null |
+| `messageSeq` | int | ❌ | 消息序号，由 OpenCode 分配 |
+| `role` | string | ✅ | 发送方：`user`（用户发送）/ `assistant`（AI 生成） |
+| `content` | string | ❌ | 消息纯文本内容（`user` 消息必有，`assistant` 可能为 null） |
+| `contentType` | string | ❌ | 内容类型：`plain`（纯文本）/ `markdown`（Markdown 格式） |
+| `createdAt` | string | ✅ | 消息创建时间（ISO 8601） |
+| `meta` | object | ❌ | 元信息对象（包含 tokens、cost 等），仅 assistant 消息可能有 |
+| `parts` | array | ❌ | `ProtocolMessagePart` 数组，仅 assistant 消息有，详见下方 |
+
+#### ProtocolMessagePart 结构（`@JsonInclude(NON_NULL)`，null 字段不输出）
+
+**基础字段**（所有 type 共用）：
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `partId` | string | ✅ | Part 唯一标识 |
+| `partSeq` | int | ✅ | Part 在消息中的序号（从 1 递增） |
+| `type` | string | ✅ | Part 类型：`text` / `thinking` / `tool` / `question` / `permission` / `file` |
+| `content` | string | ❌ | 文本内容，仅 `text` / `thinking` 类型有值 |
+
+**按 type 扩展的字段**（仅对应类型时出现）：
+
+| type | 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|---|
+| `tool` | `toolName` | string | ✅ | 工具名称（如 `bash`, `read`, `edit`） |
+| `tool` | `toolCallId` | string | ❌ | 工具调用 ID |
+| `tool` | `status` | string | ✅ | 执行状态：`pending` / `running` / `completed` / `error` |
+| `tool` | `input` | object | ❌ | 工具输入参数（JSON 对象） |
+| `tool` | `output` | string | ❌ | 工具执行输出文本 |
+| `tool` | `error` | string | ❌ | 工具执行错误信息 |
+| `tool` | `title` | string | ❌ | 工具调用的展示标题 |
+| `question` | `toolCallId` | string | ✅ | 问题关联的工具调用 ID，前端回复时需回传 |
+| `question` | `status` | string | ✅ | 固定为 `"running"`（等待回答） |
+| `question` | `input` | object | ❌ | 问题原始 payload |
+| `question` | `header` | string | ❌ | 问题标题/说明 |
+| `question` | `question` | string | ❌ | 问题正文 |
+| `question` | `options` | array | ❌ | 选项列表（字符串数组） |
+| `permission` | `permissionId` | string | ✅ | 权限请求 ID |
+| `permission` | `permType` | string | ✅ | 权限类型（如 `file-edit`） |
+| `permission` | `metadata` | object | ❌ | 权限相关元数据 |
+| `permission` | `response` | string | ❌ | 回复值（`once` / `always` / `reject`，已回复时出现） |
+| `permission` | `status` | string | ❌ | 权限状态 |
+| `file` | `fileName` | string | ❌ | 文件名 |
+| `file` | `fileUrl` | string | ❌ | 文件下载 URL |
+| `file` | `fileMime` | string | ❌ | 文件 MIME 类型 |
+
+> 使用 `@JsonInclude(NON_NULL)`，null 字段不输出。
+
+**代码**：[SkillMessageController.java L145-172](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillMessageController.java#L145-L172)
+
 ---
 
-### 8. 查询单个会话
+### API-8：转发到 IM
 
-**GET** `/api/skill/sessions/{welinkSessionId}`
-
-#### 路径参数
-
-| 参数              | 类型 | 说明    |
-| ----------------- | ---- | ------- |
-| `welinkSessionId` | Long | 会话 ID |
-
-#### 响应
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "welinkSessionId": 42,
-    "userId": "10001",
-    "ak": "ak_xxxxxxxx",
-    "title": "帮我创建一个React项目",
-    "imGroupId": "group_abc123",
-    "status": "ACTIVE",
-    "toolSessionId": "ses_abc",
-    "createdAt": "2026-03-08T00:15:00",
-    "updatedAt": "2026-03-08T00:16:00"
-  }
-}
+```
+POST /api/skill/sessions/{sessionId}/send-to-im
 ```
 
+**请求 Body**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `content` | string | 是 | 要转发的文本 |
+| `chatId` | string | 否 | IM 聊天 ID，空则回退到 `session.imGroupId` |
+
+**响应 `data`**：
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `success` | boolean | ✅ | 固定为 `true`（失败时走 errormsg） |
+
+**代码**：[SkillMessageController.java L178-217](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillMessageController.java#L178-L217)
+
 ---
 
-### 9. 发送内容到 IM 群聊
+### API-9：权限回复
 
-**POST** `/api/skill/sessions/{welinkSessionId}/send-to-im`
-
-将 AI 回复的文本内容转发到关联的 IM 群组。
-
-#### 路径参数
-
-| 参数              | 类型 | 说明    |
-| ----------------- | ---- | ------- |
-| `welinkSessionId` | Long | 会话 ID |
-
-#### 请求
-
-```json
-{
-  "content": "这是 AI 生成的代码片段...",
-  "chatId": "group_abc123"
-}
+```
+POST /api/skill/sessions/{sessionId}/permissions/{permId}
 ```
 
-| 字段      | 类型   | 必填  | 说明                                             |
-| --------- | ------ | :---: | ------------------------------------------------ |
-| `content` | String |   ✅   | 要发送的文本内容                                 |
-| `chatId`  | String |   ❌   | 目标 IM 群组 ID，不传则从会话的 `imGroupId` 获取 |
+**请求 Body**：
 
-#### 响应
+| 字段 | 类型 | 必填 | 合法值 |
+|---|---|---|---|
+| `response` | string | 是 | `once`（单次允许）/ `always`（始终允许）/ `reject`（拒绝） |
 
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": {
-    "success": true
-  }
-}
+**响应 `data`**：
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `permissionId` | string | ✅ | 被回复的权限请求 ID |
+| `response` | string | ✅ | 回复内容（回显请求值） |
+
+**副作用**：
+1. 发送 `permission_reply` invoke 到 Gateway
+2. 推送 `permission.reply` StreamMessage 到 WS
+
+**代码**：[SkillMessageController.java L225-288](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillMessageController.java#L225-L288)
+
+---
+
+### API-10：在线 Agent 列表
+
+```
+GET /api/skill/agents
 ```
 
+**响应 `data`** — `List<AgentSummary>`（`@JsonInclude(NON_NULL)`，null 字段不输出）：
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `ak` | string | ✅ | Agent Access Key，唯一标识 |
+| `status` | string | ❌ | 连接状态，如 `ONLINE` |
+| `deviceName` | string | ❌ | 设备名称 |
+| `os` | string | ❌ | 操作系统（如 `Windows`, `macOS`, `Linux`） |
+| `toolType` | string | ❌ | 工具类型（小写，如 `opencode`） |
+| `toolVersion` | string | ❌ | 工具版本号 |
+| `connectedAt` | string | ❌ | 连接时间（ISO 8601） |
+
+> 字段来自 Gateway API 透传，除 `ak` 外其他字段取决于 Agent 上报的注册信息。
+
+**代码**：[AgentQueryController.java](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/AgentQueryController.java)
+
 ---
 
-### 10. 查询在线 Agent 列表
+## 二、WebSocket 协议（Skill Server → Miniapp）
 
-**GET** `/api/skill/agents`
+### 连接
 
-查询当前用户名下在线的 Agent 列表（代理到 Gateway 的 `/api/gateway/agents`）。
-
-#### 请求
-
-无请求体。从 Cookie 解析 `userId`。
-
-#### 响应
-
-```json
-{
-  "code": 0,
-  "errormsg": "",
-  "data": [
-    {
-      "ak": "ak_xxxxxxxx",
-      "akId": "ak_xxxxxxxx",
-      "toolType": "OPENCODE",
-      "toolVersion": "1.0.0",
-      "deviceName": "MyPC",
-      "os": "WINDOWS"
-    }
-  ]
-}
+```
+ws://{host}/ws/skill/stream
 ```
 
-| data[] 字段   | 类型   | 说明                  |
-| ------------- | ------ | --------------------- |
-| `ak`          | String | Agent 的 Access Key   |
-| `akId`        | String | 同 `ak`，前端兼容字段 |
-| `toolType`    | String | 工具类型              |
-| `toolVersion` | String | 工具版本号            |
-| `deviceName`  | String | 设备名称              |
-| `os`          | String | 操作系统              |
+- **认证**：Cookie `userId`
+- **订阅模型**：按 userId，一个用户所有 session 的事件推到同一连接
+- **连接后**：自动推送所有 ACTIVE session 的 `snapshot` + `streaming`
+- **客户端消息**：`{"action": "resume"}` — 重发 `snapshot` + `streaming`
+- **重连**：指数退避，最大 30 秒
+
+**代码**：[SkillStreamHandler.java](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/ws/SkillStreamHandler.java)
 
 ---
 
-## 二、WebSocket 实时流协议
+### StreamMessage 通用字段
 
-### 连接信息
+所有 WS 事件使用 `StreamMessage` DTO（`@JsonInclude(NON_NULL)`，null 字段不输出）。
 
-| 项目         | 值                                                                  |
-| ------------ | ------------------------------------------------------------------- |
-| **端点**     | `ws://host/ws/skill/stream`                                         |
-| **认证**     | Cookie → 解析 `userId`（String）                                    |
-| **推送策略** | 自动推送该用户所有 ACTIVE 会话的事件，前端按 `welinkSessionId` 分流 |
-| **传输格式** | JSON                                                                |
-| **方向**     | 服务端 → 客户端（单向推送）                                         |
+以下字段根据事件类型选择性出现，具体见各事件定义：
 
----
-
-### 公共字段
-
-#### 传输层（所有消息都有）
-
-| 字段              | 类型    | 必填  | 说明                                         |
-| ----------------- | ------- | :---: | -------------------------------------------- |
-| `type`            | String  |   ✅   | 消息类型标识                                 |
-| `seq`             | Integer |   ✅   | 传输序号，单调递增，用于排序、去重、丢包检测 |
-| `welinkSessionId` | String  |   ✅   | 会话 ID，前端据此分流到对应会话              |
-| `emittedAt`       | String  |   ✅   | 事件发出时间，ISO-8601                       |
-| `raw`             | Object  |   ❌   | 原始 OpenCode 事件，仅调试用                 |
-
-#### 消息层（归属到某条聊天气泡的事件额外携带）
-
-| 字段         | 类型    | 必填  | 说明                                                   |
-| ------------ | ------- | :---: | ------------------------------------------------------ |
-| `messageId`  | String  |   ✅   | Skill Server 分配的稳定消息 ID，同一气泡生命周期内不变 |
-| `messageSeq` | Integer |   ✅   | 会话内消息顺序，与历史消息 API 返回的顺序对齐          |
-| `role`       | String  |   ✅   | 消息角色：`user` / `assistant` / `system` / `tool`     |
-
-#### Part 层（归属到消息中某个部件的事件额外携带）
-
-| 字段      | 类型    | 必填  | 说明                                     |
-| --------- | ------- | :---: | ---------------------------------------- |
-| `partId`  | String  |   ✅   | Part 唯一 ID，用于增量更新定位           |
-| `partSeq` | Integer |   ❌   | Part 在消息内的顺序，用于恢复/回放时排序 |
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `type` | string | 事件类型（固定，所有事件必有） |
+| `seq` | long | 传输序号（per-session 递增，由广播层动态分配） |
+| `welinkSessionId` | string | 会话 ID（由 `enrichStreamMessage` 注入） |
+| `emittedAt` | string | 发射时间（ISO 8601），部分事件类型不含此字段 |
 
 ---
 
-### 消息类型总览
+### 事件类型总览
 
-| 分类 | type               |    字段层级    | 说明                     |
-| ---- | ------------------ | :------------: | ------------------------ |
-| 内容 | `text.delta`       | 传输+消息+Part | AI 文本流式追加          |
-| 内容 | `text.done`        | 传输+消息+Part | AI 文本完成              |
-| 内容 | `thinking.delta`   | 传输+消息+Part | 思维链流式追加           |
-| 内容 | `thinking.done`    | 传输+消息+Part | 思维链完成               |
-| 内容 | `tool.update`      | 传输+消息+Part | 工具调用状态更新         |
-| 内容 | `question`         | 传输+消息+Part | AI 提问交互              |
-| 内容 | `file`             | 传输+消息+Part | 文件/图片附件            |
-| 状态 | `step.start`       |   传输+消息    | 推理步骤开始             |
-| 状态 | `step.done`        |   传输+消息    | 推理步骤结束             |
-| 状态 | `session.status`   |     仅传输     | 会话状态变化             |
-| 状态 | `session.title`    |     仅传输     | 会话标题变化             |
-| 状态 | `session.error`    |     仅传输     | 会话级错误               |
-| 交互 | `permission.ask`   |   传输+消息    | 权限请求                 |
-| 交互 | `permission.reply` |   传输+消息    | 权限响应结果             |
-| 系统 | `agent.online`     |     仅传输     | Agent 上线               |
-| 系统 | `agent.offline`    |     仅传输     | Agent 下线               |
-| 系统 | `error`            |     仅传输     | 非会话级错误             |
-| 恢复 | `snapshot`         |     仅传输     | 断线恢复：已完成消息快照 |
-| 恢复 | `streaming`        |     仅传输     | 断线恢复：进行中的流消息 |
+| 类型 | 用途 | 基于 Builder |
+|---|---|---|
+| `text.delta` | 文本增量 | partBuilder |
+| `text.done` | 文本完成 | partBuilder |
+| `thinking.delta` | 思考增量 | partBuilder |
+| `thinking.done` | 思考完成 | partBuilder |
+| `tool.update` | 工具调用状态 | partBuilder |
+| `question` | 交互式提问 | partBuilder |
+| `file` | 文件附件 | partBuilder |
+| `permission.ask` | 权限请求 | messageBuilder |
+| `permission.reply` | 权限回复 | 直接构造 |
+| `step.start` | 步骤开始 | messageBuilder |
+| `step.done` | 步骤完成（含 tokens/cost） | messageBuilder |
+| `session.status` | 会话状态变更 | baseBuilder |
+| `session.title` | 会话标题更新 | baseBuilder |
+| `session.error` | 会话错误 | baseBuilder |
+| `agent.online` | Agent 上线 | 直接构造 |
+| `agent.offline` | Agent 下线 | 直接构造 |
+| `snapshot` | 历史消息快照 | 直接构造 |
+| `streaming` | 当前流式状态 | 直接构造 |
+| `error` | 通用错误 | 直接构造 |
 
----
-
-### 消息类型详细定义
-
-#### `text.delta` — AI 文本流式追加
-
-`content` 为增量文本，前端拼接到该 `partId` 已有内容之后。
-
-```json
-{
-  "type": "text.delta",
-  "seq": 4,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:01.123Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_1",
-  "partSeq": 1,
-  "content": "好的，"
-}
-```
-
-| 特有字段  | 类型   | 说明         |
-| --------- | ------ | ------------ |
-| `content` | String | 增量文本片段 |
+**Builder 层级决定的字段组合**：
+- **baseBuilder**：`type` + `sessionId` + `emittedAt`
+- **messageBuilder** = baseBuilder + `role` + `messageId` + `sourceMessageId`
+- **partBuilder** = messageBuilder + `partId` + `partSeq`
 
 ---
 
-#### `text.done` — AI 文本完成
+### WS-1/2：text.delta / text.done
 
-`content` 为该 Part 的最终完整文本。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"text.delta"` 或 `"text.done"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ✅ | 所属消息 ID |
+| `sourceMessageId` | string | ✅ | 源消息 ID（同 messageId） |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `partId` | string | ✅ | Part 唯一标识 |
+| `partSeq` | int | ✅ | Part 在消息中的序号 |
+| `content` | string | ✅ | `delta` 为增量片段，`done` 为完整文本 |
 
-```json
-{
-  "type": "text.done",
-  "seq": 8,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:05.000Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_1",
-  "partSeq": 1,
-  "content": "好的，我来帮你创建一个React项目。"
-}
-```
-
-| 特有字段  | 类型   | 说明                   |
-| --------- | ------ | ---------------------- |
-| `content` | String | 该 Part 的最终完整文本 |
+**来源**：`OpenCodeEventTranslator.translateTextPart()` / `translatePartDelta()`
 
 ---
 
-#### `thinking.delta` — 思维链流式追加
+### WS-3/4：thinking.delta / thinking.done
 
-前端渲染为可折叠的"思考过程"区域。`content` 为增量文本。
+字段结构与 text.delta/done **完全一致**，仅 `type` 不同（`"thinking.delta"` / `"thinking.done"`）。
 
-```json
-{
-  "type": "thinking.delta",
-  "seq": 3,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:00.500Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_0",
-  "partSeq": 0,
-  "content": "用户需要创建React项目，我应该..."
-}
-```
-
-| 特有字段  | 类型   | 说明           |
-| --------- | ------ | -------------- |
-| `content` | String | 增量思维链文本 |
+OpenCode partType `"reasoning"` 映射为 `"thinking"`。
 
 ---
 
-#### `thinking.done` — 思维链完成
+### WS-5：tool.update
 
-```json
-{
-  "type": "thinking.done",
-  "seq": 5,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:01.500Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_0",
-  "partSeq": 0,
-  "content": "用户需要创建React项目，我应该使用Vite来初始化。"
-}
-```
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"tool.update"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ✅ | 所属消息 ID |
+| `sourceMessageId` | string | ✅ | 源消息 ID |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `partId` | string | ✅ | Part 唯一标识 |
+| `partSeq` | int | ✅ | Part 序号 |
+| `toolName` | string | ✅ | 工具名称（如 `bash`, `read`, `edit`） |
+| `toolCallId` | string | ❌ | 工具调用 ID，由 OpenCode 分配 |
+| `status` | string | ✅ | 执行状态：`pending` / `running` / `completed` / `error` |
+| `input` | object | ❌ | 工具输入参数，JSON 对象（如 `{"command": "ls -la"}`） |
+| `output` | string | ❌ | 工具执行输出文本 |
+| `error` | string | ❌ | 工具执行错误信息（null 时省略） |
+| `title` | string | ❌ | 工具调用的展示标题 |
 
-| 特有字段  | 类型   | 说明                         |
-| --------- | ------ | ---------------------------- |
-| `content` | String | 该 Part 的最终完整思维链文本 |
+**字段来源映射**：
 
----
+| 字段 | 来源 |
+|---|---|
+| `toolName` | `part.tool` |
+| `toolCallId` | `part.callID` |
+| `status` | `part.state.status` |
+| `input` | `part.state.input` |
+| `output` | `part.state.output` |
+| `error` | `part.state.error`（null 时省略） |
+| `title` | `part.state.title` |
 
-#### `tool.update` — 工具调用状态更新
-
-ToolPart 状态机：`pending → running → completed / error`。
-
-```json
-{
-  "type": "tool.update",
-  "seq": 6,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:02.000Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_3",
-  "partSeq": 3,
-  "toolName": "bash",
-  "toolCallId": "call_1",
-  "status": "completed",
-  "input": { "command": "npx create-vite my-app" },
-  "output": "Scaffolding project in ./my-app...\nDone.",
-  "title": "Execute bash command"
-}
-```
-
-| 特有字段     | 类型   | 必填  | 说明                                                |
-| ------------ | ------ | :---: | --------------------------------------------------- |
-| `toolName`   | String |   ✅   | 工具名称（`bash` / `edit` / `read` 等）             |
-| `toolCallId` | String |   ❌   | 工具调用 ID                                         |
-| `status`     | String |   ✅   | 状态：`pending` / `running` / `completed` / `error` |
-| `input`      | Object |   ❌   | 工具输入参数                                        |
-| `output`     | String |   ❌   | 工具输出结果（`completed` 时）                      |
-| `error`      | String |   ❌   | 错误信息（`error` 时）                              |
-| `title`      | String |   ❌   | 工具执行摘要标题                                    |
+> 当 `toolName == "question"` 且 `status == "running"` 时，转为 `question` 类型。
 
 ---
 
-#### `question` — AI 提问交互
+### WS-6：question
 
-AI 通过内置 `question` 工具向用户提问，阻塞等待用户选择或输入。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"question"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ✅ | 所属消息 ID |
+| `sourceMessageId` | string | ✅ | 源消息 ID |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `partId` | string | ✅ | Part 唯一标识 |
+| `partSeq` | int | ✅ | Part 序号 |
+| `toolName` | string | ✅ | 固定 `"question"` |
+| `toolCallId` | string | ✅ | 工具调用 ID，前端回复时需通过 API-6 回传此值 |
+| `status` | string | ✅ | 固定 `"running"`（等待回答） |
+| `input` | object | ❌ | 问题原始 payload（JSON 对象） |
+| `header` | string | ❌ | 问题标题/说明文字 |
+| `question` | string | ❌ | 问题正文 |
+| `options` | array | ❌ | 选项列表（字符串数组），无选项时不返回 |
 
-```json
-{
-  "type": "question",
-  "seq": 5,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:02.500Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_2",
-  "partSeq": 2,
-  "toolName": "question",
-  "toolCallId": "call_2",
-  "status": "running",
-  "header": "项目配置",
-  "question": "选择模板框架",
-  "options": ["Vite", "CRA", "Next.js"]
-}
-```
+**两条来源路径**：
+- `translateQuestion()`：`tool` part 中 `toolName == "question"` 且 `status == "running"`
+- `translateQuestionAsked()`：OpenCode `question.asked` 事件
 
-| 特有字段     | 类型     | 必填  | 说明                               |
-| ------------ | -------- | :---: | ---------------------------------- |
-| `toolName`   | String   |   ✅   | 固定 `"question"`                  |
-| `toolCallId` | String   |   ❌   | 工具调用 ID                        |
-| `status`     | String   |   ✅   | 固定 `"running"`（等待用户回答）   |
-| `header`     | String   |   ❌   | 问题分组标题                       |
-| `question`   | String   |   ✅   | 问题正文                           |
-| `options`    | String[] |   ❌   | 预设选项列表，用户可选择或自由输入 |
-
-用户回答方式：调用 REST API `POST /api/skill/sessions/{welinkSessionId}/messages` 发送回答文本。
+**options 提取**：每个 option 先取 `.label`，无则取文本值。
 
 ---
 
-#### `file` — 文件/图片附件
+### WS-7：file
 
-```json
-{
-  "type": "file",
-  "seq": 10,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:06.000Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "partId": "p_5",
-  "partSeq": 5,
-  "fileName": "screenshot.png",
-  "fileUrl": "https://...",
-  "fileMime": "image/png"
-}
-```
-
-| 特有字段   | 类型   | 必填  | 说明         |
-| ---------- | ------ | :---: | ------------ |
-| `fileName` | String |   ❌   | 文件名       |
-| `fileUrl`  | String |   ✅   | 文件访问 URL |
-| `fileMime` | String |   ❌   | MIME 类型    |
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"file"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ✅ | 所属消息 ID |
+| `sourceMessageId` | string | ✅ | 源消息 ID |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `partId` | string | ✅ | Part 唯一标识 |
+| `partSeq` | int | ✅ | Part 序号 |
+| `fileName` | string | ❌ | 文件名（如 `result.png`） |
+| `fileUrl` | string | ❌ | 文件下载 URL |
+| `fileMime` | string | ❌ | MIME 类型（如 `image/png`） |
 
 ---
 
-#### `step.start` — 推理步骤开始
+### WS-8：permission.ask
 
-AI 开始一轮推理步骤。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"permission.ask"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ❌ | 所属消息 ID（OpenCode 路径有，Gateway 路径可能无） |
+| `sourceMessageId` | string | ❌ | 源消息 ID（同 messageId） |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `permissionId` | string | ✅ | 权限请求唯一 ID，前端回复时需回传 |
+| `permType` | string | ✅ | 权限类型（如 `file-edit`, `bash`） |
+| `title` | string | ❌ | 权限请求展示标题（如 `"edit /src/main.ts"`） |
+| `metadata` | object | ❌ | 权限相关元数据（如 `{"path": "/src/main.ts"}`） |
 
-```json
-{
-  "type": "step.start",
-  "seq": 2,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:00.000Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant"
-}
-```
-
-无特有字段。
-
----
-
-#### `step.done` — 推理步骤结束
-
-一轮推理步骤完成，包含 token 统计。
-
-```json
-{
-  "type": "step.done",
-  "seq": 9,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:05.500Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "tokens": {
-    "input": 5000,
-    "output": 200,
-    "reasoning": 800,
-    "cache": { "read": 100, "write": 50 }
-  },
-  "cost": 0.01,
-  "reason": "stop"
-}
-```
-
-| 特有字段           | 类型    | 必填  | 说明                             |
-| ------------------ | ------- | :---: | -------------------------------- |
-| `tokens`           | Object  |   ❌   | Token 使用统计                   |
-| `tokens.input`     | Integer |   ❌   | 输入 token 数                    |
-| `tokens.output`    | Integer |   ❌   | 输出 token 数                    |
-| `tokens.reasoning` | Integer |   ❌   | 推理 token 数                    |
-| `tokens.cache`     | Object  |   ❌   | 缓存命中统计                     |
-| `cost`             | Number  |   ❌   | 本步骤费用                       |
-| `reason`           | String  |   ❌   | 结束原因（`stop` / `length` 等） |
+**两条来源**：
+- `translatePermission()`：来自 OpenCode `permission.updated`/`permission.asked` 事件
+- `translatePermissionFromGateway()`：来自 Gateway 中转的 `permission_request`
 
 ---
 
-#### `session.status` — 会话状态变化
+### WS-9：permission.reply
 
-```json
-{
-  "type": "session.status",
-  "seq": 1,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:00.000Z",
-  "sessionStatus": "busy"
-}
-```
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"permission.reply"` |
+| `welinkSessionId` | string | ✅ | 会话 ID（由广播层注入） |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `permissionId` | string | ✅ | 被回复的权限请求 ID |
+| `response` | string | ✅ | 回复内容：`once` / `always` / `reject` |
 
-| 特有字段        | 类型   | 必填  | 说明                                                    |
-| --------------- | ------ | :---: | ------------------------------------------------------- |
-| `sessionStatus` | String |   ✅   | `busy` — AI 正在推理 / `idle` — 空闲 / `retry` — 重试中 |
+> 无 `emittedAt`（直接 `StreamMessage.builder()` 构造）。
+> 在用户通过 REST API-9 回复权限时推送。
 
 ---
 
-#### `session.title` — 会话标题变化
+### WS-10：step.start
 
-AI 自动为会话生成或更新标题时触发。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"step.start"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ✅ | 所属消息 ID |
+| `sourceMessageId` | string | ✅ | 源消息 ID |
+| `role` | string | ✅ | 固定 `"assistant"` |
 
-```json
-{
-  "type": "session.title",
-  "seq": 11,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:10.000Z",
-  "title": "React项目创建与配置"
-}
-```
-
-| 特有字段 | 类型   | 必填  | 说明   |
-| -------- | ------ | :---: | ------ |
-| `title`  | String |   ✅   | 新标题 |
+仅基础字段，无额外数据。
 
 ---
 
-#### `session.error` — 会话级错误
+### WS-11：step.done
 
-```json
-{
-  "type": "session.error",
-  "seq": 12,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:12.000Z",
-  "error": "OpenCode runtime connection lost"
-}
-```
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"step.done"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messageId` | string | ✅ | 所属消息 ID |
+| `sourceMessageId` | string | ✅ | 源消息 ID |
+| `role` | string | ✅ | 固定 `"assistant"` |
+| `tokens` | object | ❌ | Token 用量：`{"input": 1000, "output": 500}`，仅 `step-finish` part 路径有 |
+| `cost` | double | ❌ | 本次调用费用（美元），仅非零时返回 |
+| `reason` | string | ❌ | 结束原因（如 `"stop"`, `"length"`） |
 
-| 特有字段 | 类型   | 必填  | 说明     |
-| -------- | ------ | :---: | -------- |
-| `error`  | String |   ✅   | 错误描述 |
-
----
-
-#### `permission.ask` — 权限请求
-
-OpenCode 需要执行受限操作（如 shell 命令、文件写入）前发出审批请求。
-
-```json
-{
-  "type": "permission.ask",
-  "seq": 7,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:03.000Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "permissionId": "perm_1",
-  "permType": "bash",
-  "title": "Execute shell command",
-  "metadata": {
-    "command": "npx create-vite my-app"
-  }
-}
-```
-
-| 特有字段       | 类型   | 必填  | 说明                                 |
-| -------------- | ------ | :---: | ------------------------------------ |
-| `permissionId` | String |   ✅   | 权限请求唯一 ID                      |
-| `permType`     | String |   ❌   | 权限类型（`bash` / `file_write` 等） |
-| `title`        | String |   ❌   | 操作摘要                             |
-| `metadata`     | Object |   ❌   | 操作详情（命令内容、文件路径等）     |
-
-用户回复方式：调用 REST API `POST /api/skill/sessions/{welinkSessionId}/permissions/{permId}`。
+- `tokens`/`cost` 仅在 `step-finish` part 路径中有
+- `message.updated`（带 `finish`）路径只有 `reason`
 
 ---
 
-#### `permission.reply` — 权限响应结果
+### WS-12：session.status
 
-权限请求被处理后的结果通知。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"session.status"` |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `sessionStatus` | string | ✅ | 归一化后的状态值（见下表） |
 
-```json
-{
-  "type": "permission.reply",
-  "seq": 8,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:16:04.000Z",
-  "messageId": "m_2",
-  "messageSeq": 2,
-  "role": "assistant",
-  "permissionId": "perm_1",
-  "response": "once"
-}
-```
+**状态映射**：
 
-| 特有字段       | 类型   | 必填  | 说明                                 |
-| -------------- | ------ | :---: | ------------------------------------ |
-| `permissionId` | String |   ✅   | 权限请求 ID                          |
-| `response`     | String |   ✅   | 回复值：`once` / `always` / `reject` |
+| OpenCode 原始值 | 映射后 | 含义 |
+|---|---|---|
+| `idle` / `completed` | `idle` | AI 处于空闲，可接收新消息 |
+| `active` / `running` / `busy` | `busy` | AI 正在处理中 |
+| `reconnecting` / `retry` / `recovering` | `retry` | 连接恢复中 |
 
 ---
 
-#### `agent.online` — Agent 上线
+### WS-13：session.title
 
-关联的 PC Agent 建立连接。
-
-```json
-{
-  "type": "agent.online",
-  "seq": 0,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:14:00.000Z"
-}
-```
-
-无特有字段。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"session.title"` |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `title` | string | ❌ | AI 自动生成的会话标题 |
 
 ---
 
-#### `agent.offline` — Agent 下线
+### WS-14：session.error
 
-关联的 PC Agent 断开连接。
-
-```json
-{
-  "type": "agent.offline",
-  "seq": 13,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:20:00.000Z"
-}
-```
-
-无特有字段。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"session.error"` |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `error` | string | ✅ | 错误描述信息 |
 
 ---
 
-#### `error` — 非会话级错误
+### WS-15/16：agent.online / agent.offline
 
-Gateway 连接异常等系统级错误。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"agent.online"` 或 `"agent.offline"` |
+| `seq` | long | ✅ | 传输序号（广播层分配） |
+| `welinkSessionId` | string | ✅ | 关联的会话 ID（广播层注入） |
 
-```json
-{
-  "type": "error",
-  "seq": 14,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:21:00.000Z",
-  "error": "Gateway connection timeout"
-}
-```
-
-| 特有字段 | 类型   | 必填  | 说明     |
-| -------- | ------ | :---: | -------- |
-| `error`  | String |   ✅   | 错误描述 |
+- 构造时仅设 `type`，`seq` 和 `welinkSessionId` 由广播路径动态注入
+- 无 `emittedAt`、`role` 等字段
+- 广播给该 `ak` 关联的所有 session（通过 `sessionService.findByAk(ak)` 查询）
 
 ---
 
-#### `snapshot` — 断线恢复：已完成消息快照
+### WS-17：snapshot
 
-客户端重连后，服务端推送当前会话的已完成消息列表。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"snapshot"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `messages` | array | ✅ | `ProtocolMessageView` 数组（格式同 REST API-7 的消息结构） |
 
-```json
-{
-  "type": "snapshot",
-  "seq": 1,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:22:00.000Z",
-  "messages": [
-    {
-      "id": "m_1",
-      "seq": 1,
-      "role": "user",
-      "content": "帮我创建React项目",
-      "contentType": "plain",
-      "createdAt": "2026-03-08T00:15:00"
-    },
-    {
-      "id": "m_2",
-      "seq": 2,
-      "role": "assistant",
-      "content": "好的，我来帮你创建...",
-      "contentType": "markdown",
-      "parts": [
-        {
-          "partId": "p_1",
-          "partSeq": 1,
-          "type": "text",
-          "content": "好的，我来帮你创建..."
-        }
-      ]
-    }
-  ]
-}
-```
-
-| 特有字段                 | 类型    | 必填  | 说明                          |
-| ------------------------ | ------- | :---: | ----------------------------- |
-| `messages`               | Array   |   ✅   | 已完成消息列表                |
-| `messages[].id`          | String  |   ✅   | 消息 ID                       |
-| `messages[].seq`         | Integer |   ✅   | 消息顺序                      |
-| `messages[].role`        | String  |   ✅   | 角色                          |
-| `messages[].content`     | String  |   ✅   | 消息内容                      |
-| `messages[].contentType` | String  |   ✅   | `plain` / `markdown` / `code` |
-| `messages[].createdAt`   | String  |   ❌   | 创建时间                      |
-| `messages[].parts`       | Array   |   ❌   | Part 列表                     |
+- 触发时机：WS 连接建立 / 客户端 `resume`
 
 ---
 
-#### `streaming` — 断线恢复：进行中的流消息
+### WS-18：streaming
 
-客户端重连后，若有正在进行中的 AI 响应，推送当前累积状态。
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"streaming"` |
+| `seq` | long | ✅ | 传输序号 |
+| `welinkSessionId` | string | ✅ | 会话 ID |
+| `emittedAt` | string | ✅ | 发射时间 |
+| `sessionStatus` | string | ✅ | 当前状态：`"busy"`（流式进行中）或 `"idle"`（空闲） |
+| `messageId` | string | ❌ | 当前流式消息 ID，仅 parts 非空时出现 |
+| `messageSeq` | int | ❌ | 当前流式消息序号，仅 parts 非空时出现 |
+| `role` | string | ❌ | 消息角色，仅 parts 非空时出现 |
+| `parts` | array | ✅ | `ProtocolMessagePart` 数组（格式同上方定义），空闲时为空数组 |
 
-```json
-{
-  "type": "streaming",
-  "seq": 2,
-  "welinkSessionId": "42",
-  "emittedAt": "2026-03-08T00:22:00.100Z",
-  "sessionStatus": "busy",
-  "messageId": "m_3",
-  "messageSeq": 3,
-  "role": "assistant",
-  "parts": [
-    {
-      "partId": "p_1",
-      "partSeq": 1,
-      "type": "text",
-      "content": "好的，我正在分析你的代码..."
-    },
-    {
-      "partId": "p_2",
-      "partSeq": 2,
-      "type": "tool",
-      "toolName": "bash",
-      "toolCallId": "call_1",
-      "status": "running"
-    }
-  ]
-}
-```
+---
 
-| 特有字段             | 类型     | 必填  | 说明                                                              |
-| -------------------- | -------- | :---: | ----------------------------------------------------------------- |
-| `sessionStatus`      | String   |   ✅   | `busy` / `idle`                                                   |
-| `messageId`          | String   |   ❌   | 当前消息 ID                                                       |
-| `messageSeq`         | Integer  |   ❌   | 当前消息顺序                                                      |
-| `role`               | String   |   ❌   | 角色                                                              |
-| `parts`              | Array    |   ✅   | 当前已累积的 Part 列表                                            |
-| `parts[].partId`     | String   |   ✅   | Part ID                                                           |
-| `parts[].partSeq`    | Integer  |   ❌   | Part 顺序                                                         |
-| `parts[].type`       | String   |   ✅   | `text` / `thinking` / `tool` / `question` / `permission` / `file` |
-| `parts[].content`    | String   |   ❌   | 文本内容                                                          |
-| `parts[].toolName`   | String   |   ❌   | 工具名                                                            |
-| `parts[].toolCallId` | String   |   ❌   | 工具调用 ID                                                       |
-| `parts[].status`     | String   |   ❌   | 工具状态                                                          |
-| `parts[].header`     | String   |   ❌   | question 标题                                                     |
-| `parts[].question`   | String   |   ❌   | question 问题                                                     |
-| `parts[].options`    | String[] |   ❌   | question 选项                                                     |
-| `parts[].fileName`   | String   |   ❌   | 文件名                                                            |
-| `parts[].fileUrl`    | String   |   ❌   | 文件 URL                                                          |
-| `parts[].fileMime`   | String   |   ❌   | MIME 类型                                                         |
+### WS-19：error
+
+| 字段 | 类型 | 必返回 | 说明 |
+|---|---|---|---|
+| `type` | string | ✅ | `"error"` |
+| `seq` | long | ✅ | 传输序号（广播层分配） |
+| `welinkSessionId` | string | ✅ | 会话 ID（广播层注入） |
+| `error` | string | ✅ | 错误描述信息 |
+
+- 来源：Gateway 回报 `tool_error` / rebuild 失败
+- 无 `emittedAt`
