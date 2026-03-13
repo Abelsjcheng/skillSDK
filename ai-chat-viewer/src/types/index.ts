@@ -218,7 +218,7 @@ export interface ApiResponse<T> {
   data: T | null;
 }
 
-export interface SendMessageResponse {
+interface MessageOperationResponseBase {
   id: string;
   welinkSessionId: string;
   seq: number | null;
@@ -230,6 +230,8 @@ export interface SendMessageResponse {
   meta: object | null;
   parts: SessionMessagePart[] | null;
 }
+
+export interface SendMessageResponse extends MessageOperationResponseBase {}
 
 export interface GetSessionMessageResponse {
   content: SessionMessage[];
@@ -253,18 +255,7 @@ export interface ReplyPermissionResponse {
   response: PermissionResponse;
 }
 
-export interface RegenerateAnswerResponse {
-  id: string;
-  welinkSessionId: string;
-  seq: number | null;
-  messageSeq: number | null;
-  role: 'user' | 'assistant' | string;
-  content: string | null;
-  contentType: 'plain' | 'markdown' | string | null;
-  createdAt: string;
-  meta: object | null;
-  parts: SessionMessagePart[] | null;
-}
+export interface RegenerateAnswerResponse extends MessageOperationResponseBase {}
 
 export interface ControlSkillWeCodeResponse {
   status: 'success' | 'failed';
