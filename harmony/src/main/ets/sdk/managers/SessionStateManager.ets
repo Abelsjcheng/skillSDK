@@ -9,6 +9,7 @@ import {
 /**
  * Session status mapper:
  * - maps `session.status` stream events to SDK status (`executing|stopped|completed`)
+ * - keeps `stopped` after `stopSkill` until next round receives `busy/retry`
  * - dispatches callbacks per session
  */
 export class SessionStateManager {
@@ -16,6 +17,7 @@ export class SessionStateManager {
   private readonly callbacks: Map<string, (result: SessionStatusResult) => void> = new Map();
   private readonly statuses: Map<string, SessionStatus> = new Map();
   private readonly sendMessageTriggeredBySession: Map<string, boolean> = new Map();
+  private readonly stoppedHoldingBySession: Map<string, boolean> = new Map();
 
   constructor(enableLog: boolean = false) {
     this.logger = new Logger('SessionStateManager', enableLog);
@@ -33,12 +35,14 @@ export class SessionStateManager {
     this.callbacks.delete(sessionId);
     this.statuses.delete(sessionId);
     this.sendMessageTriggeredBySession.delete(sessionId);
+    this.stoppedHoldingBySession.delete(sessionId);
   }
 
   clearAll(): void {
     this.callbacks.clear();
     this.statuses.clear();
     this.sendMessageTriggeredBySession.clear();
+    this.stoppedHoldingBySession.clear();
   }
 
   markSendMessageTriggered(sessionId: string): void {
@@ -52,6 +56,7 @@ export class SessionStateManager {
   forceStatus(sessionId: string, status: SessionStatus): void {
     if (status === SessionStatus.STOPPED) {
       this.sendMessageTriggeredBySession.set(sessionId, false);
+      this.stoppedHoldingBySession.set(sessionId, true);
     }
     this.emitIfChanged(sessionId, status);
   }
@@ -76,12 +81,16 @@ export class SessionStateManager {
 
     if (message.sessionStatus === 'busy' || message.sessionStatus === 'retry') {
       if (this.sendMessageTriggeredBySession.get(sessionId) === true) {
+        this.stoppedHoldingBySession.set(sessionId, false);
         return SessionStatus.EXECUTING;
       }
       return null;
     }
 
     if (message.sessionStatus === 'idle') {
+      if (this.stoppedHoldingBySession.get(sessionId) === true) {
+        return null;
+      }
       this.sendMessageTriggeredBySession.set(sessionId, false);
       return SessionStatus.COMPLETED;
     }
