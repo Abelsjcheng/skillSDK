@@ -90,6 +90,16 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
   };
 }
 
+function getLatestUserContent(messages: Message[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (msg.role === 'user' && msg.content.trim()) {
+      return msg.content.trim();
+    }
+  }
+  return '';
+}
+
 function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -100,7 +110,9 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
-  const awaitingFinalResultRef = useRef(false);
+  const shouldResetFooterOnCompletionRef = useRef(false);
+  const suppressFooterAutoResetRef = useRef(false);
+  const latestUserContentRef = useRef('');
 
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
   const onErrorRef = useRef<((err: {
@@ -138,6 +150,29 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
     streamingMsgIdRef.current = null;
   }, []);
 
+  const appendUserMessage = useCallback((content: string) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    latestUserContentRef.current = trimmed;
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.role === 'user' && last.content.trim() === trimmed) {
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: genId(),
+          role: 'user',
+          content: trimmed,
+          timestamp: Date.now(),
+        },
+      ];
+    });
+  }, []);
+
   useEffect(() => {
     if (typeof welinkSessionIdProp === 'string' && welinkSessionIdProp.trim()) {
       setIsLoading(true);
@@ -165,7 +200,9 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
           page: 0,
           size: 50,
         });
-        setMessages(result.content.map(sessionMessageToMessage));
+        const mapped = result.content.map(sessionMessageToMessage);
+        setMessages(mapped);
+        latestUserContentRef.current = getLatestUserContent(mapped);
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -242,10 +279,10 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
             setSessionStatus('idle');
             finalizeStreamingMessage();
 
-            if (awaitingFinalResultRef.current) {
+            if (shouldResetFooterOnCompletionRef.current && !suppressFooterAutoResetRef.current) {
               setFooterMode('generate');
             }
-            awaitingFinalResultRef.current = false;
+            shouldResetFooterOnCompletionRef.current = false;
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
@@ -257,15 +294,19 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
         case 'session.error':
           setSessionStatus('error');
           console.error(msg.error ?? '会话错误');
-          setFooterMode('generate');
-          awaitingFinalResultRef.current = false;
+          if (!suppressFooterAutoResetRef.current) {
+            setFooterMode('generate');
+          }
+          shouldResetFooterOnCompletionRef.current = false;
           finalizeStreamingMessage();
           break;
 
         case 'error':
           console.error(msg.error ?? '未知错误');
-          setFooterMode('generate');
-          awaitingFinalResultRef.current = false;
+          if (!suppressFooterAutoResetRef.current) {
+            setFooterMode('generate');
+          }
+          shouldResetFooterOnCompletionRef.current = false;
           break;
 
         case 'snapshot':
@@ -279,6 +320,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
               parts: mapRawParts(sm.parts, false),
             }));
             setMessages(snapshotMessages);
+            latestUserContentRef.current = getLatestUserContent(snapshotMessages);
           }
           break;
 
@@ -344,42 +386,38 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
 
+    const trimmedContent = content.trim();
     setSessionStatus('busy');
     setFooterMode('generating');
-    awaitingFinalResultRef.current = true;
-
-    const userMsg: Message = {
-      id: genId(),
-      role: 'user',
-      content: content.trim(),
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    shouldResetFooterOnCompletionRef.current = true;
+    suppressFooterAutoResetRef.current = false;
+    appendUserMessage(trimmedContent);
 
     try {
       await sendMessageApi({
         welinkSessionId,
-        content: content.trim(),
+        content: trimmedContent,
       });
     } catch (err) {
-      awaitingFinalResultRef.current = false;
+      shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
       console.error('发送消息失败:', err);
     }
-  }, [welinkSessionId]);
+  }, [welinkSessionId, appendUserMessage]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
-
-    awaitingFinalResultRef.current = false;
-    setFooterMode('regenerate');
+    suppressFooterAutoResetRef.current = true;
 
     try {
       await stopSkill({ welinkSessionId });
+      shouldResetFooterOnCompletionRef.current = false;
+      setFooterMode('regenerate');
       setSessionStatus('idle');
       finalizeStreamingMessage();
     } catch (err) {
+      suppressFooterAutoResetRef.current = false;
       console.error('Failed to stop skill:', err);
       setFooterMode('generating');
     }
@@ -390,17 +428,19 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
 
     setSessionStatus('busy');
     setFooterMode('generating');
-    awaitingFinalResultRef.current = true;
+    shouldResetFooterOnCompletionRef.current = true;
+    suppressFooterAutoResetRef.current = false;
 
     try {
       await regenerateAnswer({ welinkSessionId });
+      appendUserMessage(latestUserContentRef.current);
     } catch (err) {
-      awaitingFinalResultRef.current = false;
+      shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('regenerate');
       console.error('重新生成失败:', err);
     }
-  }, [welinkSessionId]);
+  }, [welinkSessionId, appendUserMessage]);
 
   const handleSendToIM = useCallback(async (_content: string) => {
     if (!welinkSessionId) return;

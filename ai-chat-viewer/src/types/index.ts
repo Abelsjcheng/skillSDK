@@ -28,6 +28,9 @@ export type StreamMessageType =
 export type MessagePartType = 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
 export type PartStatus = 'pending' | 'running' | 'completed' | 'error';
 export type PermissionResponse = 'once' | 'always' | 'reject';
+export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
+export type BackendMessageRole = 'user' | 'assistant' | string;
+export type BackendContentType = 'plain' | 'markdown' | string | null;
 
 interface ToolPartFields<TValue, TStatus> {
   toolName?: TValue;
@@ -78,7 +81,7 @@ export interface StreamMessage
   messageId?: string | null;
   sourceMessageId?: string | null;
   messageSeq?: number | null;
-  role?: 'user' | 'assistant' | 'system' | 'tool' | string;
+  role?: MessageRole | string;
 
   // part-level fields
   partId?: string | null;
@@ -111,9 +114,9 @@ export interface SessionMessage {
   id: string;
   seq?: number | null;
   welinkSessionId: string;
-  role: 'user' | 'assistant' | string;
+  role: BackendMessageRole;
   content: string | null;
-  contentType?: 'plain' | 'markdown' | string | null;
+  contentType?: BackendContentType;
   meta?: object | null;
   messageSeq?: number | null;
   parts?: SessionMessagePart[] | null;
@@ -152,7 +155,7 @@ export interface MessagePart
 /** A single message in the conversation */
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'system' | 'tool';
+  role: MessageRole;
   content: string;
   timestamp: number;
   isStreaming?: boolean;
@@ -175,7 +178,7 @@ export interface SessionMessageSnapshot {
   messageSeq?: number | null;
   role: string;
   content: string | null;
-  contentType?: 'plain' | 'markdown' | 'code' | string | null;
+  contentType?: BackendContentType | 'code';
   meta?: object | null;
   createdAt?: string;
   parts?: MessagePartSnapshot[];
@@ -223,9 +226,9 @@ interface MessageOperationResponseBase {
   welinkSessionId: string;
   seq: number | null;
   messageSeq: number | null;
-  role: 'user' | 'assistant' | string;
+  role: BackendMessageRole;
   content: string | null;
-  contentType: 'plain' | 'markdown' | string | null;
+  contentType: BackendContentType;
   createdAt: string;
   meta: object | null;
   parts: SessionMessagePart[] | null;
