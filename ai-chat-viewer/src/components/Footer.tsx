@@ -8,6 +8,7 @@ interface FooterProps {
   onGenerate: (message: string) => void;
   onStop: () => void;
   onRegenerate: () => void;
+  isPc?: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -15,6 +16,7 @@ export const Footer: React.FC<FooterProps> = ({
   onGenerate,
   onStop,
   onRegenerate,
+  isPc = false,
 }) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -124,6 +126,7 @@ export const Footer: React.FC<FooterProps> = ({
     <div
       className={[
         'footer-container',
+        isPc ? 'footer-pc' : '',
         showInput ? '' : 'footer-without-input',
         showInput && isFocused ? 'footer-focused' : '',
       ].filter(Boolean).join(' ')}

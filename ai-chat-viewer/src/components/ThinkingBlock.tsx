@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -12,7 +12,19 @@ interface ThinkingBlockProps {
 }
 
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(part.isStreaming);
+  const prevStreamingRef = useRef(part.isStreaming);
+
+  useEffect(() => {
+    if (part.isStreaming && !prevStreamingRef.current) {
+      // thinking started: default expand
+      setExpanded(true);
+    } else if (!part.isStreaming && prevStreamingRef.current) {
+      // thinking finished: auto collapse
+      setExpanded(false);
+    }
+    prevStreamingRef.current = part.isStreaming;
+  }, [part.isStreaming]);
 
   return (
     <div className={`thinking-block ${part.isStreaming ? 'streaming' : ''}`}>

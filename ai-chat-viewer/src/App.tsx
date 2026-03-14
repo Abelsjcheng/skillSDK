@@ -14,6 +14,7 @@ import type {
 } from './types';
 import {
   parseWelinkSessionId,
+  isPcMiniApp,
   getSessionMessage,
   sendMessage as sendMessageApi,
   regenerateAnswer,
@@ -101,6 +102,7 @@ function getLatestUserContent(messages: Message[]): string {
 }
 
 function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
+  const isPc = isPcMiniApp();
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -500,7 +502,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isPc ? 'pc-mode' : ''}`.trim()}>
       <div className="header-wrapper">
         <Header
           onMinimize={handleMinimize}
@@ -522,6 +524,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
           onGenerate={handleGenerate}
           onStop={handleStop}
           onRegenerate={handleRegenerate}
+          isPc={isPc}
         />
       </div>
     </div>
