@@ -15,6 +15,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
 @property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSessionStatusCallback> *sessionStatusCallbacks;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *sendMessageTriggeredBySession;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *stopSkillHoldingBySession;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *lastSessionStatusBySession;
 @property (nonatomic, copy, nullable) WLAgentSkillsWecodeStatusCallback wecodeStatusCallback;
 
 @end
@@ -45,6 +47,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         if (self) {
                 _sessionStatusCallbacks = [NSMutableDictionary dictionary];
                 _sendMessageTriggeredBySession = [NSMutableDictionary dictionary];
+                _stopSkillHoldingBySession = [NSMutableDictionary dictionary];
+                _lastSessionStatusBySession = [NSMutableDictionary dictionary];
                 [WLAgentSkillsWebSocketManager sharedManager].delegate = self;
         }
         return self;
@@ -123,6 +127,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         [[WLAgentSkillsStreamingCache sharedCache] clearAllCache];
         @synchronized(self) {
                 [self.sendMessageTriggeredBySession removeAllObjects];
+                [self.stopSkillHoldingBySession removeAllObjects];
+                [self.lastSessionStatusBySession removeAllObjects];
         }
 
         WLAgentSkillsCloseSkillResult *result = [[WLAgentSkillsCloseSkillResult alloc] init];
@@ -150,6 +156,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                 NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
                 WLAgentSkillsStopSkillResult *result = [[WLAgentSkillsStopSkillResult alloc] initWithDictionary:data];
                 [weakSelf setSendMessageTriggered:NO sessionId:params.welinkSessionId];
+                [weakSelf setStopSkillHolding:YES sessionId:params.welinkSessionId];
                 [weakSelf emitSessionStatus:WLAgentSkillsClientSessionStatusStopped
                                                                                         sessionId:params.welinkSessionId];
                 if (success) {
@@ -602,12 +609,17 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
         if ([message.sessionStatus isEqualToString:@"busy"] || [message.sessionStatus isEqualToString:@"retry"]) {
                 if ([self isSendMessageTriggeredForSessionId:sessionId]) {
+                        [self setStopSkillHolding:NO sessionId:sessionId];
                         return WLAgentSkillsClientSessionStatusExecuting;
                 }
                 return NSNotFound;
         }
 
         if ([message.sessionStatus isEqualToString:@"idle"]) {
+                // Keep STOPPED after stopSkill; ignore idle until next round reaches busy/retry.
+                if ([self isStopSkillHoldingForSessionId:sessionId]) {
+                        return NSNotFound;
+                }
                 [self setSendMessageTriggered:NO sessionId:sessionId];
                 return WLAgentSkillsClientSessionStatusCompleted;
         }
@@ -618,6 +630,11 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)emitSessionStatus:(WLAgentSkillsClientSessionStatus)status sessionId:(NSString *)sessionId {
         WLAgentSkillsSessionStatusCallback callback = nil;
         @synchronized(self) {
+                NSNumber *lastStatus = self.lastSessionStatusBySession[sessionId];
+                if (lastStatus != nil && lastStatus.integerValue == status) {
+                        return;
+                }
+                self.lastSessionStatusBySession[sessionId] = @(status);
                 callback = self.sessionStatusCallbacks[sessionId];
         }
 
@@ -659,6 +676,26 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
         @synchronized(self) {
                 return [self.sendMessageTriggeredBySession[sessionId] boolValue];
+        }
+}
+
+- (void)setStopSkillHolding:(BOOL)holding sessionId:(NSString *)sessionId {
+        if (sessionId.length == 0) {
+                return;
+        }
+
+        @synchronized(self) {
+                self.stopSkillHoldingBySession[sessionId] = @(holding);
+        }
+}
+
+- (BOOL)isStopSkillHoldingForSessionId:(NSString *)sessionId {
+        if (sessionId.length == 0) {
+                return NO;
+        }
+
+        @synchronized(self) {
+                return [self.stopSkillHoldingBySession[sessionId] boolValue];
         }
 }
 
