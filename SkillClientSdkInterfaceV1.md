@@ -330,11 +330,11 @@ IM 客户端调用
 - 该接口依赖已建立的 WebSocket 连接
 - 服务端原始状态为 `busy / idle / retry`
 - 客户端 SDK 继续向上层暴露 `executing / stopped / completed` 三态
-- 发送消息后，SDK 仅通过 WebSocket `onmessage` 报文中的 `session.status` 判断会话状态
+- SDK 主要通过 WebSocket `onmessage` 报文中的 `session.status` 判断会话状态，`stopSkill()` 成功是唯一的本地主动状态触发
 - 当 `session.status=busy` 或 `session.status=retry` 时，返回 `executing`
-- 当 `session.status=idle` 时，返回 `completed`
+- 当 `session.status=idle` 且不处于 `stopSkill()` 后的 `stopped` 保持阶段时，返回 `completed`
 - 调用 `stopSkill()` 成功后，触发 `onSessionStatusChange` 的 `stopped` 状态
-- 当重新执行 `sendMessage` 后，若 WebSocket 再次返回 `session.status=busy/retry`，再返回 `executing`
+- 当重新执行 `sendMessage` 或 `regenerateAnswer` 后，若 WebSocket 再次返回 `session.status=busy/retry`，再返回 `executing`
 
 ### 接口名
 
@@ -359,16 +359,17 @@ onSessionStatusChange(params: OnSessionStatusChangeParams): void
 
 | WebSocket 消息 `type` / 触发 | 附加条件 | SDK 状态 | 说明 |
 |-----------------------------|----------|----------|------|
-| `session.status` | `sessionStatus = busy` 或 `retry`（在 `sendMessage` 之后收到） | `executing` | 发送消息后会话处理中或重试中 |
-| `session.status` | `sessionStatus = idle` | `completed` | 会话回到空闲，表示当前轮完成 |
+| `session.status` | `sessionStatus = busy` 或 `retry`（在 `sendMessage`/`regenerateAnswer` 触发新一轮后收到） | `executing` | 会话处理中或重试中 |
+| `session.status` | `sessionStatus = idle` 且当前不在 `stopped` 保持阶段 | `completed` | 会话自然回到空闲，表示当前轮完成 |
+| `session.status` | `sessionStatus = idle` 且当前在 `stopped` 保持阶段 | 不回调（保持 `stopped`） | `stopSkill()` 后服务端返回的中止完成状态，不映射为 `completed` |
 | SDK 本地触发 | 调用 `stopSkill()` 成功 | `stopped` | 触发 `onSessionStatusChange` 的 `stopped` 状态 |
 
 ### 补充说明
 
 - `session.title` 暂不参与状态映射
 - 仅 `session.status` 参与状态映射，其他流式事件（如 `text.delta`、`tool.update`、`step.done` 等）不改变状态
-- `stopSkill()` 成功触发 `stopped` 后，状态不会自动回到 `executing`
-- 只有重新执行 `sendMessage`，且后续收到 `session.status=busy/retry` 时，才再次回到 `executing`
+- `stopSkill()` 成功后，SDK 进入 `stopped` 保持阶段；此阶段内若收到 `session.status=idle`，不触发 `completed`
+- `stopped` 保持阶段仅在重新触发新一轮（`sendMessage` 或 `regenerateAnswer`）并收到后续 `session.status=busy/retry` 后结束
 
 ### 错误处理
 
