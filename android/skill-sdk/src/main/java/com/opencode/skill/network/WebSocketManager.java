@@ -16,6 +16,7 @@ import com.opencode.skill.model.StreamMessage;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,8 +51,12 @@ public final class WebSocketManager {
     private OkHttpClient okHttpClient;
     @Nullable
     private String baseUrl;
+    @Nullable
+    private String wsUrl;
     private boolean enableReconnect;
     private long reconnectIntervalMs;
+    @NonNull
+    private Map<String, String> webSocketHeaders = Collections.emptyMap();
 
     @Nullable
     private volatile WebSocket webSocket;
@@ -85,8 +90,10 @@ public final class WebSocketManager {
 
     public synchronized void configure(@NonNull SkillSDKConfig config) {
         this.baseUrl = trimTrailingSlash(config.getBaseUrl());
+        this.wsUrl = normalizeOptionalString(config.getWsUrl());
         this.enableReconnect = config.isEnableReconnect();
         this.reconnectIntervalMs = config.getReconnectInterval();
+        this.webSocketHeaders = mergeWebSocketHeaders(config);
         this.okHttpClient = new OkHttpClient.Builder()
                 .connectTimeout(config.getConnectTimeout(), TimeUnit.MILLISECONDS)
                 .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -112,7 +119,11 @@ public final class WebSocketManager {
             ensureConfigured();
             connecting = true;
             manualClose = false;
-            Request request = new Request.Builder().url(buildWsUrl()).build();
+            Request.Builder requestBuilder = new Request.Builder().url(buildWsUrl());
+            for (Map.Entry<String, String> entry : webSocketHeaders.entrySet()) {
+                requestBuilder.addHeader(entry.getKey(), entry.getValue());
+            }
+            Request request = requestBuilder.build();
             webSocket = requireClient().newWebSocket(request, new InternalWebSocketListener());
         }
     }
@@ -323,11 +334,31 @@ public final class WebSocketManager {
 
     @NonNull
     private synchronized String buildWsUrl() {
+        if (wsUrl != null && !wsUrl.isEmpty()) {
+            return wsUrl;
+        }
         if (baseUrl == null) {
             throw new IllegalStateException("baseUrl not configured");
         }
         String wsBase = baseUrl.replaceFirst("^http://", "ws://").replaceFirst("^https://", "wss://");
         return wsBase + "/ws/skill/stream";
+    }
+
+    @NonNull
+    private static Map<String, String> mergeWebSocketHeaders(@NonNull SkillSDKConfig config) {
+        Map<String, String> merged = new HashMap<>();
+        merged.putAll(config.getDefaultHeaders());
+        merged.putAll(config.getWebSocketHeaders());
+        return merged;
+    }
+
+    @Nullable
+    private static String normalizeOptionalString(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @NonNull

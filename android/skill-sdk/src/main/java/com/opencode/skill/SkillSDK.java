@@ -64,13 +64,17 @@ public final class SkillSDK {
     private final StreamingMessageCache streamingMessageCache = new StreamingMessageCache();
 
     @NonNull
-    private final Map<String, CopyOnWriteArrayList<SessionStatusCallback>> sessionStatusCallbacks = new ConcurrentHashMap<>();
+    private final Map<String, SessionStatusCallback> sessionStatusCallbacks = new ConcurrentHashMap<>();
+    @NonNull
+    private final Map<String, SessionStatus> lastSessionStatusBySession = new ConcurrentHashMap<>();
     @NonNull
     private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
     @NonNull
     private final Map<String, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
     @NonNull
     private final Map<String, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
+    @NonNull
+    private final Map<String, Boolean> stoppedHoldingBySession = new ConcurrentHashMap<>();
 
     @Nullable
     private SkillSDKConfig config;
@@ -193,7 +197,9 @@ public final class SkillSDK {
             webSocketManager.clearAllListeners();
             listenerBindings.clear();
             sessionStatusCallbacks.clear();
+            lastSessionStatusBySession.clear();
             awaitingExecutingBySession.clear();
+            stoppedHoldingBySession.clear();
             streamingMessageCache.clearAll();
             callback.onSuccess(new CloseSkillResult("success"));
         } catch (Exception e) {
@@ -222,6 +228,7 @@ public final class SkillSDK {
                                 ? new StopSkillResult(params.getWelinkSessionId(), "aborted")
                                 : result;
                         awaitingExecutingBySession.put(params.getWelinkSessionId(), Boolean.FALSE);
+                        stoppedHoldingBySession.put(params.getWelinkSessionId(), Boolean.TRUE);
                         emitSessionStatus(params.getWelinkSessionId(), SessionStatus.STOPPED);
                         callback.onSuccess(resolved);
                     }
@@ -246,11 +253,7 @@ public final class SkillSDK {
         if (isBlank(params.getWelinkSessionId()) || params.getCallback() == null) {
             throw error(1000, "welinkSessionId and callback are required");
         }
-        if (!webSocketManager.isConnected()) {
-            throw error(3000, "WebSocket is not connected");
-        }
-        sessionStatusCallbacks.computeIfAbsent(params.getWelinkSessionId(), key -> new CopyOnWriteArrayList<>())
-                .addIfAbsent(params.getCallback());
+        sessionStatusCallbacks.put(params.getWelinkSessionId(), params.getCallback());
     }
 
     // 5. onSkillWecodeStatusChange
@@ -538,8 +541,10 @@ public final class SkillSDK {
         apiClient.shutdown();
         listenerBindings.clear();
         sessionStatusCallbacks.clear();
+        lastSessionStatusBySession.clear();
         wecodeStatusCallbacks.clear();
         awaitingExecutingBySession.clear();
+        stoppedHoldingBySession.clear();
         streamingMessageCache.clearAll();
         config = null;
     }
@@ -628,14 +633,17 @@ public final class SkillSDK {
     }
 
     private void emitSessionStatus(@NonNull String sessionId, @NonNull SessionStatus status) {
-        List<SessionStatusCallback> callbacks = sessionStatusCallbacks.get(sessionId);
-        if (callbacks == null || callbacks.isEmpty()) {
+        SessionStatus lastStatus = lastSessionStatusBySession.get(sessionId);
+        if (lastStatus == status) {
+            return;
+        }
+        lastSessionStatusBySession.put(sessionId, status);
+        SessionStatusCallback callback = sessionStatusCallbacks.get(sessionId);
+        if (callback == null) {
             return;
         }
         SessionStatusResult result = new SessionStatusResult(status);
-        for (SessionStatusCallback callback : new ArrayList<>(callbacks)) {
-            callback.onStatusChange(result);
-        }
+        callback.onStatusChange(result);
     }
 
     private void emitWecodeStatus(@NonNull SkillWecodeStatus status, @Nullable String message) {
@@ -655,12 +663,17 @@ public final class SkillSDK {
             case MessageType.SESSION_STATUS:
                 if ("busy".equalsIgnoreCase(message.getSessionStatus()) || "retry".equalsIgnoreCase(message.getSessionStatus())) {
                     if (Boolean.TRUE.equals(awaitingExecutingBySession.get(sessionId))) {
+                        stoppedHoldingBySession.put(sessionId, Boolean.FALSE);
                         return SessionStatus.EXECUTING;
                     }
                     return null;
                 }
                 if ("idle".equalsIgnoreCase(message.getSessionStatus())) {
                     awaitingExecutingBySession.put(sessionId, Boolean.FALSE);
+                    // Keep STOPPED after stopSkill; ignore idle until a new round enters busy/retry.
+                    if (Boolean.TRUE.equals(stoppedHoldingBySession.get(sessionId))) {
+                        return null;
+                    }
                     return SessionStatus.COMPLETED;
                 }
                 return null;

@@ -14,6 +14,8 @@ public class SkillSDKConfig {
 
     @NonNull
     private final String baseUrl;
+    @Nullable
+    private final String wsUrl;
     private final long connectTimeout;
     private final long readTimeout;
     private final long writeTimeout;
@@ -22,9 +24,12 @@ public class SkillSDKConfig {
     private final boolean autoDisconnectWhenNoListener;
     @NonNull
     private final Map<String, String> defaultHeaders;
+    @NonNull
+    private final Map<String, String> webSocketHeaders;
 
     private SkillSDKConfig(@NonNull Builder builder) {
         this.baseUrl = builder.baseUrl;
+        this.wsUrl = builder.wsUrl;
         this.connectTimeout = builder.connectTimeout;
         this.readTimeout = builder.readTimeout;
         this.writeTimeout = builder.writeTimeout;
@@ -32,11 +37,17 @@ public class SkillSDKConfig {
         this.reconnectInterval = builder.reconnectInterval;
         this.autoDisconnectWhenNoListener = builder.autoDisconnectWhenNoListener;
         this.defaultHeaders = Collections.unmodifiableMap(new HashMap<>(builder.defaultHeaders));
+        this.webSocketHeaders = Collections.unmodifiableMap(new HashMap<>(builder.webSocketHeaders));
     }
 
     @NonNull
     public String getBaseUrl() {
         return baseUrl;
+    }
+
+    @Nullable
+    public String getWsUrl() {
+        return wsUrl;
     }
 
     public long getConnectTimeout() {
@@ -68,8 +79,15 @@ public class SkillSDKConfig {
         return defaultHeaders;
     }
 
+    @NonNull
+    public Map<String, String> getWebSocketHeaders() {
+        return webSocketHeaders;
+    }
+
     public static class Builder {
         private String baseUrl;
+        @Nullable
+        private String wsUrl;
         private long connectTimeout = 30000;
         private long readTimeout = 60000;
         private long writeTimeout = 30000;
@@ -77,10 +95,22 @@ public class SkillSDKConfig {
         private long reconnectInterval = 5000;
         private boolean autoDisconnectWhenNoListener = false;
         private final Map<String, String> defaultHeaders = new HashMap<>();
+        private final Map<String, String> webSocketHeaders = new HashMap<>();
 
         @NonNull
         public Builder baseUrl(@NonNull String baseUrl) {
             this.baseUrl = baseUrl;
+            return this;
+        }
+
+        @NonNull
+        public Builder wsUrl(@Nullable String wsUrl) {
+            if (wsUrl == null) {
+                this.wsUrl = null;
+                return this;
+            }
+            String trimmed = wsUrl.trim();
+            this.wsUrl = trimmed.isEmpty() ? null : trimmed;
             return this;
         }
 
@@ -131,9 +161,22 @@ public class SkillSDKConfig {
         }
 
         @NonNull
+        public Builder addWebSocketHeader(@NonNull String key, @Nullable String value) {
+            if (value == null) {
+                webSocketHeaders.remove(key);
+            } else {
+                webSocketHeaders.put(key, value);
+            }
+            return this;
+        }
+
+        @NonNull
         public SkillSDKConfig build() {
             if (baseUrl == null || baseUrl.trim().isEmpty()) {
                 throw new IllegalArgumentException("baseUrl is required");
+            }
+            if (wsUrl != null && !(wsUrl.startsWith("ws://") || wsUrl.startsWith("wss://"))) {
+                throw new IllegalArgumentException("wsUrl must start with ws:// or wss://");
             }
             return new SkillSDKConfig(this);
         }
