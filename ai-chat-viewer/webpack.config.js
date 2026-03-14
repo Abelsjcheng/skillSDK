@@ -3,7 +3,6 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const {
   RESOLVE_EXTENSIONS,
-  BASE_OPTIMIZATION,
   createModuleRules,
 } = require('./webpack.shared');
 
@@ -43,7 +42,8 @@ module.exports = {
     }),
   ],
   optimization: {
-    ...BASE_OPTIMIZATION,
+    minimize: true,
+    usedExports: true,
     splitChunks: {
       chunks: 'all',
       cacheGroups: {

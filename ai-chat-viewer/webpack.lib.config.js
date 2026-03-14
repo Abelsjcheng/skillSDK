@@ -18,7 +18,7 @@ module.exports = {
     },
     globalObject: 'this',
     clean: true,
-    publicPath: ''
+    publicPath: './'
   },
   resolve: {
     extensions: RESOLVE_EXTENSIONS,
@@ -27,8 +27,9 @@ module.exports = {
     rules: createModuleRules({ singletonStyleTag: true }),
   },
   optimization: {
-    ...BASE_OPTIMIZATION,
+    minimize: false,
+    usedExports: true,
   },
-  devtool: false,
+  devtool: "source-map",
   performance: { hints: false },
 };

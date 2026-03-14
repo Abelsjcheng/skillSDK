@@ -2,11 +2,6 @@ const BASE_BROWSERS_TARGET = '>0.5%, last 2 versions, not dead';
 
 const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 
-const BASE_OPTIMIZATION = {
-  minimize: true,
-  usedExports: true,
-};
-
 function createBabelRule({ includePolyfills = false } = {}) {
   const presetEnvOptions = { targets: BASE_BROWSERS_TARGET };
   if (includePolyfills) {
@@ -77,7 +72,6 @@ function createModuleRules({ includePolyfills = false, singletonStyleTag = false
 
 module.exports = {
   RESOLVE_EXTENSIONS,
-  BASE_OPTIMIZATION,
   createModuleRules,
 };
 
