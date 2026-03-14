@@ -117,7 +117,11 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     sendMessageToIM: (params) => call<SendMessageToIMResponse>('sendMessageToIM', params),
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     registerSessionListener: (params) => {
-      void call<void>('registerSessionListener', params).catch((err) => {
+      window.addEventListener("agentSkills_registerSessionListener_onMessage", (e: any) => {
+        const msg = e.detail.msg;
+        params.onMessage(msg);
+      })
+      void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
         console.error('registerSessionListener failed:', err);
       });
     },
