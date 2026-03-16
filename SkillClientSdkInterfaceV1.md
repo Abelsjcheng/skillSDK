@@ -750,6 +750,8 @@ we码调用
 - AI 已持续返回回答内容，但还没回答结束
 - 此时调用 `getSessionMessage` 接口需要获取当前会话所有历史消息和当前已连接会话所持续返回的消息内容
 
+补充说明：新增 `isFirst` 入参用于区分首次获取与后续分页获取。
+
 ### 接口名
 
 ```typescript
@@ -763,15 +765,17 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMe
 | welinkSessionId | string | 是 | - | 会话 ID |
 | page | number | 否 | 0 | 页码（从 0 开始） |
 | size | number | 否 | 50 | 每页条数 |
+| isFirst | boolean | 否 | false | 是否首次获取。`true` 时合并本地流式缓存并将该消息插入返回 `content` 首位；`false` 时直接返回服务端内容（保持服务端时间降序） |
 
 ### 出参
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| content | Array<SessionMessage> | 历史消息列表 |
-| number | number | 当前页码（从 0 开始） |
+| content | Array<SessionMessage> | 历史消息列表（按时间降序：从最新到最旧） |
+| page | number | 当前页码（从 0 开始） |
 | size | number | 每页大小 |
-| totalElements | number | 总记录数 |
+| total | number | 总记录数 |
+| totalPages | number | 总页数 |
 
 ### 实现方法
 
@@ -811,14 +815,15 @@ SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 Web
 
 调用 `getSessionMessage` 时，SDK 执行以下步骤：
 
-1. 获取服务端历史消息
-2. 获取本地流式缓存中的所有消息，包括：
+1. 获取服务端历史消息（服务端 `content` 已按时间降序返回，即从最新到最旧）
+2. 若 `isFirst=false`，直接返回服务端获取的内容，并保持服务端原始顺序（不做二次重排）
+3. 若 `isFirst=true`，获取本地流式缓存中的所有消息，包括：
    - 已完成的消息（`text.done` / `thinking.done` 标记的）
    - 进行中的消息（仅通过 `text.delta` 等增量事件接收的）
-3. 对同一稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）做去重和合并，确保消息的完整性和一致性
-4. 按 `seq`（有值优先）再按 `messageSeq` 排序，确保消息顺序正确
-5. 若当前存在未持久化的进行中消息，将其追加到返回列表
-6. 处理分页逻辑，确保返回指定页的消息
+4. 对同一稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）做去重和合并，确保消息的完整性和一致性
+5. 将本地流式缓存聚合出的消息插入最终返回 `content` 的第一个位置
+6. 除首位插入的本地聚合消息外，其余消息保持服务端时间降序（从最新到最旧）
+7. 基于最终结果执行分页并返回
 
 ### 缓存实现细节
 
@@ -848,7 +853,7 @@ interface MessageCache {
         createdAt: string;
       };
     };
-    messageSeqOrder: string[]; // 按 seq/messageSeq 排序的稳定消息 ID 列表
+    messageSeqOrder: string[]; // 用于缓存合并的稳定消息 ID 列表（不作为对外返回顺序依据）
   };
 }
 ```
@@ -860,12 +865,13 @@ interface MessageCache {
 2. 根据消息类型更新本地缓存
 3. 对于增量消息（如 `text.delta`），实时更新缓存中的内容
 4. 对于完成消息（如 `text.done`），标记消息为已完成并更新最终内容
-5. 当调用 `getSessionMessage` 时，SDK 会将这些实时消息与历史消息合并后返回
+5. 当调用 `getSessionMessage` 且 `isFirst=true` 时，SDK 会将这些实时消息与历史消息合并后返回
 
 #### 数据一致性保证
 
 - **去重机制**：通过稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）确保消息不重复
-- **顺序保证**：通过 `seq`（优先）+ `messageSeq` 确保消息顺序正确
+- **首次控制**：`isFirst=true` 时合并本地流式缓存并插入首位，`isFirst=false` 时直接返回服务端结果
+- **顺序保证**：返回 `content` 统一按时间降序（从最新到最旧）；`isFirst=true` 时本地聚合消息固定插入 `content[0]`
 - **完整性保证**：对于进行中的消息，返回当前已接收的所有内容
 - **实时性保证**：缓存实时更新，确保获取到最新的消息状态
 
@@ -899,11 +905,12 @@ try {
   const result = await getSessionMessage({
     welinkSessionId: "42",
     page: 0,
-    size: 50
+    size: 50,
+    isFirst: true
   });
 
-  console.log("总消息数:", result.totalElements);
-  console.log("当前页:", result.number);
+  console.log("总消息数:", result.total);
+  console.log("当前页:", result.page);
 
   result.content.forEach((message) => {
     console.log(`[${message.role}] ${message.content}`);
@@ -1455,6 +1462,7 @@ try {
 | welinkSessionId | string | 是 | - | 会话 ID |
 | page | number | 否 | 0 | 页码（从 0 开始） |
 | size | number | 否 | 50 | 每页条数 |
+| isFirst | boolean | 否 | false | 是否首次获取。`true` 时合并本地流式缓存并将该消息插入返回 `content` 首位；`false` 时直接返回服务端内容（保持服务端时间降序） |
 
 ### RegisterSessionListenerParams
 
@@ -1533,9 +1541,10 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | content | Array<T> | 当前页数据 |
-| number | number | 当前页码（从 0 开始） |
+| page | number | 当前页码（从 0 开始） |
 | size | number | 每页大小 |
-| totalElements | number | 总记录数 |
+| total | number | 总记录数 |
+| totalPages | number | 总页数 |
 
 ### SessionMessage
 

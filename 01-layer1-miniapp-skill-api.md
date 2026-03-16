@@ -93,9 +93,10 @@ GET /api/skill/sessions?page=0&size=20&status=ACTIVE&ak=xxx&imGroupId=yyy
 | 字段 | 类型 | 必返回 | 说明 |
 |---|---|---|---|
 | `content` | array | ✅ | `SkillSession` 对象数组（字段同 API-1） |
-| `totalElements` | long | ✅ | 满足条件的总记录数 |
-| `number` | int | ✅ | 当前页码（从 0 开始） |
+| `total` | long | ✅ | 满足条件的总记录数 |
+| `page` | int | ✅ | 当前页码（从 0 开始） |
 | `size` | int | ✅ | 每页大小 |
+| `totalPages` | int | ✅ | 总页数 |
 
 **代码**：[SkillSessionController.java L81-94](file:///D:/02_Lab/Projects/sandbox/opencode-CUI/skill-server/src/main/java/com/opencode/cui/skill/controller/SkillSessionController.java#L81-L94)
 
