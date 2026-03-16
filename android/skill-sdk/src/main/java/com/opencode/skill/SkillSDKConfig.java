@@ -88,11 +88,11 @@ public class SkillSDKConfig {
         private String baseUrl;
         @Nullable
         private String wsUrl;
-        private long connectTimeout = 30000;
-        private long readTimeout = 60000;
-        private long writeTimeout = 30000;
+        private long connectTimeout = 30000L;
+        private long readTimeout = 60000L;
+        private long writeTimeout = 30000L;
         private boolean enableReconnect = true;
-        private long reconnectInterval = 5000;
+        private long reconnectInterval = 5000L;
         private boolean autoDisconnectWhenNoListener = false;
         private final Map<String, String> defaultHeaders = new HashMap<>();
         private final Map<String, String> webSocketHeaders = new HashMap<>();

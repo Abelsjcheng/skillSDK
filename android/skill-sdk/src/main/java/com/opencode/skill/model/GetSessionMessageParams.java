@@ -9,15 +9,21 @@ public class GetSessionMessageParams {
     private final String welinkSessionId;
     private final int page;
     private final int size;
+    private final boolean isFirst;
 
     public GetSessionMessageParams(@NonNull String welinkSessionId) {
-        this(welinkSessionId, 0, 50);
+        this(welinkSessionId, 0, 50, false);
     }
 
     public GetSessionMessageParams(@NonNull String welinkSessionId, int page, int size) {
+        this(welinkSessionId, page, size, false);
+    }
+
+    public GetSessionMessageParams(@NonNull String welinkSessionId, int page, int size, boolean isFirst) {
         this.welinkSessionId = welinkSessionId;
         this.page = page;
         this.size = size;
+        this.isFirst = isFirst;
     }
 
     @NonNull
@@ -31,5 +37,9 @@ public class GetSessionMessageParams {
 
     public int getSize() {
         return size;
+    }
+
+    public boolean isFirst() {
+        return isFirst;
     }
 }

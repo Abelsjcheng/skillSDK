@@ -374,6 +374,7 @@ public final class SkillSDK {
         }
         int page = Math.max(params.getPage(), 0);
         int size = params.getSize() <= 0 ? 50 : params.getSize();
+        boolean isFirst = params.isFirst();
 
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
@@ -381,9 +382,14 @@ public final class SkillSDK {
                 apiClient.getMessages(params.getWelinkSessionId(), page, size, new SkillCallback<PageResult<SessionMessage>>() {
                     @Override
                     public void onSuccess(@Nullable PageResult<SessionMessage> result) {
-                        PageResult<SessionMessage> serverPage = result == null ? new PageResult<>() : result;
+                        PageResult<SessionMessage> serverPage = normalizeSessionMessagePage(result, page, size);
+                        if (!isFirst) {
+                            streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), serverPage.getContent());
+                            callback.onSuccess(serverPage);
+                            return;
+                        }
                         PageResult<SessionMessage> merged = streamingMessageCache.mergeWithLocalCache(
-                                params.getWelinkSessionId(), page, size, serverPage);
+                                params.getWelinkSessionId(), serverPage);
                         callback.onSuccess(merged);
                     }
 
@@ -399,6 +405,26 @@ public final class SkillSDK {
                 callback.onError(wrapError(error));
             }
         });
+    }
+
+    @NonNull
+    private static PageResult<SessionMessage> normalizeSessionMessagePage(@Nullable PageResult<SessionMessage> pageResult,
+            int requestPage, int requestSize) {
+        PageResult<SessionMessage> source = pageResult == null ? new PageResult<>() : pageResult;
+
+        int safePage = source.getPage() < 0 ? requestPage : source.getPage();
+        int safeSize = source.getSize() <= 0 ? requestSize : source.getSize();
+        List<SessionMessage> content = source.getContent() == null ? new ArrayList<>() : new ArrayList<>(source.getContent());
+        long safeTotal = source.getTotal() < 0 ? content.size() : source.getTotal();
+        int safeTotalPages = source.getTotalPages() < 0 ? 0 : source.getTotalPages();
+
+        PageResult<SessionMessage> normalized = new PageResult<>();
+        normalized.setContent(content);
+        normalized.setPage(safePage);
+        normalized.setSize(safeSize);
+        normalized.setTotal(safeTotal);
+        normalized.setTotalPages(safeTotalPages);
+        return normalized;
     }
 
     // 9. registerSessionListener

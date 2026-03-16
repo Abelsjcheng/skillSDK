@@ -32,10 +32,19 @@ import com.opencode.skill.SkillSDKConfig;
 SkillSDK sdk = SkillSDK.getInstance();
 SkillSDKConfig config = new SkillSDKConfig.Builder()
     .baseUrl("http://127.0.0.1:8082")
+    .wsUrl("ws://127.0.0.1:8082/ws/skill/stream")
+    .addDefaultHeader("Cookie", "ticket=xxx")
+    .addWebSocketHeader("Cookie", "ticket=xxx")
     .enableReconnect(true)
     .build();
 sdk.initialize(config);
 ```
+
+说明：
+- `baseUrl`：服务端 REST API 地址
+- `wsUrl`：WebSocket 地址（不传则由 `baseUrl` 自动推导为 `/ws/skill/stream`）
+- `addDefaultHeader`：REST 默认请求头
+- `addWebSocketHeader`：WebSocket 握手请求头（会覆盖同名默认头）
 
 ## 最小调用链路示例
 

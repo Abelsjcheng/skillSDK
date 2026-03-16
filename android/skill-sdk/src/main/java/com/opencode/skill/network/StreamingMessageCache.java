@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * Local cache for server history + websocket streaming events.
@@ -142,30 +143,76 @@ public class StreamingMessageCache {
     }
 
     @NonNull
-    public PageResult<SessionMessage> mergeWithLocalCache(@NonNull String welinkSessionId, int page, int size,
+    public PageResult<SessionMessage> mergeWithLocalCache(@NonNull String welinkSessionId,
             @NonNull PageResult<SessionMessage> serverPage) {
-        ingestServerMessages(welinkSessionId, serverPage.getContent());
+        List<SessionMessage> serverContent = new ArrayList<>(serverPage.getContent());
+        ingestServerMessages(welinkSessionId, serverContent);
 
-        SessionCache cache = sessionCache(welinkSessionId);
-        List<SessionMessage> merged = new ArrayList<>();
-        synchronized (cache) {
-            for (CachedMessage item : cache.byNumericId.values()) {
-                merged.add(cloneMessage(item.message));
+        SessionMessage localLatest = findLatestLocalMessageNotInServer(welinkSessionId, serverContent);
+        if (localLatest == null) {
+            return serverPage;
+        }
+
+        List<SessionMessage> mergedContent = new ArrayList<>();
+        mergedContent.add(localLatest);
+        for (SessionMessage message : serverContent) {
+            if (!isSameMessage(message, localLatest)) {
+                mergedContent.add(message);
             }
         }
-        merged.sort(MESSAGE_COMPARATOR);
 
-        int safeSize = Math.max(size, 1);
-        int from = Math.max(page, 0) * safeSize;
-        int to = Math.min(from + safeSize, merged.size());
-        List<SessionMessage> pageContent = from >= merged.size() ? new ArrayList<>() : new ArrayList<>(merged.subList(from, to));
+        PageResult<SessionMessage> merged = new PageResult<>();
+        merged.setContent(mergedContent);
+        merged.setPage(serverPage.getPage());
+        merged.setSize(serverPage.getSize());
+        merged.setTotal(serverPage.getTotal());
+        merged.setTotalPages(serverPage.getTotalPages());
+        return merged;
+    }
 
-        PageResult<SessionMessage> result = new PageResult<>();
-        result.setNumber(Math.max(page, 0));
-        result.setSize(safeSize);
-        result.setTotalElements(merged.size());
-        result.setContent(pageContent);
-        return result;
+    @Nullable
+    private SessionMessage findLatestLocalMessageNotInServer(@NonNull String welinkSessionId,
+            @NonNull List<SessionMessage> serverContent) {
+        SessionCache cache = sessionCaches.get(welinkSessionId);
+        if (cache == null) {
+            return null;
+        }
+        synchronized (cache) {
+            SessionMessage latest = null;
+            for (CachedMessage candidate : cache.byNumericId.values()) {
+                SessionMessage current = candidate.message;
+                if (containsMessage(serverContent, current)) {
+                    continue;
+                }
+                if (latest == null || MESSAGE_COMPARATOR.compare(current, latest) > 0) {
+                    latest = current;
+                }
+            }
+            return latest == null ? null : cloneMessage(latest);
+        }
+    }
+
+    private static boolean containsMessage(@NonNull List<SessionMessage> messages, @NonNull SessionMessage target) {
+        for (SessionMessage message : messages) {
+            if (isSameMessage(message, target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSameMessage(@NonNull SessionMessage left, @NonNull SessionMessage right) {
+        String leftId = left.getId() == null ? "" : left.getId().trim();
+        String rightId = right.getId() == null ? "" : right.getId().trim();
+        if (!leftId.isEmpty() && !rightId.isEmpty() && leftId.equals(rightId)) {
+            return true;
+        }
+        Integer leftMessageSeq = left.getMessageSeq();
+        Integer rightMessageSeq = right.getMessageSeq();
+        if (leftMessageSeq != null && rightMessageSeq != null) {
+            return leftMessageSeq.intValue() == rightMessageSeq.intValue();
+        }
+        return false;
     }
 
     @Nullable
@@ -400,65 +447,53 @@ public class StreamingMessageCache {
     private void updatePart(@NonNull SessionMessage message, @NonNull StreamMessage event, boolean appendContent) {
         SessionMessagePart target = findOrCreatePart(message, event);
         target.setType(defaultString(target.getType(), inferPartType(event.getType())));
+        updatePartContent(target, event, appendContent);
+        updateOptionalPartFields(target, event);
+    }
 
-        if (event.getContent() != null) {
-            if (appendContent && target.getContent() != null) {
-                target.setContent(target.getContent() + event.getContent());
-            } else {
-                target.setContent(event.getContent());
-            }
+    private static void updatePartContent(@NonNull SessionMessagePart target, @NonNull StreamMessage event,
+            boolean appendContent) {
+        String incomingContent = event.getContent();
+        if (incomingContent == null) {
+            return;
         }
+        if (!appendContent) {
+            target.setContent(incomingContent);
+            return;
+        }
+        String existingContent = target.getContent();
+        target.setContent(existingContent == null ? incomingContent : existingContent + incomingContent);
+    }
 
-        if (event.getToolName() != null) {
-            target.setToolName(event.getToolName());
+    private static void updateOptionalPartFields(@NonNull SessionMessagePart target, @NonNull StreamMessage event) {
+        applyIfNotNull(event.getToolName(), target::setToolName);
+        applyIfNotNull(event.getToolCallId(), target::setToolCallId);
+        applyIfNotNull(event.getStatus(), target::setStatus);
+        applyIfNotNull(event.getInput(), target::setInput);
+        applyIfNotNull(event.getOutput(), target::setOutput);
+        applyIfNotNull(event.getError(), target::setError);
+        applyIfNotNull(event.getTitle(), target::setTitle);
+        applyIfNotNull(event.getQuestion(), target::setQuestion);
+        applyIfNotNull(event.getHeader(), target::setHeader);
+        applyIfNotEmpty(event.getOptions(), target::setOptions);
+        applyIfNotNull(event.getPermissionId(), target::setPermissionId);
+        applyIfNotNull(event.getPermType(), target::setPermType);
+        applyIfNotNull(event.getMetadata(), target::setMetadata);
+        applyIfNotNull(event.getResponse(), target::setResponse);
+        applyIfNotNull(event.getFileName(), target::setFileName);
+        applyIfNotNull(event.getFileUrl(), target::setFileUrl);
+        applyIfNotNull(event.getFileMime(), target::setFileMime);
+    }
+
+    private static <T> void applyIfNotNull(@Nullable T value, @NonNull Consumer<T> setter) {
+        if (value != null) {
+            setter.accept(value);
         }
-        if (event.getToolCallId() != null) {
-            target.setToolCallId(event.getToolCallId());
-        }
-        if (event.getStatus() != null) {
-            target.setStatus(event.getStatus());
-        }
-        if (event.getInput() != null) {
-            target.setInput(event.getInput());
-        }
-        if (event.getOutput() != null) {
-            target.setOutput(event.getOutput());
-        }
-        if (event.getError() != null) {
-            target.setError(event.getError());
-        }
-        if (event.getTitle() != null) {
-            target.setTitle(event.getTitle());
-        }
-        if (event.getQuestion() != null) {
-            target.setQuestion(event.getQuestion());
-        }
-        if (event.getHeader() != null) {
-            target.setHeader(event.getHeader());
-        }
-        if (event.getOptions() != null && !event.getOptions().isEmpty()) {
-            target.setOptions(event.getOptions());
-        }
-        if (event.getPermissionId() != null) {
-            target.setPermissionId(event.getPermissionId());
-        }
-        if (event.getPermType() != null) {
-            target.setPermType(event.getPermType());
-        }
-        if (event.getMetadata() != null) {
-            target.setMetadata(event.getMetadata());
-        }
-        if (event.getResponse() != null) {
-            target.setResponse(event.getResponse());
-        }
-        if (event.getFileName() != null) {
-            target.setFileName(event.getFileName());
-        }
-        if (event.getFileUrl() != null) {
-            target.setFileUrl(event.getFileUrl());
-        }
-        if (event.getFileMime() != null) {
-            target.setFileMime(event.getFileMime());
+    }
+
+    private static void applyIfNotEmpty(@Nullable List<String> value, @NonNull Consumer<List<String>> setter) {
+        if (value != null && !value.isEmpty()) {
+            setter.accept(value);
         }
     }
 
