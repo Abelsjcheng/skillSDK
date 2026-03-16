@@ -29,7 +29,7 @@ export type MessagePartType = 'text' | 'thinking' | 'tool' | 'question' | 'permi
 export type PartStatus = 'pending' | 'running' | 'completed' | 'error';
 export type PermissionResponse = 'once' | 'always' | 'reject';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
-export type BackendMessageRole = 'user' | 'assistant' | string;
+export type BackendMessageRole = 'user' | 'assistant' | 'system' | 'tool' | string;
 export type BackendContentType = 'plain' | 'markdown' | string | null;
 
 interface ToolPartFields<TValue, TStatus> {
@@ -112,14 +112,14 @@ export interface StreamMessage
 
 export interface SessionMessage {
   id: string;
-  seq?: number | null;
+  seq: number | null;
   welinkSessionId: string;
   role: BackendMessageRole;
   content: string | null;
-  contentType?: BackendContentType;
-  meta?: object | null;
-  messageSeq?: number | null;
-  parts?: SessionMessagePart[] | null;
+  contentType: BackendContentType;
+  meta: object | null;
+  messageSeq: number | null;
+  parts: SessionMessagePart[] | null;
   createdAt: string;
 }
 
@@ -238,9 +238,10 @@ export interface SendMessageResponse extends MessageOperationResponseBase {}
 
 export interface GetSessionMessageResponse {
   content: SessionMessage[];
-  number: number;
+  page: number;
   size: number;
-  totalElements: number;
+  total: number;
+  totalPages: number;
 }
 
 export interface StopSkillResponse {

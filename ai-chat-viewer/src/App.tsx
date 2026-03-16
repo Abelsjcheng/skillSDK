@@ -4,12 +4,11 @@ import { Content } from './components/Content';
 import { Footer, FooterMode } from './components/Footer';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
+  GetSessionMessageResponse,
   Message,
-  MessagePart,
-  MessagePartSnapshot,
-  SessionMessagePart,
+  RegenerateAnswerResponse,
+  SendMessageResponse,
   StreamMessage,
-  SessionMessage,
   SessionStatus,
 } from './types';
 import {
@@ -24,81 +23,30 @@ import {
   registerSessionListener,
   unregisterSessionListener,
 } from './utils/hwext';
+import { copyTextToClipboard } from './utils/clipboard';
+import {
+  genMessageId,
+  getLatestUserContent,
+  mapRawParts,
+  messageOperationToMessage,
+  normalizeRole,
+  sessionMessageToMessage,
+  snapshotMessageToMessage,
+} from './utils/message';
+import { showToast } from './utils/toast';
 import './styles/App.less';
 
 export interface AppProps {
   welinkSessionId?: string;
 }
 
-let nextMsgId = 1;
-function genId(): string {
-  return `msg_${Date.now()}_${nextMsgId++}`;
-}
+const HISTORY_PAGE_SIZE = 20;
 
-function normalizeRole(role: unknown): Message['role'] {
-  const normalized = String(role ?? '').trim().toLowerCase();
-  if (
-    normalized === 'user' ||
-    normalized === 'assistant' ||
-    normalized === 'system' ||
-    normalized === 'tool'
-  ) {
-    return normalized;
+function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
+  if (typeof result.totalPages === 'number') {
+    return result.page + 1 < result.totalPages;
   }
-  return 'assistant';
-}
-
-type RawPart = SessionMessagePart | MessagePartSnapshot;
-
-function mapRawPartToMessagePart(rawPart: RawPart, isStreaming: boolean): MessagePart {
-  return {
-    partId: rawPart.partId,
-    type: rawPart.type,
-    content: rawPart.content ?? '',
-    isStreaming,
-    toolName: rawPart.toolName ?? undefined,
-    toolCallId: rawPart.toolCallId ?? undefined,
-    status: (rawPart.status as 'pending' | 'running' | 'completed' | 'error' | undefined) ?? undefined,
-    input: rawPart.input ?? undefined,
-    output: rawPart.output ?? undefined,
-    title: rawPart.title ?? undefined,
-    header: rawPart.header ?? undefined,
-    question: rawPart.question ?? undefined,
-    options: rawPart.options ?? undefined,
-    permissionId: rawPart.permissionId ?? undefined,
-    permType: rawPart.permType ?? undefined,
-    fileName: rawPart.fileName ?? undefined,
-    fileUrl: rawPart.fileUrl ?? undefined,
-    fileMime: rawPart.fileMime ?? undefined,
-  };
-}
-
-function mapRawParts(rawParts: RawPart[] | null | undefined, isStreaming: boolean): MessagePart[] | undefined {
-  if (!rawParts || rawParts.length === 0) {
-    return undefined;
-  }
-  return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming));
-}
-
-function sessionMessageToMessage(sm: SessionMessage): Message {
-  return {
-    id: String(sm.id),
-    role: normalizeRole(sm.role),
-    content: sm.content ?? '',
-    timestamp: new Date(sm.createdAt).getTime(),
-    isStreaming: false,
-    parts: mapRawParts(sm.parts, false),
-  };
-}
-
-function getLatestUserContent(messages: Message[]): string {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const msg = messages[i];
-    if (msg.role === 'user' && msg.content.trim()) {
-      return msg.content.trim();
-    }
-  }
-  return '';
+  return (result.page + 1) * result.size < result.total;
 }
 
 function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
@@ -108,6 +56,8 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
   const [footerMode, setFooterMode] = useState<FooterMode>('generate');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -115,6 +65,9 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
   const latestUserContentRef = useRef('');
+  const historyPageRef = useRef(0);
+  const hasMoreHistoryRef = useRef(false);
+  const isLoadingHistoryRef = useRef(false);
 
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
   const onErrorRef = useRef<((err: {
@@ -152,28 +105,83 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
     streamingMsgIdRef.current = null;
   }, []);
 
-  const appendUserMessage = useCallback((content: string) => {
-    const trimmed = content.trim();
-    if (!trimmed) return;
-
-    latestUserContentRef.current = trimmed;
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last?.role === 'user' && last.content.trim() === trimmed) {
-        return prev;
+  const appendMessageFromOperation = useCallback(
+    (messageOperation: SendMessageResponse | RegenerateAnswerResponse) => {
+      const mappedMessage = messageOperationToMessage(messageOperation);
+      if (mappedMessage.role === 'user' && mappedMessage.content.trim()) {
+        latestUserContentRef.current = mappedMessage.content.trim();
       }
 
-      return [
-        ...prev,
-        {
-          id: genId(),
-          role: 'user',
-          content: trimmed,
-          timestamp: Date.now(),
-        },
-      ];
-    });
-  }, []);
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((msg) => msg.id === mappedMessage.id);
+        if (existingIndex >= 0) {
+          const next = [...prev];
+          next[existingIndex] = {
+            ...next[existingIndex],
+            ...mappedMessage,
+          };
+          return next;
+        }
+
+        if (mappedMessage.role === 'user' && streamingMsgIdRef.current) {
+          const streamingIndex = prev.findIndex((msg) => msg.id === streamingMsgIdRef.current);
+          if (streamingIndex >= 0) {
+            return [
+              ...prev.slice(0, streamingIndex),
+              mappedMessage,
+              ...prev.slice(streamingIndex),
+            ];
+          }
+        }
+
+        return [...prev, mappedMessage];
+      });
+    },
+    [],
+  );
+
+  const loadMoreHistory = useCallback(async () => {
+    if (!welinkSessionId) return;
+    if (isLoadingHistoryRef.current || !hasMoreHistoryRef.current) return;
+
+    isLoadingHistoryRef.current = true;
+    setIsLoadingHistory(true);
+
+    try {
+      const nextPage = historyPageRef.current + 1;
+      const result = await getSessionMessage({
+        welinkSessionId,
+        page: nextPage,
+        size: HISTORY_PAGE_SIZE,
+        isFirst: false,
+      });
+
+      const olderMessages = result.content
+        .map((message) => sessionMessageToMessage(message))
+        .reverse();
+
+      if (olderMessages.length > 0) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((msg) => msg.id));
+          const prependMessages = olderMessages.filter((msg) => !existingIds.has(msg.id));
+          if (prependMessages.length === 0) {
+            return prev;
+          }
+          return [...prependMessages, ...prev];
+        });
+      }
+
+      historyPageRef.current = result.page;
+      const nextHasMoreHistory = hasMoreHistoryByPage(result);
+      hasMoreHistoryRef.current = nextHasMoreHistory;
+      setHasMoreHistory(nextHasMoreHistory);
+    } catch (err) {
+      console.error('Failed to load more history messages:', err);
+    } finally {
+      isLoadingHistoryRef.current = false;
+      setIsLoadingHistory(false);
+    }
+  }, [welinkSessionId]);
 
   useEffect(() => {
     if (typeof welinkSessionIdProp === 'string' && welinkSessionIdProp.trim()) {
@@ -195,16 +203,28 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   useEffect(() => {
     if (!welinkSessionId) return;
 
+    historyPageRef.current = 0;
+    hasMoreHistoryRef.current = false;
+    isLoadingHistoryRef.current = false;
+    setHasMoreHistory(false);
+    setIsLoadingHistory(false);
+
     const loadMessages = async () => {
       try {
         const result = await getSessionMessage({
           welinkSessionId,
           page: 0,
-          size: 50,
+          size: HISTORY_PAGE_SIZE,
+          isFirst: true,
         });
-        const mapped = result.content.map(sessionMessageToMessage);
+        const mapped = result.content.map(sessionMessageToMessage).reverse();
         setMessages(mapped);
         latestUserContentRef.current = getLatestUserContent(mapped);
+
+        historyPageRef.current = result.page;
+        const nextHasMoreHistory = hasMoreHistoryByPage(result);
+        hasMoreHistoryRef.current = nextHasMoreHistory;
+        setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -235,7 +255,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
                   : m,
               );
             }
-            const id = genId();
+            const id = genMessageId();
             streamingMsgIdRef.current = id;
             return [
               ...prev,
@@ -313,14 +333,9 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
 
         case 'snapshot':
           if (msg.messages && msg.messages.length > 0) {
-            const snapshotMessages: Message[] = msg.messages.map((sm) => ({
-              id: sm.id,
-              role: normalizeRole(sm.role),
-              content: sm.content ?? '',
-              timestamp: sm.createdAt ? new Date(sm.createdAt).getTime() : Date.now(),
-              isStreaming: false,
-              parts: mapRawParts(sm.parts, false),
-            }));
+            const snapshotMessages: Message[] = msg.messages
+              .map((sm) => snapshotMessageToMessage(sm))
+              .reverse();
             setMessages(snapshotMessages);
             latestUserContentRef.current = getLatestUserContent(snapshotMessages);
           }
@@ -329,7 +344,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
         case 'streaming':
           if (msg.parts && msg.parts.length > 0) {
             setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
-            const id = genId();
+            const id = genMessageId();
             streamingMsgIdRef.current = id;
             const streamingMsg: Message = {
               id,
@@ -393,20 +408,20 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
     setFooterMode('generating');
     shouldResetFooterOnCompletionRef.current = true;
     suppressFooterAutoResetRef.current = false;
-    appendUserMessage(trimmedContent);
 
     try {
-      await sendMessageApi({
+      const result = await sendMessageApi({
         welinkSessionId,
         content: trimmedContent,
       });
+      appendMessageFromOperation(result);
     } catch (err) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
       console.error('发送消息失败:', err);
     }
-  }, [welinkSessionId, appendUserMessage]);
+  }, [welinkSessionId, appendMessageFromOperation]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -434,15 +449,15 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
     suppressFooterAutoResetRef.current = false;
 
     try {
-      await regenerateAnswer({ welinkSessionId });
-      appendUserMessage(latestUserContentRef.current);
+      const result = await regenerateAnswer({ welinkSessionId });
+      appendMessageFromOperation(result);
     } catch (err) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('regenerate');
       console.error('重新生成失败:', err);
     }
-  }, [welinkSessionId, appendUserMessage]);
+  }, [welinkSessionId, appendMessageFromOperation]);
 
   const handleSendToIM = useCallback(async (_content: string) => {
     if (!welinkSessionId) return;
@@ -477,29 +492,15 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
   }, []);
 
   const handleCopy = useCallback((content: string) => {
-    navigator.clipboard.writeText(content).then(() => {
-      showToast('已复制到剪贴板');
-    }).catch(() => {
-      const textArea = document.createElement('textarea');
-      textArea.value = content;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      showToast('已复制到剪贴板');
-    });
+    copyTextToClipboard(content)
+      .then(() => {
+        showToast('已复制到剪贴板');
+      })
+      .catch((err) => {
+        console.error('复制失败:', err);
+        showToast('复制失败');
+      });
   }, []);
-
-  const showToast = (message: string) => {
-    const toast = document.createElement('div');
-    toast.className = 'copy-toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add('copy-toast-hide');
-      setTimeout(() => toast.remove(), 300);
-    }, 2000);
-  };
 
   return (
     <div className={`app-container ${isPc ? 'pc-mode' : ''}`.trim()}>
@@ -514,6 +515,9 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
           messages={messages}
           welinkSessionId={welinkSessionId ?? ''}
           isLoading={isLoading}
+          isLoadingHistory={isLoadingHistory}
+          hasMoreHistory={hasMoreHistory}
+          onLoadMoreHistory={loadMoreHistory}
           onCopy={handleCopy}
           onSendToIM={handleSendToIM}
         />

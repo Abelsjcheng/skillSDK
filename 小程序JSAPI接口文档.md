@@ -170,7 +170,7 @@ window.HWH5EXT.sendMessageToIM({
 ### 接口说明
 
 获取当前会话消息列表。
-SDK 会将服务端历史消息与本地尚未落库的流式缓存合并后返回，避免漏掉“进行中”消息。
+SDK 会将服务端历史消息与本地尚未落库的流式缓存按规则合并后返回，避免漏掉“进行中”消息。
 
 ### 调用方式
 
@@ -190,7 +190,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 |--------|------|------|--------|------|
 | welinkSessionId | string | 是 | - | 会话 ID |
 | page | number | 否 | 0 | 页码（从 0 开始） |
-| size | number | 否 | 50 | 每页条数 |
+| size | number | 否 | 20 | 每页条数 |
+| isFirst | boolean | 否 | false | 是否首次获取。`true` 时合并本地流式缓存并将该消息插入返回 `content` 首位；`false` 时直接返回服务端内容（保持服务端时间降序） |
 
 ### 返回值
 
@@ -198,10 +199,19 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| content | Array<SessionMessage> | 消息列表 |
-| number | number | 当前页码（从 0 开始） |
-| size | number | 每页大小 |
-| totalElements | number | 总记录数 |
+| content | Array<SessionMessage> | 历史消息列表（按时间降序：从最新到最旧） |
+| page | number | 当前页码（从 0 开始，透传服务端返回） |
+| size | number | 每页大小（透传服务端返回） |
+| total | number | 总记录数（透传服务端返回） |
+| totalPages | number | 总页数（透传服务端返回） |
+
+### 行为说明
+
+1. 当 `isFirst=false` 时：直接返回服务端 `content`（保持服务端原始顺序，不做二次重排）。
+2. 当 `isFirst=true` 时：SDK 会将本地流式缓存中的聚合消息与服务端历史消息去重合并，并将本地聚合消息插入 `content[0]`。
+3. 去重依据为稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）。
+4. `page` / `size` / `total` / `totalPages` 始终透传服务端返回值，不因本地首位插入消息变化。
+5. 以下传输层事件不参与 `SessionMessage` 聚合：`session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error`。
 
 ### SessionMessage 结构
 
@@ -210,7 +220,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 | id | string | 稳定消息 ID |
 | seq | number \| null | 数据库排序序号，用户消息可能为 `null` |
 | welinkSessionId | string | 所属会话 ID |
-| role | string | 当前服务端返回值为 `user` / `assistant` |
+| role | string | 角色：`user` / `assistant` / `system` / `tool` |
 | content | string \| null | 聚合后的消息文本 |
 | contentType | string \| null | `plain` / `markdown` |
 | meta | object \| null | 元信息（tokens、cost 等） |
@@ -258,10 +268,11 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 window.HWH5EXT.getSessionMessage({
   welinkSessionId: '42',
   page: 0,
-  size: 50
+  size: 50,
+  isFirst: true
 }).then((result) => {
-  console.log('总消息数:', result.totalElements);
-  console.log('当前页:', result.number);
+  console.log('总消息数:', result.total);
+  console.log('当前页:', result.page);
   result.content.forEach((message) => {
     console.log(`[${message.role}] ${message.content ?? ''}`);
   });

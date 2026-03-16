@@ -38,6 +38,7 @@ export interface GetSessionMessageParams {
   welinkSessionId: string;
   page?: number;
   size?: number;
+  isFirst?: boolean;
 }
 
 export interface StopSkillParams {

@@ -12,6 +12,7 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import type { Message, MessagePart } from '../types';
+import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import 'katex/dist/katex.min.css';
 
 interface MessageBubbleProps {
@@ -34,7 +35,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onCopy,
   onSendToIM,
 }) => {
-  const normalizedRole = String(message.role ?? '').trim().toLowerCase();
+  const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
 
   const markdownComponents: Components = useMemo(
@@ -127,17 +128,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderContent = () => {
-    let toolCallId: string | undefined = undefined
-    if (message.parts && message.parts.length > 0) {
+    const normalizedParts = message.parts ? syncToolCallIdForQuestionParts(message.parts) : undefined;
+    if (normalizedParts && normalizedParts.length > 0) {
       return (
         <div className="message-parts">
-          {message.parts.map((part) => {
-            if(part.type = 'tool') {
-              toolCallId = part.toolCallId
-            }
-            part.toolCallId = toolCallId;
-            return renderPart(part)
-          })}
+          {normalizedParts.map((part) => renderPart(part))}
         </div>
       );
     }
