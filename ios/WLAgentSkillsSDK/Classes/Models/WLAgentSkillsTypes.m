@@ -72,6 +72,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     if (self) {
         _page = @0;
         _size = @50;
+        _isFirst = NO;
     }
     return self;
 }
@@ -292,12 +293,22 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
             [messages addObject:[[WLAgentSkillsSessionMessage alloc] initWithDictionary:item]];
         }
         _content = [messages copy];
-        _number = WLAgentSkillsNumberValue(dictionary[@"number"], WLAgentSkillsNumberValue(dictionary[@"page"], @0));
+        _page = WLAgentSkillsNumberValue(dictionary[@"page"], WLAgentSkillsNumberValue(dictionary[@"number"], @0));
         _size = WLAgentSkillsNumberValue(dictionary[@"size"], @50);
-        _totalElements = WLAgentSkillsNumberValue(
-                dictionary[@"totalElements"],
-                WLAgentSkillsNumberValue(dictionary[@"total"], @((NSInteger)messages.count))
+        _total = WLAgentSkillsNumberValue(
+                dictionary[@"total"],
+                WLAgentSkillsNumberValue(
+                        dictionary[@"totalElements"],
+                        WLAgentSkillsNumberValue(dictionary[@"totalCount"], @((NSInteger)messages.count))
+                )
         );
+        NSInteger computedTotalPages = 0;
+        if (_size.integerValue > 0 && _total.longLongValue > 0) {
+            computedTotalPages = (NSInteger)((_total.longLongValue + _size.integerValue - 1) / _size.integerValue);
+        }
+        _totalPages = WLAgentSkillsNumberValue(dictionary[@"totalPages"], @(computedTotalPages));
+        _number = _page;
+        _totalElements = _total;
     }
     return self;
 }

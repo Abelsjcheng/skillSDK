@@ -17,7 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)cacheHistoryMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
                                                             forSessionId:(NSString *)welinkSessionId;
 
-- (NSArray<WLAgentSkillsSessionMessage *> *)mergedMessagesWithServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
+- (nullable WLAgentSkillsSessionMessage *)latestLocalMessageNotInServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
                                                                                                                                                                                                                                                                     sessionId:(NSString *)welinkSessionId;
 
 - (nullable NSString *)latestCompletedContentForSessionId:(NSString *)welinkSessionId

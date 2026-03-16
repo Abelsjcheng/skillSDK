@@ -141,33 +141,49 @@
         }
 }
 
-- (NSArray<WLAgentSkillsSessionMessage *> *)mergedMessagesWithServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
-                                                                                                                                                                                                                                                                    sessionId:(NSString *)welinkSessionId {
+- (nullable WLAgentSkillsSessionMessage *)latestLocalMessageNotInServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
+                                                                                                                                                                                                                                                                   sessionId:(NSString *)welinkSessionId {
         if (welinkSessionId.length == 0) {
-                return @[];
+                return nil;
         }
 
         [self cacheHistoryMessages:serverMessages forSessionId:welinkSessionId];
 
         NSString *sessionKey = welinkSessionId;
-        NSMutableArray<WLAgentSkillsSessionMessage *> *result = [NSMutableArray array];
         @synchronized(self) {
                 NSDictionary<NSString *, NSMutableDictionary *> *messages = self.messagesBySession[sessionKey] ?: @{};
-                NSArray<NSMutableDictionary *> *sortedStores = [messages.allValues sortedArrayUsingComparator:^NSComparisonResult(NSMutableDictionary *lhs, NSMutableDictionary *rhs) {
-                        NSComparisonResult orderCompare = [self compareMessageStoreOrder:lhs other:rhs];
-                        if (orderCompare != NSOrderedSame) {
-                                return orderCompare;
-                        }
-                        NSNumber *leftUpdated = lhs[@"updatedAt"] ?: @0;
-                        NSNumber *rightUpdated = rhs[@"updatedAt"] ?: @0;
-                        return [leftUpdated compare:rightUpdated];
-                }];
+                NSMutableDictionary *latestStore = nil;
 
-                for (NSDictionary *store in sortedStores) {
-                        [result addObject:[self messageModelFromStore:store sessionKey:sessionKey]];
+                for (NSMutableDictionary *store in messages.allValues) {
+                        WLAgentSkillsSessionMessage *candidate = [self messageModelFromStore:store sessionKey:sessionKey];
+                        if ([self containsMessage:candidate inServerMessages:serverMessages]) {
+                                continue;
+                        }
+
+                        if (latestStore == nil) {
+                                latestStore = store;
+                                continue;
+                        }
+
+                        NSComparisonResult orderCompare = [self compareMessageStoreOrder:store other:latestStore];
+                        if (orderCompare == NSOrderedDescending) {
+                                latestStore = store;
+                                continue;
+                        }
+                        if (orderCompare == NSOrderedSame) {
+                                NSNumber *latestUpdated = latestStore[@"updatedAt"] ?: @0;
+                                NSNumber *currentUpdated = store[@"updatedAt"] ?: @0;
+                                if ([currentUpdated compare:latestUpdated] == NSOrderedDescending) {
+                                        latestStore = store;
+                                }
+                        }
                 }
+
+                if (latestStore == nil) {
+                        return nil;
+                }
+                return [self messageModelFromStore:latestStore sessionKey:sessionKey];
         }
-        return result;
 }
 
 - (nullable NSString *)latestCompletedContentForSessionId:(NSString *)welinkSessionId
@@ -960,6 +976,29 @@
                 return NSOrderedDescending;
         }
         return NSOrderedSame;
+}
+
+- (BOOL)containsMessage:(WLAgentSkillsSessionMessage *)candidate
+                                                                                                                        inServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages {
+        for (WLAgentSkillsSessionMessage *item in serverMessages) {
+                if ([self isSameMessage:candidate other:item]) {
+                        return YES;
+                }
+        }
+        return NO;
+}
+
+- (BOOL)isSameMessage:(WLAgentSkillsSessionMessage *)left other:(WLAgentSkillsSessionMessage *)right {
+        NSString *leftId = [self normalizedMessageIdValue:left.id];
+        NSString *rightId = [self normalizedMessageIdValue:right.id];
+        if (leftId.length > 0 && rightId.length > 0 && [leftId isEqualToString:rightId]) {
+                return YES;
+        }
+
+        if (left.messageSeq != nil && right.messageSeq != nil) {
+                return [left.messageSeq compare:right.messageSeq] == NSOrderedSame;
+        }
+        return NO;
 }
 
 - (long long)currentTimestampMs {

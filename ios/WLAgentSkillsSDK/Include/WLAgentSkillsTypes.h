@@ -74,6 +74,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, strong, nullable) NSNumber *page;
 @property (nonatomic, strong, nullable) NSNumber *size;
+@property (nonatomic, assign) BOOL isFirst;
 @end
 
 @interface WLAgentSkillsRegisterSessionListenerParams : NSObject
@@ -164,9 +165,13 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsPageResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsSessionMessage *> *content;
-@property (nonatomic, strong) NSNumber *number;
+@property (nonatomic, strong) NSNumber *page;
 @property (nonatomic, strong) NSNumber *size;
-@property (nonatomic, strong) NSNumber *totalElements;
+@property (nonatomic, strong) NSNumber *total;
+@property (nonatomic, strong) NSNumber *totalPages;
+
+@property (nonatomic, strong) NSNumber *number __attribute__((deprecated("Use page")));
+@property (nonatomic, strong) NSNumber *totalElements __attribute__((deprecated("Use total")));
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 @end

@@ -342,38 +342,59 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
         NSNumber *page = params.page ?: @0;
         NSNumber *size = params.size ?: @50;
+        BOOL isFirst = params.isFirst;
 
         __weak typeof(self) weakSelf = self;
         [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
                                                                                                                                                                                                                                                             page:page
                                                                                                                                                                                                                                                             size:size
                                                                                                                                                                                                                                                 success:^(id  _Nullable responseObject) {
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (strongSelf == nil) {
+                        return;
+                }
                 NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-                WLAgentSkillsPageResult *serverPage = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
+                WLAgentSkillsPageResult *serverPage = [strongSelf normalizedPageResultFromDictionary:data
+                                                                                                                                                                                                                                    requestPage:page
+                                                                                                                                                                                                                                    requestSize:size];
 
-                NSArray<WLAgentSkillsSessionMessage *> *merged = [[WLAgentSkillsStreamingCache sharedCache] mergedMessagesWithServerMessages:serverPage.content
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        sessionId:params.welinkSessionId];
-
-                NSInteger pageValue = page.integerValue;
-                NSInteger sizeValue = MAX(1, size.integerValue);
-                NSInteger start = pageValue * sizeValue;
-                NSInteger end = MIN(start + sizeValue, merged.count);
-
-                NSArray<WLAgentSkillsSessionMessage *> *paged = @[];
-                if (start < end) {
-                        paged = [merged subarrayWithRange:NSMakeRange(start, end - start)];
+                if (!isFirst) {
+                        [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:serverPage.content
+                                                                                                                                                                                                                             forSessionId:params.welinkSessionId];
+                        if (success) {
+                                success(serverPage);
+                        }
+                        return;
                 }
 
-                NSMutableArray *dictContent = [NSMutableArray arrayWithCapacity:paged.count];
-                for (WLAgentSkillsSessionMessage *message in paged) {
+                WLAgentSkillsSessionMessage *localLatest = [[WLAgentSkillsStreamingCache sharedCache] latestLocalMessageNotInServerMessages:serverPage.content
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           sessionId:params.welinkSessionId];
+                if (localLatest == nil) {
+                        if (success) {
+                                success(serverPage);
+                        }
+                        return;
+                }
+
+                NSMutableArray<WLAgentSkillsSessionMessage *> *merged = [NSMutableArray arrayWithObject:localLatest];
+                for (WLAgentSkillsSessionMessage *message in serverPage.content) {
+                        if ([strongSelf isSameSessionMessage:message other:localLatest]) {
+                                continue;
+                        }
+                        [merged addObject:message];
+                }
+
+                NSMutableArray *dictContent = [NSMutableArray arrayWithCapacity:merged.count];
+                for (WLAgentSkillsSessionMessage *message in merged) {
                         [dictContent addObject:[message toDictionary]];
                 }
 
                 NSDictionary *pageDict = @{
                         @"content" : dictContent,
-                        @"number" : @(pageValue),
-                        @"size" : @(sizeValue),
-                        @"totalElements" : @(merged.count)
+                        @"page" : serverPage.page ?: @0,
+                        @"size" : serverPage.size ?: @50,
+                        @"total" : serverPage.total ?: @0,
+                        @"totalPages" : serverPage.totalPages ?: @0
                 };
 
                 WLAgentSkillsPageResult *result = [[WLAgentSkillsPageResult alloc] initWithDictionary:pageDict];
@@ -597,6 +618,53 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         }
         NSString *trimmed = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         return trimmed.length > 0 ? trimmed : nil;
+}
+
+- (WLAgentSkillsPageResult *)normalizedPageResultFromDictionary:(NSDictionary *)dictionary
+                                                                                                                                                                                                                                  requestPage:(NSNumber *)requestPage
+                                                                                                                                                                                                                                  requestSize:(NSNumber *)requestSize {
+        WLAgentSkillsPageResult *raw = [[WLAgentSkillsPageResult alloc] initWithDictionary:dictionary];
+        NSNumber *safePage = raw.page ?: (requestPage ?: @0);
+        NSInteger safeSizeValue = raw.size != nil && raw.size.integerValue > 0
+                ? raw.size.integerValue
+                : (requestSize != nil && requestSize.integerValue > 0 ? requestSize.integerValue : 50);
+        NSNumber *safeSize = @(safeSizeValue);
+        NSNumber *safeTotal = raw.total ?: @((NSInteger)raw.content.count);
+        NSNumber *safeTotalPages = raw.totalPages;
+        if (safeTotalPages == nil || safeTotalPages.integerValue < 0) {
+                NSInteger totalPages = 0;
+                if (safeTotal.longLongValue > 0 && safeSizeValue > 0) {
+                        totalPages = (NSInteger)((safeTotal.longLongValue + safeSizeValue - 1) / safeSizeValue);
+                }
+                safeTotalPages = @(totalPages);
+        }
+
+        NSMutableArray *dictContent = [NSMutableArray arrayWithCapacity:raw.content.count];
+        for (WLAgentSkillsSessionMessage *message in raw.content) {
+                [dictContent addObject:[message toDictionary]];
+        }
+
+        NSDictionary *normalized = @{
+                @"content" : dictContent,
+                @"page" : safePage,
+                @"size" : safeSize,
+                @"total" : safeTotal,
+                @"totalPages" : safeTotalPages
+        };
+        return [[WLAgentSkillsPageResult alloc] initWithDictionary:normalized];
+}
+
+- (BOOL)isSameSessionMessage:(WLAgentSkillsSessionMessage *)left
+                                                                                                                                                                                    other:(WLAgentSkillsSessionMessage *)right {
+        NSString *leftId = left.id.length > 0 ? left.id : @"";
+        NSString *rightId = right.id.length > 0 ? right.id : @"";
+        if (leftId.length > 0 && rightId.length > 0 && [leftId isEqualToString:rightId]) {
+                return YES;
+        }
+        if (left.messageSeq != nil && right.messageSeq != nil) {
+                return [left.messageSeq compare:right.messageSeq] == NSOrderedSame;
+        }
+        return NO;
 }
 
 - (NSInteger)mapStreamMessageToSessionStatus:(WLAgentSkillsStreamMessage *)message
