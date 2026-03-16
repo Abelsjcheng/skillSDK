@@ -772,10 +772,10 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMe
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | content | Array<SessionMessage> | 历史消息列表（按时间降序：从最新到最旧） |
-| page | number | 当前页码（从 0 开始） |
-| size | number | 每页大小 |
-| total | number | 总记录数 |
-| totalPages | number | 总页数 |
+| page | number | 当前页码（从 0 开始，透传服务端返回） |
+| size | number | 每页大小（透传服务端返回） |
+| total | number | 总记录数（透传服务端返回） |
+| totalPages | number | 总页数（透传服务端返回） |
 
 ### 实现方法
 
@@ -823,7 +823,7 @@ SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 Web
 4. 对同一稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）做去重和合并，确保消息的完整性和一致性
 5. 将本地流式缓存聚合出的消息插入最终返回 `content` 的第一个位置
 6. 除首位插入的本地聚合消息外，其余消息保持服务端时间降序（从最新到最旧）
-7. 基于最终结果执行分页并返回
+7. 返回最终结果；其中 `page` / `size` / `total` / `totalPages` 透传服务端返回值，不因本地首位插入消息变化
 
 ### 缓存实现细节
 
@@ -872,6 +872,7 @@ interface MessageCache {
 - **去重机制**：通过稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）确保消息不重复
 - **首次控制**：`isFirst=true` 时合并本地流式缓存并插入首位，`isFirst=false` 时直接返回服务端结果
 - **顺序保证**：返回 `content` 统一按时间降序（从最新到最旧）；`isFirst=true` 时本地聚合消息固定插入 `content[0]`
+- **分页元信息透传**：`page` / `size` / `total` / `totalPages` 透传服务端返回，不受本地首位插入消息影响
 - **完整性保证**：对于进行中的消息，返回当前已接收的所有内容
 - **实时性保证**：缓存实时更新，确保获取到最新的消息状态
 
