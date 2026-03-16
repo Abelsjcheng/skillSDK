@@ -31,7 +31,7 @@
     static WLAgentSkillsWebSocketManager *sharedInstance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        sharedInstance = [[WLAgentSkillsWebSocketManager alloc] init];
+    sharedInstance = [[WLAgentSkillsWebSocketManager alloc] init];
     });
     return sharedInstance;
 }
@@ -39,50 +39,50 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _listeners = [NSMutableDictionary dictionary];
-        _isConnected = NO;
-        _isConnecting = NO;
+    _listeners = [NSMutableDictionary dictionary];
+    _isConnected = NO;
+    _isConnecting = NO;
     }
     return self;
 }
 
 - (void)connectIfNeeded {
     @synchronized(self) {
-        if (self.isConnected || self.isConnecting) {
-            return;
-        }
+    if (self.isConnected || self.isConnecting) {
+        return;
+    }
 
-        NSString *wsURL = [WLAgentSkillsConfig sharedConfig].webSocketURL;
-        NSURL *url = [NSURL URLWithString:wsURL];
-        if (url == nil) {
-            return;
-        }
+    NSString *wsURL = [WLAgentSkillsConfig sharedConfig].webSocketURL;
+    NSURL *url = [NSURL URLWithString:wsURL];
+    if (url == nil) {
+        return;
+    }
 
-        self.isConnecting = YES;
-        self.webSocket = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:url]];
-        self.webSocket.delegate = self;
-        [self.webSocket open];
+    self.isConnecting = YES;
+    self.webSocket = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:url]];
+    self.webSocket.delegate = self;
+    [self.webSocket open];
     }
 }
 
 - (void)disconnect {
     @synchronized(self) {
-        if (self.webSocket != nil) {
-            [self.webSocket close];
-        }
-        self.webSocket.delegate = nil;
-        self.webSocket = nil;
-        self.isConnected = NO;
-        self.isConnecting = NO;
+    if (self.webSocket != nil) {
+        [self.webSocket close];
+    }
+    self.webSocket.delegate = nil;
+    self.webSocket = nil;
+    self.isConnected = NO;
+    self.isConnecting = NO;
     }
 }
 
 - (BOOL)addListenerForSessionId:(NSString *)welinkSessionId
-                                            onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
-                                                onError:(nullable WLAgentSkillsSessionErrorCallback)onError
-                                                onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
+                        onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                        onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                        onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
     if (welinkSessionId.length == 0 || onMessage == nil) {
-        return NO;
+    return NO;
     }
 
     NSString *key = welinkSessionId;
@@ -92,10 +92,10 @@
     listener.onClose = onClose;
 
     @synchronized(self) {
-        if (self.listeners[key] != nil) {
-            return NO;
-        }
-        self.listeners[key] = listener;
+    if (self.listeners[key] != nil) {
+        return NO;
+    }
+    self.listeners[key] = listener;
     }
 
     [self connectIfNeeded];
@@ -104,35 +104,35 @@
 
 - (BOOL)removeListenerForSessionId:(NSString *)welinkSessionId {
     if (welinkSessionId.length == 0) {
-        return NO;
+    return NO;
     }
 
     NSString *key = welinkSessionId;
     @synchronized(self) {
-        if (self.listeners[key] == nil) {
-            return NO;
-        }
-        [self.listeners removeObjectForKey:key];
+    if (self.listeners[key] == nil) {
+        return NO;
+    }
+    [self.listeners removeObjectForKey:key];
     }
     return YES;
 }
 
 - (void)removeAllListenersForSessionId:(NSString *)welinkSessionId {
     if (welinkSessionId.length == 0) {
-        return;
+    return;
     }
 
     @synchronized(self) {
-        [self.listeners removeObjectForKey:welinkSessionId];
+    [self.listeners removeObjectForKey:welinkSessionId];
     }
 }
 
 - (BOOL)hasListenerForSessionId:(NSString *)welinkSessionId {
     if (welinkSessionId.length == 0) {
-        return NO;
+    return NO;
     }
     @synchronized(self) {
-        return self.listeners[welinkSessionId] != nil;
+    return self.listeners[welinkSessionId] != nil;
     }
 }
 
@@ -140,40 +140,40 @@
 
 - (void)webSocketDidOpen:(SRWebSocket *)webSocket {
     @synchronized(self) {
-        self.isConnecting = NO;
-        self.isConnected = YES;
+    self.isConnecting = NO;
+    self.isConnected = YES;
     }
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidConnect)]) {
-        [self.delegate webSocketManagerDidConnect];
+    [self.delegate webSocketManagerDidConnect];
     }
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didFailWithError:(NSError *)error {
     @synchronized(self) {
-        self.isConnecting = NO;
-        self.isConnected = NO;
+    self.isConnecting = NO;
+    self.isConnected = NO;
     }
 
     WLAgentSkillsSessionError *sessionError = [[WLAgentSkillsSessionError alloc] initWithCode:@"6000"
-                                                                                                                                                                            message:error.localizedDescription ?: @"WebSocket connect failed"];
+                                                                                        message:error.localizedDescription ?: @"WebSocket connect failed"];
     [self notifyAllError:sessionError];
 
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidDisconnectWithError:)]) {
-        [self.delegate webSocketManagerDidDisconnectWithError:error];
+    [self.delegate webSocketManagerDidDisconnectWithError:error];
     }
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didCloseWithCode:(NSInteger)code reason:(NSString *)reason wasClean:(BOOL)wasClean {
     @synchronized(self) {
-        self.isConnecting = NO;
-        self.isConnected = NO;
+    self.isConnecting = NO;
+    self.isConnected = NO;
     }
 
     NSString *closeReason = reason.length > 0 ? reason : @"WebSocket closed";
     [self notifyAllClose:closeReason];
 
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidDisconnectWithError:)]) {
-        [self.delegate webSocketManagerDidDisconnectWithError:nil];
+    [self.delegate webSocketManagerDidDisconnectWithError:nil];
     }
 }
 
@@ -193,38 +193,38 @@
     NSDictionary *json = nil;
 
     if ([message isKindOfClass:[NSString class]]) {
-        NSData *data = [(NSString *)message dataUsingEncoding:NSUTF8StringEncoding];
-        if (data != nil) {
-            json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        }
+    NSData *data = [(NSString *)message dataUsingEncoding:NSUTF8StringEncoding];
+    if (data != nil) {
+        json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    }
     } else if ([message isKindOfClass:[NSData class]]) {
-        json = [NSJSONSerialization JSONObjectWithData:(NSData *)message options:0 error:nil];
+    json = [NSJSONSerialization JSONObjectWithData:(NSData *)message options:0 error:nil];
     } else if ([message isKindOfClass:[NSDictionary class]]) {
-        json = message;
+    json = message;
     }
 
     if (![json isKindOfClass:[NSDictionary class]]) {
-        return;
+    return;
     }
 
     WLAgentSkillsStreamMessage *streamMessage = [[WLAgentSkillsStreamMessage alloc] initWithDictionary:json];
 
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidReceiveMessage:)]) {
-        [self.delegate webSocketManagerDidReceiveMessage:streamMessage];
+    [self.delegate webSocketManagerDidReceiveMessage:streamMessage];
     }
 
     NSString *sessionKey = streamMessage.welinkSessionId;
     if (sessionKey.length == 0) {
-        return;
+    return;
     }
 
     WLAgentSkillsSocketListener *listener = nil;
     @synchronized(self) {
-        listener = self.listeners[sessionKey];
+    listener = self.listeners[sessionKey];
     }
 
     if (listener.onMessage != nil) {
-        listener.onMessage(streamMessage);
+    listener.onMessage(streamMessage);
     }
 }
 
@@ -233,27 +233,27 @@
 - (void)notifyAllError:(WLAgentSkillsSessionError *)error {
     NSArray<WLAgentSkillsSocketListener *> *allListeners = [self flattenedListeners];
     for (WLAgentSkillsSocketListener *listener in allListeners) {
-        if (listener.onError != nil) {
-            listener.onError(error);
-        }
+    if (listener.onError != nil) {
+        listener.onError(error);
+    }
     }
 }
 
 - (void)notifyAllClose:(NSString *)reason {
     NSArray<WLAgentSkillsSocketListener *> *allListeners = [self flattenedListeners];
     for (WLAgentSkillsSocketListener *listener in allListeners) {
-        if (listener.onClose != nil) {
-            listener.onClose(reason);
-        }
+    if (listener.onClose != nil) {
+        listener.onClose(reason);
+    }
     }
 }
 
 - (NSArray<WLAgentSkillsSocketListener *> *)flattenedListeners {
     NSMutableArray<WLAgentSkillsSocketListener *> *result = [NSMutableArray array];
     @synchronized(self) {
-        for (WLAgentSkillsSocketListener *value in self.listeners.allValues) {
-            [result addObject:value];
-        }
+    for (WLAgentSkillsSocketListener *value in self.listeners.allValues) {
+        [result addObject:value];
+    }
     }
     return result;
 }

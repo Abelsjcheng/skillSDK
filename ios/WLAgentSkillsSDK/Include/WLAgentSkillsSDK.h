@@ -17,17 +17,17 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 1. createSession
 - (void)createSession:(WLAgentSkillsCreateSessionParams *)params
-                                                        success:(void (^)(WLAgentSkillsSkillSession *session))success
-                                                        failure:(void (^)(NSError *error))failure;
+                            success:(void (^)(WLAgentSkillsSkillSession *session))success
+                            failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 2. closeSkill (local WebSocket only)
 - (void)closeSkillWithSuccess:(void (^)(WLAgentSkillsCloseSkillResult *result))success
-                                                                                        failure:(void (^)(NSError *error))failure;
+                                            failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 3. stopSkill
 - (void)stopSkill:(WLAgentSkillsStopSkillParams *)params
-                                        success:(void (^)(WLAgentSkillsStopSkillResult *result))success
-                                        failure:(void (^)(NSError *error))failure;
+                    success:(void (^)(WLAgentSkillsStopSkillResult *result))success
+                    failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 4. onSessionStatusChange
 - (void)onSessionStatusChange:(WLAgentSkillsOnSessionStatusChangeParams *)params;
@@ -37,18 +37,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 6. regenerateAnswer
 - (void)regenerateAnswer:(WLAgentSkillsRegenerateAnswerParams *)params
-                                                                    success:(void (^)(WLAgentSkillsSendMessageResult *result))success
-                                                                    failure:(void (^)(NSError *error))failure;
+                                    success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+                                    failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 7. sendMessageToIM
 - (void)sendMessageToIM:(WLAgentSkillsSendMessageToIMParams *)params
-                                                                success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
-                                                                failure:(void (^)(NSError *error))failure;
+                                success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
+                                failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 8. getSessionMessage
 - (void)getSessionMessage:(WLAgentSkillsGetSessionMessageParams *)params
-                                                                        success:(void (^)(WLAgentSkillsPageResult *result))success
-                                                                        failure:(void (^)(NSError *error))failure;
+                                    success:(void (^)(WLAgentSkillsPageResult *result))success
+                                    failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 9. registerSessionListener
 - (WLAgentSkillsRegisterSessionListenerResult *)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params;
@@ -58,18 +58,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 11. sendMessage
 - (void)sendMessage:(WLAgentSkillsSendMessageParams *)params
-                                                success:(void (^)(WLAgentSkillsSendMessageResult *result))success
-                                                failure:(void (^)(NSError *error))failure;
+                        success:(void (^)(WLAgentSkillsSendMessageResult *result))success
+                        failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 12. replyPermission
 - (void)replyPermission:(WLAgentSkillsReplyPermissionParams *)params
-                                                                success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
-                                                                failure:(void (^)(NSError *error))failure;
+                                success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
+                                failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 13. controlSkillWeCode
 - (void)controlSkillWeCode:(WLAgentSkillsControlSkillWeCodeParams *)params
-                                                                            success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
-                                                                            failure:(void (^)(NSError *error))failure;
+                                        success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
+                                        failure:(void (^)(NSError *error))failure;
 
 @end
 

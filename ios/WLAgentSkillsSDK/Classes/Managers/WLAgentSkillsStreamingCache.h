@@ -15,13 +15,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)updateWithStreamMessage:(WLAgentSkillsStreamMessage *)message;
 - (void)cacheSendMessageResult:(WLAgentSkillsSendMessageResult *)result;
 - (void)cacheHistoryMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
-                                                            forSessionId:(NSString *)welinkSessionId;
+                                forSessionId:(NSString *)welinkSessionId;
 
 - (nullable WLAgentSkillsSessionMessage *)latestLocalMessageNotInServerMessages:(NSArray<WLAgentSkillsSessionMessage *> *)serverMessages
-                                                                                                                                                                                                                                                                    sessionId:(NSString *)welinkSessionId;
+                                                                                                                                    sessionId:(NSString *)welinkSessionId;
 
 - (nullable NSString *)latestCompletedContentForSessionId:(NSString *)welinkSessionId
-                                                                                                                                                                                                        messageId:(nullable NSString *)messageId;
+                                                                                                    messageId:(nullable NSString *)messageId;
 - (BOOL)hasMessageForSessionId:(NSString *)welinkSessionId messageId:(NSString *)messageId;
 - (BOOL)isMessageCompletedForSessionId:(NSString *)welinkSessionId messageId:(NSString *)messageId;
 

@@ -26,9 +26,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)disconnect;
 
 - (BOOL)addListenerForSessionId:(NSString *)welinkSessionId
-                                            onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
-                                                onError:(nullable WLAgentSkillsSessionErrorCallback)onError
-                                                onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
+                        onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
+                        onError:(nullable WLAgentSkillsSessionErrorCallback)onError
+                        onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose;
 
 - (BOOL)removeListenerForSessionId:(NSString *)welinkSessionId;
 
