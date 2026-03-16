@@ -190,28 +190,22 @@ export class MessageCacheManager {
     return target !== undefined && target.final;
   }
 
-  mergeWithHistory(sessionId: string, history: SessionMessage[]): SessionMessage[] {
+  getLatestLocalMessageNotInHistory(sessionId: string, history: SessionMessage[]): SessionMessage | null {
     const state = this.sessions.get(sessionId);
     if (state === undefined) {
-      return history;
+      return null;
     }
 
-    const historyBySeq = new Map<number, SessionMessage>();
-    for (const message of history) {
-      historyBySeq.set(message.messageSeq ?? 0, message);
-    }
-
-    const merged: SessionMessage[] = [...history];
-    const orderedLocal = this.toOrderedMessages(state);
-    for (const local of orderedLocal) {
-      if (historyBySeq.has(local.messageSeq)) {
-        continue;
+    const ordered = this.toOrderedMessages(state);
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const candidate = this.toSessionMessage(sessionId, ordered[i]);
+      const duplicated = history.some((item: SessionMessage) => this.isSameMessage(item, candidate));
+      if (!duplicated) {
+        return candidate;
       }
-      merged.push(this.toSessionMessage(sessionId, local));
     }
 
-    merged.sort((a: SessionMessage, b: SessionMessage) => this.compareSessionMessages(a, b));
-    return merged;
+    return null;
   }
 
   private normalizeHistoryMessage(message: SessionMessage): LocalMessageState {
@@ -480,18 +474,6 @@ export class MessageCacheManager {
     return leftId.localeCompare(rightId);
   }
 
-  private compareSessionMessages(left: SessionMessage, right: SessionMessage): number {
-    const seqCompare = this.compareNullableNumber(left.seq, right.seq);
-    if (seqCompare !== 0) {
-      return seqCompare;
-    }
-    const messageSeqCompare = this.compareNullableNumber(left.messageSeq, right.messageSeq);
-    if (messageSeqCompare !== 0) {
-      return messageSeqCompare;
-    }
-    return (left.id ?? '').localeCompare(right.id ?? '');
-  }
-
   private compareNullableNumber(left?: number | null, right?: number | null): number {
     if (left !== null && left !== undefined && right !== null && right !== undefined) {
       return left - right;
@@ -518,6 +500,17 @@ export class MessageCacheManager {
       contentType: local.contentType,
       meta: local.meta ?? null
     };
+  }
+
+  private isSameMessage(left: SessionMessage, right: SessionMessage): boolean {
+    if (left.id !== '' && right.id !== '' && left.id === right.id) {
+      return true;
+    }
+    return left.messageSeq !== undefined
+      && left.messageSeq !== null
+      && right.messageSeq !== undefined
+      && right.messageSeq !== null
+      && left.messageSeq === right.messageSeq;
   }
 
   private ensureSessionState(sessionId: string): SessionCacheState {

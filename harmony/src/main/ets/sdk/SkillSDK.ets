@@ -319,21 +319,32 @@ export class SkillSDK {
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.optionalNonNegativeInteger(params.page, 'page');
       Validator.optionalPositiveInteger(params.size, 'size');
+      if (params.isFirst !== undefined && typeof params.isFirst !== 'boolean') {
+        throw new SkillSdkException(1000, 'isFirst must be a boolean');
+      }
       await this.ensureWebSocketConnected();
 
       const page = params.page ?? 0;
       const size = params.size ?? 50;
       const history = await this.fetchServerMessages(params.welinkSessionId, page, size);
       this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
-      const mergedContent = this.messageCacheManager.mergeWithHistory(
+      const isFirst = params.isFirst ?? false;
+      if (!isFirst) {
+        return history;
+      }
+
+      const localLatest = this.messageCacheManager.getLatestLocalMessageNotInHistory(
         params.welinkSessionId,
         history.content
       );
+      if (localLatest === null) {
+        return history;
+      }
 
+      const dedupedHistory = history.content.filter((item: SessionMessage) => !this.isSameMessage(item, localLatest));
       return {
         ...history,
-        content: mergedContent,
-        totalElements: Math.max(history.totalElements, mergedContent.length)
+        content: [localLatest, ...dedupedHistory]
       };
     } catch (error) {
       throw this.normalizeError('getSessionMessage', error);
@@ -448,16 +459,36 @@ export class SkillSDK {
     page: number,
     size: number
   ): Promise<PageResult<SessionMessage>> {
-    const result = await this.httpClient.get<PageResult<SessionMessage>>(
+    const result = await this.httpClient.get<Record<string, unknown>>(
       `/api/skill/sessions/${welinkSessionId}/messages`,
       { page, size }
     );
+    const content = Array.isArray(result.content) ? (result.content as SessionMessage[]) : [];
+    const resolvedPage = Number(result.page ?? result.number ?? page);
+    const resolvedSize = Number(result.size ?? size);
+    const resolvedTotal = Number(result.total ?? result.totalElements ?? content.length);
+    const resolvedTotalPages = Number(result.totalPages);
+
     return {
-      content: result.content ?? [],
-      number: result.number ?? page,
-      size: result.size ?? size,
-      totalElements: result.totalElements ?? 0
+      content,
+      page: Number.isFinite(resolvedPage) ? resolvedPage : page,
+      size: Number.isFinite(resolvedSize) && resolvedSize > 0 ? resolvedSize : size,
+      total: Number.isFinite(resolvedTotal) && resolvedTotal >= 0 ? resolvedTotal : content.length,
+      totalPages: Number.isFinite(resolvedTotalPages) && resolvedTotalPages >= 0
+        ? resolvedTotalPages
+        : 0
     };
+  }
+
+  private isSameMessage(left: SessionMessage, right: SessionMessage): boolean {
+    if (left.id.trim() !== '' && right.id.trim() !== '' && left.id === right.id) {
+      return true;
+    }
+    return left.messageSeq !== undefined
+      && left.messageSeq !== null
+      && right.messageSeq !== undefined
+      && right.messageSeq !== null
+      && left.messageSeq === right.messageSeq;
   }
 
   private normalizeSendToImResult(raw: Record<string, unknown>): SendMessageToIMResult {

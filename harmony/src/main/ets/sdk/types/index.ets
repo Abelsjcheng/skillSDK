@@ -145,9 +145,10 @@ export interface SessionMessage {
 
 export interface PageResult<T> {
   content: T[];
-  number: number;
+  page: number;
   size: number;
-  totalElements: number;
+  total: number;
+  totalPages: number;
 }
 
 // ---------------------------
@@ -312,6 +313,7 @@ export interface GetSessionMessageParams {
   welinkSessionId: string;
   page?: number;
   size?: number;
+  isFirst?: boolean;
 }
 
 export interface RegisterSessionListenerParams {
