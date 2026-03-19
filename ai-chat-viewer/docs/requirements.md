@@ -1,7 +1,7 @@
 ﻿# 创建个人助理页面需求文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.13`
+- 文档版本：`v3.14`
 - 创建日期：`2026-03-18`
 - 状态：`需求已确认，可进入设计阶段`
 
@@ -21,7 +21,7 @@
    - 必填校验与按钮禁用/启用态；
    - 选中态视觉反馈（边框、勾选标识）。
 5. 页面功能内部闭环，不向宿主页面透出回调或提交事件。
-6. 当前版本中，`X` 与 `取消` 点击事件直接调用 `window.Pedestal.remote.getCurrentWindow().close()`；`确定` 点击事件调用 `window.create()`。
+6. 当前版本中，`X` 与 `取消` 点击事件直接调用 `window.Pedestal.remote.getCurrentWindow().close()`；`确定` 点击事件调用 `window.createDigitalTwin()`。
 7. 状态职责拆分：
    - 页面 1 的状态变量在 `StepBasicInfo` 内部管理；
    - 页面 2 的状态变量在 `StepBrainSelect` 内部管理；
@@ -33,7 +33,7 @@
 2. 当“名称 + 简介”均已填写时，“下一步”可点击；点击后进入页面 2。
 3. 页面 2 选择“大脑类型”并完成子项选择（如需）后，“确定”可点击。
 4. 任一页面点击右上角 `X` 或“取消”时，直接调用 `window.Pedestal.remote.getCurrentWindow().close()` 关闭当前窗口。
-5. 页面 2 点击“确定”时调用 `window.create()`，并按规则组装分身创建入参。
+5. 页面 2 点击“确定”时调用 `window.createDigitalTwin()`，并按规则组装分身创建入参。
 
 ### 3.1 全局布局约束
 
@@ -217,6 +217,10 @@
    - 样式：`14px / 400 / 22px`，颜色 `rgba(153,153,153,1)`
    - 标题文本距离第二个容器父容器顶部 `12px`
 2. 下方间距 `8px` 展示 3 行 2 列选项按钮组：
+   - 数据来源：调用 `window.getAgentType()` 获取内部助手列表
+   - 按钮文本：使用出参 `name`
+   - 按钮图标：使用出参 `icon`
+   - 业务标识：保留出参 `bizRobotId` 供确认时透传
    - 列间距 `12px`，行间距 `8px`
    - 单按钮样式：
       - 高 `36px`，宽自适应，`padding: 0 8px`
@@ -266,7 +270,8 @@
    - `description`：助理简介（必填）。
 2. 页面 2（`StepBrainSelect`）内部状态：
    - `brainType`：`internal` 或 `custom`。
-   - `internalAssistantId`：当 `brainType=internal` 时必填。
+   - `agentTypeList`：由 `window.getAgentType()` 返回的内部助手列表（`name/icon/bizRobotId`）。
+   - `selectedBizRobotId`：当 `brainType=internal` 时必填。
 3. `DigitalTwinCreator` 内部状态：
    - `step`：页面步骤切换状态（1/2）。
 
@@ -275,18 +280,22 @@
 1. 不对外提供回调或事件。
 2. 点击 `X` / “取消”时：
    - 直接调用 `window.Pedestal.remote.getCurrentWindow().close()` 关闭当前窗口。
-3. 点击“确定”时直接调用 `window.create(params)`，入参规则如下：
+3. 页面 2 初始化时调用 `window.getAgentType()` 获取内部助手列表；渲染规则：
+   - 按钮文本显示 `name`；
+   - 按钮图标显示 `icon`；
+   - 选中项记录 `bizRobotId` 供确认提交。
+4. 点击“确定”时直接调用 `window.createDigitalTwin(params)`，入参规则如下：
    - `name`（string）：分身名称，取页面 1 “名称”输入框值。
    - `icon`（string）：分身头像地址，取页面 1 当前选中头像地址。
    - `description`（string）：分身简介，取页面 1 “简介”输入框值。
-   - `digitalTwintype`（string）：分身类型，取页面 2 单选值（`internal`/`custom`）。
-   - `agent`（string，可选）：仅当 `digitalTwintype=internal` 时传入，值为 `助手分身`；`custom` 时不传该字段。
+   - `weCrewType`（number）：分身类型，`internal` 传 `1`，`custom` 传 `0`。
+   - `bizRobotId`（string，可选）：仅当 `weCrewType=1` 且已选择内部助手时传入，值取所选内部助手的 `bizRobotId`。
 
 ## 7. 资源与依赖
 
 1. 默认头像资源：4 个（需提供具体图源）。
 2. 插画背景资源：1 张（页面 2，需提供具体图源）。
-3. 内部助手选项资源：6 个按钮项（每项图标 + 文本，需提供具体列表）。
+3. 内部助手选项资源：通过 `window.getAgentType()` 动态获取（每项包含 `name/icon/bizRobotId`）。
 
 ## 8. 验收标准（功能）
 
@@ -296,7 +305,7 @@
 4. 页面 1 的“下一步”严格受“名称/简介必填”控制。
 5. 页面 2 的“确定”严格受选择状态控制。
 6. 头像默认选择与选中态、内部助手按钮组选中态视觉正确。
-7. `X` 与取消点击会触发 `window.Pedestal.remote.getCurrentWindow().close()` 且不报错；确定点击会触发 `window.create()` 且入参符合本文件定义。
+7. `X` 与取消点击会触发 `window.Pedestal.remote.getCurrentWindow().close()` 且不报错；页面 2 初始化会触发 `window.getAgentType()`；确定点击会触发 `window.createDigitalTwin()` 且入参符合本文件定义。
 8. 下一步行为正常可用，且符合本文件定义（无需对外事件）。
 9. 页面内部主容器以 `100%` 宽高自适应填充整个页面。
 10. 页面入口直接渲染组件，不存在额外父容器包裹层。

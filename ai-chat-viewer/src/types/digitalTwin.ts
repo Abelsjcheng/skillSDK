@@ -1,9 +1,9 @@
 ﻿export type BrainType = 'internal' | 'custom';
 
 export interface InternalAssistantOption {
-  id: string;
-  label: string;
+  name: string;
   icon?: string;
+  bizRobotId: string;
 }
 
 export interface DefaultAvatarOption {
@@ -18,7 +18,7 @@ export interface DigitalTwinFormData {
   name: string;
   description: string;
   brainType: BrainType;
-  internalAssistantId?: string;
+  bizRobotId?: string;
 }
 
 export interface DigitalTwinBasicInfoPayload {
@@ -29,12 +29,15 @@ export interface DigitalTwinBasicInfoPayload {
 
 export interface DigitalTwinBrainPayload {
   digitalTwintype: BrainType;
-  internalAssistantId?: string;
+  bizRobotId?: string;
+}
+
+export interface AgentTypeListResult {
+  content?: unknown;
+  data?: unknown;
 }
 
 export interface CreateDigitalTwinParams extends DigitalTwinBasicInfoPayload {
-  digitalTwintype: BrainType;
-  agent?: string;
+  weCrewType: 0 | 1;
+  bizRobotId?: string;
 }
-
-

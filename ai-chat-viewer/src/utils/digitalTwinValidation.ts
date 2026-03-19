@@ -14,10 +14,10 @@ export function canProceedNext(name: string, description: string): boolean {
   return Boolean(name.trim() && description.trim());
 }
 
-export function canConfirm(brainType?: BrainType, internalAssistantId?: string): boolean {
+export function canConfirm(brainType?: BrainType, bizRobotId?: string): boolean {
   if (!brainType) return false;
   if (brainType === 'custom') return true;
-  return Boolean(internalAssistantId?.trim());
+  return Boolean(bizRobotId?.trim());
 }
 
 export function validateAvatarFile(file: File): AvatarValidationResult {
@@ -37,4 +37,3 @@ export function validateAvatarFile(file: File): AvatarValidationResult {
 
   return { valid: false, reason: '仅支持JPG/PNG格式', code: 'format' };
 }
-

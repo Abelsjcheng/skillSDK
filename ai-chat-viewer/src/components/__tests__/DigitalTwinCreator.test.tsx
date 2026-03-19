@@ -1,10 +1,28 @@
 ﻿import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
 import { DigitalTwinCreator } from '../DigitalTwinCreator';
 
 describe('DigitalTwinCreator', () => {
+  const getAgentTypeMock = jest.fn();
+
+  beforeEach(() => {
+    getAgentTypeMock.mockReset();
+    getAgentTypeMock.mockResolvedValue({
+      content: [
+        { name: '写作助手', icon: 'https://example.com/assistant-writing.png', bizRobotId: '8041241' },
+        { name: '会议助手', icon: 'https://example.com/assistant-meeting.png', bizRobotId: '8041242' },
+      ],
+    });
+
+    Object.defineProperty(window, 'getAgentType', {
+      value: getAgentTypeMock,
+      configurable: true,
+      writable: true,
+    });
+  });
+
   it('switches to step2 after filling required fields and clicking next', () => {
     render(<DigitalTwinCreator />);
 
@@ -38,10 +56,10 @@ describe('DigitalTwinCreator', () => {
     expect(closeMock).toHaveBeenCalledTimes(2);
   });
 
-  it('calls window.create with custom digital twin payload when clicking confirm', () => {
-    const createMock = jest.fn();
-    Object.defineProperty(window, 'create', {
-      value: createMock,
+  it('calls window.createDigitalTwin with custom digital twin payload when clicking confirm', async () => {
+    const createDigitalTwinMock = jest.fn();
+    Object.defineProperty(window, 'createDigitalTwin', {
+      value: createDigitalTwinMock,
       configurable: true,
       writable: true,
     });
@@ -52,24 +70,28 @@ describe('DigitalTwinCreator', () => {
     fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部个人助理简介' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
+    await waitFor(() => {
+      expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
+    });
+
     fireEvent.click(screen.getByLabelText('自定义助手'));
     const confirmButton = screen.getByRole('button', { name: '确定' });
     expect(confirmButton).not.toBeDisabled();
 
     fireEvent.click(confirmButton);
-    expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createMock).toHaveBeenCalledWith({
+    expect(createDigitalTwinMock).toHaveBeenCalledTimes(1);
+    expect(createDigitalTwinMock).toHaveBeenCalledWith({
       name: '智能助手',
       icon: expect.any(String),
       description: '内部个人助理简介',
-      digitalTwintype: 'custom',
+      weCrewType: 0,
     });
   });
 
-  it('calls window.create with internal digital twin payload and agent field', () => {
-    const createMock = jest.fn();
-    Object.defineProperty(window, 'create', {
-      value: createMock,
+  it('calls window.createDigitalTwin with internal digital twin payload and bizRobotId', async () => {
+    const createDigitalTwinMock = jest.fn();
+    Object.defineProperty(window, 'createDigitalTwin', {
+      value: createDigitalTwinMock,
       configurable: true,
       writable: true,
     });
@@ -81,16 +103,16 @@ describe('DigitalTwinCreator', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
     fireEvent.click(screen.getByLabelText('内部助手'));
-    fireEvent.click(screen.getByRole('button', { name: /写作助手/i }));
+    fireEvent.click(await screen.findByRole('button', { name: '写作助手' }));
     fireEvent.click(screen.getByRole('button', { name: '确定' }));
 
-    expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createMock).toHaveBeenCalledWith({
+    expect(createDigitalTwinMock).toHaveBeenCalledTimes(1);
+    expect(createDigitalTwinMock).toHaveBeenCalledWith({
       name: '智能助手2',
       icon: expect.any(String),
       description: '内部类型测试',
-      digitalTwintype: 'internal',
-      agent: '助手分身',
+      weCrewType: 1,
+      bizRobotId: '8041241',
     });
   });
 
@@ -103,4 +125,3 @@ describe('DigitalTwinCreator', () => {
     expect(fs.existsSync(pageEntryPath)).toBe(true);
   });
 });
-

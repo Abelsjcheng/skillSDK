@@ -1,34 +1,108 @@
-﻿import React, { useCallback, useMemo, useState } from 'react';
-import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { AgentTypeListResult, BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 
 interface StepBrainSelectProps {
   illustration: string;
-  internalAssistants: InternalAssistantOption[];
   onClose: () => void;
   onCancel: () => void;
   onConfirm: (payload: DigitalTwinBrainPayload) => void;
 }
 
+function normalizeAgentTypeList(result: unknown): InternalAssistantOption[] {
+  const payload = result as AgentTypeListResult | null | undefined;
+  const source =
+    Array.isArray(payload?.content)
+      ? payload.content
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(result)
+          ? result
+          : [];
+
+  return source.reduce<InternalAssistantOption[]>((list, item) => {
+    const raw = (item ?? {}) as Record<string, unknown>;
+    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+    const icon = typeof raw.icon === 'string' ? raw.icon.trim() : '';
+    const bizRobotId = typeof raw.bizRobotId === 'string' ? raw.bizRobotId.trim() : '';
+
+    if (!name || !bizRobotId) {
+      return list;
+    }
+
+    const option: InternalAssistantOption = {
+      name,
+      bizRobotId,
+    };
+
+    if (icon) {
+      option.icon = icon;
+    }
+
+    list.push(option);
+    return list;
+  }, []);
+}
+
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   illustration,
-  internalAssistants,
   onClose,
   onCancel,
   onConfirm,
 }) => {
   const [brainType, setBrainType] = useState<BrainType | undefined>();
-  const [selectedInternalAssistantId, setSelectedInternalAssistantId] = useState<string | undefined>();
+  const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>();
+  const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>([]);
+  const [loadingAssistants, setLoadingAssistants] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchAgentTypes = async () => {
+      if (typeof window === 'undefined') return;
+
+      const getAgentType = (window as any).getAgentType;
+      if (typeof getAgentType !== 'function') {
+        if (active) {
+          setInternalAssistants([]);
+        }
+        return;
+      }
+
+      if (active) {
+        setLoadingAssistants(true);
+      }
+
+      try {
+        const result = await getAgentType();
+        if (!active) return;
+        setInternalAssistants(normalizeAgentTypeList(result));
+      } catch (_error) {
+        if (!active) return;
+        setInternalAssistants([]);
+      } finally {
+        if (active) {
+          setLoadingAssistants(false);
+        }
+      }
+    };
+
+    void fetchAgentTypes();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const confirmEnabled = useMemo(
-    () => canConfirm(brainType, selectedInternalAssistantId),
-    [brainType, selectedInternalAssistantId],
+    () => canConfirm(brainType, selectedBizRobotId),
+    [brainType, selectedBizRobotId],
   );
 
   const handleBrainTypeChange = useCallback((value: BrainType) => {
     setBrainType(value);
     if (value === 'custom') {
-      setSelectedInternalAssistantId(undefined);
+      setSelectedBizRobotId(undefined);
     }
   }, []);
 
@@ -36,9 +110,9 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     if (!confirmEnabled || !brainType) return;
     onConfirm({
       digitalTwintype: brainType,
-      internalAssistantId: selectedInternalAssistantId,
+      bizRobotId: selectedBizRobotId,
     });
-  }, [brainType, confirmEnabled, onConfirm, selectedInternalAssistantId]);
+  }, [brainType, confirmEnabled, onConfirm, selectedBizRobotId]);
 
   return (
     <section className="digital-twin">
@@ -86,32 +160,41 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           {brainType === 'internal' ? (
             <>
               <h4 className="digital-twin__brain-subtitle">请选择</h4>
-              <div className="digital-twin__assistant-grid">
-                {internalAssistants.map((assistant) => {
-                  const selected = selectedInternalAssistantId === assistant.id;
-                  return (
-                    <button
-                      key={assistant.id}
-                      type="button"
-                      className={`digital-twin__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
-                      onClick={() => setSelectedInternalAssistantId(assistant.id)}
-                    >
-                      <span className="digital-twin__assistant-content">
-                        {assistant.icon ? (
-                          <img
-                            src={assistant.icon}
-                            alt=""
-                            className="digital-twin__assistant-icon"
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                        <span className="digital-twin__assistant-label">{assistant.label}</span>
-                      </span>
-                      {selected ? <span className="digital-twin__check">✓</span> : null}
-                    </button>
-                  );
-                })}
-              </div>
+              {loadingAssistants ? (
+                <p className="digital-twin__custom-tip">内部助手加载中...</p>
+              ) : null}
+              {!loadingAssistants && internalAssistants.length === 0 ? (
+                <p className="digital-twin__custom-tip">暂无可用内部助手</p>
+              ) : null}
+              {!loadingAssistants && internalAssistants.length > 0 ? (
+                <div className="digital-twin__assistant-grid">
+                  {internalAssistants.map((assistant) => {
+                    const selected = selectedBizRobotId === assistant.bizRobotId;
+                    return (
+                      <button
+                        key={assistant.bizRobotId}
+                        type="button"
+                        className={`digital-twin__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
+                        onClick={() => setSelectedBizRobotId(assistant.bizRobotId)}
+                        aria-label={assistant.name}
+                      >
+                        <span className="digital-twin__assistant-content">
+                          {assistant.icon ? (
+                            <img
+                              src={assistant.icon}
+                              alt=""
+                              className="digital-twin__assistant-icon"
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                          <span className="digital-twin__assistant-label">{assistant.name}</span>
+                        </span>
+                        {selected ? <span className="digital-twin__check">✓</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </>
           ) : null}
 
@@ -143,4 +226,3 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     </section>
   );
 };
-

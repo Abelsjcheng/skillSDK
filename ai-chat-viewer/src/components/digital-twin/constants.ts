@@ -1,4 +1,4 @@
-﻿import type { DefaultAvatarOption, InternalAssistantOption } from '../../types/digitalTwin';
+﻿import type { DefaultAvatarOption } from '../../types/digitalTwin';
 
 function createSvgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -15,29 +15,11 @@ function createAvatar(bg: string, fg: string, text: string): string {
   `);
 }
 
-function createAssistantIcon(bg: string): string {
-  return createSvgDataUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
-      <rect width="20" height="20" rx="6" fill="${bg}" />
-      <circle cx="10" cy="10" r="4" fill="#ffffff" fill-opacity="0.95" />
-    </svg>
-  `);
-}
-
 export const DEFAULT_AVATARS: DefaultAvatarOption[] = [
   { id: 'avatar-1', image: createAvatar('#0D94FF', '#D8EEFF', 'A1') },
   { id: 'avatar-2', image: createAvatar('#0EA5A4', '#B7F3EF', 'A2') },
   { id: 'avatar-3', image: createAvatar('#7C3AED', '#E4D9FF', 'A3') },
   { id: 'avatar-4', image: createAvatar('#EA580C', '#FFE1CD', 'A4') },
-];
-
-export const INTERNAL_ASSISTANTS: InternalAssistantOption[] = [
-  { id: 'assistant-writing', label: '写作助手', icon: createAssistantIcon('#0D94FF') },
-  { id: 'assistant-meeting', label: '会议助手', icon: createAssistantIcon('#0EA5A4') },
-  { id: 'assistant-coding', label: '编码助手', icon: createAssistantIcon('#7C3AED') },
-  { id: 'assistant-analysis', label: '分析助手', icon: createAssistantIcon('#EA580C') },
-  { id: 'assistant-plan', label: '计划助手', icon: createAssistantIcon('#2563EB') },
-  { id: 'assistant-office', label: '办公助手', icon: createAssistantIcon('#4F46E5') },
 ];
 
 export const BRAIN_ILLUSTRATION = createSvgDataUri(`
@@ -55,6 +37,3 @@ export const BRAIN_ILLUSTRATION = createSvgDataUri(`
     <text x="320" y="90" text-anchor="middle" font-size="24" font-weight="700" fill="#1D4ED8">DIGITAL TWIN</text>
   </svg>
 `);
-
-
-

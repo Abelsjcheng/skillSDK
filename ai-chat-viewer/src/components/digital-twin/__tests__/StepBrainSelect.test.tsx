@@ -1,21 +1,42 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+﻿import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StepBrainSelect } from '../StepBrainSelect';
-import { BRAIN_ILLUSTRATION, INTERNAL_ASSISTANTS } from '../constants';
+import { BRAIN_ILLUSTRATION } from '../constants';
 
 const Noop = () => {};
 
 describe('StepBrainSelect', () => {
-  it('enables confirm when selecting custom brain', () => {
+  const getAgentTypeMock = jest.fn();
+
+  beforeEach(() => {
+    getAgentTypeMock.mockReset();
+    getAgentTypeMock.mockResolvedValue({
+      content: [
+        { name: '写作助手', icon: 'https://example.com/assistant-writing.png', bizRobotId: '8041241' },
+        { name: '会议助手', icon: 'https://example.com/assistant-meeting.png', bizRobotId: '8041242' },
+      ],
+    });
+
+    Object.defineProperty(window, 'getAgentType', {
+      value: getAgentTypeMock,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  it('enables confirm when selecting custom brain', async () => {
     render(
       <StepBrainSelect
         illustration={BRAIN_ILLUSTRATION}
-        internalAssistants={INTERNAL_ASSISTANTS}
         onClose={Noop}
         onCancel={Noop}
         onConfirm={Noop}
       />,
     );
+
+    await waitFor(() => {
+      expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
+    });
 
     const confirmButton = screen.getByRole('button', { name: '确定' });
     expect(confirmButton).toBeDisabled();
@@ -25,29 +46,28 @@ describe('StepBrainSelect', () => {
     expect(confirmButton).toHaveClass('is-active');
   });
 
-  it('keeps confirm disabled for internal brain before selecting an internal assistant', () => {
+  it('keeps confirm disabled for internal brain before selecting an internal assistant', async () => {
     render(
       <StepBrainSelect
         illustration={BRAIN_ILLUSTRATION}
-        internalAssistants={INTERNAL_ASSISTANTS}
         onClose={Noop}
         onCancel={Noop}
         onConfirm={Noop}
       />,
     );
 
-    const confirmButton = screen.getByRole('button', { name: '确定' });
     fireEvent.click(screen.getByLabelText('内部助手'));
+    await screen.findByRole('button', { name: '写作助手' });
 
+    const confirmButton = screen.getByRole('button', { name: '确定' });
     expect(confirmButton).toBeDisabled();
     expect(confirmButton).toHaveClass('is-disabled');
   });
 
-  it('enables confirm after selecting an internal assistant and marks selected style', () => {
+  it('enables confirm after selecting an internal assistant and marks selected style', async () => {
     render(
       <StepBrainSelect
         illustration={BRAIN_ILLUSTRATION}
-        internalAssistants={INTERNAL_ASSISTANTS}
         onClose={Noop}
         onCancel={Noop}
         onConfirm={Noop}
@@ -55,7 +75,7 @@ describe('StepBrainSelect', () => {
     );
 
     fireEvent.click(screen.getByLabelText('内部助手'));
-    const assistantButton = screen.getByRole('button', { name: /写作助手/i });
+    const assistantButton = await screen.findByRole('button', { name: '写作助手' });
     fireEvent.click(assistantButton);
 
     expect(assistantButton).toHaveClass('is-selected');
