@@ -12,7 +12,7 @@ describe('PersonalAgentCreator', () => {
     fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部个人助理简介' } });
 
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    expect(screen.getByText('请选择你的个人助理大脑：')).toBeInTheDocument();
+    expect(screen.getByText(/请选择你的.*个人助理.*大脑：/)).toBeInTheDocument();
   });
 
   it('keeps state unchanged when clicking close and cancel in step1 (no-op)', () => {
@@ -40,7 +40,7 @@ describe('PersonalAgentCreator', () => {
     expect(confirmButton).not.toBeDisabled();
 
     fireEvent.click(confirmButton);
-    expect(screen.getByText('请选择你的个人助理大脑：')).toBeInTheDocument();
+    expect(screen.getByText(/请选择你的.*个人助理.*大脑：/)).toBeInTheDocument();
     expect(screen.getByLabelText('自定义助手')).toBeChecked();
   });
 

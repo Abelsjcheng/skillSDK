@@ -1,19 +1,10 @@
-import React, { ChangeEvent, useRef } from 'react';
+import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DefaultAvatarOption } from '../../types/personalAgent';
+import { canProceedNext, validateAvatarFile } from '../../utils/personalAgentValidation';
+import { showToast } from '../../utils/toast';
 
 interface StepBasicInfoProps {
   defaultAvatars: DefaultAvatarOption[];
-  selectedAvatarType: 'default' | 'custom';
-  selectedAvatarId?: string;
-  customAvatarPreview?: string;
-  avatarError?: string;
-  name: string;
-  description: string;
-  canNext: boolean;
-  onSelectDefaultAvatar: (avatarId: string) => void;
-  onAvatarUpload: (file: File) => void;
-  onNameChange: (value: string) => void;
-  onDescriptionChange: (value: string) => void;
   onClose: () => void;
   onCancel: () => void;
   onNext: () => void;
@@ -21,37 +12,90 @@ interface StepBasicInfoProps {
 
 export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   defaultAvatars,
-  selectedAvatarType,
-  selectedAvatarId,
-  customAvatarPreview,
-  avatarError,
-  name,
-  description,
-  canNext,
-  onSelectDefaultAvatar,
-  onAvatarUpload,
-  onNameChange,
-  onDescriptionChange,
   onClose,
   onCancel,
   onNext,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const currentAvatarSrc =
-    selectedAvatarType === 'custom'
-      ? customAvatarPreview
-      : defaultAvatars.find((item) => item.id === selectedAvatarId)?.image ?? defaultAvatars[0]?.image;
+  const [avatarType, setAvatarType] = useState<'default' | 'custom'>('default');
+  const [avatarId, setAvatarId] = useState<string | undefined>(defaultAvatars[0]?.id);
+  const [customAvatarPreview, setCustomAvatarPreview] = useState<string | undefined>();
+  const [avatarError, setAvatarError] = useState<string>('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
-  const handleChooseUpload = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastObjectUrlRef = useRef<string>();
+
+  useEffect(() => {
+    return () => {
+      if (lastObjectUrlRef.current && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(lastObjectUrlRef.current);
+      }
+    };
+  }, []);
+
+  const canNext = useMemo(() => canProceedNext(name, description), [name, description]);
+
+  const currentAvatarSrc =
+    avatarType === 'custom'
+      ? customAvatarPreview
+      : defaultAvatars.find((item) => item.id === avatarId)?.image ?? defaultAvatars[0]?.image;
+
+  const handleChooseUpload = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
+
+  const handleSelectDefaultAvatar = useCallback((selectedAvatarId: string) => {
+    setAvatarType('default');
+    setAvatarId(selectedAvatarId);
+    setAvatarError('');
+  }, []);
+
+  const handleAvatarUpload = useCallback((file: File) => {
+    const result = validateAvatarFile(file);
+    if (!result.valid) {
+      if (result.code === 'size') {
+        showToast(result.reason, {
+          toastClassName: 'personal-agent-toast',
+          hideClassName: 'personal-agent-toast-hide',
+        });
+        setAvatarError('');
+      } else {
+        setAvatarError(result.reason);
+      }
+      return;
+    }
+
+    if (lastObjectUrlRef.current && typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(lastObjectUrlRef.current);
+      lastObjectUrlRef.current = undefined;
+    }
+
+    const previewUrl =
+      typeof URL.createObjectURL === 'function'
+        ? URL.createObjectURL(file)
+        : undefined;
+
+    if (previewUrl) {
+      lastObjectUrlRef.current = previewUrl;
+    }
+
+    setAvatarType('custom');
+    setCustomAvatarPreview(previewUrl);
+    setAvatarError('');
+  }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    onAvatarUpload(file);
+    handleAvatarUpload(file);
     event.target.value = '';
   };
+
+  const handleNext = useCallback(() => {
+    if (!canNext) return;
+    onNext();
+  }, [canNext, onNext]);
 
   return (
     <section className="personal-agent">
@@ -80,7 +124,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
         <div className="personal-agent__avatar-options" role="list" aria-label="默认头像列表">
           {defaultAvatars.map((avatar) => {
-            const selected = selectedAvatarType === 'default' && selectedAvatarId === avatar.id;
+            const selected = avatarType === 'default' && avatarId === avatar.id;
             return (
               <button
                 key={avatar.id}
@@ -88,7 +132,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                 role="listitem"
                 className={`personal-agent__avatar-option ${selected ? 'is-selected' : ''}`.trim()}
                 aria-label={`选择默认头像 ${avatar.id}`}
-                onClick={() => onSelectDefaultAvatar(avatar.id)}
+                onClick={() => handleSelectDefaultAvatar(avatar.id)}
               >
                 <img src={avatar.image} alt={`默认头像 ${avatar.id}`} className="personal-agent__avatar-option-img" />
                 {selected ? <span className="personal-agent__check">✓</span> : null}
@@ -99,13 +143,13 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           <button
             type="button"
             className={`personal-agent__avatar-option personal-agent__avatar-option--upload ${
-              selectedAvatarType === 'custom' ? 'is-selected' : ''
+              avatarType === 'custom' ? 'is-selected' : ''
             }`.trim()}
             aria-label="上传自定义头像"
             onClick={handleChooseUpload}
           >
             +
-            {selectedAvatarType === 'custom' ? <span className="personal-agent__check">✓</span> : null}
+            {avatarType === 'custom' ? <span className="personal-agent__check">✓</span> : null}
           </button>
           <input
             ref={fileInputRef}
@@ -127,7 +171,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             type="text"
             value={name}
             placeholder="例如：智能助手"
-            onChange={(event) => onNameChange(event.target.value)}
+            onChange={(event) => setName(event.target.value)}
           />
         </div>
 
@@ -140,7 +184,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             className="personal-agent__textarea"
             value={description}
             placeholder="介绍助理的功能和应用场景"
-            onChange={(event) => onDescriptionChange(event.target.value)}
+            onChange={(event) => setDescription(event.target.value)}
           />
         </div>
       </div>
@@ -159,7 +203,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             canNext ? 'is-active' : 'is-disabled'
           }`.trim()}
           disabled={!canNext}
-          onClick={onNext}
+          onClick={handleNext}
         >
           下一步
         </button>
@@ -167,4 +211,3 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     </section>
   );
 };
-

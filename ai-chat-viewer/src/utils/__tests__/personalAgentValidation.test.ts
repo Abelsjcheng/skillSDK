@@ -44,6 +44,7 @@ describe('personalAgentValidation', () => {
       const file = createFile(2 * 1024 * 1024, 'avatar.png', 'image/png');
       expect(validateAvatarFile(file)).toEqual({
         valid: false,
+        code: 'size',
         reason: '图片大小需小于2MB',
       });
     });
@@ -52,9 +53,9 @@ describe('personalAgentValidation', () => {
       const file = createFile(1024, 'avatar.webp', 'image/webp');
       expect(validateAvatarFile(file)).toEqual({
         valid: false,
+        code: 'format',
         reason: '仅支持JPG/PNG格式',
       });
     });
   });
 });
-

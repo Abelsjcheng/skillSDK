@@ -1,31 +1,42 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { BrainType, InternalAssistantOption } from '../../types/personalAgent';
+import { canConfirm } from '../../utils/personalAgentValidation';
 
 interface StepBrainSelectProps {
-  brainType?: BrainType;
-  selectedInternalAssistantId?: string;
-  canConfirm: boolean;
   illustration: string;
   internalAssistants: InternalAssistantOption[];
-  onBrainTypeChange: (brainType: BrainType) => void;
-  onSelectInternalAssistant: (assistantId: string) => void;
   onClose: () => void;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
-  brainType,
-  selectedInternalAssistantId,
-  canConfirm,
   illustration,
   internalAssistants,
-  onBrainTypeChange,
-  onSelectInternalAssistant,
   onClose,
   onCancel,
   onConfirm,
 }) => {
+  const [brainType, setBrainType] = useState<BrainType | undefined>();
+  const [selectedInternalAssistantId, setSelectedInternalAssistantId] = useState<string | undefined>();
+
+  const confirmEnabled = useMemo(
+    () => canConfirm(brainType, selectedInternalAssistantId),
+    [brainType, selectedInternalAssistantId],
+  );
+
+  const handleBrainTypeChange = useCallback((value: BrainType) => {
+    setBrainType(value);
+    if (value === 'custom') {
+      setSelectedInternalAssistantId(undefined);
+    }
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    if (!confirmEnabled) return;
+    onConfirm();
+  }, [confirmEnabled, onConfirm]);
+
   return (
     <section className="personal-agent">
       <header className="personal-agent__header personal-agent__header--close-only">
@@ -45,14 +56,14 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
       <div className="personal-agent__content personal-agent__content--step2">
         <div className="personal-agent__brain-type-block">
-          <h3 className="personal-agent__brain-title">请选择你的个人助理大脑：</h3>
+          <h3 className="personal-agent__brain-title">请选择你的「个人助理」大脑：</h3>
           <div className="personal-agent__brain-radios" role="radiogroup" aria-label="个人助理大脑类型">
             <label className="personal-agent__radio-item">
               <input
                 type="radio"
                 name="brain-type"
                 checked={brainType === 'internal'}
-                onChange={() => onBrainTypeChange('internal')}
+                onChange={() => handleBrainTypeChange('internal')}
               />
               <span>内部助手</span>
             </label>
@@ -61,7 +72,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                 type="radio"
                 name="brain-type"
                 checked={brainType === 'custom'}
-                onChange={() => onBrainTypeChange('custom')}
+                onChange={() => handleBrainTypeChange('custom')}
               />
               <span>自定义助手</span>
             </label>
@@ -80,7 +91,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                       key={assistant.id}
                       type="button"
                       className={`personal-agent__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
-                      onClick={() => onSelectInternalAssistant(assistant.id)}
+                      onClick={() => setSelectedInternalAssistantId(assistant.id)}
                     >
                       <span className="personal-agent__assistant-content">
                         {assistant.icon ? (
@@ -118,10 +129,10 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         <button
           type="button"
           className={`personal-agent__action-btn personal-agent__action-btn--confirm ${
-            canConfirm ? 'is-active' : 'is-disabled'
+            confirmEnabled ? 'is-active' : 'is-disabled'
           }`.trim()}
-          disabled={!canConfirm}
-          onClick={onConfirm}
+          disabled={!confirmEnabled}
+          onClick={handleConfirm}
         >
           确定
         </button>

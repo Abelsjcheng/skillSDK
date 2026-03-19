@@ -14,6 +14,13 @@
   box-sizing: border-box;
   min-height: 0;
   overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(206, 233, 255, 1) 0px,
+    rgba(255, 255, 255, 1) 160px,
+    rgba(255, 255, 255, 1) 100%
+  );
+  box-shadow: 0 16px 48px 0 rgba(0, 0, 0, 0.16);
 }
 
 .personal-agent__header {
@@ -21,7 +28,7 @@
   height: 40px;
   min-height: 40px;
   padding: 0 16px;
-  background: rgba(255, 255, 255, 1);
+  background: transparent;
   color: rgba(25, 25, 25, 1);
   display: flex;
   align-items: center;
@@ -29,7 +36,6 @@
   box-sizing: border-box;
   overflow: hidden;
   flex: 0 0 40px;
-  flex-shrink: 0;
 }
 
 .personal-agent__header--close-only {
@@ -198,7 +204,9 @@
 }
 
 .personal-agent__label {
-  display: inline-block;
+  display: block;
+  height: 22px;
+  margin: 0;
   font-size: 14px;
   font-weight: 500;
   line-height: 22px;
@@ -207,7 +215,9 @@
 
 .personal-agent__input,
 .personal-agent__textarea {
+  display: block;
   margin-top: 8px;
+  margin-bottom: 0;
   width: 100%;
   border-radius: 4px;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -244,6 +254,7 @@
 }
 
 .personal-agent__brain-title {
+  margin: 0;
   color: rgba(51, 51, 51, 1);
   font-size: 16px;
   font-weight: 700;
@@ -260,18 +271,63 @@
 .personal-agent__radio-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: rgba(51, 51, 51, 1);
   font-size: 14px;
   font-weight: 400;
   line-height: 22px;
 }
 
+.personal-agent__radio-item input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.personal-agent__radio-item input[type='radio']::before {
+  content: '';
+  width: 16.67px;
+  height: 16.67px;
+  border-radius: 50%;
+  border: 1.2px solid rgba(204, 204, 204, 1);
+  background: rgba(255, 255, 255, 1);
+  box-sizing: border-box;
+}
+
+.personal-agent__radio-item input[type='radio']:checked::before {
+  border-color: rgba(13, 148, 255, 1);
+  background: rgba(13, 148, 255, 1);
+}
+
+.personal-agent__radio-item input[type='radio']:checked::after {
+  content: '';
+  width: 6.67px;
+  height: 6.67px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 1);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .personal-agent__brain-detail {
-  margin-top: 12px;
+  padding-top: 12px;
 }
 
 .personal-agent__brain-subtitle {
+  margin: 0;
   color: rgba(153, 153, 153, 1);
   font-size: 14px;
   font-weight: 400;
@@ -290,7 +346,7 @@
   height: 36px;
   width: 100%;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #ffffff;
   display: inline-flex;
@@ -303,6 +359,17 @@
 .personal-agent__assistant-btn.is-selected {
   background: rgba(236, 246, 255, 1);
   border-color: rgba(13, 148, 255, 1);
+}
+
+.personal-agent__assistant-btn.is-selected .personal-agent__assistant-label {
+  color: rgba(13, 148, 255, 1);
+}
+
+.personal-agent__assistant-btn .personal-agent__check {
+  right: 8px;
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .personal-agent__assistant-content {
@@ -329,6 +396,7 @@
 }
 
 .personal-agent__custom-tip {
+  margin: 0;
   color: rgba(153, 153, 153, 1);
   font-size: 14px;
   font-weight: 400;
@@ -378,4 +446,24 @@
 .personal-agent__action-btn--next.is-active,
 .personal-agent__action-btn--confirm.is-active {
   background: rgba(13, 148, 255, 1);
+}
+
+.personal-agent-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.personal-agent-toast-hide {
+  opacity: 0;
 }

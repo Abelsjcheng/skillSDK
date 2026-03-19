@@ -1,56 +1,30 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { StepBasicInfo } from '../StepBasicInfo';
 import { DEFAULT_AVATARS } from '../constants';
-import { canProceedNext, validateAvatarFile } from '../../../utils/personalAgentValidation';
+import { showToast } from '../../../utils/toast';
+
+jest.mock('../../../utils/toast', () => ({
+  showToast: jest.fn(),
+}));
 
 const Noop = () => {};
-
-const StepBasicInfoHarness: React.FC = () => {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [avatarType, setAvatarType] = useState<'default' | 'custom'>('default');
-  const [avatarId, setAvatarId] = useState(DEFAULT_AVATARS[0].id);
-  const [avatarError, setAvatarError] = useState('');
-  const [customPreview, setCustomPreview] = useState<string | undefined>();
-  const canNext = useMemo(() => canProceedNext(name, description), [name, description]);
-
-  return (
-    <StepBasicInfo
-      defaultAvatars={DEFAULT_AVATARS}
-      selectedAvatarType={avatarType}
-      selectedAvatarId={avatarId}
-      customAvatarPreview={customPreview}
-      avatarError={avatarError}
-      name={name}
-      description={description}
-      canNext={canNext}
-      onSelectDefaultAvatar={(id) => {
-        setAvatarType('default');
-        setAvatarId(id);
-      }}
-      onAvatarUpload={(file) => {
-        const result = validateAvatarFile(file);
-        if (!result.valid) {
-          setAvatarError(result.reason || '');
-          return;
-        }
-        setAvatarType('custom');
-        setCustomPreview('blob://preview');
-        setAvatarError('');
-      }}
-      onNameChange={setName}
-      onDescriptionChange={setDescription}
-      onClose={Noop}
-      onCancel={Noop}
-      onNext={Noop}
-    />
-  );
-};
+const mockedShowToast = showToast as jest.MockedFunction<typeof showToast>;
 
 describe('StepBasicInfo', () => {
+  beforeEach(() => {
+    mockedShowToast.mockClear();
+  });
+
   it('disables next button when required fields are empty and enables after filling', () => {
-    render(<StepBasicInfoHarness />);
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={Noop}
+        onCancel={Noop}
+        onNext={Noop}
+      />,
+    );
 
     const nextButton = screen.getByRole('button', { name: '下一步' });
     expect(nextButton).toBeDisabled();
@@ -64,7 +38,14 @@ describe('StepBasicInfo', () => {
   });
 
   it('updates selected class when selecting default avatar', () => {
-    render(<StepBasicInfoHarness />);
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={Noop}
+        onCancel={Noop}
+        onNext={Noop}
+      />,
+    );
 
     const avatar2Button = screen.getByLabelText('选择默认头像 avatar-2');
     fireEvent.click(avatar2Button);
@@ -73,13 +54,47 @@ describe('StepBasicInfo', () => {
   });
 
   it('shows validation error when uploading invalid file', () => {
-    render(<StepBasicInfoHarness />);
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={Noop}
+        onCancel={Noop}
+        onNext={Noop}
+      />,
+    );
 
     const input = screen.getByTestId('avatar-upload-input') as HTMLInputElement;
     const invalidFile = new File([new Uint8Array(10)], 'avatar.webp', { type: 'image/webp' });
     fireEvent.change(input, { target: { files: [invalidFile] } });
 
     expect(screen.getByText('仅支持JPG/PNG格式')).toBeInTheDocument();
+    expect(mockedShowToast).not.toHaveBeenCalled();
+  });
+
+  it('shows toast when uploading file larger than 2MB and keeps current selection', () => {
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={Noop}
+        onCancel={Noop}
+        onNext={Noop}
+      />,
+    );
+
+    const defaultAvatarButton = screen.getByLabelText('选择默认头像 avatar-2');
+    fireEvent.click(defaultAvatarButton);
+    expect(defaultAvatarButton).toHaveClass('is-selected');
+
+    const input = screen.getByTestId('avatar-upload-input') as HTMLInputElement;
+    const oversizedFile = new File([new Uint8Array(2 * 1024 * 1024)], 'avatar.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [oversizedFile] } });
+
+    expect(mockedShowToast).toHaveBeenCalledWith('图片大小需小于2MB', {
+      toastClassName: 'personal-agent-toast',
+      hideClassName: 'personal-agent-toast-hide',
+    });
+    expect(screen.queryByText('图片大小需小于2MB')).not.toBeInTheDocument();
+    expect(defaultAvatarButton).toHaveClass('is-selected');
+    expect(screen.getByLabelText('上传自定义头像')).not.toHaveClass('is-selected');
   });
 });
-
