@@ -1,9 +1,9 @@
-# Personal Agent Creator Demo
+﻿# Digital Twin Creator Demo
 
 ## 本地启动
 
 ```bash
-npm run serve:personal-agent-demo
+npm run serve:digital-twin-demo
 ```
 
 默认地址：
@@ -15,6 +15,8 @@ http://localhost:3101
 ## 生产构建
 
 ```bash
-npm run build:personal-agent-demo
+npm run build:digital-twin-demo
 ```
+
+
 

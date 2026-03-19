@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import type { BrainType, InternalAssistantOption } from '../../types/personalAgent';
-import { canConfirm } from '../../utils/personalAgentValidation';
+﻿import React, { useCallback, useMemo, useState } from 'react';
+import type { BrainType, InternalAssistantOption } from '../../types/digitalTwin';
+import { canConfirm } from '../../utils/digitalTwinValidation';
 
 interface StepBrainSelectProps {
   illustration: string;
@@ -38,11 +38,11 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   }, [confirmEnabled, onConfirm]);
 
   return (
-    <section className="personal-agent">
-      <header className="personal-agent__header personal-agent__header--close-only">
+    <section className="digital-twin">
+      <header className="digital-twin__header digital-twin__header--close-only">
         <button
           type="button"
-          className="personal-agent__close-btn"
+          className="digital-twin__close-btn"
           aria-label="关闭创建个人助理"
           onClick={onClose}
         >
@@ -50,15 +50,15 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         </button>
       </header>
 
-      <div className="personal-agent__illustration-wrap">
-        <img className="personal-agent__illustration" src={illustration} alt="个人助理插画" />
+      <div className="digital-twin__illustration-wrap">
+        <img className="digital-twin__illustration" src={illustration} alt="个人助理插画" />
       </div>
 
-      <div className="personal-agent__content personal-agent__content--step2">
-        <div className="personal-agent__brain-type-block">
-          <h3 className="personal-agent__brain-title">请选择你的「个人助理」大脑：</h3>
-          <div className="personal-agent__brain-radios" role="radiogroup" aria-label="个人助理大脑类型">
-            <label className="personal-agent__radio-item">
+      <div className="digital-twin__content digital-twin__content--step2">
+        <div className="digital-twin__brain-type-block">
+          <h3 className="digital-twin__brain-title">请选择你的「个人助理」大脑：</h3>
+          <div className="digital-twin__brain-radios" role="radiogroup" aria-label="个人助理大脑类型">
+            <label className="digital-twin__radio-item">
               <input
                 type="radio"
                 name="brain-type"
@@ -67,7 +67,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
               />
               <span>内部助手</span>
             </label>
-            <label className="personal-agent__radio-item">
+            <label className="digital-twin__radio-item">
               <input
                 type="radio"
                 name="brain-type"
@@ -79,32 +79,32 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           </div>
         </div>
 
-        <div className="personal-agent__brain-detail">
+        <div className="digital-twin__brain-detail">
           {brainType === 'internal' ? (
             <>
-              <h4 className="personal-agent__brain-subtitle">请选择</h4>
-              <div className="personal-agent__assistant-grid">
+              <h4 className="digital-twin__brain-subtitle">请选择</h4>
+              <div className="digital-twin__assistant-grid">
                 {internalAssistants.map((assistant) => {
                   const selected = selectedInternalAssistantId === assistant.id;
                   return (
                     <button
                       key={assistant.id}
                       type="button"
-                      className={`personal-agent__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
+                      className={`digital-twin__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
                       onClick={() => setSelectedInternalAssistantId(assistant.id)}
                     >
-                      <span className="personal-agent__assistant-content">
+                      <span className="digital-twin__assistant-content">
                         {assistant.icon ? (
                           <img
                             src={assistant.icon}
                             alt=""
-                            className="personal-agent__assistant-icon"
+                            className="digital-twin__assistant-icon"
                             aria-hidden="true"
                           />
                         ) : null}
-                        <span className="personal-agent__assistant-label">{assistant.label}</span>
+                        <span className="digital-twin__assistant-label">{assistant.label}</span>
                       </span>
-                      {selected ? <span className="personal-agent__check">✓</span> : null}
+                      {selected ? <span className="digital-twin__check">✓</span> : null}
                     </button>
                   );
                 })}
@@ -113,22 +113,22 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           ) : null}
 
           {brainType === 'custom' ? (
-            <p className="personal-agent__custom-tip">需自定义部署、安装OpenCode/OpenClaw等工具</p>
+            <p className="digital-twin__custom-tip">需自定义部署、安装OpenCode/OpenClaw等工具</p>
           ) : null}
         </div>
       </div>
 
-      <footer className="personal-agent__actions">
+      <footer className="digital-twin__actions">
         <button
           type="button"
-          className="personal-agent__action-btn personal-agent__action-btn--cancel"
+          className="digital-twin__action-btn digital-twin__action-btn--cancel"
           onClick={onCancel}
         >
           取消
         </button>
         <button
           type="button"
-          className={`personal-agent__action-btn personal-agent__action-btn--confirm ${
+          className={`digital-twin__action-btn digital-twin__action-btn--confirm ${
             confirmEnabled ? 'is-active' : 'is-disabled'
           }`.trim()}
           disabled={!confirmEnabled}
@@ -140,3 +140,4 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     </section>
   );
 };
+

@@ -1,4 +1,4 @@
-import type { DefaultAvatarOption, InternalAssistantOption } from '../../types/personalAgent';
+﻿import type { DefaultAvatarOption, InternalAssistantOption } from '../../types/digitalTwin';
 
 function createSvgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -52,7 +52,9 @@ export const BRAIN_ILLUSTRATION = createSvgDataUri(`
     <circle cx="116" cy="80" r="52" fill="#BFDBFE" fill-opacity="0.75" />
     <circle cx="518" cy="54" r="34" fill="#93C5FD" fill-opacity="0.5" />
     <circle cx="546" cy="115" r="22" fill="#60A5FA" fill-opacity="0.55" />
-    <text x="320" y="90" text-anchor="middle" font-size="24" font-weight="700" fill="#1D4ED8">PERSONAL AGENT</text>
+    <text x="320" y="90" text-anchor="middle" font-size="24" font-weight="700" fill="#1D4ED8">DIGITAL TWIN</text>
   </svg>
 `);
+
+
 

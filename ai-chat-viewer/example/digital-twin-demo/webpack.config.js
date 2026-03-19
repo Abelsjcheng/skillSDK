@@ -1,4 +1,4 @@
-const path = require('path');
+﻿const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const {
   RESOLVE_EXTENSIONS,
@@ -9,7 +9,7 @@ module.exports = {
   entry: path.resolve(__dirname, './src/index.tsx'),
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'personal-agent-demo.bundle.js',
+    filename: 'digital-twin-demo.bundle.js',
     clean: true,
   },
   resolve: {
@@ -37,4 +37,5 @@ module.exports = {
   devtool: 'source-map',
   performance: { hints: false },
 };
+
 

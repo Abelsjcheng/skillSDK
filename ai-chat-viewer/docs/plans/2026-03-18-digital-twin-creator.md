@@ -1,4 +1,4 @@
-# 个人助理创建组件执行计划
+﻿# 个人助理创建组件执行计划
 
 - 计划日期：`2026-03-18`
 - 对应需求：`docs/requirements.md (v0.7)`
@@ -43,12 +43,12 @@ Step 5：提交
 ## Task 2：实现领域类型与纯函数校验（TDD）
 
 文件：
-1. 新建：`src/types/personalAgent.ts`
-2. 新建：`src/utils/personalAgentValidation.ts`
-3. 新建：`src/utils/__tests__/personalAgentValidation.test.ts`
+1. 新建：`src/types/digitalTwin.ts`
+2. 新建：`src/utils/digitalTwinValidation.ts`
+3. 新建：`src/utils/__tests__/digitalTwinValidation.test.ts`
 
 Step 1：先写失败测试（红灯）
-1. 在 `personalAgentValidation.test.ts` 增加用例：
+1. 在 `digitalTwinValidation.test.ts` 增加用例：
    - 名称/简介为空时 `canProceedNext` 返回 `false`
    - 名称/简介均有值时 `canProceedNext` 返回 `true`
    - `brainType=custom` 时 `canConfirm` 返回 `true`
@@ -56,35 +56,35 @@ Step 1：先写失败测试（红灯）
    - `jpg/png` 且 `<2MB` 头像文件通过，其他失败
 
 Step 2：运行测试确认失败
-1. 命令：`npm test -- src/utils/__tests__/personalAgentValidation.test.ts`
+1. 命令：`npm test -- src/utils/__tests__/digitalTwinValidation.test.ts`
 2. 预期：因目标模块不存在而失败。
 
 Step 3：写最小实现（绿灯）
-1. 在 `personalAgent.ts` 定义：
+1. 在 `digitalTwin.ts` 定义：
    - `BrainType`
    - `InternalAssistantOption`
    - `DefaultAvatarOption`
-   - `PersonalAgentFormData`
-2. 在 `personalAgentValidation.ts` 实现：
+   - `DigitalTwinFormData`
+2. 在 `digitalTwinValidation.ts` 实现：
    - `canProceedNext(name, description)`
    - `canConfirm(brainType, internalAssistantId?)`
    - `validateAvatarFile(file)`（返回 `{ valid: boolean; reason?: string }`）
 
 Step 4：再次运行测试确认通过
-1. 命令：`npm test -- src/utils/__tests__/personalAgentValidation.test.ts`
+1. 命令：`npm test -- src/utils/__tests__/digitalTwinValidation.test.ts`
 2. 预期：用例全部通过。
 
 Step 5：提交
-1. 命令：`git add src/types/personalAgent.ts src/utils/personalAgentValidation.ts src/utils/__tests__/personalAgentValidation.test.ts`
-2. 命令：`git commit -m "feat(viewer): add personal agent types and validation utils"`
+1. 命令：`git add src/types/digitalTwin.ts src/utils/digitalTwinValidation.ts src/utils/__tests__/digitalTwinValidation.test.ts`
+2. 命令：`git commit -m "feat(viewer): add digital twin types and validation utils"`
 
 ## Task 3：实现页面 1 子组件（基础信息）
 
 文件：
-1. 新建：`src/components/personal-agent/StepBasicInfo.tsx`
-2. 新建：`src/components/personal-agent/__tests__/StepBasicInfo.test.tsx`
-3. 新建：`src/components/personal-agent/constants.ts`
-4. 修改：`src/styles/PersonalAgentCreator.less`
+1. 新建：`src/components/digital-twin/StepBasicInfo.tsx`
+2. 新建：`src/components/digital-twin/__tests__/StepBasicInfo.test.tsx`
+3. 新建：`src/components/digital-twin/constants.ts`
+4. 修改：`src/styles/DigitalTwinCreator.less`
 
 Step 1：先写失败测试（红灯）
 1. 断言点：
@@ -94,7 +94,7 @@ Step 1：先写失败测试（红灯）
    - 上传非法头像文件时显示错误提示
 
 Step 2：运行测试确认失败
-1. 命令：`npm test -- src/components/personal-agent/__tests__/StepBasicInfo.test.tsx`
+1. 命令：`npm test -- src/components/digital-twin/__tests__/StepBasicInfo.test.tsx`
 2. 预期：组件不存在导致失败。
 
 Step 3：写最小实现（绿灯）
@@ -105,19 +105,19 @@ Step 3：写最小实现（绿灯）
 5. 实现名称/简介受控输入与下一步启用逻辑。
 
 Step 4：再次运行测试确认通过
-1. 命令：`npm test -- src/components/personal-agent/__tests__/StepBasicInfo.test.tsx`
+1. 命令：`npm test -- src/components/digital-twin/__tests__/StepBasicInfo.test.tsx`
 2. 预期：全部用例通过。
 
 Step 5：提交
-1. 命令：`git add src/components/personal-agent/StepBasicInfo.tsx src/components/personal-agent/__tests__/StepBasicInfo.test.tsx src/components/personal-agent/constants.ts src/styles/PersonalAgentCreator.less`
-2. 命令：`git commit -m "feat(viewer): implement personal agent basic info step"`
+1. 命令：`git add src/components/digital-twin/StepBasicInfo.tsx src/components/digital-twin/__tests__/StepBasicInfo.test.tsx src/components/digital-twin/constants.ts src/styles/DigitalTwinCreator.less`
+2. 命令：`git commit -m "feat(viewer): implement digital twin basic info step"`
 
 ## Task 4：实现页面 2 子组件（大脑选择）
 
 文件：
-1. 新建：`src/components/personal-agent/StepBrainSelect.tsx`
-2. 新建：`src/components/personal-agent/__tests__/StepBrainSelect.test.tsx`
-3. 修改：`src/styles/PersonalAgentCreator.less`
+1. 新建：`src/components/digital-twin/StepBrainSelect.tsx`
+2. 新建：`src/components/digital-twin/__tests__/StepBrainSelect.test.tsx`
+3. 修改：`src/styles/DigitalTwinCreator.less`
 
 Step 1：先写失败测试（红灯）
 1. 断言点：
@@ -127,7 +127,7 @@ Step 1：先写失败测试（红灯）
    - 内部助手项选中态 class、勾选标识显示正确
 
 Step 2：运行测试确认失败
-1. 命令：`npm test -- src/components/personal-agent/__tests__/StepBrainSelect.test.tsx`
+1. 命令：`npm test -- src/components/digital-twin/__tests__/StepBrainSelect.test.tsx`
 2. 预期：组件不存在导致失败。
 
 Step 3：写最小实现（绿灯）
@@ -138,20 +138,20 @@ Step 3：写最小实现（绿灯）
 5. 点击“确定”事件先 no-op（保留事件入口）。
 
 Step 4：再次运行测试确认通过
-1. 命令：`npm test -- src/components/personal-agent/__tests__/StepBrainSelect.test.tsx`
+1. 命令：`npm test -- src/components/digital-twin/__tests__/StepBrainSelect.test.tsx`
 2. 预期：全部用例通过。
 
 Step 5：提交
-1. 命令：`git add src/components/personal-agent/StepBrainSelect.tsx src/components/personal-agent/__tests__/StepBrainSelect.test.tsx src/styles/PersonalAgentCreator.less`
-2. 命令：`git commit -m "feat(viewer): implement personal agent brain select step"`
+1. 命令：`git add src/components/digital-twin/StepBrainSelect.tsx src/components/digital-twin/__tests__/StepBrainSelect.test.tsx src/styles/DigitalTwinCreator.less`
+2. 命令：`git commit -m "feat(viewer): implement digital twin brain select step"`
 
 ## Task 5：组装主组件并完成独立导出
 
 文件：
-1. 新建：`src/components/PersonalAgentCreator.tsx`
-2. 新建：`src/components/__tests__/PersonalAgentCreator.test.tsx`
+1. 新建：`src/components/DigitalTwinCreator.tsx`
+2. 新建：`src/components/__tests__/DigitalTwinCreator.test.tsx`
 3. 修改：`src/lib/index.ts`
-4. 修改：`src/styles/PersonalAgentCreator.less`
+4. 修改：`src/styles/DigitalTwinCreator.less`
 
 Step 1：先写失败测试（红灯）
 1. 断言点：
@@ -162,7 +162,7 @@ Step 1：先写失败测试（红灯）
    - 组件从 `src/lib/index.ts` 可被导出
 
 Step 2：运行测试确认失败
-1. 命令：`npm test -- src/components/__tests__/PersonalAgentCreator.test.tsx`
+1. 命令：`npm test -- src/components/__tests__/DigitalTwinCreator.test.tsx`
 2. 预期：主组件或导出不存在导致失败。
 
 Step 3：写最小实现（绿灯）
@@ -180,13 +180,13 @@ Step 4：回归验证
 8. 预期：库构建成功，导出产物更新。
 
 Step 5：提交
-1. 命令：`git add src/components/PersonalAgentCreator.tsx src/components/__tests__/PersonalAgentCreator.test.tsx src/lib/index.ts src/styles/PersonalAgentCreator.less`
-2. 命令：`git commit -m "feat(viewer): export personal agent creator component"`
+1. 命令：`git add src/components/DigitalTwinCreator.tsx src/components/__tests__/DigitalTwinCreator.test.tsx src/lib/index.ts src/styles/DigitalTwinCreator.less`
+2. 命令：`git commit -m "feat(viewer): export digital twin creator component"`
 
 ## Task 6：人工验收与结果记录
 
 文件：
-1. 新建：`docs/acceptance/2026-03-18-personal-agent-creator.md`
+1. 新建：`docs/acceptance/2026-03-18-digital-twin-creator.md`
 
 Step 1：整理验收清单（来源于 `docs/requirements.md`）
 1. 包含页面 1/2 结构、尺寸、交互、禁用态、no-op 行为检查项。
@@ -199,5 +199,7 @@ Step 3：记录结果
 1. 在验收文档中勾选通过项，并记录发现问题（如有）。
 
 Step 4：提交
-1. 命令：`git add docs/acceptance/2026-03-18-personal-agent-creator.md`
-2. 命令：`git commit -m "docs(viewer): add personal agent creator acceptance checklist"`
+1. 命令：`git add docs/acceptance/2026-03-18-digital-twin-creator.md`
+2. 命令：`git commit -m "docs(viewer): add digital twin creator acceptance checklist"`
+
+

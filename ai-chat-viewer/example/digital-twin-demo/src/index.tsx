@@ -1,6 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { PersonalAgentCreator } from '../../../src/components/PersonalAgentCreator';
+import { DigitalTwinCreator } from '../../../src/components/DigitalTwinCreator';
 
 const rootElement = document.getElementById('root');
 
@@ -28,9 +28,10 @@ if (rootElement) {
             boxSizing: 'border-box',
           }}
         >
-          <PersonalAgentCreator />
+          <DigitalTwinCreator />
         </section>
       </main>
     </React.StrictMode>,
   );
 }
+

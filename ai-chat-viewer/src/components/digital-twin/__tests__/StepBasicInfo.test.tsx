@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { StepBasicInfo } from '../StepBasicInfo';
 import { DEFAULT_AVATARS } from '../constants';
@@ -90,11 +90,12 @@ describe('StepBasicInfo', () => {
     fireEvent.change(input, { target: { files: [oversizedFile] } });
 
     expect(mockedShowToast).toHaveBeenCalledWith('图片大小需小于2MB', {
-      toastClassName: 'personal-agent-toast',
-      hideClassName: 'personal-agent-toast-hide',
+      toastClassName: 'digital-twin-toast',
+      hideClassName: 'digital-twin-toast-hide',
     });
     expect(screen.queryByText('图片大小需小于2MB')).not.toBeInTheDocument();
     expect(defaultAvatarButton).toHaveClass('is-selected');
     expect(screen.getByLabelText('上传自定义头像')).not.toHaveClass('is-selected');
   });
 });
+

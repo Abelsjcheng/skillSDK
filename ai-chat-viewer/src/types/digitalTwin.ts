@@ -1,4 +1,4 @@
-export type BrainType = 'internal' | 'custom';
+﻿export type BrainType = 'internal' | 'custom';
 
 export interface InternalAssistantOption {
   id: string;
@@ -11,7 +11,7 @@ export interface DefaultAvatarOption {
   image: string;
 }
 
-export interface PersonalAgentFormData {
+export interface DigitalTwinFormData {
   avatarType: 'default' | 'custom';
   avatarId?: string;
   avatarFile?: File;
@@ -20,4 +20,5 @@ export interface PersonalAgentFormData {
   brainType: BrainType;
   internalAssistantId?: string;
 }
+
 

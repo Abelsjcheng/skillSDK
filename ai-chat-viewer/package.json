@@ -7,7 +7,7 @@
   "types": "dist/lib/index.d.ts",
   "files": [
     "dist/lib",
-    "dist/personal-agent-page"
+    "dist/digital-twin-page"
   ],
   "scripts": {
     "dev": "webpack serve --mode development --open",
@@ -15,11 +15,11 @@
     "build:lib": "webpack --config webpack.lib.config.js --mode production && tsc --emitDeclarationOnly --declaration --outDir dist",
     "build:all": "npm run build && npm run build:lib",
     "build:require-demo": "npm run build:lib && webpack --config example/require-demo/webpack.config.js --mode production",
-    "build:personal-agent-page": "webpack --config webpack.personal-agent-page.config.js --mode production",
-    "build:personal-agent-demo": "webpack --config example/personal-agent-demo/webpack.config.js --mode production",
+    "build:digital-twin-page": "webpack --config webpack.digital-twin-page.config.js --mode production",
+    "build:digital-twin-demo": "webpack --config example/digital-twin-demo/webpack.config.js --mode production",
     "serve:require-demo": "webpack serve --config example/require-demo/webpack.config.js --mode development --open",
-    "serve:personal-agent-page": "webpack serve --config webpack.personal-agent-page.config.js --mode development --open",
-    "serve:personal-agent-demo": "webpack serve --config example/personal-agent-demo/webpack.config.js --mode development --open",
+    "serve:digital-twin-page": "webpack serve --config webpack.digital-twin-page.config.js --mode development --open",
+    "serve:digital-twin-demo": "webpack serve --config example/digital-twin-demo/webpack.config.js --mode development --open",
     "lint": "eslint src --ext .ts,.tsx",
     "test": "jest --runInBand"
   },
@@ -83,3 +83,4 @@
     "not dead"
   ]
 }
+

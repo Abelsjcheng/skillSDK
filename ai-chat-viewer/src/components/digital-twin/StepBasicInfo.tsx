@@ -1,6 +1,6 @@
-import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DefaultAvatarOption } from '../../types/personalAgent';
-import { canProceedNext, validateAvatarFile } from '../../utils/personalAgentValidation';
+﻿import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DefaultAvatarOption } from '../../types/digitalTwin';
+import { canProceedNext, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 
 interface StepBasicInfoProps {
@@ -56,8 +56,8 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     if (!result.valid) {
       if (result.code === 'size') {
         showToast(result.reason, {
-          toastClassName: 'personal-agent-toast',
-          hideClassName: 'personal-agent-toast-hide',
+          toastClassName: 'digital-twin-toast',
+          hideClassName: 'digital-twin-toast-hide',
         });
         setAvatarError('');
       } else {
@@ -98,12 +98,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   }, [canNext, onNext]);
 
   return (
-    <section className="personal-agent">
-      <header className="personal-agent__header">
-        <span className="personal-agent__title">创建个人助理</span>
+    <section className="digital-twin">
+      <header className="digital-twin__header">
+        <span className="digital-twin__title">创建个人助理</span>
         <button
           type="button"
-          className="personal-agent__close-btn"
+          className="digital-twin__close-btn"
           aria-label="关闭创建个人助理"
           onClick={onClose}
         >
@@ -111,18 +111,18 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         </button>
       </header>
 
-      <div className="personal-agent__content personal-agent__content--step1">
-        <div className="personal-agent__avatar-preview-wrap">
-          <div className="personal-agent__avatar-preview">
+      <div className="digital-twin__content digital-twin__content--step1">
+        <div className="digital-twin__avatar-preview-wrap">
+          <div className="digital-twin__avatar-preview">
             {currentAvatarSrc ? (
-              <img src={currentAvatarSrc} alt="当前头像预览" className="personal-agent__avatar-preview-img" />
+              <img src={currentAvatarSrc} alt="当前头像预览" className="digital-twin__avatar-preview-img" />
             ) : null}
           </div>
-          <p className="personal-agent__avatar-tip">支持JPG/PNG格式，小于2MB</p>
-          {avatarError ? <p className="personal-agent__error-text">{avatarError}</p> : null}
+          <p className="digital-twin__avatar-tip">支持JPG/PNG格式，小于2MB</p>
+          {avatarError ? <p className="digital-twin__error-text">{avatarError}</p> : null}
         </div>
 
-        <div className="personal-agent__avatar-options" role="list" aria-label="默认头像列表">
+        <div className="digital-twin__avatar-options" role="list" aria-label="默认头像列表">
           {defaultAvatars.map((avatar) => {
             const selected = avatarType === 'default' && avatarId === avatar.id;
             return (
@@ -130,44 +130,44 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                 key={avatar.id}
                 type="button"
                 role="listitem"
-                className={`personal-agent__avatar-option ${selected ? 'is-selected' : ''}`.trim()}
+                className={`digital-twin__avatar-option ${selected ? 'is-selected' : ''}`.trim()}
                 aria-label={`选择默认头像 ${avatar.id}`}
                 onClick={() => handleSelectDefaultAvatar(avatar.id)}
               >
-                <img src={avatar.image} alt={`默认头像 ${avatar.id}`} className="personal-agent__avatar-option-img" />
-                {selected ? <span className="personal-agent__check">✓</span> : null}
+                <img src={avatar.image} alt={`默认头像 ${avatar.id}`} className="digital-twin__avatar-option-img" />
+                {selected ? <span className="digital-twin__check">✓</span> : null}
               </button>
             );
           })}
 
           <button
             type="button"
-            className={`personal-agent__avatar-option personal-agent__avatar-option--upload ${
+            className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${
               avatarType === 'custom' ? 'is-selected' : ''
             }`.trim()}
             aria-label="上传自定义头像"
             onClick={handleChooseUpload}
           >
             +
-            {avatarType === 'custom' ? <span className="personal-agent__check">✓</span> : null}
+            {avatarType === 'custom' ? <span className="digital-twin__check">✓</span> : null}
           </button>
           <input
             ref={fileInputRef}
             type="file"
             accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-            className="personal-agent__hidden-file"
+            className="digital-twin__hidden-file"
             onChange={handleFileChange}
             data-testid="avatar-upload-input"
           />
         </div>
 
-        <div className="personal-agent__field">
-          <label className="personal-agent__label" htmlFor="personal-agent-name">
+        <div className="digital-twin__field">
+          <label className="digital-twin__label" htmlFor="digital-twin-name">
             名称
           </label>
           <input
-            id="personal-agent-name"
-            className="personal-agent__input"
+            id="digital-twin-name"
+            className="digital-twin__input"
             type="text"
             value={name}
             placeholder="例如：智能助手"
@@ -175,13 +175,13 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           />
         </div>
 
-        <div className="personal-agent__field">
-          <label className="personal-agent__label" htmlFor="personal-agent-description">
+        <div className="digital-twin__field">
+          <label className="digital-twin__label" htmlFor="digital-twin-description">
             简介
           </label>
           <textarea
-            id="personal-agent-description"
-            className="personal-agent__textarea"
+            id="digital-twin-description"
+            className="digital-twin__textarea"
             value={description}
             placeholder="介绍助理的功能和应用场景"
             onChange={(event) => setDescription(event.target.value)}
@@ -189,17 +189,17 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         </div>
       </div>
 
-      <footer className="personal-agent__actions">
+      <footer className="digital-twin__actions">
         <button
           type="button"
-          className="personal-agent__action-btn personal-agent__action-btn--cancel"
+          className="digital-twin__action-btn digital-twin__action-btn--cancel"
           onClick={onCancel}
         >
           取消
         </button>
         <button
           type="button"
-          className={`personal-agent__action-btn personal-agent__action-btn--next ${
+          className={`digital-twin__action-btn digital-twin__action-btn--next ${
             canNext ? 'is-active' : 'is-disabled'
           }`.trim()}
           disabled={!canNext}
@@ -211,3 +211,4 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     </section>
   );
 };
+

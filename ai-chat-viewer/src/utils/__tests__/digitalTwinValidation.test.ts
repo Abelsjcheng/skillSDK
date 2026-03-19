@@ -1,11 +1,11 @@
-import { canConfirm, canProceedNext, validateAvatarFile } from '../personalAgentValidation';
+﻿import { canConfirm, canProceedNext, validateAvatarFile } from '../digitalTwinValidation';
 
 function createFile(size: number, name: string, type: string): File {
   const blob = new Blob([new Uint8Array(size)], { type });
   return new File([blob], name, { type });
 }
 
-describe('personalAgentValidation', () => {
+describe('digitalTwinValidation', () => {
   describe('canProceedNext', () => {
     it('returns false when name is empty', () => {
       expect(canProceedNext('', 'desc')).toBe(false);
@@ -59,3 +59,4 @@ describe('personalAgentValidation', () => {
     });
   });
 });
+

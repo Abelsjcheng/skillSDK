@@ -1,4 +1,4 @@
-const path = require('path');
+﻿const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const {
   RESOLVE_EXTENSIONS,
@@ -6,10 +6,10 @@ const {
 } = require('./webpack.shared');
 
 module.exports = {
-  entry: './src/pages/personal-agent/index.tsx',
+  entry: './src/pages/digital-twin/index.tsx',
   output: {
-    path: path.resolve(__dirname, 'dist/personal-agent-page'),
-    filename: 'js/personal-agent-page.[contenthash].js',
+    path: path.resolve(__dirname, 'dist/digital-twin-page'),
+    filename: 'js/digital-twin-page.[contenthash].js',
     assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
     clean: true,
   },
@@ -21,7 +21,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './public/personal-agent-page.html',
+      template: './public/digital-twin-page.html',
       filename: 'index.html',
     }),
   ],
@@ -40,7 +40,7 @@ module.exports = {
     },
   },
   devServer: {
-    static: path.resolve(__dirname, 'dist/personal-agent-page'),
+    static: path.resolve(__dirname, 'dist/digital-twin-page'),
     compress: true,
     port: 3102,
     hot: true,
@@ -51,3 +51,4 @@ module.exports = {
     hints: false,
   },
 };
+

@@ -1,4 +1,4 @@
-import type { BrainType } from '../types/personalAgent';
+﻿import type { BrainType } from '../types/digitalTwin';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
@@ -37,3 +37,4 @@ export function validateAvatarFile(file: File): AvatarValidationResult {
 
   return { valid: false, reason: '仅支持JPG/PNG格式', code: 'format' };
 }
+
