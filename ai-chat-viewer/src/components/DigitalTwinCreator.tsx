@@ -1,14 +1,18 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { BRAIN_ILLUSTRATION, DEFAULT_AVATARS, INTERNAL_ASSISTANTS } from './digital-twin/constants';
 import { StepBasicInfo } from './digital-twin/StepBasicInfo';
 import { StepBrainSelect } from './digital-twin/StepBrainSelect';
+import type { CreateDigitalTwinParams, DigitalTwinBasicInfoPayload, DigitalTwinBrainPayload } from '../types/digitalTwin';
 import '../styles/DigitalTwinCreator.less';
-
-const noop = () => {};
 
 const DigitalTwinCreator: React.FC = () => {
   const [step, setStep] = useState<1 | 2>(1);
-  const handleNext = useCallback(() => setStep(2), []);
+  const basicInfoRef = useRef<DigitalTwinBasicInfoPayload | null>(null);
+
+  const handleNext = useCallback((payload: DigitalTwinBasicInfoPayload) => {
+    basicInfoRef.current = payload;
+    setStep(2);
+  }, []);
 
   const handleClose = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -22,7 +26,23 @@ const DigitalTwinCreator: React.FC = () => {
     }
   }, []);
 
-  const handleConfirmNoop = useCallback(noop, []);
+  const handleConfirm = useCallback((payload: DigitalTwinBrainPayload) => {
+    const basicInfo = basicInfoRef.current;
+    if (!basicInfo) return;
+
+    const params: CreateDigitalTwinParams = {
+      name: basicInfo.name,
+      icon: basicInfo.icon,
+      description: basicInfo.description,
+      digitalTwintype: payload.digitalTwintype,
+    };
+
+    if (payload.digitalTwintype === 'internal') {
+      params.agent = '助手分身';
+    }
+
+    (window as any).create(params);
+  }, []);
 
   return (
     <div className="digital-twin-creator">
@@ -39,7 +59,7 @@ const DigitalTwinCreator: React.FC = () => {
           internalAssistants={INTERNAL_ASSISTANTS}
           onClose={handleClose}
           onCancel={handleCancel}
-          onConfirm={handleConfirmNoop}
+          onConfirm={handleConfirm}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.6`
+- 文档版本：`v3.9`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -13,7 +13,7 @@
 3. 页面 2 选择助理大脑（内部助手/自定义助手）；
 4. 完整支持禁用态、选中态、页面切换交互。
 5. 页面对外不接收任何 `props`，不对外抛出回调事件。
-6. 当前版本 `X` / “取消”点击事件调用 `window.Pedestal.remote.getCurrentWindow().close()`；“确定”点击事件先空实现（no-op）。
+6. 当前版本 `X` / “取消”点击事件调用 `window.Pedestal.remote.getCurrentWindow().close()`；“确定”点击事件调用 `window.create()`。
 7. 页面主容器宽高均以 `100%` 自适应填满父容器。
 8. 页面入口直接渲染组件，宽高占满整个页面，不引入额外父容器。
 
@@ -92,6 +92,7 @@ interface DigitalTwinFormData {
    - 头像预览与格式说明；
    - 4 个默认头像 + 1 个自定义上传入口；
    - 自定义上传入口边框固定为 `0.63px dashed rgba(221,221,221,1)`；
+   - 头像预览图片显示模式固定为 `object-fit: fill`；
    - 名称输入；
    - 简介输入。
 7. 头像说明文案样式固定为 `12px / 400 / 20px`，且仅保留 `margin-top: 8px`，左右/底部外边距均为 `0`。
@@ -103,7 +104,8 @@ interface DigitalTwinFormData {
 13. 为消除 2px 行盒误差，名称/简介标签采用块级元素并固定 `height: 22px; line-height: 22px; margin: 0`。
 14. 操作区使用 `padding: 16px 24px 12px`，右对齐两个按钮：取消/下一步。
 15. 操作区必须固定在组件容器可视范围内，不得超出底部边界；内容区域应自适应可滚动。
-16. “下一步”启用条件：`name.trim() && description.trim()`。
+16. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
+17. “下一步”启用条件：`name.trim() && description.trim()`。
 
 ## 5.2 页面 2（大脑选择）
 
@@ -116,15 +118,16 @@ interface DigitalTwinFormData {
      - `custom`：显示提示文案。
 4. 操作区使用 `padding: 16px 24px 12px`，按钮右对齐。
 5. 操作区必须固定在组件容器可视范围内，不得超出底部边界；内容区域应自适应可滚动。
-6. “确定”启用条件：
+6. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
+7. “确定”启用条件：
    - `brainType === 'custom'`：可直接启用；
    - `brainType === 'internal'`：需 `internalAssistantId` 已选择。
-7. 第二页内容区标题文本与父容器顶部间距固定为 `6px`，并将标题元素默认外边距重置为 `0` 以避免偏差。
-8. 第二页单选圆点按钮使用自定义样式：圆点容器 `20px x 20px`、左侧间距 `0px`；容器内圆点 `16.67px x 16.67px` 且垂直居中；按钮文本与圆点容器间距 `8px`；未选中为 `1.2px` 灰色边框白底，选中为蓝色外环与白色 `6.67px` 圆心。
-9. 第二页第二个容器标题文本（“请选择”）与其父容器顶部间距固定为 `12px`，并重置标题默认外边距，避免浏览器默认样式干扰。
-10. 第二页内部助手选择按钮圆角半径固定为 `8px`。
-11. 第二页内部助手选择按钮在选中态时，按钮文本颜色固定为 `rgba(13,148,255,1)`。
-12. 第二页内部助手选择按钮在选中态时，圆形 `√` 固定在按钮内部右侧，距离右边 `8px`。
+8. 第二页内容区标题文本与父容器顶部间距固定为 `6px`，并将标题元素默认外边距重置为 `0` 以避免偏差。
+9. 第二页单选圆点按钮使用自定义样式：圆点容器 `20px x 20px`、左侧间距 `0px`；容器内圆点 `16.67px x 16.67px` 且垂直居中；按钮文本与圆点容器间距 `8px`；未选中为 `1.2px` 灰色边框白底，选中为蓝色外环与白色 `6.67px` 圆心。
+10. 第二页第二个容器标题文本（“请选择”）与其父容器顶部间距固定为 `12px`，并重置标题默认外边距，避免浏览器默认样式干扰。
+11. 第二页内部助手选择按钮圆角半径固定为 `8px`。
+12. 第二页内部助手选择按钮在选中态时，按钮文本颜色固定为 `rgba(13,148,255,1)`。
+13. 第二页内部助手选择按钮在选中态时，圆形 `√` 固定在按钮内部右侧，距离右边 `8px`。
 
 ## 6. 状态模型决策
 
@@ -160,7 +163,12 @@ interface DigitalTwinFormData {
 3. 点击头像项即切换选中态并更新预览区。
 4. 页面切换不清空已输入数据。
 5. 点击 `X` 与“取消”时直接调用 `window.Pedestal.remote.getCurrentWindow().close()`。
-6. 点击“确定”当前版本先 no-op（保留事件入口，不做状态变化）。
+6. 点击“确定”时调用 `window.create(params)`，`params` 字段映射：
+   - `name`：页面 1 名称输入值
+   - `icon`：页面 1 当前选中头像地址
+   - `description`：页面 1 简介输入值
+   - `digitalTwintype`：页面 2 单选值（`internal`/`custom`）
+   - `agent`：仅 `internal` 时传 `助手分身`，`custom` 不传
 
 ## 8. 样式与实现约束
 
@@ -188,7 +196,7 @@ interface DigitalTwinFormData {
 4. 关键行为需可测：
    - 点击 `X` 调用 `window.Pedestal.remote.getCurrentWindow().close()`
    - 点击“取消”调用 `window.Pedestal.remote.getCurrentWindow().close()`
-   - 点击“确定”不改变当前页面与选择状态
+   - 点击“确定”调用 `window.create()` 且参数映射正确
 
 ## 10. 风险与边界
 
@@ -197,5 +205,5 @@ interface DigitalTwinFormData {
    - 组件仍渲染为两列网格；
    - 行数自适应，不阻塞流程。
 3. 本期不包含后端接口对接，也不包含对外回调协议。
-4. 本期关闭/取消仅调用 `window.Pedestal.remote.getCurrentWindow().close()`；确定不实现业务提交行为。
+4. 本期关闭/取消调用 `window.Pedestal.remote.getCurrentWindow().close()`；确定调用前端 `window.create()`，不包含后端接口联调。
 

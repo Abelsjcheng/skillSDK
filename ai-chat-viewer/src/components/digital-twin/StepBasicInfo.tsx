@@ -1,5 +1,5 @@
 ﻿import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DefaultAvatarOption } from '../../types/digitalTwin';
+import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
 import { canProceedNext, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 
@@ -7,7 +7,7 @@ interface StepBasicInfoProps {
   defaultAvatars: DefaultAvatarOption[];
   onClose: () => void;
   onCancel: () => void;
-  onNext: () => void;
+  onNext: (payload: DigitalTwinBasicInfoPayload) => void;
 }
 
 export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
@@ -94,8 +94,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
   const handleNext = useCallback(() => {
     if (!canNext) return;
-    onNext();
-  }, [canNext, onNext]);
+    onNext({
+      name: name.trim(),
+      icon: currentAvatarSrc ?? '',
+      description: description.trim(),
+    });
+  }, [canNext, currentAvatarSrc, description, name, onNext]);
 
   return (
     <section className="digital-twin">

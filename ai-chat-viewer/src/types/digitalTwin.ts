@@ -21,4 +21,20 @@ export interface DigitalTwinFormData {
   internalAssistantId?: string;
 }
 
+export interface DigitalTwinBasicInfoPayload {
+  name: string;
+  icon: string;
+  description: string;
+}
+
+export interface DigitalTwinBrainPayload {
+  digitalTwintype: BrainType;
+  internalAssistantId?: string;
+}
+
+export interface CreateDigitalTwinParams extends DigitalTwinBasicInfoPayload {
+  digitalTwintype: BrainType;
+  agent?: string;
+}
+
 

@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useMemo, useState } from 'react';
-import type { BrainType, InternalAssistantOption } from '../../types/digitalTwin';
+import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 
 interface StepBrainSelectProps {
@@ -7,7 +7,7 @@ interface StepBrainSelectProps {
   internalAssistants: InternalAssistantOption[];
   onClose: () => void;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (payload: DigitalTwinBrainPayload) => void;
 }
 
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
@@ -33,9 +33,12 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   }, []);
 
   const handleConfirm = useCallback(() => {
-    if (!confirmEnabled) return;
-    onConfirm();
-  }, [confirmEnabled, onConfirm]);
+    if (!confirmEnabled || !brainType) return;
+    onConfirm({
+      digitalTwintype: brainType,
+      internalAssistantId: selectedInternalAssistantId,
+    });
+  }, [brainType, confirmEnabled, onConfirm, selectedInternalAssistantId]);
 
   return (
     <section className="digital-twin">

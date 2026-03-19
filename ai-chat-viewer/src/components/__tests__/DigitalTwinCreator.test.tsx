@@ -38,7 +38,14 @@ describe('DigitalTwinCreator', () => {
     expect(closeMock).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps state unchanged when clicking confirm in step2 (no-op)', () => {
+  it('calls window.create with custom digital twin payload when clicking confirm', () => {
+    const createMock = jest.fn();
+    Object.defineProperty(window, 'create', {
+      value: createMock,
+      configurable: true,
+      writable: true,
+    });
+
     render(<DigitalTwinCreator />);
 
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '智能助手' } });
@@ -50,8 +57,41 @@ describe('DigitalTwinCreator', () => {
     expect(confirmButton).not.toBeDisabled();
 
     fireEvent.click(confirmButton);
-    expect(screen.getByText(/请选择你的.*个人助理.*大脑：/)).toBeInTheDocument();
-    expect(screen.getByLabelText('自定义助手')).toBeChecked();
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock).toHaveBeenCalledWith({
+      name: '智能助手',
+      icon: expect.any(String),
+      description: '内部个人助理简介',
+      digitalTwintype: 'custom',
+    });
+  });
+
+  it('calls window.create with internal digital twin payload and agent field', () => {
+    const createMock = jest.fn();
+    Object.defineProperty(window, 'create', {
+      value: createMock,
+      configurable: true,
+      writable: true,
+    });
+
+    render(<DigitalTwinCreator />);
+
+    fireEvent.change(screen.getByLabelText('名称'), { target: { value: '智能助手2' } });
+    fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部类型测试' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    fireEvent.click(screen.getByLabelText('内部助手'));
+    fireEvent.click(screen.getByRole('button', { name: /写作助手/i }));
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock).toHaveBeenCalledWith({
+      name: '智能助手2',
+      icon: expect.any(String),
+      description: '内部类型测试',
+      digitalTwintype: 'internal',
+      agent: '助手分身',
+    });
   });
 
   it('is not exported from lib entry and has standalone page entry', () => {
