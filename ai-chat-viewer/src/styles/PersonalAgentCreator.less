@@ -1,0 +1,381 @@
+.personal-agent-creator {
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.personal-agent {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.personal-agent__header {
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 1);
+  color: rgba(25, 25, 25, 1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  overflow: hidden;
+  flex: 0 0 40px;
+  flex-shrink: 0;
+}
+
+.personal-agent__header--close-only {
+  justify-content: flex-end;
+}
+
+.personal-agent__title {
+  min-width: 72px;
+  max-width: calc(100% - 28px);
+  width: auto;
+  height: 22px;
+  line-height: 22px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(25, 25, 25, 1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.personal-agent__close-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: rgba(25, 25, 25, 1);
+  font-size: 18px;
+  line-height: 20px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.personal-agent__illustration-wrap {
+  width: 100%;
+  height: 160px;
+}
+
+.personal-agent__illustration {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.personal-agent__content {
+  width: 100%;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.personal-agent__content--step1 {
+  padding: 16px 24px 12px;
+}
+
+.personal-agent__content--step2 {
+  padding: 0 24px;
+}
+
+.personal-agent__avatar-preview-wrap {
+  width: 100%;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.personal-agent__avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  border: 2px solid rgba(255, 255, 255, 1);
+  overflow: hidden;
+  background: rgba(239, 246, 255, 1);
+}
+
+.personal-agent__avatar-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.personal-agent__avatar-tip {
+  margin: 8px 0 0;
+  color: rgba(153, 153, 153, 1);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: center;
+}
+
+.personal-agent__error-text {
+  margin-top: 4px;
+  color: #ef4444;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.personal-agent__avatar-options {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.personal-agent__avatar-option {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 1);
+  border: 1px solid transparent;
+  padding: 0;
+  position: relative;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.personal-agent__avatar-option.is-selected {
+  border-color: rgba(13, 148, 255, 1);
+}
+
+.personal-agent__avatar-option-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.personal-agent__avatar-option--upload {
+  background: rgba(249, 249, 249, 1);
+  border: 0.63px solid rgba(221, 221, 221, 1);
+  color: rgba(153, 153, 153, 1);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.personal-agent__check {
+  width: 12px;
+  height: 12px;
+  border-radius: 16px;
+  background: rgba(13, 148, 255, 1);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  line-height: 12px;
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+}
+
+.personal-agent__hidden-file {
+  display: none;
+}
+
+.personal-agent__field {
+  margin-top: 12px;
+}
+
+.personal-agent__label {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: rgba(25, 25, 25, 1);
+}
+
+.personal-agent__input,
+.personal-agent__textarea {
+  margin-top: 8px;
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 7px 8px;
+  color: rgba(51, 51, 51, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  outline: none;
+}
+
+.personal-agent__input {
+  height: 36px;
+  box-sizing: border-box;
+  padding: 6px 12px;
+}
+
+.personal-agent__textarea {
+  height: 82px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.personal-agent__input::placeholder,
+.personal-agent__textarea::placeholder {
+  color: rgba(204, 204, 204, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.personal-agent__brain-type-block {
+  margin-top: 6px;
+}
+
+.personal-agent__brain-title {
+  color: rgba(51, 51, 51, 1);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.personal-agent__brain-radios {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.personal-agent__radio-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(51, 51, 51, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.personal-agent__brain-detail {
+  margin-top: 12px;
+}
+
+.personal-agent__brain-subtitle {
+  color: rgba(153, 153, 153, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.personal-agent__assistant-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 8px;
+}
+
+.personal-agent__assistant-btn {
+  height: 36px;
+  width: 100%;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  position: relative;
+}
+
+.personal-agent__assistant-btn.is-selected {
+  background: rgba(236, 246, 255, 1);
+  border-color: rgba(13, 148, 255, 1);
+}
+
+.personal-agent__assistant-content {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.personal-agent__assistant-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.personal-agent__assistant-label {
+  margin-left: 4px;
+  color: rgba(51, 51, 51, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.personal-agent__custom-tip {
+  color: rgba(153, 153, 153, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.personal-agent__actions {
+  width: 100%;
+  height: 60px;
+  min-height: 60px;
+  flex: 0 0 60px;
+  padding: 16px 24px 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.personal-agent__action-btn {
+  width: 64px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  font-size: 14px;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.personal-agent__action-btn--cancel {
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(25, 25, 25, 1);
+}
+
+.personal-agent__action-btn--next,
+.personal-agent__action-btn--confirm {
+  color: #ffffff;
+}
+
+.personal-agent__action-btn--next.is-disabled,
+.personal-agent__action-btn--confirm.is-disabled {
+  background: rgba(206, 233, 255, 1);
+  cursor: not-allowed;
+}
+
+.personal-agent__action-btn--next.is-active,
+.personal-agent__action-btn--confirm.is-active {
+  background: rgba(13, 148, 255, 1);
+}
