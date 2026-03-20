@@ -21,11 +21,11 @@ public class PageResult<T> {
 
     @NonNull
     public List<T> getContent() {
-        return content;
+        return new ArrayList<>(content);
     }
 
     public void setContent(@NonNull List<T> content) {
-        this.content = content;
+        this.content = new ArrayList<>(content);
     }
 
     public int getSize() {

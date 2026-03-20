@@ -192,8 +192,15 @@ public final class SkillSDK {
             return;
         }
 
+        Exception disconnectException = null;
         try {
             webSocketManager.disconnect();
+        } catch (Exception e) {
+            disconnectException = e;
+        }
+
+        Exception cleanupException = null;
+        try {
             webSocketManager.clearAllListeners();
             listenerBindings.clear();
             sessionStatusCallbacks.clear();
@@ -201,10 +208,23 @@ public final class SkillSDK {
             awaitingExecutingBySession.clear();
             stoppedHoldingBySession.clear();
             streamingMessageCache.clearAll();
-            callback.onSuccess(new CloseSkillResult("success"));
         } catch (Exception e) {
-            callback.onError(error(5000, "Close skill failed: " + e.getMessage()));
+            cleanupException = e;
         }
+
+        if (disconnectException != null || cleanupException != null) {
+            StringBuilder messageBuilder = new StringBuilder("Close skill failed");
+            if (disconnectException != null) {
+                messageBuilder.append(", disconnect error: ").append(disconnectException.getMessage());
+            }
+            if (cleanupException != null) {
+                messageBuilder.append(", cleanup error: ").append(cleanupException.getMessage());
+            }
+            callback.onError(error(5000, messageBuilder.toString()));
+            return;
+        }
+
+        callback.onSuccess(new CloseSkillResult("success"));
     }
 
     // 3. stopSkill
@@ -687,14 +707,18 @@ public final class SkillSDK {
         }
         switch (type) {
             case MessageType.SESSION_STATUS:
-                if ("busy".equalsIgnoreCase(message.getSessionStatus()) || "retry".equalsIgnoreCase(message.getSessionStatus())) {
+                String sessionStatus = message.getSessionStatus();
+                if (sessionStatus == null) {
+                    return null;
+                }
+                if ("busy".equalsIgnoreCase(sessionStatus) || "retry".equalsIgnoreCase(sessionStatus)) {
                     if (Boolean.TRUE.equals(awaitingExecutingBySession.get(sessionId))) {
                         stoppedHoldingBySession.put(sessionId, Boolean.FALSE);
                         return SessionStatus.EXECUTING;
                     }
                     return null;
                 }
-                if ("idle".equalsIgnoreCase(message.getSessionStatus())) {
+                if ("idle".equalsIgnoreCase(sessionStatus)) {
                     awaitingExecutingBySession.put(sessionId, Boolean.FALSE);
                     // Keep STOPPED after stopSkill; ignore idle until a new round enters busy/retry.
                     if (Boolean.TRUE.equals(stoppedHoldingBySession.get(sessionId))) {

@@ -18,8 +18,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -64,6 +68,8 @@ public class StreamingMessageCache {
                 cached.message.setWelinkSessionId(welinkSessionId);
                 cached.completed = true;
                 cached.updatedAt = System.currentTimeMillis();
+                markPartIndexDirty(cached);
+                refreshCompletedMessageIndex(cache, numericMessageId, cached);
             }
         }
     }
@@ -86,6 +92,8 @@ public class StreamingMessageCache {
             sessionMessage.setCreatedAt(message.getCreatedAt());
             cached.completed = true;
             cached.updatedAt = System.currentTimeMillis();
+            markPartIndexDirty(cached);
+            refreshCompletedMessageIndex(cache, numericMessageId, cached);
         }
     }
 
@@ -138,7 +146,11 @@ public class StreamingMessageCache {
             }
 
             CachedMessage cached = getOrCreateCachedMessage(cache, sessionId, event);
-            applyEventToMessage(cached, event);
+            Long numericMessageId = resolveExistingNumericMessageId(cache, cached.message.getId());
+            if (numericMessageId == null) {
+                return;
+            }
+            applyEventToMessage(cache, numericMessageId, cached, event);
         }
     }
 
@@ -147,18 +159,22 @@ public class StreamingMessageCache {
             @NonNull PageResult<SessionMessage> serverPage) {
         List<SessionMessage> serverContent = new ArrayList<>(serverPage.getContent());
         ingestServerMessages(welinkSessionId, serverContent);
+        MessageIdentityIndex serverIdentity = buildMessageIdentityIndex(serverContent);
 
-        SessionMessage localLatest = findLatestLocalMessageNotInServer(welinkSessionId, serverContent);
+        SessionMessage localLatest = findLatestLocalMessageNotInServer(welinkSessionId, serverIdentity);
         if (localLatest == null) {
             return serverPage;
         }
 
-        List<SessionMessage> mergedContent = new ArrayList<>();
+        String localMessageId = normalizeMessageId(localLatest.getId());
+        Integer localMessageSeq = localLatest.getMessageSeq();
+        List<SessionMessage> mergedContent = new ArrayList<>(serverContent.size() + 1);
         mergedContent.add(localLatest);
         for (SessionMessage message : serverContent) {
-            if (!isSameMessage(message, localLatest)) {
-                mergedContent.add(message);
+            if (matchesIdentity(message, localMessageId, localMessageSeq)) {
+                continue;
             }
+            mergedContent.add(message);
         }
 
         PageResult<SessionMessage> merged = new PageResult<>();
@@ -172,7 +188,7 @@ public class StreamingMessageCache {
 
     @Nullable
     private SessionMessage findLatestLocalMessageNotInServer(@NonNull String welinkSessionId,
-            @NonNull List<SessionMessage> serverContent) {
+            @NonNull MessageIdentityIndex serverIdentity) {
         SessionCache cache = sessionCaches.get(welinkSessionId);
         if (cache == null) {
             return null;
@@ -181,7 +197,7 @@ public class StreamingMessageCache {
             SessionMessage latest = null;
             for (CachedMessage candidate : cache.byNumericId.values()) {
                 SessionMessage current = candidate.message;
-                if (containsMessage(serverContent, current)) {
+                if (serverIdentity.contains(current)) {
                     continue;
                 }
                 if (latest == null || MESSAGE_COMPARATOR.compare(current, latest) > 0) {
@@ -192,27 +208,28 @@ public class StreamingMessageCache {
         }
     }
 
-    private static boolean containsMessage(@NonNull List<SessionMessage> messages, @NonNull SessionMessage target) {
+    @NonNull
+    private static MessageIdentityIndex buildMessageIdentityIndex(@NonNull List<SessionMessage> messages) {
+        MessageIdentityIndex index = new MessageIdentityIndex();
         for (SessionMessage message : messages) {
-            if (isSameMessage(message, target)) {
-                return true;
-            }
+            index.add(message);
         }
-        return false;
+        return index;
     }
 
-    private static boolean isSameMessage(@NonNull SessionMessage left, @NonNull SessionMessage right) {
-        String leftId = left.getId() == null ? "" : left.getId().trim();
-        String rightId = right.getId() == null ? "" : right.getId().trim();
-        if (!leftId.isEmpty() && !rightId.isEmpty() && leftId.equals(rightId)) {
+    @NonNull
+    private static String normalizeMessageId(@Nullable String messageId) {
+        return messageId == null ? "" : messageId.trim();
+    }
+
+    private static boolean matchesIdentity(@NonNull SessionMessage message, @NonNull String messageId,
+            @Nullable Integer messageSeq) {
+        String currentId = normalizeMessageId(message.getId());
+        if (!messageId.isEmpty() && !currentId.isEmpty() && messageId.equals(currentId)) {
             return true;
         }
-        Integer leftMessageSeq = left.getMessageSeq();
-        Integer rightMessageSeq = right.getMessageSeq();
-        if (leftMessageSeq != null && rightMessageSeq != null) {
-            return leftMessageSeq.intValue() == rightMessageSeq.intValue();
-        }
-        return false;
+        Integer currentMessageSeq = message.getMessageSeq();
+        return messageSeq != null && currentMessageSeq != null && messageSeq.intValue() == currentMessageSeq.intValue();
     }
 
     @Nullable
@@ -234,16 +251,16 @@ public class StreamingMessageCache {
                 return resolvedContent(found.message);
             }
 
-            CachedMessage latest = null;
-            for (CachedMessage current : cache.byNumericId.values()) {
-                if (!current.completed) {
+            while (!cache.completedMessageIds.isEmpty()) {
+                Long latestMessageId = cache.completedMessageIds.last();
+                CachedMessage latest = cache.byNumericId.get(latestMessageId);
+                if (latest == null || !latest.completed) {
+                    cache.completedMessageIds.pollLast();
                     continue;
                 }
-                if (latest == null || MESSAGE_COMPARATOR.compare(current.message, latest.message) > 0) {
-                    latest = current;
-                }
+                return resolvedContent(latest.message);
             }
-            return latest == null ? null : resolvedContent(latest.message);
+            return null;
         }
     }
 
@@ -325,10 +342,13 @@ public class StreamingMessageCache {
     }
 
     private void markLatestMessageCompleted(@NonNull SessionCache cache, boolean completed) {
+        Long latestMessageId = null;
         CachedMessage latest = null;
-        for (CachedMessage candidate : cache.byNumericId.values()) {
+        for (Map.Entry<Long, CachedMessage> entry : cache.byNumericId.entrySet()) {
+            CachedMessage candidate = entry.getValue();
             if (latest == null || MESSAGE_COMPARATOR.compare(candidate.message, latest.message) > 0) {
                 latest = candidate;
+                latestMessageId = entry.getKey();
             }
         }
         if (latest == null) {
@@ -336,6 +356,9 @@ public class StreamingMessageCache {
         }
         latest.completed = completed;
         latest.updatedAt = System.currentTimeMillis();
+        if (latestMessageId != null) {
+            refreshCompletedMessageIndex(cache, latestMessageId, latest);
+        }
     }
 
     @NonNull
@@ -406,22 +429,24 @@ public class StreamingMessageCache {
         return cache.stableToNumericId.get(normalizedMessageId);
     }
 
-    private void applyEventToMessage(@NonNull CachedMessage cached, @NonNull StreamMessage event) {
+    private void applyEventToMessage(@NonNull SessionCache cache, long numericMessageId, @NonNull CachedMessage cached,
+            @NonNull StreamMessage event) {
         String type = event.getType();
         if (type == null) {
             return;
         }
+        cache.completedMessageIds.remove(numericMessageId);
         SessionMessage message = cached.message;
 
         switch (type) {
             case MessageType.TEXT_DELTA:
             case MessageType.THINKING_DELTA:
-                updatePart(message, event, true);
+                updatePart(cached, event, true);
                 cached.completed = false;
                 break;
             case MessageType.TEXT_DONE:
             case MessageType.THINKING_DONE:
-                updatePart(message, event, false);
+                updatePart(cached, event, false);
                 cached.completed = true;
                 break;
             case MessageType.TOOL_UPDATE:
@@ -429,7 +454,7 @@ public class StreamingMessageCache {
             case MessageType.PERMISSION_ASK:
             case MessageType.PERMISSION_REPLY:
             case MessageType.FILE:
-                updatePart(message, event, false);
+                updatePart(cached, event, false);
                 if (MessageType.PERMISSION_REPLY.equals(type) && "reject".equalsIgnoreCase(event.getResponse())) {
                     cached.completed = true;
                 }
@@ -442,10 +467,11 @@ public class StreamingMessageCache {
         }
         recalculateContent(message);
         cached.updatedAt = System.currentTimeMillis();
+        refreshCompletedMessageIndex(cache, numericMessageId, cached);
     }
 
-    private void updatePart(@NonNull SessionMessage message, @NonNull StreamMessage event, boolean appendContent) {
-        SessionMessagePart target = findOrCreatePart(message, event);
+    private void updatePart(@NonNull CachedMessage cached, @NonNull StreamMessage event, boolean appendContent) {
+        SessionMessagePart target = findOrCreatePart(cached, event);
         target.setType(defaultString(target.getType(), inferPartType(event.getType())));
         updatePartContent(target, event, appendContent);
         updateOptionalPartFields(target, event);
@@ -498,22 +524,37 @@ public class StreamingMessageCache {
     }
 
     @NonNull
-    private SessionMessagePart findOrCreatePart(@NonNull SessionMessage message, @NonNull StreamMessage event) {
-        String incomingPartId = event.getPartId();
+    private SessionMessagePart findOrCreatePart(@NonNull CachedMessage cached, @NonNull StreamMessage event) {
+        ensurePartIndex(cached);
+
+        String incomingPartId = normalizeMessageId(event.getPartId());
         Integer incomingPartSeq = event.getPartSeq();
-        for (SessionMessagePart existing : ensureParts(message)) {
-            if (incomingPartId != null && incomingPartId.equals(existing.getPartId())) {
-                return existing;
+
+        SessionMessagePart existing = null;
+        if (!incomingPartId.isEmpty()) {
+            existing = cached.partsById.get(incomingPartId);
+        }
+        if (existing == null && incomingPartSeq != null) {
+            existing = cached.partsBySeq.get(incomingPartSeq);
+        }
+        if (existing != null) {
+            if (!incomingPartId.isEmpty() && normalizeMessageId(existing.getPartId()).isEmpty()) {
+                existing.setPartId(incomingPartId);
             }
-            if (incomingPartId == null && incomingPartSeq != null && incomingPartSeq.equals(existing.getPartSeq())) {
-                return existing;
+            if (incomingPartSeq != null && existing.getPartSeq() == null) {
+                existing.setPartSeq(incomingPartSeq);
             }
+            indexPart(cached, existing);
+            return existing;
         }
 
         SessionMessagePart created = new SessionMessagePart();
-        created.setPartId(incomingPartId);
+        if (!incomingPartId.isEmpty()) {
+            created.setPartId(incomingPartId);
+        }
         created.setPartSeq(incomingPartSeq);
-        ensureParts(message).add(created);
+        ensureParts(cached.message).add(created);
+        indexPart(cached, created);
         return created;
     }
 
@@ -527,6 +568,46 @@ public class StreamingMessageCache {
         }
         if (builder.length() > 0) {
             message.setContent(builder.toString());
+        }
+    }
+
+    private static void refreshCompletedMessageIndex(@NonNull SessionCache cache, long numericMessageId,
+            @NonNull CachedMessage cached) {
+        cache.completedMessageIds.remove(numericMessageId);
+        if (cached.completed) {
+            cache.completedMessageIds.add(numericMessageId);
+        }
+    }
+
+    private static void markPartIndexDirty(@NonNull CachedMessage cached) {
+        cached.partsById.clear();
+        cached.partsBySeq.clear();
+        cached.partIndexReady = false;
+    }
+
+    private static void ensurePartIndex(@NonNull CachedMessage cached) {
+        if (cached.partIndexReady) {
+            return;
+        }
+        cached.partsById.clear();
+        cached.partsBySeq.clear();
+        for (SessionMessagePart part : ensureParts(cached.message)) {
+            indexPart(cached, part);
+        }
+        cached.partIndexReady = true;
+    }
+
+    private static void indexPart(@NonNull CachedMessage cached, @NonNull SessionMessagePart part) {
+        String partId = normalizeMessageId(part.getPartId());
+        if (!partId.isEmpty()) {
+            cached.partsById.put(partId, part);
+            if (part.getPartId() == null || !partId.equals(part.getPartId())) {
+                part.setPartId(partId);
+            }
+        }
+        Integer partSeq = part.getPartSeq();
+        if (partSeq != null) {
+            cached.partsBySeq.put(partSeq, part);
         }
     }
 
@@ -550,6 +631,8 @@ public class StreamingMessageCache {
             cached.message = cloneMessage(message);
             cached.completed = true;
             cached.updatedAt = System.currentTimeMillis();
+            markPartIndexDirty(cached);
+            refreshCompletedMessageIndex(cache, numericMessageId, cached);
         }
     }
 
@@ -561,10 +644,16 @@ public class StreamingMessageCache {
         SessionMessage message = cached.message;
         JsonArray parts = event.getParts();
         if (parts != null) {
-            Map<String, SessionMessagePart> currentParts = new HashMap<>();
+            Map<String, SessionMessagePart> currentPartsById = new HashMap<>();
+            Map<Integer, SessionMessagePart> currentPartsBySeq = new HashMap<>();
             for (SessionMessagePart part : ensureParts(message)) {
-                if (part.getPartId() != null) {
-                    currentParts.put(part.getPartId(), part);
+                String partId = normalizeMessageId(part.getPartId());
+                if (!partId.isEmpty()) {
+                    currentPartsById.put(partId, part);
+                }
+                Integer partSeq = part.getPartSeq();
+                if (partSeq != null) {
+                    currentPartsBySeq.put(partSeq, part);
                 }
             }
             for (JsonElement partJson : parts) {
@@ -575,12 +664,17 @@ public class StreamingMessageCache {
                 if (incoming == null) {
                     continue;
                 }
-                mergePart(message, currentParts, incoming);
+                mergePart(message, currentPartsById, currentPartsBySeq, incoming);
             }
         }
         recalculateContent(message);
         cached.completed = "idle".equalsIgnoreCase(event.getSessionStatus());
         cached.updatedAt = System.currentTimeMillis();
+        markPartIndexDirty(cached);
+        Long numericMessageId = resolveExistingNumericMessageId(cache, message.getId());
+        if (numericMessageId != null) {
+            refreshCompletedMessageIndex(cache, numericMessageId, cached);
+        }
     }
 
     @Nullable
@@ -676,29 +770,38 @@ public class StreamingMessageCache {
         return part;
     }
 
-    private void mergePart(@NonNull SessionMessage message, @NonNull Map<String, SessionMessagePart> currentParts,
-            @NonNull SessionMessagePart incoming) {
-        SessionMessagePart target = resolveMergeTarget(message, currentParts, incoming);
+    private void mergePart(@NonNull SessionMessage message, @NonNull Map<String, SessionMessagePart> currentPartsById,
+            @NonNull Map<Integer, SessionMessagePart> currentPartsBySeq, @NonNull SessionMessagePart incoming) {
+        SessionMessagePart target = resolveMergeTarget(message, currentPartsById, currentPartsBySeq, incoming);
         mergePartFields(target, incoming);
 
-        String partId = target.getPartId();
-        if (partId != null && !partId.isEmpty()) {
-            currentParts.put(partId, target);
+        String partId = normalizeMessageId(target.getPartId());
+        if (!partId.isEmpty()) {
+            currentPartsById.put(partId, target);
+            if (target.getPartId() == null || !partId.equals(target.getPartId())) {
+                target.setPartId(partId);
+            }
+        }
+        Integer partSeq = target.getPartSeq();
+        if (partSeq != null) {
+            currentPartsBySeq.put(partSeq, target);
         }
     }
 
     @NonNull
     private SessionMessagePart resolveMergeTarget(@NonNull SessionMessage message,
-            @NonNull Map<String, SessionMessagePart> currentParts, @NonNull SessionMessagePart incoming) {
-        String incomingPartId = incoming.getPartId();
-        if (incomingPartId != null && !incomingPartId.isEmpty()) {
-            SessionMessagePart byId = currentParts.get(incomingPartId);
+            @NonNull Map<String, SessionMessagePart> currentPartsById,
+            @NonNull Map<Integer, SessionMessagePart> currentPartsBySeq, @NonNull SessionMessagePart incoming) {
+        String incomingPartId = normalizeMessageId(incoming.getPartId());
+        if (!incomingPartId.isEmpty()) {
+            SessionMessagePart byId = currentPartsById.get(incomingPartId);
             if (byId != null) {
                 return byId;
             }
         }
 
-        SessionMessagePart bySeq = findPartBySeq(message, incoming.getPartSeq());
+        Integer incomingPartSeq = incoming.getPartSeq();
+        SessionMessagePart bySeq = incomingPartSeq == null ? null : currentPartsBySeq.get(incomingPartSeq);
         if (bySeq != null) {
             return bySeq;
         }
@@ -706,19 +809,6 @@ public class StreamingMessageCache {
         SessionMessagePart created = new SessionMessagePart();
         ensureParts(message).add(created);
         return created;
-    }
-
-    @Nullable
-    private SessionMessagePart findPartBySeq(@NonNull SessionMessage message, @Nullable Integer partSeq) {
-        if (partSeq == null) {
-            return null;
-        }
-        for (SessionMessagePart existing : ensureParts(message)) {
-            if (partSeq.equals(existing.getPartSeq())) {
-                return existing;
-            }
-        }
-        return null;
     }
 
     private void mergePartFields(@NonNull SessionMessagePart target, @NonNull SessionMessagePart incoming) {
@@ -928,6 +1018,28 @@ public class StreamingMessageCache {
         return 0;
     }
 
+    private static int compareCompletedMessageIds(@NonNull SessionCache cache, long leftId, long rightId) {
+        if (leftId == rightId) {
+            return 0;
+        }
+        CachedMessage left = cache.byNumericId.get(leftId);
+        CachedMessage right = cache.byNumericId.get(rightId);
+        if (left == null && right == null) {
+            return Long.compare(leftId, rightId);
+        }
+        if (left == null) {
+            return -1;
+        }
+        if (right == null) {
+            return 1;
+        }
+        int cmp = MESSAGE_COMPARATOR.compare(left.message, right.message);
+        if (cmp != 0) {
+            return cmp;
+        }
+        return Long.compare(leftId, rightId);
+    }
+
     @NonNull
     private static List<SessionMessagePart> ensureParts(@NonNull SessionMessage message) {
         List<SessionMessagePart> parts = message.getParts();
@@ -939,15 +1051,47 @@ public class StreamingMessageCache {
         return created;
     }
 
+    private static final class MessageIdentityIndex {
+        @NonNull
+        private final Set<String> messageIds = new HashSet<>();
+        @NonNull
+        private final Set<Integer> messageSeqs = new HashSet<>();
+
+        private void add(@NonNull SessionMessage message) {
+            String messageId = normalizeMessageId(message.getId());
+            if (!messageId.isEmpty()) {
+                messageIds.add(messageId);
+            }
+            Integer messageSeq = message.getMessageSeq();
+            if (messageSeq != null) {
+                messageSeqs.add(messageSeq);
+            }
+        }
+
+        private boolean contains(@NonNull SessionMessage message) {
+            String messageId = normalizeMessageId(message.getId());
+            if (!messageId.isEmpty() && messageIds.contains(messageId)) {
+                return true;
+            }
+            Integer messageSeq = message.getMessageSeq();
+            return messageSeq != null && messageSeqs.contains(messageSeq);
+        }
+    }
+
     private static final class SessionCache {
         private final Map<Long, CachedMessage> byNumericId = new HashMap<>();
         private final Map<String, Long> stableToNumericId = new HashMap<>();
         private final AtomicLong syntheticIdGenerator = new AtomicLong(-1);
+        private final NavigableSet<Long> completedMessageIds =
+                new TreeSet<>((leftId, rightId) -> compareCompletedMessageIds(this, leftId, rightId));
     }
 
     private static final class CachedMessage {
         private SessionMessage message = new SessionMessage();
         private boolean completed;
         private long updatedAt;
+        private final Map<String, SessionMessagePart> partsById = new HashMap<>();
+        private final Map<Integer, SessionMessagePart> partsBySeq = new HashMap<>();
+        private boolean partIndexReady;
     }
 }

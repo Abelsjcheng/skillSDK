@@ -4,6 +4,8 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.Objects;
+
 @Keep
 public class SkillSession {
     @NonNull
@@ -31,7 +33,7 @@ public class SkillSession {
     }
 
     public void setWelinkSessionId(@NonNull String welinkSessionId) {
-        this.welinkSessionId = welinkSessionId;
+        this.welinkSessionId = Objects.requireNonNull(welinkSessionId, "welinkSessionId == null");
     }
 
     @NonNull
@@ -40,7 +42,7 @@ public class SkillSession {
     }
 
     public void setUserId(@NonNull String userId) {
-        this.userId = userId;
+        this.userId = Objects.requireNonNull(userId, "userId == null");
     }
 
     @Nullable
@@ -76,7 +78,7 @@ public class SkillSession {
     }
 
     public void setStatus(@NonNull String status) {
-        this.status = status;
+        this.status = Objects.requireNonNull(status, "status == null");
     }
 
     @Nullable
@@ -94,7 +96,7 @@ public class SkillSession {
     }
 
     public void setCreatedAt(@NonNull String createdAt) {
-        this.createdAt = createdAt;
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt == null");
     }
 
     @NonNull
@@ -103,6 +105,6 @@ public class SkillSession {
     }
 
     public void setUpdatedAt(@NonNull String updatedAt) {
-        this.updatedAt = updatedAt;
+        this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt == null");
     }
 }
