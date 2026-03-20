@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.10`
+- 文档版本：`v3.11`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -46,6 +46,7 @@
 3. `src/lib/index.ts` 不再导出 `DigitalTwinCreator`，保留 `AIChatViewer` 现有库导出能力。
 4. 在 `package.json` 增加页面构建与本地预览脚本（`build:digital-twin-page`、`serve:digital-twin-page`）。
 5. 页面模板需保证 `html/body/#root` 为 `100%` 宽高，确保组件可占满页面。
+6. 页面入口不使用 `React.StrictMode` 包裹，避免开发环境下页面 2 初始化 `useEffect` 双执行导致重复请求。
 
 ## 4. 组件 API 决策
 
