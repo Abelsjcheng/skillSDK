@@ -81,7 +81,7 @@
                         onMessage:(WLAgentSkillsSessionMessageCallback)onMessage
                         onError:(nullable WLAgentSkillsSessionErrorCallback)onError
                         onClose:(nullable WLAgentSkillsSessionCloseCallback)onClose {
-    if (welinkSessionId.length == 0 || onMessage == nil) {
+    if (welinkSessionId == nil || welinkSessionId.length == 0 || onMessage == nil) {
     return NO;
     }
 
@@ -103,7 +103,7 @@
 }
 
 - (BOOL)removeListenerForSessionId:(NSString *)welinkSessionId {
-    if (welinkSessionId.length == 0) {
+    if (welinkSessionId == nil || welinkSessionId.length == 0) {
     return NO;
     }
 
@@ -118,7 +118,7 @@
 }
 
 - (void)removeAllListenersForSessionId:(NSString *)welinkSessionId {
-    if (welinkSessionId.length == 0) {
+    if (welinkSessionId == nil || welinkSessionId.length == 0) {
     return;
     }
 
@@ -128,7 +128,7 @@
 }
 
 - (BOOL)hasListenerForSessionId:(NSString *)welinkSessionId {
-    if (welinkSessionId.length == 0) {
+    if (welinkSessionId == nil || welinkSessionId.length == 0) {
     return NO;
     }
     @synchronized(self) {
@@ -169,7 +169,7 @@
     self.isConnected = NO;
     }
 
-    NSString *closeReason = reason.length > 0 ? reason : @"WebSocket closed";
+    NSString *closeReason = (reason != nil && reason.length > 0) ? reason : @"WebSocket closed";
     [self notifyAllClose:closeReason];
 
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidDisconnectWithError:)]) {
@@ -214,7 +214,7 @@
     }
 
     NSString *sessionKey = streamMessage.welinkSessionId;
-    if (sessionKey.length == 0) {
+    if (sessionKey == nil || sessionKey.length == 0) {
     return;
     }
 

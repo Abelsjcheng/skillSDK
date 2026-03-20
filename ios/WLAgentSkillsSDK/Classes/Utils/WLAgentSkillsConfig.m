@@ -11,7 +11,7 @@
     static WLAgentSkillsConfig *sharedInstance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-    sharedInstance = [[WLAgentSkillsConfig alloc] init];
+        sharedInstance = [[WLAgentSkillsConfig alloc] init];
     });
     return sharedInstance;
 }
@@ -19,11 +19,11 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-    _baseURL = @"http://localhost:8082";
-    _webSocketURL = @"ws://localhost:8082/ws/skill/stream";
-    _requestTimeout = 30.0;
-    _webSocketTimeout = 60.0;
-    _debugMode = NO;
+        _baseURL = @"http://localhost:8082";
+        _webSocketURL = @"ws://localhost:8082/ws/skill/stream";
+        _requestTimeout = 30.0;
+        _webSocketTimeout = 60.0;
+        _debugMode = NO;
     }
     return self;
 }
@@ -33,27 +33,37 @@
 }
 
 - (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL {
-    if (baseURL.length == 0) {
-    return;
+    if (baseURL == nil || baseURL.length == 0) {
+        return;
     }
 
-    self.baseURL = [baseURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *trimmedBaseURL = [baseURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmedBaseURL.length == 0) {
+        return;
+    }
+    self.baseURL = trimmedBaseURL;
 
-    if (webSocketURL.length > 0) {
-    self.webSocketURL = webSocketURL;
-    return;
+    if (webSocketURL != nil && webSocketURL.length > 0) {
+        self.webSocketURL = webSocketURL;
+        return;
     }
 
     NSURLComponents *components = [NSURLComponents componentsWithString:self.baseURL];
+    if (components == nil || components.scheme == nil) {
+        self.webSocketURL = @"ws://localhost:8082/ws/skill/stream";
+        return;
+    }
+
     NSString *scheme = components.scheme.lowercaseString;
     if ([scheme isEqualToString:@"https"]) {
-    components.scheme = @"wss";
+        components.scheme = @"wss";
     } else {
-    components.scheme = @"ws";
+        components.scheme = @"ws";
     }
+
     NSString *path = components.path ?: @"";
-    if ([path hasSuffix:@"/"]) {
-    path = [path substringToIndex:path.length - 1];
+    if (path.length > 0 && [path hasSuffix:@"/"]) {
+        path = [path substringToIndex:path.length - 1];
     }
     components.path = [path stringByAppendingString:@"/ws/skill/stream"];
     self.webSocketURL = components.string ?: @"ws://localhost:8082/ws/skill/stream";

@@ -59,7 +59,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)createSession:(WLAgentSkillsCreateSessionParams *)params
                             success:(void (^)(WLAgentSkillsSkillSession *session))success
                             failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.imGroupId.length == 0) {
+    if (params == nil || params.imGroupId == nil || params.imGroupId.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: imGroupId is required."];
         return;
     }
@@ -143,7 +143,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)stopSkill:(WLAgentSkillsStopSkillParams *)params
                     success:(void (^)(WLAgentSkillsStopSkillResult *result))success
                     failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0) {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
         return;
     }
@@ -171,7 +171,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 #pragma mark - 4. onSessionStatusChange
 
 - (void)onSessionStatusChange:(WLAgentSkillsOnSessionStatusChangeParams *)params {
-    if (params == nil || params.welinkSessionId.length == 0 || params.callback == nil) {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0 || params.callback == nil) {
         return;
     }
     @synchronized(self) {
@@ -193,7 +193,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)regenerateAnswer:(WLAgentSkillsRegenerateAnswerParams *)params
                                     success:(void (^)(WLAgentSkillsSendMessageResult *result))success
                                     failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0) {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
         return;
     }
@@ -201,7 +201,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
     NSString *cachedContent = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
-    if (cachedContent.length > 0) {
+    if (cachedContent != nil && cachedContent.length > 0) {
         [self sendMessageWithSessionId:params.welinkSessionId
                                                         content:cachedContent
                                                 toolCallId:nil
@@ -221,7 +221,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                                                                                                                 forSessionId:params.welinkSessionId];
 
         NSString *content = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
-        if (content.length == 0) {
+        if (content == nil || content.length == 0) {
             [weakSelf dispatchFailure:failure code:4002 message:@"No user message can be used for regenerateAnswer."];
             return;
         }
@@ -242,7 +242,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)sendMessageToIM:(WLAgentSkillsSendMessageToIMParams *)params
                                 success:(void (^)(WLAgentSkillsSendMessageToIMResult *result))success
                                 failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0) {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
         return;
     }
@@ -257,17 +257,21 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                                                                                                                     content:content
                                                                                                                         chatId:normalizedChatId
                                                                                                                     success:^(id  _Nullable responseObject) {
-                WLAgentSkillsSendMessageToIMResult *result = [[WLAgentSkillsSendMessageToIMResult alloc] init];
+                if (![responseObject isKindOfClass:[NSDictionary class]]) {
+                    NSString *responseType = responseObject != nil
+                            ? NSStringFromClass([responseObject class])
+                            : @"nil";
+                    NSString *message = [NSString stringWithFormat:@"Invalid sendMessageToIM response type: %@.", responseType];
+                    [weakSelf dispatchFailure:failure code:5006 message:message];
+                    return;
+                }
 
-                if ([responseObject isKindOfClass:[NSDictionary class]]) {
-                    NSDictionary *dict = responseObject;
-                    if (dict[@"success"] != nil) {
-                        result.success = [dict[@"success"] boolValue];
-                    } else if (dict[@"status"] != nil) {
-                        result.success = [[dict[@"status"] description] isEqualToString:@"success"];
-                    } else {
-                        result.success = YES;
-                    }
+                WLAgentSkillsSendMessageToIMResult *result = [[WLAgentSkillsSendMessageToIMResult alloc] init];
+                NSDictionary *dict = (NSDictionary *)responseObject;
+                if (dict[@"success"] != nil) {
+                    result.success = [dict[@"success"] boolValue];
+                } else if (dict[@"status"] != nil) {
+                    result.success = [[dict[@"status"] description] isEqualToString:@"success"];
                 } else {
                     result.success = YES;
                 }
@@ -282,8 +286,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
     };
 
     NSString *content = [[WLAgentSkillsStreamingCache sharedCache] latestCompletedContentForSessionId:params.welinkSessionId
-                                                                                                                                                                                            messageId:normalizedMessageId];
-    if (content.length > 0) {
+                                                                                                                            messageId:normalizedMessageId];
+    if (content != nil && content.length > 0) {
         sendWithContent(content);
         return;
     }
@@ -298,8 +302,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
                                                                                                                 forSessionId:params.welinkSessionId];
 
         NSString *latest = [[WLAgentSkillsStreamingCache sharedCache] latestCompletedContentForSessionId:params.welinkSessionId
-                                                                                                                                                                                            messageId:normalizedMessageId];
-        if (latest.length == 0) {
+                                                                                                                            messageId:normalizedMessageId];
+        if (latest == nil || latest.length == 0) {
             NSInteger code = 4005;
             NSString *message = @"No completed message available.";
             if (normalizedMessageId != nil) {
@@ -333,7 +337,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)getSessionMessage:(WLAgentSkillsGetSessionMessageParams *)params
                                     success:(void (^)(WLAgentSkillsPageResult *result))success
                                     failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0) {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
         return;
     }
@@ -410,7 +414,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 #pragma mark - 9. registerSessionListener
 
 - (WLAgentSkillsRegisterSessionListenerResult *)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params {
-    if (params == nil || params.welinkSessionId.length == 0 || params.onMessage == nil) {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0 || params.onMessage == nil) {
         return [self buildRegisterSessionListenerResult];
     }
 
@@ -424,7 +428,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 #pragma mark - 10. unregisterSessionListener
 
 - (WLAgentSkillsUnregisterSessionListenerResult *)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params {
-    if (params != nil && params.welinkSessionId.length > 0) {
+    if (params != nil && params.welinkSessionId != nil && params.welinkSessionId.length > 0) {
         [[WLAgentSkillsWebSocketManager sharedManager] removeListenerForSessionId:params.welinkSessionId];
     }
     return [self buildUnregisterSessionListenerResult];
@@ -435,7 +439,11 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)sendMessage:(WLAgentSkillsSendMessageParams *)params
                         success:(void (^)(WLAgentSkillsSendMessageResult *result))success
                         failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0 || params.content.length == 0) {
+    if (params == nil ||
+            params.welinkSessionId == nil ||
+            params.welinkSessionId.length == 0 ||
+            params.content == nil ||
+            params.content.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId and content are required."];
         return;
     }
@@ -452,7 +460,13 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 - (void)replyPermission:(WLAgentSkillsReplyPermissionParams *)params
                                 success:(void (^)(WLAgentSkillsReplyPermissionResult *result))success
                                 failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0 || params.permId.length == 0 || params.response.length == 0) {
+    if (params == nil ||
+            params.welinkSessionId == nil ||
+            params.welinkSessionId.length == 0 ||
+            params.permId == nil ||
+            params.permId.length == 0 ||
+            params.response == nil ||
+            params.response.length == 0) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params for replyPermission."];
         return;
     }
@@ -525,7 +539,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
     [[WLAgentSkillsStreamingCache sharedCache] updateWithStreamMessage:message];
 
     NSString *sessionId = message.welinkSessionId;
-    if (sessionId.length == 0) {
+    if (sessionId == nil || sessionId.length == 0) {
         return;
     }
 
@@ -591,7 +605,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         }
         NSString *sessionAK = [session[@"ak"] isKindOfClass:[NSString class]] ? session[@"ak"] : @"";
         NSString *sessionImGroupId = [session[@"imGroupId"] isKindOfClass:[NSString class]] ? session[@"imGroupId"] : @"";
-        if (ak.length > 0 && ![ak isEqualToString:sessionAK]) {
+        if (ak != nil && ak.length > 0 && ![ak isEqualToString:sessionAK]) {
             continue;
         }
         if (imGroupId.length > 0 && ![imGroupId isEqualToString:sessionImGroupId]) {
@@ -617,7 +631,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         return nil;
     }
     NSString *trimmed = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    return trimmed.length > 0 ? trimmed : nil;
+    return trimmed != nil && trimmed.length > 0 ? trimmed : nil;
 }
 
 - (WLAgentSkillsPageResult *)normalizedPageResultFromDictionary:(NSDictionary *)dictionary
@@ -656,8 +670,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 
 - (BOOL)isSameSessionMessage:(WLAgentSkillsSessionMessage *)left
                                                                                             other:(WLAgentSkillsSessionMessage *)right {
-    NSString *leftId = left.id.length > 0 ? left.id : @"";
-    NSString *rightId = right.id.length > 0 ? right.id : @"";
+    NSString *leftId = (left.id != nil && left.id.length > 0) ? left.id : @"";
+    NSString *rightId = (right.id != nil && right.id.length > 0) ? right.id : @"";
     if (leftId.length > 0 && rightId.length > 0 && [leftId isEqualToString:rightId]) {
         return YES;
     }
@@ -728,7 +742,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 }
 
 - (void)setSendMessageTriggered:(BOOL)triggered sessionId:(NSString *)sessionId {
-    if (sessionId.length == 0) {
+    if (sessionId == nil || sessionId.length == 0) {
         return;
     }
 
@@ -738,7 +752,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 }
 
 - (BOOL)isSendMessageTriggeredForSessionId:(NSString *)sessionId {
-    if (sessionId.length == 0) {
+    if (sessionId == nil || sessionId.length == 0) {
         return NO;
     }
 
@@ -748,7 +762,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 }
 
 - (void)setStopSkillHolding:(BOOL)holding sessionId:(NSString *)sessionId {
-    if (sessionId.length == 0) {
+    if (sessionId == nil || sessionId.length == 0) {
         return;
     }
 
@@ -758,7 +772,7 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 }
 
 - (BOOL)isStopSkillHoldingForSessionId:(NSString *)sessionId {
-    if (sessionId.length == 0) {
+    if (sessionId == nil || sessionId.length == 0) {
         return NO;
     }
 

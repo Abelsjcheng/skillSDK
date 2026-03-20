@@ -128,15 +128,15 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     _toolName = WLAgentSkillsStringValue(dictionary[@"toolName"], nil);
     _toolCallId = WLAgentSkillsStringValue(dictionary[@"toolCallId"], nil);
     _status = WLAgentSkillsStringValue(dictionary[@"status"], nil);
-    if (_status.length == 0) {
+    if (_status == nil || _status.length == 0) {
         _status = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
     }
     _input = [dictionary[@"input"] isKindOfClass:[NSDictionary class]] ? dictionary[@"input"] : nil;
-    if (_input.count == 0) {
+    if (_input == nil || _input.count == 0) {
         _input = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
     }
     _output = WLAgentSkillsStringValue(dictionary[@"output"], nil);
-    if (_output.length == 0) {
+    if (_output == nil || _output.length == 0) {
         _output = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
     }
     _error = WLAgentSkillsStringValue(dictionary[@"error"], nil);
@@ -157,67 +157,67 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 
 - (NSDictionary *)toDictionary {
     NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-    if (self.partId.length > 0) {
+    if (self.partId != nil && self.partId.length > 0) {
     dictionary[@"partId"] = self.partId;
     }
     if (self.partSeq != nil) {
     dictionary[@"partSeq"] = self.partSeq;
     }
-    if (self.type.length > 0) {
+    if (self.type != nil && self.type.length > 0) {
     dictionary[@"type"] = self.type;
     }
-    if (self.content.length > 0) {
+    if (self.content != nil && self.content.length > 0) {
     dictionary[@"content"] = self.content;
     }
-    if (self.toolName.length > 0) {
+    if (self.toolName != nil && self.toolName.length > 0) {
     dictionary[@"toolName"] = self.toolName;
     }
-    if (self.toolCallId.length > 0) {
+    if (self.toolCallId != nil && self.toolCallId.length > 0) {
     dictionary[@"toolCallId"] = self.toolCallId;
     }
-    if (self.status.length > 0) {
+    if (self.status != nil && self.status.length > 0) {
     dictionary[@"status"] = self.status;
     }
-    if (self.input.count > 0) {
+    if (self.input != nil && self.input.count > 0) {
     dictionary[@"input"] = self.input;
     }
-    if (self.output.length > 0) {
+    if (self.output != nil && self.output.length > 0) {
     dictionary[@"output"] = self.output;
     }
-    if (self.error.length > 0) {
+    if (self.error != nil && self.error.length > 0) {
     dictionary[@"error"] = self.error;
     }
-    if (self.title.length > 0) {
+    if (self.title != nil && self.title.length > 0) {
     dictionary[@"title"] = self.title;
     }
-    if (self.header.length > 0) {
+    if (self.header != nil && self.header.length > 0) {
     dictionary[@"header"] = self.header;
     }
-    if (self.question.length > 0) {
+    if (self.question != nil && self.question.length > 0) {
     dictionary[@"question"] = self.question;
     }
-    if (self.options.count > 0) {
+    if (self.options != nil && self.options.count > 0) {
     dictionary[@"options"] = self.options;
     }
-    if (self.permissionId.length > 0) {
+    if (self.permissionId != nil && self.permissionId.length > 0) {
     dictionary[@"permissionId"] = self.permissionId;
     }
-    if (self.permType.length > 0) {
+    if (self.permType != nil && self.permType.length > 0) {
     dictionary[@"permType"] = self.permType;
     }
-    if (self.metadata.count > 0) {
+    if (self.metadata != nil && self.metadata.count > 0) {
     dictionary[@"metadata"] = self.metadata;
     }
-    if (self.response.length > 0) {
+    if (self.response != nil && self.response.length > 0) {
     dictionary[@"response"] = self.response;
     }
-    if (self.fileName.length > 0) {
+    if (self.fileName != nil && self.fileName.length > 0) {
     dictionary[@"fileName"] = self.fileName;
     }
-    if (self.fileUrl.length > 0) {
+    if (self.fileUrl != nil && self.fileUrl.length > 0) {
     dictionary[@"fileUrl"] = self.fileUrl;
     }
-    if (self.fileMime.length > 0) {
+    if (self.fileMime != nil && self.fileMime.length > 0) {
     dictionary[@"fileMime"] = self.fileMime;
     }
     return dictionary;
@@ -237,7 +237,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     _id = resolvedId ?: @"";
     _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], nil);
     _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
-    if (_welinkSessionId.length == 0) {
+    if (_welinkSessionId == nil || _welinkSessionId.length == 0) {
         _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"sessionId"], @"");
     }
     _role = WLAgentSkillsStringValue(dictionary[@"role"], @"");
@@ -320,8 +320,8 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithCode:(NSString *)code message:(NSString *)message {
     self = [super init];
     if (self) {
-    _code = code.length > 0 ? code : @"UNKNOWN";
-    _message = message.length > 0 ? message : @"Unknown error";
+    _code = (code != nil && code.length > 0) ? code : @"UNKNOWN";
+    _message = (message != nil && message.length > 0) ? message : @"Unknown error";
     _timestamp = @((long long)([[NSDate date] timeIntervalSince1970] * 1000));
     }
     return self;
@@ -342,7 +342,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     _type = WLAgentSkillsStringValue(dictionary[@"type"], @"");
     _seq = WLAgentSkillsNumberValue(dictionary[@"seq"], nil);
     _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
-    if (_welinkSessionId.length == 0) {
+    if (_welinkSessionId == nil || _welinkSessionId.length == 0) {
         _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"sessionId"], @"");
     }
     _emittedAt = WLAgentSkillsStringValue(dictionary[@"emittedAt"], @"");
@@ -360,15 +360,15 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     _toolName = WLAgentSkillsStringValue(dictionary[@"toolName"], nil);
     _toolCallId = WLAgentSkillsStringValue(dictionary[@"toolCallId"], nil);
     _status = WLAgentSkillsStringValue(dictionary[@"status"], nil);
-    if (_status.length == 0) {
+    if (_status == nil || _status.length == 0) {
         _status = WLAgentSkillsStringValue(dictionary[@"toolStatus"], nil);
     }
     _input = [dictionary[@"input"] isKindOfClass:[NSDictionary class]] ? dictionary[@"input"] : nil;
-    if (_input.count == 0) {
+    if (_input == nil || _input.count == 0) {
         _input = [dictionary[@"toolInput"] isKindOfClass:[NSDictionary class]] ? dictionary[@"toolInput"] : nil;
     }
     _output = WLAgentSkillsStringValue(dictionary[@"output"], nil);
-    if (_output.length == 0) {
+    if (_output == nil || _output.length == 0) {
         _output = WLAgentSkillsStringValue(dictionary[@"toolOutput"], nil);
     }
     _error = WLAgentSkillsStringValue(dictionary[@"error"], nil);
@@ -403,7 +403,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     self = [super init];
     if (self) {
     _id = WLAgentSkillsStringValue(dictionary[@"id"], @"");
-    if (_id.length == 0) {
+    if (_id == nil || _id.length == 0) {
         _id = WLAgentSkillsStringValue(dictionary[@"messageId"], @"");
     }
     _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");

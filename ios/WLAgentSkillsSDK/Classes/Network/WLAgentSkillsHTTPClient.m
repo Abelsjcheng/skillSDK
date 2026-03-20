@@ -48,10 +48,10 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSMutableDictionary *parameters = [@{ @"imGroupId" : imGroupId } mutableCopy];
-    if (ak.length > 0) {
+    if (ak != nil && ak.length > 0) {
         parameters[@"ak"] = ak;
     }
-    if (title.length > 0) {
+    if (title != nil && title.length > 0) {
         parameters[@"title"] = title;
     }
 
@@ -66,13 +66,13 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
-    if (imGroupId.length > 0) {
+    if (imGroupId != nil && imGroupId.length > 0) {
         parameters[@"imGroupId"] = imGroupId;
     }
-    if (ak.length > 0) {
+    if (ak != nil && ak.length > 0) {
         parameters[@"ak"] = ak;
     }
-    if (status.length > 0) {
+    if (status != nil && status.length > 0) {
         parameters[@"status"] = status;
     }
     if (page != nil) {
@@ -112,7 +112,7 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", welinkSessionId];
     NSMutableDictionary *parameters = [@{ @"content" : content } mutableCopy];
-    if (toolCallId.length > 0) {
+    if (toolCallId != nil && toolCallId.length > 0) {
         parameters[@"toolCallId"] = toolCallId;
     }
     [self POST:path parameters:parameters success:success failure:failure];
@@ -142,7 +142,7 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
                                                 failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/send-to-im", welinkSessionId];
     NSMutableDictionary *parameters = [@{ @"content" : content } mutableCopy];
-    if (chatId.length > 0) {
+    if (chatId != nil && chatId.length > 0) {
         parameters[@"chatId"] = chatId;
     }
     [self POST:path parameters:parameters success:success failure:failure];
@@ -226,7 +226,7 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 
 - (void)handleFailureError:(NSError *)error failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSData *responseData = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
-    if (responseData.length > 0) {
+    if (responseData != nil && responseData.length > 0) {
         NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:nil];
         if ([json isKindOfClass:[NSDictionary class]]) {
             NSString *message = @"Network request failed";
