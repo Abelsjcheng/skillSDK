@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.29`
+- 文档版本：`v3.31`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -26,12 +26,13 @@
 1. `src/components/PersonalAssistantCreator.tsx`
 2. `src/components/createAssistant/StepBasicInfo.tsx`
 3. `src/components/createAssistant/StepBrainSelect.tsx`
-4. `src/components/createAssistant/constants.ts`
-5. `src/styles/PersonalAssistantCreator.less`
-6. `src/types/digitalTwin.ts`
-7. `src/pages/createAssistant/index.tsx`
-8. `public/create-assistant-page.html`
-9. `webpack.create-assistant-page.config.js`
+4. `src/components/createAssistant/CreatorStepHeader.tsx`
+5. `src/components/createAssistant/constants.ts`
+6. `src/styles/PersonalAssistantCreator.less`
+7. `src/types/digitalTwin.ts`
+8. `src/pages/createAssistant/index.tsx`
+9. `public/create-assistant-page.html`
+10. `webpack.create-assistant-page.config.js`
 
 ### 2.2 修改文件（导出目标）
 
@@ -226,6 +227,7 @@ interface CreateDigitalTwinParams {
 11. 页面 1 与页面 2 主体区域统一使用线性渐变主题背景：`linear-gradient(180deg, rgba(206,233,255,1) 0px, rgba(206,233,255,1) 40px, rgba(255,255,255,1) 176px, rgba(255,255,255,1) 100%)`。
 12. 页面主题背景容器附加统一阴影：`box-shadow: 0 16px 48px 0 rgba(0,0,0,0.16)`。
 13. 移动端样式覆盖与结构切换基于 `isPcMiniApp` 对应 class 生效，不使用媒体查询替代端类型判断。
+14. 页面 1 与页面 2 的重复结构（标题区与主操作按钮 class 组装）抽取为公共实现，保持 UI 与交互行为不变，仅减少重复代码。
 
 ## 9. 可访问性与可测性
 

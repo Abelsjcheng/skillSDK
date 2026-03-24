@@ -2,6 +2,7 @@
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 import { INTERNAL_ASSISTANTS } from './constants';
+import { CreatorStepHeader, getStateActionButtonClassName, getStepClassName } from './CreatorStepHeader';
 
 interface StepBrainSelectProps {
   isPcMiniApp?: boolean;
@@ -73,37 +74,8 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   }, []);
 
   return (
-    <section className={`digital-twin ${isPcMiniApp ? '' : 'digital-twin--mobile'}`.trim()}>
-      <header className="digital-twin__header">
-        {isPcMiniApp ? (
-          <>
-            <span className="digital-twin__title">创建个人助理</span>
-            <button
-              type="button"
-              className="digital-twin__close-btn"
-              aria-label="关闭创建个人助理"
-              onClick={onClose}
-            >
-              ×
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="digital-twin__mobile-header-side">
-              <button
-                type="button"
-                className="digital-twin__mobile-back-btn"
-                aria-label="返回上一页"
-                onClick={onPrev}
-              >
-                {'<'}
-              </button>
-            </div>
-            <span className="digital-twin__mobile-title">创建个人助理</span>
-            <div className="digital-twin__mobile-header-side" aria-hidden="true" />
-          </>
-        )}
-      </header>
+    <section className={getStepClassName(isPcMiniApp)}>
+      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} onMobileBack={onPrev} />
 
       <div className="digital-twin__content digital-twin__content--step2">
         <div className="digital-twin__brain-type-block">
@@ -206,9 +178,10 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
             </button>
             <button
               type="button"
-              className={`digital-twin__action-btn digital-twin__action-btn--confirm ${
-                confirmEnabled ? 'is-active' : 'is-disabled'
-              }`.trim()}
+              className={getStateActionButtonClassName(
+                'digital-twin__action-btn digital-twin__action-btn--confirm',
+                confirmEnabled,
+              )}
               disabled={!confirmEnabled}
               onClick={handleConfirm}
             >
@@ -218,9 +191,11 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         ) : (
           <button
             type="button"
-            className={`digital-twin__action-btn digital-twin__action-btn--confirm digital-twin__action-btn--mobile-primary ${
-              confirmEnabled ? 'is-active' : 'is-disabled'
-            }`.trim()}
+            className={getStateActionButtonClassName(
+              'digital-twin__action-btn digital-twin__action-btn--confirm',
+              confirmEnabled,
+              true,
+            )}
             disabled={!confirmEnabled}
             onClick={handleConfirm}
           >
@@ -231,3 +206,5 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     </section>
   );
 };
+
+

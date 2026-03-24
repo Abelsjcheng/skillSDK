@@ -2,6 +2,7 @@
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
 import { canProceedNext, hasInvalidBasicTextChar, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
+import { CreatorStepHeader, getStateActionButtonClassName, getStepClassName } from './CreatorStepHeader';
 
 interface StepBasicInfoProps {
   isPcMiniApp?: boolean;
@@ -118,40 +119,9 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     });
   }, [avatarId, avatarType, canNext, currentAvatarSrc, description, name, onNext]);
 
-  const handleMobileBack = useCallback(() => {}, []);
-
   return (
-    <section className={`digital-twin ${isPcMiniApp ? '' : 'digital-twin--mobile'}`.trim()}>
-      <header className="digital-twin__header">
-        {isPcMiniApp ? (
-          <>
-            <span className="digital-twin__title">创建个人助理</span>
-            <button
-              type="button"
-              className="digital-twin__close-btn"
-              aria-label="关闭创建个人助理"
-              onClick={onClose}
-            >
-              ×
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="digital-twin__mobile-header-side">
-              <button
-                type="button"
-                className="digital-twin__mobile-back-btn"
-                aria-label="返回上一页"
-                onClick={handleMobileBack}
-              >
-                {'<'}
-              </button>
-            </div>
-            <span className="digital-twin__mobile-title">创建个人助理</span>
-            <div className="digital-twin__mobile-header-side" aria-hidden="true" />
-          </>
-        )}
-      </header>
+    <section className={getStepClassName(isPcMiniApp)}>
+      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} />
 
       <div className="digital-twin__content digital-twin__content--step1">
         <div className="digital-twin__avatar-preview-wrap">
@@ -242,9 +212,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             </button>
             <button
               type="button"
-              className={`digital-twin__action-btn digital-twin__action-btn--next ${
-                canNext ? 'is-active' : 'is-disabled'
-              }`.trim()}
+              className={getStateActionButtonClassName('digital-twin__action-btn digital-twin__action-btn--next', canNext)}
               disabled={!canNext}
               onClick={handleNext}
             >
@@ -254,9 +222,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         ) : (
           <button
             type="button"
-            className={`digital-twin__action-btn digital-twin__action-btn--next digital-twin__action-btn--mobile-primary ${
-              canNext ? 'is-active' : 'is-disabled'
-            }`.trim()}
+            className={getStateActionButtonClassName(
+              'digital-twin__action-btn digital-twin__action-btn--next',
+              canNext,
+              true,
+            )}
             disabled={!canNext}
             onClick={handleNext}
           >
@@ -267,4 +237,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     </section>
   );
 };
+
+
 
