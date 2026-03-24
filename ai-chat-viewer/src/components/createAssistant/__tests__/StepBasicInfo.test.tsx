@@ -83,7 +83,7 @@ describe('StepBasicInfo', () => {
     expect(avatar2Button).toHaveClass('is-selected');
   });
 
-  it('shows validation error when uploading invalid file', () => {
+  it('shows toast when uploading invalid format file', () => {
     render(
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
@@ -97,8 +97,11 @@ describe('StepBasicInfo', () => {
     const invalidFile = new File([new Uint8Array(10)], 'avatar.webp', { type: 'image/webp' });
     fireEvent.change(input, { target: { files: [invalidFile] } });
 
-    expect(screen.getByText('仅支持JPG/PNG格式')).toBeInTheDocument();
-    expect(mockedShowToast).not.toHaveBeenCalled();
+    expect(mockedShowToast).toHaveBeenCalledWith('仅支持JPG/PNG格式', {
+      toastClassName: 'digital-twin-toast',
+      hideClassName: 'digital-twin-toast-hide',
+    });
+    expect(screen.queryByText('仅支持JPG/PNG格式')).not.toBeInTheDocument();
   });
 
   it('shows toast when uploading file larger than 2MB and keeps current selection', () => {

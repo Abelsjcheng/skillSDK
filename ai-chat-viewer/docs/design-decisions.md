@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.27`
+- 文档版本：`v3.29`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -189,7 +189,8 @@ interface CreateDigitalTwinParams {
 2. 上传不合法时：
    - 不改变当前头像选择
    - 文件大小超限（`>= 2MB`）使用 toast 提示：`图片大小需小于2MB`
-   - 文件格式不合法使用组件内轻提示（文本区域）：`仅支持JPG/PNG格式`
+   - 文件格式不合法使用 toast 提示：`仅支持JPG/PNG格式`
+   - 页面 1 不再维护 `avatarError` 组件内错误文本状态
 3. 点击头像项即切换选中态并更新预览区。
 4. 页面切换不清空已输入数据。
 5. 点击“上一步”时从页面 2 返回页面 1，且页面 1 的头像选择、名称和简介保持不变。
@@ -251,7 +252,7 @@ interface CreateDigitalTwinParams {
 
 ## 11. 路由实现决策
 
-1. 在主入口 `src/index.tsx` 引入 `HashRouter`，路由配置下沉到独立路由组件。
+1. 在主入口 `src/index.tsx` 基于 `react-router` 引入 `HashRouter`，路由配置下沉到独立路由组件。
 2. 路由表仅包含两个业务页与重定向规则：
    - `/aiChat` -> `App`（AI 对话页）
    - `/createAssistant` -> `PersonalAssistantCreator`（创建个人助理页）

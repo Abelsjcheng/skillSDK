@@ -46,7 +46,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const [customAvatarPreview, setCustomAvatarPreview] = useState<string | undefined>(
     initialValue?.avatarType === 'custom' ? initialValue.icon : undefined,
   );
-  const [avatarError, setAvatarError] = useState<string>('');
   const [name, setName] = useState(initialValue?.name ?? '');
   const [description, setDescription] = useState(initialValue?.description ?? '');
 
@@ -74,21 +73,15 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const handleSelectDefaultAvatar = useCallback((selectedAvatarId: string) => {
     setAvatarType('default');
     setAvatarId(selectedAvatarId);
-    setAvatarError('');
   }, []);
 
   const handleAvatarUpload = useCallback((file: File) => {
     const result = validateAvatarFile(file);
     if (!result.valid) {
-      if (result.code === 'size') {
-        showToast(result.reason, {
-          toastClassName: 'digital-twin-toast',
-          hideClassName: 'digital-twin-toast-hide',
-        });
-        setAvatarError('');
-      } else {
-        setAvatarError(result.reason);
-      }
+      showToast(result.reason, {
+        toastClassName: 'digital-twin-toast',
+        hideClassName: 'digital-twin-toast-hide',
+      });
       return;
     }
 
@@ -105,7 +98,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
     setAvatarType('custom');
     setCustomAvatarPreview(previewUrl);
-    setAvatarError('');
   }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -169,7 +161,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             ) : null}
           </div>
           <p className="digital-twin__avatar-tip">支持JPG/PNG格式，小于2MB</p>
-          {avatarError ? <p className="digital-twin__error-text">{avatarError}</p> : null}
         </div>
 
         <div className="digital-twin__avatar-options" role="list" aria-label="默认头像列表">
