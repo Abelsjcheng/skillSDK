@@ -1,4 +1,4 @@
-﻿import type { DefaultAvatarOption } from '../../types/digitalTwin';
+﻿import type { DefaultAvatarOption, InternalAssistantOption } from '../../types/digitalTwin';
 
 function createSvgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -37,3 +37,7 @@ export const BRAIN_ILLUSTRATION = createSvgDataUri(`
     <text x="320" y="90" text-anchor="middle" font-size="24" font-weight="700" fill="#1D4ED8">DIGITAL TWIN</text>
   </svg>
 `);
+
+export const INTERNAL_ASSISTANTS: InternalAssistantOption[] = [
+  { name: '助手', icon: '', bizRobotId: '1234' },
+];

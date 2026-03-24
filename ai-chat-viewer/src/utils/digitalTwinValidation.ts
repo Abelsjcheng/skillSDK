@@ -3,6 +3,7 @@
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png']);
+const INVALID_BASIC_TEXT_CHAR_PATTERN = /[^A-Za-z0-9\u4E00-\u9FFF]/;
 
 type AvatarValidationErrorCode = 'size' | 'format';
 
@@ -12,6 +13,10 @@ type AvatarValidationResult =
 
 export function canProceedNext(name: string, description: string): boolean {
   return Boolean(name.trim() && description.trim());
+}
+
+export function hasInvalidBasicTextChar(value: string): boolean {
+  return Boolean(value) && INVALID_BASIC_TEXT_CHAR_PATTERN.test(value);
 }
 
 export function canConfirm(brainType?: BrainType, bizRobotId?: string): boolean {

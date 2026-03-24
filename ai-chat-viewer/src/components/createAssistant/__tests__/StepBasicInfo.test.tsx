@@ -37,6 +37,36 @@ describe('StepBasicInfo', () => {
     expect(nextButton).toHaveClass('is-active');
   });
 
+  it('highlights input in red and disables next when unsupported characters are entered', () => {
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={Noop}
+        onCancel={Noop}
+        onNext={Noop}
+      />,
+    );
+
+    const nameInput = screen.getByLabelText('名称');
+    const descriptionInput = screen.getByLabelText('简介');
+    const nextButton = screen.getByRole('button', { name: '下一步' });
+
+    fireEvent.change(nameInput, { target: { value: '智能助手@' } });
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC123' } });
+    expect(nameInput).toHaveClass('is-invalid');
+    expect(nextButton).toBeDisabled();
+
+    fireEvent.change(nameInput, { target: { value: '智能助手1' } });
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC#' } });
+    expect(descriptionInput).toHaveClass('is-invalid');
+    expect(nextButton).toBeDisabled();
+
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC123' } });
+    expect(nameInput).not.toHaveClass('is-invalid');
+    expect(descriptionInput).not.toHaveClass('is-invalid');
+    expect(nextButton).not.toBeDisabled();
+  });
+
   it('updates selected class when selecting default avatar', () => {
     render(
       <StepBasicInfo

@@ -6,10 +6,10 @@ const {
 } = require('./webpack.shared');
 
 module.exports = {
-  entry: './src/pages/digital-twin/index.tsx',
+  entry: './src/pages/createAssistant/index.tsx',
   output: {
-    path: path.resolve(__dirname, 'dist/digital-twin-page'),
-    filename: 'js/digital-twin-page.[contenthash].js',
+    path: path.resolve(__dirname, 'dist/create-assistant-page'),
+    filename: 'js/create-assistant-page.[contenthash].js',
     assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
     clean: true,
   },
@@ -21,7 +21,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './public/digital-twin-page.html',
+      template: './public/create-assistant-page.html',
       filename: 'index.html',
     }),
   ],
@@ -40,7 +40,7 @@ module.exports = {
     },
   },
   devServer: {
-    static: path.resolve(__dirname, 'dist/digital-twin-page'),
+    static: path.resolve(__dirname, 'dist/create-assistant-page'),
     compress: true,
     port: 3102,
     hot: true,

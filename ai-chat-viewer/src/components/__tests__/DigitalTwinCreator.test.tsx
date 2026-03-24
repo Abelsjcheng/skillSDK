@@ -2,29 +2,35 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
-import { DigitalTwinCreator } from '../DigitalTwinCreator';
+import { PersonalAssistantCreator } from '../PersonalAssistantCreator';
 
-describe('DigitalTwinCreator', () => {
+describe('PersonalAssistantCreator', () => {
   const getAgentTypeMock = jest.fn();
 
   beforeEach(() => {
     getAgentTypeMock.mockReset();
-    getAgentTypeMock.mockResolvedValue({
-      content: [
-        { name: '写作助手', icon: 'https://example.com/assistant-writing.png', bizRobotId: '8041241' },
-        { name: '会议助手', icon: 'https://example.com/assistant-meeting.png', bizRobotId: '8041242' },
-      ],
-    });
+    getAgentTypeMock.mockResolvedValue([
+      { name: '写作助手', icon: 'https://example.com/assistant-writing.png', bizRobotId: '8041241' },
+      { name: '会议助手', icon: 'https://example.com/assistant-meeting.png', bizRobotId: '8041242' },
+    ]);
 
     Object.defineProperty(window, 'getAgentType', {
       value: getAgentTypeMock,
       configurable: true,
       writable: true,
     });
+
+    Object.defineProperty(window, 'Pedestal', {
+      value: {
+        callMethod: jest.fn(),
+      },
+      configurable: true,
+      writable: true,
+    });
   });
 
   it('switches to step2 after filling required fields and clicking next', () => {
-    render(<DigitalTwinCreator />);
+    render(<PersonalAssistantCreator />);
 
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '智能助手' } });
     fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部个人助理简介' } });
@@ -33,9 +39,25 @@ describe('DigitalTwinCreator', () => {
     expect(screen.getByText(/请选择你的.*个人助理.*大脑：/)).toBeInTheDocument();
   });
 
+  it('goes back to step1 when clicking previous button on step2', () => {
+    render(<PersonalAssistantCreator />);
+
+    fireEvent.click(screen.getByRole('listitem', { name: '选择默认头像 avatar-2' }));
+    fireEvent.change(screen.getByLabelText('名称'), { target: { value: '智能助手' } });
+    fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部个人助理简介' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByText(/请选择你的.*个人助理.*大脑：/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    expect(screen.getByLabelText('名称')).toHaveValue('智能助手');
+    expect(screen.getByLabelText('简介')).toHaveValue('内部个人助理简介');
+    expect(screen.getByRole('listitem', { name: '选择默认头像 avatar-2' })).toHaveClass('is-selected');
+  });
+
   it('calls window.Pedestal.remote.getCurrentWindow().close when clicking close and cancel', () => {
     const closeMock = jest.fn();
     const pedestalMock = {
+      callMethod: jest.fn(),
       remote: {
         getCurrentWindow: () => ({
           close: closeMock,
@@ -48,7 +70,7 @@ describe('DigitalTwinCreator', () => {
       writable: true,
     });
 
-    render(<DigitalTwinCreator />);
+    render(<PersonalAssistantCreator />);
 
     fireEvent.click(screen.getByRole('button', { name: '关闭创建个人助理' }));
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
@@ -64,7 +86,7 @@ describe('DigitalTwinCreator', () => {
       writable: true,
     });
 
-    render(<DigitalTwinCreator />);
+    render(<PersonalAssistantCreator />);
 
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '智能助手' } });
     fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部个人助理简介' } });
@@ -96,7 +118,7 @@ describe('DigitalTwinCreator', () => {
       writable: true,
     });
 
-    render(<DigitalTwinCreator />);
+    render(<PersonalAssistantCreator />);
 
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '智能助手2' } });
     fireEvent.change(screen.getByLabelText('简介'), { target: { value: '内部类型测试' } });
@@ -119,9 +141,10 @@ describe('DigitalTwinCreator', () => {
   it('is not exported from lib entry and has standalone page entry', () => {
     const libFilePath = path.resolve(__dirname, '../../lib/index.ts');
     const libSource = fs.readFileSync(libFilePath, 'utf8');
-    expect(libSource).not.toContain('export { DigitalTwinCreator };');
+    expect(libSource).not.toContain('export { PersonalAssistantCreator };');
 
-    const pageEntryPath = path.resolve(__dirname, '../../pages/digital-twin/index.tsx');
+    const pageEntryPath = path.resolve(__dirname, '../../pages/createAssistant/index.tsx');
     expect(fs.existsSync(pageEntryPath)).toBe(true);
   });
 });
+

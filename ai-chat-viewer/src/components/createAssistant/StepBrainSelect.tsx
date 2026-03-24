@@ -1,98 +1,50 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AgentTypeListResult, BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
+import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { canConfirm } from '../../utils/digitalTwinValidation';
+import { INTERNAL_ASSISTANTS } from './constants';
 
 interface StepBrainSelectProps {
+  isPcMiniApp?: boolean;
   illustration: string;
   onClose: () => void;
   onCancel: () => void;
+  onPrev: () => void;
   onConfirm: (payload: DigitalTwinBrainPayload) => void;
 }
 
-function normalizeAgentTypeList(result: unknown): InternalAssistantOption[] {
-  const payload = result as AgentTypeListResult | null | undefined;
-  const source =
-    Array.isArray(payload?.content)
-      ? payload.content
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(result)
-          ? result
-          : [];
-
-  return source.reduce<InternalAssistantOption[]>((list, item) => {
-    const raw = (item ?? {}) as Record<string, unknown>;
-    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
-    const icon = typeof raw.icon === 'string' ? raw.icon.trim() : '';
-    const bizRobotId = typeof raw.bizRobotId === 'string' ? raw.bizRobotId.trim() : '';
-
-    if (!name || !bizRobotId) {
-      return list;
-    }
-
-    const option: InternalAssistantOption = {
-      name,
-      bizRobotId,
-    };
-
-    if (icon) {
-      option.icon = icon;
-    }
-
-    list.push(option);
-    return list;
-  }, []);
-}
+const GUIDE_DOCUMENT_URL = '';
 
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
+  isPcMiniApp = true,
   illustration,
   onClose,
   onCancel,
+  onPrev,
   onConfirm,
 }) => {
-  const [brainType, setBrainType] = useState<BrainType | undefined>();
+  const [brainType, setBrainType] = useState<BrainType | undefined>('internal');
   const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>();
-  const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>([]);
-  const [loadingAssistants, setLoadingAssistants] = useState<boolean>(false);
+  const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>(INTERNAL_ASSISTANTS);
 
-  useEffect(() => {
-    let active = true;
+  const fetchAgentTypes = useCallback(async (): Promise<void> => {
+    if (typeof window === 'undefined') return;
 
-    const fetchAgentTypes = async () => {
-      if (typeof window === 'undefined') return;
-
+    try {
       const getAgentType = (window as any).getAgentType;
       if (typeof getAgentType !== 'function') {
-        if (active) {
-          setInternalAssistants([]);
-        }
         return;
       }
 
-      if (active) {
-        setLoadingAssistants(true);
-      }
-
-      try {
-        const result = await getAgentType();
-        if (!active) return;
-        setInternalAssistants(normalizeAgentTypeList(result));
-      } catch (_error) {
-        if (!active) return;
-        setInternalAssistants([]);
-      } finally {
-        if (active) {
-          setLoadingAssistants(false);
-        }
-      }
-    };
-
-    void fetchAgentTypes();
-
-    return () => {
-      active = false;
-    };
+      const result = await getAgentType();
+      setInternalAssistants(result as InternalAssistantOption[]);
+    } catch (_error) {
+      setInternalAssistants(INTERNAL_ASSISTANTS);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAgentTypes();
+  }, [fetchAgentTypes]);
 
   const confirmEnabled = useMemo(
     () => canConfirm(brainType, selectedBizRobotId),
@@ -114,22 +66,44 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     });
   }, [brainType, confirmEnabled, onConfirm, selectedBizRobotId]);
 
-  return (
-    <section className="digital-twin">
-      <header className="digital-twin__header digital-twin__header--close-only">
-        <button
-          type="button"
-          className="digital-twin__close-btn"
-          aria-label="关闭创建个人助理"
-          onClick={onClose}
-        >
-          ×
-        </button>
-      </header>
+  const handleOpenGuideDocument = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    if (typeof window === 'undefined') return;
+    window.open(GUIDE_DOCUMENT_URL, '_blank');
+  }, []);
 
-      <div className="digital-twin__illustration-wrap">
-        <img className="digital-twin__illustration" src={illustration} alt="个人助理插画" />
-      </div>
+  return (
+    <section className={`digital-twin ${isPcMiniApp ? '' : 'digital-twin--mobile'}`.trim()}>
+      <header className="digital-twin__header">
+        {isPcMiniApp ? (
+          <>
+            <span className="digital-twin__title">创建个人助理</span>
+            <button
+              type="button"
+              className="digital-twin__close-btn"
+              aria-label="关闭创建个人助理"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="digital-twin__mobile-header-side">
+              <button
+                type="button"
+                className="digital-twin__mobile-back-btn"
+                aria-label="返回上一页"
+                onClick={onPrev}
+              >
+                {'<'}
+              </button>
+            </div>
+            <span className="digital-twin__mobile-title">创建个人助理</span>
+            <div className="digital-twin__mobile-header-side" aria-hidden="true" />
+          </>
+        )}
+      </header>
 
       <div className="digital-twin__content digital-twin__content--step2">
         <div className="digital-twin__brain-type-block">
@@ -160,13 +134,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           {brainType === 'internal' ? (
             <>
               <h4 className="digital-twin__brain-subtitle">请选择</h4>
-              {loadingAssistants ? (
-                <p className="digital-twin__custom-tip">内部助手加载中...</p>
-              ) : null}
-              {!loadingAssistants && internalAssistants.length === 0 ? (
-                <p className="digital-twin__custom-tip">暂无可用内部助手</p>
-              ) : null}
-              {!loadingAssistants && internalAssistants.length > 0 ? (
+              {internalAssistants.length > 0 ? (
                 <div className="digital-twin__assistant-grid">
                   {internalAssistants.map((assistant) => {
                     const selected = selectedBizRobotId === assistant.bizRobotId;
@@ -199,29 +167,66 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           ) : null}
 
           {brainType === 'custom' ? (
-            <p className="digital-twin__custom-tip">需自定义部署、安装OpenCode/OpenClaw等工具</p>
+            <p className="digital-twin__custom-tip">
+              需在本地电脑自定义部署第三方助手，点击查看
+              <a
+                href={GUIDE_DOCUMENT_URL}
+                className="digital-twin__custom-tip-link"
+                target="_blank"
+                rel="noreferrer"
+                onClick={handleOpenGuideDocument}
+              >
+                指导文档→
+              </a>
+            </p>
           ) : null}
+        </div>
+
+        <div className="digital-twin__brain-illustration-wrap">
+          <img className="digital-twin__brain-illustration" src={illustration} alt="个人助理插画" />
         </div>
       </div>
 
       <footer className="digital-twin__actions">
-        <button
-          type="button"
-          className="digital-twin__action-btn digital-twin__action-btn--cancel"
-          onClick={onCancel}
-        >
-          取消
-        </button>
-        <button
-          type="button"
-          className={`digital-twin__action-btn digital-twin__action-btn--confirm ${
-            confirmEnabled ? 'is-active' : 'is-disabled'
-          }`.trim()}
-          disabled={!confirmEnabled}
-          onClick={handleConfirm}
-        >
-          确定
-        </button>
+        {isPcMiniApp ? (
+          <>
+            <button
+              type="button"
+              className="digital-twin__action-btn digital-twin__action-btn--cancel"
+              onClick={onCancel}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="digital-twin__action-btn digital-twin__action-btn--cancel"
+              onClick={onPrev}
+            >
+              上一步
+            </button>
+            <button
+              type="button"
+              className={`digital-twin__action-btn digital-twin__action-btn--confirm ${
+                confirmEnabled ? 'is-active' : 'is-disabled'
+              }`.trim()}
+              disabled={!confirmEnabled}
+              onClick={handleConfirm}
+            >
+              确定
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className={`digital-twin__action-btn digital-twin__action-btn--confirm digital-twin__action-btn--mobile-primary ${
+              confirmEnabled ? 'is-active' : 'is-disabled'
+            }`.trim()}
+            disabled={!confirmEnabled}
+            onClick={handleConfirm}
+          >
+            确定
+          </button>
+        )}
       </footer>
     </section>
   );

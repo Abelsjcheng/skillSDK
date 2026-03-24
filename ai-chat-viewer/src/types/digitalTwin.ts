@@ -22,6 +22,8 @@ export interface DigitalTwinFormData {
 }
 
 export interface DigitalTwinBasicInfoPayload {
+  avatarType: 'default' | 'custom';
+  avatarId?: string;
   name: string;
   icon: string;
   description: string;
@@ -37,7 +39,10 @@ export interface AgentTypeListResult {
   data?: unknown;
 }
 
-export interface CreateDigitalTwinParams extends DigitalTwinBasicInfoPayload {
+export interface CreateDigitalTwinParams {
+  name: string;
+  icon: string;
+  description: string;
   weCrewType: 0 | 1;
   bizRobotId?: string;
 }

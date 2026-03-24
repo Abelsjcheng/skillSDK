@@ -10,12 +10,10 @@ describe('StepBrainSelect', () => {
 
   beforeEach(() => {
     getAgentTypeMock.mockReset();
-    getAgentTypeMock.mockResolvedValue({
-      content: [
-        { name: '写作助手', icon: 'https://example.com/assistant-writing.png', bizRobotId: '8041241' },
-        { name: '会议助手', icon: 'https://example.com/assistant-meeting.png', bizRobotId: '8041242' },
-      ],
-    });
+    getAgentTypeMock.mockResolvedValue([
+      { name: '写作助手', icon: 'https://example.com/assistant-writing.png', bizRobotId: '8041241' },
+      { name: '会议助手', icon: 'https://example.com/assistant-meeting.png', bizRobotId: '8041242' },
+    ]);
 
     Object.defineProperty(window, 'getAgentType', {
       value: getAgentTypeMock,
@@ -30,6 +28,7 @@ describe('StepBrainSelect', () => {
         illustration={BRAIN_ILLUSTRATION}
         onClose={Noop}
         onCancel={Noop}
+        onPrev={Noop}
         onConfirm={Noop}
       />,
     );
@@ -52,6 +51,7 @@ describe('StepBrainSelect', () => {
         illustration={BRAIN_ILLUSTRATION}
         onClose={Noop}
         onCancel={Noop}
+        onPrev={Noop}
         onConfirm={Noop}
       />,
     );
@@ -70,6 +70,7 @@ describe('StepBrainSelect', () => {
         illustration={BRAIN_ILLUSTRATION}
         onClose={Noop}
         onCancel={Noop}
+        onPrev={Noop}
         onConfirm={Noop}
       />,
     );
@@ -80,5 +81,21 @@ describe('StepBrainSelect', () => {
 
     expect(assistantButton).toHaveClass('is-selected');
     expect(screen.getByRole('button', { name: '确定' })).not.toBeDisabled();
+  });
+
+  it('calls onPrev when clicking previous button', () => {
+    const onPrevMock = jest.fn();
+    render(
+      <StepBrainSelect
+        illustration={BRAIN_ILLUSTRATION}
+        onClose={Noop}
+        onCancel={Noop}
+        onPrev={onPrevMock}
+        onConfirm={Noop}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    expect(onPrevMock).toHaveBeenCalledTimes(1);
   });
 });

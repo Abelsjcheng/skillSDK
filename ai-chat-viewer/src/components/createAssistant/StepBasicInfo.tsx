@@ -1,40 +1,66 @@
-﻿import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
-import { canProceedNext, validateAvatarFile } from '../../utils/digitalTwinValidation';
+import { canProceedNext, hasInvalidBasicTextChar, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 
 interface StepBasicInfoProps {
+  isPcMiniApp?: boolean;
   defaultAvatars: DefaultAvatarOption[];
+  initialValue?: DigitalTwinBasicInfoPayload | null;
   onClose: () => void;
   onCancel: () => void;
   onNext: (payload: DigitalTwinBasicInfoPayload) => void;
 }
 
+function resolveInitialDefaultAvatarId(
+  defaultAvatars: DefaultAvatarOption[],
+  initialValue?: DigitalTwinBasicInfoPayload | null,
+): string | undefined {
+  if (initialValue?.avatarType !== 'default') {
+    return defaultAvatars[0]?.id;
+  }
+
+  if (initialValue.avatarId) {
+    return initialValue.avatarId;
+  }
+
+  if (initialValue.icon) {
+    return defaultAvatars.find((avatar) => avatar.image === initialValue.icon)?.id ?? defaultAvatars[0]?.id;
+  }
+
+  return defaultAvatars[0]?.id;
+}
+
 export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
+  isPcMiniApp = true,
   defaultAvatars,
+  initialValue,
   onClose,
   onCancel,
   onNext,
 }) => {
-  const [avatarType, setAvatarType] = useState<'default' | 'custom'>('default');
-  const [avatarId, setAvatarId] = useState<string | undefined>(defaultAvatars[0]?.id);
-  const [customAvatarPreview, setCustomAvatarPreview] = useState<string | undefined>();
+  const [avatarType, setAvatarType] = useState<'default' | 'custom'>(initialValue?.avatarType ?? 'default');
+  const [avatarId, setAvatarId] = useState<string | undefined>(
+    resolveInitialDefaultAvatarId(defaultAvatars, initialValue),
+  );
+  const [customAvatarPreview, setCustomAvatarPreview] = useState<string | undefined>(
+    initialValue?.avatarType === 'custom' ? initialValue.icon : undefined,
+  );
   const [avatarError, setAvatarError] = useState<string>('');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(initialValue?.name ?? '');
+  const [description, setDescription] = useState(initialValue?.description ?? '');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const lastObjectUrlRef = useRef<string>();
+  const lastObjectUrlRef = useRef<string | undefined>(
+    initialValue?.avatarType === 'custom' ? initialValue.icon : undefined,
+  );
 
-  useEffect(() => {
-    return () => {
-      if (lastObjectUrlRef.current && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(lastObjectUrlRef.current);
-      }
-    };
-  }, []);
-
-  const canNext = useMemo(() => canProceedNext(name, description), [name, description]);
+  const nameHasInvalidChar = useMemo(() => hasInvalidBasicTextChar(name), [name]);
+  const descriptionHasInvalidChar = useMemo(() => hasInvalidBasicTextChar(description), [description]);
+  const canNext = useMemo(
+    () => canProceedNext(name, description) && !nameHasInvalidChar && !descriptionHasInvalidChar,
+    [description, descriptionHasInvalidChar, name, nameHasInvalidChar],
+  );
 
   const currentAvatarSrc =
     avatarType === 'custom'
@@ -71,10 +97,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       lastObjectUrlRef.current = undefined;
     }
 
-    const previewUrl =
-      typeof URL.createObjectURL === 'function'
-        ? URL.createObjectURL(file)
-        : undefined;
+    const previewUrl = typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : undefined;
 
     if (previewUrl) {
       lastObjectUrlRef.current = previewUrl;
@@ -95,24 +118,47 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const handleNext = useCallback(() => {
     if (!canNext) return;
     onNext({
-      name: name.trim(),
+      avatarType,
+      avatarId,
+      name,
       icon: currentAvatarSrc ?? '',
-      description: description.trim(),
+      description,
     });
-  }, [canNext, currentAvatarSrc, description, name, onNext]);
+  }, [avatarId, avatarType, canNext, currentAvatarSrc, description, name, onNext]);
+
+  const handleMobileBack = useCallback(() => {}, []);
 
   return (
-    <section className="digital-twin">
+    <section className={`digital-twin ${isPcMiniApp ? '' : 'digital-twin--mobile'}`.trim()}>
       <header className="digital-twin__header">
-        <span className="digital-twin__title">创建个人助理</span>
-        <button
-          type="button"
-          className="digital-twin__close-btn"
-          aria-label="关闭创建个人助理"
-          onClick={onClose}
-        >
-          ×
-        </button>
+        {isPcMiniApp ? (
+          <>
+            <span className="digital-twin__title">创建个人助理</span>
+            <button
+              type="button"
+              className="digital-twin__close-btn"
+              aria-label="关闭创建个人助理"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="digital-twin__mobile-header-side">
+              <button
+                type="button"
+                className="digital-twin__mobile-back-btn"
+                aria-label="返回上一页"
+                onClick={handleMobileBack}
+              >
+                {'<'}
+              </button>
+            </div>
+            <span className="digital-twin__mobile-title">创建个人助理</span>
+            <div className="digital-twin__mobile-header-side" aria-hidden="true" />
+          </>
+        )}
       </header>
 
       <div className="digital-twin__content digital-twin__content--step1">
@@ -171,7 +217,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           </label>
           <input
             id="digital-twin-name"
-            className="digital-twin__input"
+            className={`digital-twin__input ${nameHasInvalidChar ? 'is-invalid' : ''}`.trim()}
             type="text"
             value={name}
             placeholder="例如：智能助手"
@@ -185,7 +231,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           </label>
           <textarea
             id="digital-twin-description"
-            className="digital-twin__textarea"
+            className={`digital-twin__textarea ${descriptionHasInvalidChar ? 'is-invalid' : ''}`.trim()}
             value={description}
             placeholder="介绍助理的功能和应用场景"
             onChange={(event) => setDescription(event.target.value)}
@@ -194,23 +240,38 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       </div>
 
       <footer className="digital-twin__actions">
-        <button
-          type="button"
-          className="digital-twin__action-btn digital-twin__action-btn--cancel"
-          onClick={onCancel}
-        >
-          取消
-        </button>
-        <button
-          type="button"
-          className={`digital-twin__action-btn digital-twin__action-btn--next ${
-            canNext ? 'is-active' : 'is-disabled'
-          }`.trim()}
-          disabled={!canNext}
-          onClick={handleNext}
-        >
-          下一步
-        </button>
+        {isPcMiniApp ? (
+          <>
+            <button
+              type="button"
+              className="digital-twin__action-btn digital-twin__action-btn--cancel"
+              onClick={onCancel}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className={`digital-twin__action-btn digital-twin__action-btn--next ${
+                canNext ? 'is-active' : 'is-disabled'
+              }`.trim()}
+              disabled={!canNext}
+              onClick={handleNext}
+            >
+              下一步
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className={`digital-twin__action-btn digital-twin__action-btn--next digital-twin__action-btn--mobile-primary ${
+              canNext ? 'is-active' : 'is-disabled'
+            }`.trim()}
+            disabled={!canNext}
+            onClick={handleNext}
+          >
+            下一步
+          </button>
+        )}
       </footer>
     </section>
   );

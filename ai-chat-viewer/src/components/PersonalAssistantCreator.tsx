@@ -1,15 +1,17 @@
 ﻿import React, { useCallback, useRef, useState } from 'react';
-import { BRAIN_ILLUSTRATION, DEFAULT_AVATARS } from './digital-twin/constants';
-import { StepBasicInfo } from './digital-twin/StepBasicInfo';
-import { StepBrainSelect } from './digital-twin/StepBrainSelect';
+import { BRAIN_ILLUSTRATION, DEFAULT_AVATARS } from './createAssistant/constants';
+import { StepBasicInfo } from './createAssistant/StepBasicInfo';
+import { StepBrainSelect } from './createAssistant/StepBrainSelect';
 import type {
   CreateDigitalTwinParams,
   DigitalTwinBasicInfoPayload,
   DigitalTwinBrainPayload,
 } from '../types/digitalTwin';
+import { isPcMiniApp } from '../utils/hwext';
 import '../styles/DigitalTwinCreator.less';
 
-const DigitalTwinCreator: React.FC = () => {
+const PersonalAssistantCreator: React.FC = () => {
+  const isPc = isPcMiniApp();
   const [step, setStep] = useState<1 | 2>(1);
   const basicInfoRef = useRef<DigitalTwinBasicInfoPayload | null>(null);
 
@@ -28,6 +30,10 @@ const DigitalTwinCreator: React.FC = () => {
     if (typeof window !== 'undefined') {
       (window as any).Pedestal.remote.getCurrentWindow().close();
     }
+  }, []);
+
+  const handlePrev = useCallback(() => {
+    setStep(1);
   }, []);
 
   const handleConfirm = useCallback((payload: DigitalTwinBrainPayload) => {
@@ -49,19 +55,23 @@ const DigitalTwinCreator: React.FC = () => {
   }, []);
 
   return (
-    <div className="digital-twin-creator">
+    <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>
       {step === 1 ? (
         <StepBasicInfo
+          isPcMiniApp={isPc}
           defaultAvatars={DEFAULT_AVATARS}
+          initialValue={basicInfoRef.current}
           onClose={handleClose}
           onCancel={handleCancel}
           onNext={handleNext}
         />
       ) : (
         <StepBrainSelect
+          isPcMiniApp={isPc}
           illustration={BRAIN_ILLUSTRATION}
           onClose={handleClose}
           onCancel={handleCancel}
+          onPrev={handlePrev}
           onConfirm={handleConfirm}
         />
       )}
@@ -69,5 +79,5 @@ const DigitalTwinCreator: React.FC = () => {
   );
 };
 
-export default DigitalTwinCreator;
-export { DigitalTwinCreator };
+export default PersonalAssistantCreator;
+export { PersonalAssistantCreator };
