@@ -12,16 +12,6 @@ export function getStepClassName(isPcMiniApp: boolean): string {
   return `digital-twin ${isPcMiniApp ? '' : 'digital-twin--mobile'}`.trim();
 }
 
-export function getStateActionButtonClassName(
-  baseClassName: string,
-  isEnabled: boolean,
-  includeMobilePrimary = false,
-): string {
-  return `${baseClassName} ${includeMobilePrimary ? 'digital-twin__action-btn--mobile-primary' : ''} ${
-    isEnabled ? 'is-active' : 'is-disabled'
-  }`.trim();
-}
-
 export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   isPcMiniApp,
   onClose,

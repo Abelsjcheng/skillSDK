@@ -2,7 +2,8 @@
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
 import { canProceedNext, hasInvalidBasicTextChar, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
-import { CreatorStepHeader, getStateActionButtonClassName, getStepClassName } from './CreatorStepHeader';
+import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
+import { CreatorStepFooter } from './CreatorStepFooter';
 
 interface StepBasicInfoProps {
   isPcMiniApp?: boolean;
@@ -200,40 +201,14 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         </div>
       </div>
 
-      <footer className="digital-twin__actions">
-        {isPcMiniApp ? (
-          <>
-            <button
-              type="button"
-              className="digital-twin__action-btn digital-twin__action-btn--cancel"
-              onClick={onCancel}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              className={getStateActionButtonClassName('digital-twin__action-btn digital-twin__action-btn--next', canNext)}
-              disabled={!canNext}
-              onClick={handleNext}
-            >
-              下一步
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            className={getStateActionButtonClassName(
-              'digital-twin__action-btn digital-twin__action-btn--next',
-              canNext,
-              true,
-            )}
-            disabled={!canNext}
-            onClick={handleNext}
-          >
-            下一步
-          </button>
-        )}
-      </footer>
+      <CreatorStepFooter
+        isPcMiniApp={isPcMiniApp}
+        pcButtons={[
+          { label: '取消', onClick: onCancel, variant: 'cancel' },
+          { label: '下一步', onClick: handleNext, variant: 'next', enabled: canNext, withStateClass: true },
+        ]}
+        mobileButton={{ label: '下一步', onClick: handleNext, variant: 'next', enabled: canNext, withStateClass: true }}
+      />
     </section>
   );
 };

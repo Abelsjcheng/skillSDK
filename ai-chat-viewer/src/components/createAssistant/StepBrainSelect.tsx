@@ -2,7 +2,8 @@
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 import { INTERNAL_ASSISTANTS } from './constants';
-import { CreatorStepHeader, getStateActionButtonClassName, getStepClassName } from './CreatorStepHeader';
+import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
+import { CreatorStepFooter } from './CreatorStepFooter';
 
 interface StepBrainSelectProps {
   isPcMiniApp?: boolean;
@@ -159,50 +160,21 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         </div>
       </div>
 
-      <footer className="digital-twin__actions">
-        {isPcMiniApp ? (
-          <>
-            <button
-              type="button"
-              className="digital-twin__action-btn digital-twin__action-btn--cancel"
-              onClick={onCancel}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              className="digital-twin__action-btn digital-twin__action-btn--cancel"
-              onClick={onPrev}
-            >
-              上一步
-            </button>
-            <button
-              type="button"
-              className={getStateActionButtonClassName(
-                'digital-twin__action-btn digital-twin__action-btn--confirm',
-                confirmEnabled,
-              )}
-              disabled={!confirmEnabled}
-              onClick={handleConfirm}
-            >
-              确定
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            className={getStateActionButtonClassName(
-              'digital-twin__action-btn digital-twin__action-btn--confirm',
-              confirmEnabled,
-              true,
-            )}
-            disabled={!confirmEnabled}
-            onClick={handleConfirm}
-          >
-            确定
-          </button>
-        )}
-      </footer>
+      <CreatorStepFooter
+        isPcMiniApp={isPcMiniApp}
+        pcButtons={[
+          { label: '取消', onClick: onCancel, variant: 'cancel' },
+          { label: '上一步', onClick: onPrev, variant: 'cancel' },
+          { label: '确定', onClick: handleConfirm, variant: 'confirm', enabled: confirmEnabled, withStateClass: true },
+        ]}
+        mobileButton={{
+          label: '确定',
+          onClick: handleConfirm,
+          variant: 'confirm',
+          enabled: confirmEnabled,
+          withStateClass: true,
+        }}
+      />
     </section>
   );
 };
