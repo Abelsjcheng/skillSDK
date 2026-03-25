@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import PersonalAssistantCreator from '../../components/PersonalAssistantCreator';
+import PersonalAssistantCreator from '../components/PersonalAssistantCreator';
 
 const rootElement = document.getElementById('root');
 

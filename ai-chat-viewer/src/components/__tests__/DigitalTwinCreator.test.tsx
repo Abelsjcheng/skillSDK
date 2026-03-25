@@ -143,7 +143,7 @@ describe('PersonalAssistantCreator', () => {
     const libSource = fs.readFileSync(libFilePath, 'utf8');
     expect(libSource).not.toContain('export { PersonalAssistantCreator };');
 
-    const pageEntryPath = path.resolve(__dirname, '../../pages/createAssistant/index.tsx');
+    const pageEntryPath = path.resolve(__dirname, '../../pages/createAssistant.tsx');
     expect(fs.existsSync(pageEntryPath)).toBe(true);
   });
 });

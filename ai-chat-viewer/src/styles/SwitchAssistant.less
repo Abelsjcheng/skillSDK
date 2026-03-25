@@ -1,0 +1,128 @@
+.switch-assistant {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: rgba(245, 247, 250, 1);
+}
+
+.switch-assistant__content {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 16px;
+  box-sizing: border-box;
+}
+
+.switch-assistant__list {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.switch-assistant__card {
+  width: 100%;
+  height: 72px;
+  border-radius: 8px;
+  padding: 16px 12px;
+  box-sizing: border-box;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+}
+
+.switch-assistant__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.switch-assistant__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.switch-assistant__desc {
+  margin-left: 16px;
+  min-width: 0;
+  flex: 1;
+}
+
+.switch-assistant__desc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.switch-assistant__name {
+  color: rgba(51, 51, 51, 1);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.switch-assistant__tag {
+  width: 60px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(217, 232, 255, 1);
+  color: rgba(65, 142, 255, 1);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.switch-assistant__summary {
+  margin: 0;
+  color: rgba(102, 102, 102, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switch-assistant__actions {
+  width: 100%;
+  height: 68px;
+  min-height: 68px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.switch-assistant__action-btn {
+  width: 156px;
+  height: 44px;
+  border: none;
+  border-radius: 50px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.switch-assistant__action-btn--cancel {
+  background: rgba(255, 255, 255, 1);
+  color: rgba(51, 51, 51, 1);
+}
+
+.switch-assistant__action-btn--confirm {
+  background: rgba(13, 148, 255, 1);
+  color: #ffffff;
+}

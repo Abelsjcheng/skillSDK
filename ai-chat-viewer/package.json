@@ -17,9 +17,11 @@
     "build:require-demo": "npm run build:lib && webpack --config example/require-demo/webpack.config.js --mode production",
     "build:create-assistant-page": "webpack --config webpack.create-assistant-page.config.js --mode production",
     "build:digital-twin-demo": "webpack --config example/digital-twin-demo/webpack.config.js --mode production",
+    "build:assistant-components-demo": "npm run build:lib && webpack --config example/assistant-components-demo/webpack.config.js --mode production",
     "serve:require-demo": "webpack serve --config example/require-demo/webpack.config.js --mode development --open",
     "serve:create-assistant-page": "webpack serve --config webpack.create-assistant-page.config.js --mode development --open",
     "serve:digital-twin-demo": "webpack serve --config example/digital-twin-demo/webpack.config.js --mode development --open",
+    "serve:assistant-components-demo": "npm run build:lib && webpack serve --config example/assistant-components-demo/webpack.config.js --mode development --open",
     "lint": "eslint src --ext .ts,.tsx",
     "test": "jest --runInBand"
   },

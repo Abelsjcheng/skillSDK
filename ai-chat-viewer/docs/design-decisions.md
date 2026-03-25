@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.32`
+- 文档版本：`v3.50`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -24,26 +24,46 @@
 ### 2.1 新增文件（实现目标）
 
 1. `src/components/PersonalAssistantCreator.tsx`
-2. `src/components/createAssistant/StepBasicInfo.tsx`
-3. `src/components/createAssistant/StepBrainSelect.tsx`
-4. `src/components/createAssistant/CreatorStepHeader.tsx`
-5. `src/components/createAssistant/CreatorStepFooter.tsx`
-6. `src/components/createAssistant/constants.ts`
-7. `src/styles/PersonalAssistantCreator.less`
-8. `src/types/digitalTwin.ts`
-9. `src/pages/createAssistant/index.tsx`
-10. `public/create-assistant-page.html`
-11. `webpack.create-assistant-page.config.js`
+2. `src/pages/activateAssistant.tsx`
+3. `src/components/createAssistant/StepBasicInfo.tsx`
+4. `src/components/createAssistant/StepBrainSelect.tsx`
+5. `src/components/createAssistant/CreatorStepHeader.tsx`
+6. `src/components/createAssistant/CreatorStepFooter.tsx`
+7. `src/components/createAssistant/constants.ts`
+8. `src/styles/ActivateAssistant.less`
+9. `src/imgs/activate-guide-1.svg`
+10. `src/imgs/activate-guide-2.svg`
+11. `src/imgs/activate-bg.svg`
+12. `src/styles/PersonalAssistantCreator.less`
+13. `src/types/digitalTwin.ts`
+14. `src/pages/createAssistant.tsx`
+15. `public/create-assistant-page.html`
+16. `webpack.create-assistant-page.config.js`
+17. `src/pages/assistantDetail.tsx`
+18. `src/pages/switchAssistant.tsx`
+19. `src/components/assistant/AssistantPageHeader.tsx`
+20. `src/styles/AssistantPageHeader.less`
+21. `src/styles/AssistantDetail.less`
+22. `src/styles/SwitchAssistant.less`
+23. `src/imgs/icon-back.svg`
+24. `src/imgs/icon-service.svg`
+25. `src/imgs/assistant-avatar.svg`
+26. `src/imgs/switch-assistant-avatar.svg`
+27. `example/assistant-components-demo/index.html`
+28. `example/assistant-components-demo/webpack.config.js`
+29. `example/assistant-components-demo/src/index.tsx`
+30. `example/assistant-components-demo/README.md`
 
 ### 2.2 修改文件（导出目标）
 
 1. `src/lib/index.ts`
 2. `package.json`
 3. `src/components/__tests__/PersonalAssistantCreator.test.tsx`
+4. `src/routes/AppRouter.tsx`
 
 ## 3. 页面打包导出策略
 
-1. 新增独立页面打包配置 `webpack.create-assistant-page.config.js`，以 `src/pages/createAssistant/index.tsx` 作为入口。
+1. 新增独立页面打包配置 `webpack.create-assistant-page.config.js`，以 `src/pages/createAssistant.tsx` 作为入口。
 2. 页面构建产物输出到 `dist/create-assistant-page`，包含 `index.html` 与页面脚本。
 3. `src/lib/index.ts` 不再导出 `PersonalAssistantCreator`，保留 `AIChatViewer` 现有库导出能力。
 4. 在 `package.json` 增加页面构建与本地预览脚本（`build:create-assistant-page`、`serve:create-assistant-page`）。
@@ -229,6 +249,7 @@ interface CreateDigitalTwinParams {
 12. 页面主题背景容器附加统一阴影：`box-shadow: 0 16px 48px 0 rgba(0,0,0,0.16)`。
 13. 移动端样式覆盖与结构切换基于 `isPcMiniApp` 对应 class 生效，不使用媒体查询替代端类型判断。
 14. 页面 1 与页面 2 的重复结构（标题区、footer 操作区与主操作按钮 class 组装）抽取为公共实现，保持 UI 与交互行为不变，仅减少重复代码。
+15. 激活助理页面使用独立组件实现轮播区与操作区，避免与创建流程页面样式互相污染。
 
 ## 9. 可访问性与可测性
 
@@ -256,17 +277,65 @@ interface CreateDigitalTwinParams {
 ## 11. 路由实现决策
 
 1. 在主入口 `src/index.tsx` 基于 `react-router` 引入 `HashRouter`，路由配置下沉到独立路由组件。
-2. 路由表仅包含两个业务页与重定向规则：
+2. 路由表包含五个业务页与重定向规则：
    - `/aiChat` -> `App`（AI 对话页）
    - `/createAssistant` -> `PersonalAssistantCreator`（创建个人助理页）
+   - `/activateAssistant` -> `ActivateAssistant`（激活助理页）
+   - `/assistantDetail` -> `AssistantDetail`（助理详情页）
+   - `/switchAssistant` -> `SwitchAssistant`（切换助理页）
    - `/` 与 `*` -> 重定向到 `/aiChat`
 3. 页面路由切换不改变原有业务逻辑，只做视图层分发。
 4. `create-assistant-page` 独立打包入口维持现状，用于单页发布场景；与主入口路由方案并存。
 
-## 12. 依赖版本兼容决策
+## 12. 激活助理页面设计
+
+1. 页面结构拆分为两段：
+   - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
+   - 操作区：与内容区间距 `30px`，仅保留“立即启用”主按钮。
+   - 页面背景图使用 `src/imgs/activate-bg.svg`，底色为 `rgba(102,235,255,1)`。
+2. 内容区仅展示第一张本地图片资源 `src/imgs/activate-guide-1.svg`，不再保留轮播状态与指示器逻辑。
+3. “立即启用”按钮使用固定尺寸 `250x38`、圆角 `99px`、线性渐变背景，当前版本点击事件空实现（预留业务接入）。
+
+## 13. 依赖版本兼容决策
 
 1. 构建工具链保持对 `Node.js 18.x` 的可运行性。
 2. `copy-webpack-plugin` 固定为 `13.x`，避免 `14.x` 依赖 `Array.prototype.toSorted`（`Node 20+`）导致开发服务与生产构建失败。
+
+## 14. 助理详情页面设计
+
+1. 页面采用“标题区 + 内容区”纵向结构，整体宽高自适应占满路由容器。
+2. 标题区固定 `44px` 高、白色背景，左右采用 `90px` 对称占位，中间标题“助理详情”居中显示（`16px/400/22px`）。
+3. 标题区左侧包含两个图标按钮并垂直居中：
+   - 返回按钮：`24px x 24px`，左间距 `10px`，点击事件空实现；
+   - 客服按钮：`24px x 24px`，与返回按钮间距 `16px`，点击事件空实现。
+4. 内容区改为通过内边距控制与标题区间距，使用 `padding: 12px 16px 16px`（上 `12px`、左右 `16px`），包含三个白底圆角卡片（圆角 `8px`）：
+   - 卡片 1：头像（`72x72`，圆角 `19px`）+ 名称“小咪”+ 标签“员工助手”；名称文本需独立水平居中，标签不参与名称居中计算；
+   - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行（左“创建者”，右“小米”）；
+   - 卡片 3：组织信息两行（“部门/测试”“责任人/测试”），行样式与创建者行保持一致。
+   - 卡片 2 中“助理简介内容”和“创建者行”之间增加 `1px solid rgba(0,0,0,0.05)` 分割线；
+   - 卡片 3 中“部门”与“责任人”两行之间增加 `1px solid rgba(0,0,0,0.05)` 分割线。
+   - 标题区与头像区域相关图标/图片均通过 `src/imgs` 静态资源导入，不再使用内联 SVG 或纯色块占位。
+5. 页面为静态展示页，当前版本不接入接口与状态管理；按钮点击仅保留空实现占位，后续按业务接入。
+
+## 15. 切换助理页面设计
+
+1. 页面结构采用“标题区 + 列表内容区”，整体宽高占满路由容器。
+2. 标题区复用助理详情页的结构与样式规范（44px 白底头部、左双按钮、右侧占位、居中标题），标题文案使用“切换助理”。
+3. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动。
+4. 助理列表项样式固定：
+   - 列表项间距 `12px`；
+   - 单项尺寸 `height: 72px; width: 100%; border-radius: 8px; padding: 16px 12px`；
+   - 左侧头像 `40x40`，与右侧说明块间距 `16px`。
+5. 说明块第一行左侧主标题样式为 `16px/500/24px`、`rgba(51,51,51,1)`，右侧 tag 为 `60x16`、`4px` 圆角、`rgba(217,232,255,1)` 背景，tag 文本为 `10px/400/14px`、`rgba(65,142,255,1)`。
+6. 说明块第二行描述文案样式为 `14px/400/22px`、`rgba(102,102,102,1)`，采用单行省略号截断。
+7. 页面底部新增固定操作区，样式为 `height: 68px; width: 100%; padding: 12px 16px`，包含两个按钮分别左右对齐（左“取消选择”、右“确认切换”）：
+   - “取消选择”：`156x44`、圆角 `50px`、背景 `rgba(255,255,255,1)`；
+   - “确认切换”：`156x44`、圆角 `50px`、背景 `rgba(13,148,255,1)`。
+8. 底部按钮点击行为当前均采用空实现函数占位，后续按业务接入真实切换逻辑。
+9. 切换助理页标题区与头像图标统一通过 `src/imgs` 静态资源导入，不使用内联 SVG。
+10. 助理详情页与切换助理页迁移至 `src/pages` 目录单文件组件（`assistantDetail.tsx`、`switchAssistant.tsx`），并将重复标题区提取到 `src/components/assistant/AssistantPageHeader.tsx` 复用。
+11. 助理详情页与切换助理页需保留命名导出与默认导出，支持组件化引用场景。
+12. 新增 `example/assistant-components-demo`，用于演示通过库产物（`dist/lib/index.js`）导入 `AssistantDetail` 与 `SwitchAssistant` 并进行页面切换展示。
 
 
 

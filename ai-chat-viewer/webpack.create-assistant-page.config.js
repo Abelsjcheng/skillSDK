@@ -6,7 +6,7 @@ const {
 } = require('./webpack.shared');
 
 module.exports = {
-  entry: './src/pages/createAssistant/index.tsx',
+  entry: './src/pages/createAssistant.tsx',
   output: {
     path: path.resolve(__dirname, 'dist/create-assistant-page'),
     filename: 'js/create-assistant-page.[contenthash].js',

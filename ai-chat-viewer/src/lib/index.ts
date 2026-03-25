@@ -1,6 +1,8 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import App, { type AppProps } from '../App';
+import { AssistantDetail } from '../pages/assistantDetail';
+import { SwitchAssistant } from '../pages/switchAssistant';
 import type {
   Message,
   MessagePart,
@@ -19,6 +21,8 @@ export type {
   SessionStatus,
   AgentStatus,
 };
+
+export { AssistantDetail, SwitchAssistant };
 
 const rootMap = new WeakMap<Element, Root>();
 
