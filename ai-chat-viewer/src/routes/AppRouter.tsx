@@ -4,7 +4,9 @@ import App from '../App';
 import PersonalAssistantCreator from '../components/PersonalAssistantCreator';
 import ActivateAssistant from '../pages/activateAssistant';
 import AssistantDetail from '../pages/assistantDetail';
+import StartAssistant from '../pages/startAssistant';
 import SwitchAssistant from '../pages/switchAssistant';
+import WeAgentCUI from '../pages/weAgentCUI';
 
 const FULL_PAGE_ROUTE_STYLE: React.CSSProperties = {
   width: '100vw',
@@ -14,6 +16,7 @@ const FULL_PAGE_ROUTE_STYLE: React.CSSProperties = {
 export const AppRouter: React.FC = () => (
   <Routes>
     <Route path="/aiChat" element={<App />} />
+    <Route path="/weAgentCUI" element={<WeAgentCUI />} />
     <Route
       path="/createAssistant"
       element={(
@@ -43,6 +46,14 @@ export const AppRouter: React.FC = () => (
       element={(
         <div style={FULL_PAGE_ROUTE_STYLE}>
           <SwitchAssistant />
+        </div>
+      )}
+    />
+    <Route
+      path="/startAssistant"
+      element={(
+        <div style={FULL_PAGE_ROUTE_STYLE}>
+          <StartAssistant />
         </div>
       )}
     />

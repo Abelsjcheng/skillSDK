@@ -1,0 +1,169 @@
+.app-container--we-agent-cui {
+  padding: 8px 12px;
+  gap: 12px;
+  box-shadow: none;
+  background: linear-gradient(90deg, rgba(243, 248, 255, 1), rgba(255, 255, 255, 1) 100%);
+
+  .header-wrapper,
+  .content-wrapper,
+  .footer-wrapper {
+    margin-bottom: 0;
+  }
+
+  .content-wrapper {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .content--we-agent-cui {
+    padding: 7px 0;
+    background: transparent;
+  }
+
+  .messages-container--we-agent-cui {
+    gap: 24px;
+  }
+
+  .message-we-agent {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .we-agent-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+
+    &.we-agent-message--user {
+      align-items: flex-end;
+    }
+
+    &.we-agent-message--assistant {
+      align-items: flex-start;
+    }
+  }
+
+  .we-agent-message__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    &.is-user {
+      justify-content: flex-end;
+    }
+  }
+
+  .we-agent-message__meta-text {
+    color: rgba(57, 57, 57, 1);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 20px;
+  }
+
+  .we-agent-message__avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    object-fit: fill;
+    flex-shrink: 0;
+  }
+
+  .we-agent-message__bubble {
+    margin-top: 4px;
+    max-width: calc(100% - 28px);
+    word-break: break-word;
+    overflow-wrap: break-word;
+
+    &.is-user {
+      border-radius: 24px 0 24px 24px;
+      padding: 10px 20px;
+      background: linear-gradient(270deg, rgba(13, 148, 255, 1), rgba(22, 115, 246, 1) 100%);
+      color: #fff;
+    }
+
+    &.is-assistant {
+      border-radius: 0 24px 24px 24px;
+      padding: 16px;
+      background: #fff;
+    }
+  }
+
+  .we-agent-message__bubble .message-content {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+    color: inherit;
+  }
+
+  .we-agent-message__bubble p {
+    margin: 0;
+  }
+
+  .we-agent-cui-welcome {
+    margin-top: 27px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .we-agent-cui-welcome__avatar-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: 124px;
+    border: 2px solid rgba(255, 255, 255, 1);
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .we-agent-cui-welcome__avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .we-agent-cui-welcome__title {
+    color: rgba(25, 25, 25, 1);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 26px;
+  }
+
+  .we-agent-cui-welcome__subtitle {
+    color: rgba(89, 89, 89, 1);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+  }
+}
+
+.app-container--we-agent-cui.pc-mode {
+  height: 100vh;
+}
+
+.we-agent-cui-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.we-agent-cui-actions__button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 20px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.we-agent-cui-actions__icon {
+  width: 16px;
+  height: 16px;
+  object-fit: fill;
+}

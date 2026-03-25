@@ -17,6 +17,7 @@
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
 | `getWeAgentDetails` | `GET /v4-1/we-crew/{partnerAccount}` | 获取助理详情 |
+| `openAssistantCUI` | 无（SDK 本地能力） | 打开助理 CUI（当前空实现） |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外返回业务对象，不透出服务端外层包装字段（`code`/`message`/`error`）。
 
@@ -297,6 +298,60 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails>
 
 ---
 
+## 5. 打开助理 CUI 接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+打开助理 CUI 页面。
+
+当前版本仅保留接口形态，功能为空实现，调用后统一返回成功状态。
+
+### 接口名
+
+```typescript
+openAssistantCUI(params: OpenAssistantCUIParams): Promise<OpenAssistantCUIResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `weCodeUrl` | `string` | 是 | 助理 CUI 的 wecode 地址 |
+
+### 入参示例
+
+```json
+{
+  "weCodeUrl": "welink://welinkassistant/cui?assistantAccount=x00123456"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. 当前版本不调用服务端接口
+2. 预留打开 CUI 能力实现位置
+3. 直接返回 `OpenAssistantCUIResult`
+
+---
+
 ## 数据类型定义
 
 ### CreateDigitalTwinParams
@@ -381,5 +436,21 @@ type WeAgentDetails = {
   ownerDeptName: string
   ownerDeptNameEn: string
   bizRobotId: string
+}
+```
+
+### OpenAssistantCUIParams
+
+```typescript
+type OpenAssistantCUIParams = {
+  weCodeUrl: string
+}
+```
+
+### OpenAssistantCUIResult
+
+```typescript
+type OpenAssistantCUIResult = {
+  status: 'success'
 }
 ```

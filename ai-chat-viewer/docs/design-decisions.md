@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.56`
+- 文档版本：`v3.64`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -47,12 +47,16 @@
 22. `src/styles/SwitchAssistant.less`
 23. `src/imgs/icon-back.svg`
 24. `src/imgs/icon-service.svg`
-25. `src/imgs/assistant-avatar.svg`
-26. `src/imgs/switch-assistant-avatar.svg`
-27. `example/assistant-components-demo/index.html`
-28. `example/assistant-components-demo/webpack.config.js`
-29. `example/assistant-components-demo/src/index.tsx`
-30. `example/assistant-components-demo/README.md`
+25. `src/imgs/icon-close.svg`
+26. `src/imgs/assistant-avatar.svg`
+27. `src/imgs/switch-assistant-avatar.svg`
+28. `example/assistant-components-demo/index.html`
+29. `example/assistant-components-demo/webpack.config.js`
+30. `example/assistant-components-demo/src/index.tsx`
+31. `example/assistant-components-demo/README.md`
+32. `src/components/assistant/AssistantSelectionPage.tsx`
+33. `src/pages/startAssistant.tsx`
+34. `src/components/__tests__/StartAssistant.test.tsx`
 
 ### 2.2 修改文件（导出目标）
 
@@ -281,12 +285,14 @@ interface CreateDigitalTwinParams {
 ## 11. 路由实现决策
 
 1. 在主入口 `src/index.tsx` 基于 `react-router` 引入 `HashRouter`，路由配置下沉到独立路由组件。
-2. 路由表包含五个业务页与重定向规则：
+2. 路由表包含七个业务页与重定向规则：
    - `/aiChat` -> `App`（AI 对话页）
+   - `/weAgentCUI` -> `App(variant='weAgentCUI')`（WeAgentCUI 对话页）
    - `/createAssistant` -> `PersonalAssistantCreator`（创建个人助理页）
    - `/activateAssistant` -> `ActivateAssistant`（激活助理页）
    - `/assistantDetail` -> `AssistantDetail`（助理详情页）
    - `/switchAssistant` -> `SwitchAssistant`（切换助理页）
+   - `/startAssistant` -> `StartAssistant`（启动助理页）
    - `/` 与 `*` -> 重定向到 `/aiChat`
 3. 页面路由切换不改变原有业务逻辑，只做视图层分发。
 4. `create-assistant-page` 独立打包入口维持现状，用于单页发布场景；与主入口路由方案并存。
@@ -296,7 +302,7 @@ interface CreateDigitalTwinParams {
 1. 页面结构拆分为两段：
    - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
    - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
-   - 页面背景图使用 `src/imgs/activate-bg.svg`，底色为 `rgba(102,235,255,1)`。
+   - 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
 2. 内容区仅展示第一张本地图片资源 `src/imgs/activate-guide-1.svg`，不再保留轮播状态与指示器逻辑。
 3. “立即启用”按钮使用固定尺寸 `250x38`、圆角 `99px`、线性渐变背景，当前版本点击事件空实现（预留业务接入）。
 
@@ -308,10 +314,10 @@ interface CreateDigitalTwinParams {
 ## 14. 助理详情页面设计
 
 1. 页面采用“标题区 + 内容区”纵向结构，整体宽高自适应占满路由容器。
-2. 标题区固定 `44px` 高、白色背景，左右采用 `90px` 对称占位，中间标题“助理详情”居中显示（`16px/400/22px`）。
-3. 标题区左侧包含两个图标按钮并垂直居中：
-   - 返回按钮：`24px x 24px`，左间距 `10px`，点击事件空实现；
-   - 客服按钮：`24px x 24px`，与返回按钮间距 `16px`，点击事件空实现。
+2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+3. 标题区通过 `isPcMiniApp` 区分端样式：
+   - `isPcMiniApp === true`（PC）：`height: 54px; padding: 11px 16px;`，左侧 `32x32` 关闭按钮（内含 `20x20` 关闭图标），右侧 `32x32` 客服按钮（内含 `20x20` 客服图标），中间标题居中。
+   - `isPcMiniApp === false`（移动）：沿用现有 `44px` 高度与左侧返回+客服按钮布局。
 4. 内容区改为通过内边距控制与标题区间距，使用 `padding: 12px 16px 16px`（上 `12px`、左右 `16px`），包含三个白底圆角卡片（圆角 `8px`）：
    - 卡片 1：头像（`72x72`，圆角 `19px`）+ 名称“小咪”+ 标签“员工助手”；名称文本需独立水平居中，标签不参与名称居中计算；
    - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行（左“创建者”，右“小米”）；
@@ -324,24 +330,69 @@ interface CreateDigitalTwinParams {
 ## 15. 切换助理页面设计
 
 1. 页面结构采用“标题区 + 列表内容区”，整体宽高占满路由容器。
-2. 标题区复用助理详情页的结构与样式规范（44px 白底头部、左双按钮、右侧占位、居中标题），标题文案使用“切换助理”。
-3. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动，并隐藏可视滚动条。
-4. 助理列表项样式固定：
+2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+3. 标题区复用助理详情页的结构与样式规范（含 `isPcMiniApp` 的 PC/移动端分支），标题文案使用“切换助理”。
+4. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动，并隐藏可视滚动条。
+5. 助理列表项样式固定：
    - 列表项间距 `12px`；
    - 单项尺寸 `height: 72px; width: 100%; border-radius: 8px; padding: 16px 12px`；
    - 左侧头像 `40x40`，与右侧说明块间距 `16px`。
    - 列表项支持单选态，点击后为当前项增加 `1px solid rgba(13,148,255,1)` 边框；未选中项保持透明边框，避免布局抖动。
    - 列表项去除浏览器默认点击/聚焦高亮，仅保留选中边框作为反馈。
-5. 说明块第一行左侧主标题样式为 `16px/500/24px`、`rgba(51,51,51,1)`，右侧 tag 为内容自适应宽度、`padding: 2px 4px`、`4px` 圆角、`rgba(217,232,255,1)` 背景，tag 文本为 `10px/400/14px`、`rgba(65,142,255,1)`。
-6. 说明块第二行描述文案样式为 `14px/400/22px`、`rgba(102,102,102,1)`，采用单行省略号截断。
-7. 页面底部新增固定操作区，样式为 `height: 68px; width: 100%; padding: 12px 16px`，包含两个按钮分别左右对齐（左“取消选择”、右“确认切换”）：
+6. 说明块第一行左侧主标题样式为 `16px/500/24px`、`rgba(51,51,51,1)`，右侧 tag 为内容自适应宽度、`padding: 2px 4px`、`4px` 圆角、`rgba(217,232,255,1)` 背景，tag 文本为 `10px/400/14px`、`rgba(65,142,255,1)`。
+7. 说明块第二行描述文案样式为 `14px/400/22px`、`rgba(102,102,102,1)`，采用单行省略号截断。
+8. 页面底部新增固定操作区，样式为 `height: 68px; width: 100%; padding: 12px 16px`，包含两个按钮分别左右对齐（左“取消选择”、右“确认切换”）：
    - “取消选择”：`156x44`、圆角 `50px`、背景 `rgba(255,255,255,1)`；
    - “确认切换”：`156x44`、圆角 `50px`、背景 `rgba(13,148,255,1)`。
-8. 底部按钮点击行为当前均采用空实现函数占位，后续按业务接入真实切换逻辑。
-9. 切换助理页标题区与头像图标统一通过 `src/imgs` 静态资源导入，不使用内联 SVG。
-10. 助理详情页与切换助理页迁移至 `src/pages` 目录单文件组件（`assistantDetail.tsx`、`switchAssistant.tsx`），并将重复标题区提取到 `src/components/assistant/AssistantPageHeader.tsx` 复用。
-11. 助理详情页与切换助理页需保留命名导出与默认导出，支持组件化引用场景。
-12. 新增 `example/assistant-components-demo`，用于演示通过库产物（`dist/lib/index.js`）导入 `AssistantDetail` 与 `SwitchAssistant` 并进行页面切换展示。
+9. 底部按钮点击行为当前均采用空实现函数占位，后续按业务接入真实切换逻辑。
+10. 切换助理页标题区与头像图标统一通过 `src/imgs` 静态资源导入，不使用内联 SVG。
+11. 助理详情页与切换助理页迁移至 `src/pages` 目录单文件组件（`assistantDetail.tsx`、`switchAssistant.tsx`），并将重复标题区提取到 `src/components/assistant/AssistantPageHeader.tsx` 复用。
+12. 助理详情页与切换助理页源码文件仅保留 `default export`；组件化引用场景所需的命名导出统一由 `src/lib/index.ts` 转出。
+13. 新增 `example/assistant-components-demo`，用于演示通过库产物（`dist/lib/index.js`）导入 `AssistantDetail` 与 `SwitchAssistant` 并进行页面切换展示。
+14. “切换助理页”与“启动助理页”共用列表布局与交互结构，提取到 `src/components/assistant/AssistantSelectionPage.tsx` 复用；两个页面仅传入不同的标题和底部按钮文案。
+
+## 16. 启动助理页面设计
+
+1. 页面组件放在 `src/pages/startAssistant.tsx`。
+2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+3. 使用 `isPcMiniApp` 做双端分支：
+   - `false`（移动）：继续复用 `AssistantSelectionPage` 的现有样式与交互，不做变更；
+   - `true`（PC）：走独立 PC 布局渲染。
+4. PC 布局采用 `500px` 宽度的居中面板（标题区 + 内容区 + 底部操作区）。
+5. PC 标题区仅显示标题“启用助理”，字号 `24px`、字重 `700`、行高 `24px`，高度随内容自适应。
+6. PC 内容区内边距固定为 `padding: 36px 24px`。
+7. PC 底部操作区水平居中显示两个按钮，间距 `12px`：
+   - 左按钮“创建助理”：`80x32`，圆角 `4px`，背景 `rgba(0,0,0,0.05)`；
+   - 右按钮“立即启用”：`80x32`，圆角 `4px`，背景 `rgba(13,148,255,1)`。
+8. PC 与移动端按钮事件保持空实现占位，后续再接入业务逻辑。
+
+## 17. WeAgentCUI 页面设计
+
+1. 新增 `WeAgentCUI` 路由页，功能复用现有 `aiChat` 数据流与会话能力（消息加载、发送、流式更新、停止、重试、历史分页）。
+2. 为减少逻辑重复，`App` 增加 `variant` 视图变体能力：默认值为 `default`；`weAgentCUI` 仅切换布局与样式，不改业务逻辑。
+3. `weAgentCUI` 变体下页面结构改为：`对话内容区 + 多功能按钮区 + 底部输入区`，不渲染原 `Header` 区。
+4. `weAgentCUI` 页面根容器背景统一使用线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+5. 多功能按钮区提供“新建会话”“历史会话”两个按钮，当前点击行为为空实现，仅预留扩展点。
+6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
+   - 用户消息右对齐，头部文案为“测试 + 时间”，右侧头像 `24x24`；
+   - 助手消息左对齐，头部文案为“小米 + 时间”，左侧头像 `24x24`；
+   - 用户气泡使用蓝色线性渐变，助手气泡使用白底圆角样式。
+7. 输入区在 `Footer` 增加变体样式支持：
+   - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px; background: #fff`；
+   - placeholder 固定为“有问题尽管问我~”；
+   - 发送按钮为 `24x24` 图标按钮，图标尺寸 `20x20`。
+8. 新增样式文件 `src/styles/WeAgentCUI.less`，集中维护变体布局；并通过 class 前缀 `we-agent-cui-` 约束样式作用域，避免影响现有 `aiChat` 页面。
+9. 新增图标资源：
+   - `src/imgs/icon-we-agent-new-session.svg`
+   - `src/imgs/icon-we-agent-history.svg`
+   - `src/imgs/icon-we-agent-send.svg`
+10. 视觉样式改造仅在 `variant='weAgentCUI'` 时生效，保持 `/aiChat` 现有 UI 与交互不变。
+11. 在 `weAgentCUI` 变体下，当消息列表为空时，`Content` 区渲染欢迎块（头像 + 标题 + 副标题），样式规则如下：
+   - 顶部间距 `27px`；
+   - 纵向 `12px` 间距、水平居中；
+   - 头像容器 `72x72`，圆角 `124px`，白色 `2px` 边框；
+   - 标题文本：`早上好，峰哥`（`18px/500/26px`，`rgba(25,25,25,1)`）；
+   - 副标题文本：`CodeAgent | 你的专属编程智能体`（`14px/400/22px`，`rgba(89,89,89,1)`）。
 
 
 

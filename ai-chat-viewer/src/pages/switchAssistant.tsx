@@ -1,93 +1,21 @@
-import React, { useState } from 'react';
-import switchAssistantAvatar from '../imgs/switch-assistant-avatar.svg';
-import '../styles/SwitchAssistant.less';
-import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
-
-interface AssistantItem {
-  id: string;
-  name: string;
-  tag: string;
-  description: string;
-}
-
-const ASSISTANT_LIST: AssistantItem[] = [
-  { id: 'assistant-1', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-2', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-3', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-4', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-5', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-6', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-7', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-];
+import React from 'react';
+import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
+import { isPcMiniApp } from '../utils/hwext';
 
 const SwitchAssistant: React.FC = () => {
-  const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
-
+  const isPc = isPcMiniApp();
   const handleCancelSelect = () => {};
   const handleConfirmSwitch = () => {};
-  const handleSelectAssistant = (assistantId: string) => {
-    setSelectedAssistantId(assistantId);
-  };
-
-  const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-
-    event.preventDefault();
-    handleSelectAssistant(assistantId);
-  };
 
   return (
-    <div className="switch-assistant">
-      <AssistantPageHeader title="切换助理" />
-
-      <main className="switch-assistant__content">
-        <div className="switch-assistant__list">
-          {ASSISTANT_LIST.map((assistant) => (
-            <article
-              key={assistant.id}
-              className={`switch-assistant__card${
-                selectedAssistantId === assistant.id ? ' switch-assistant__card--selected' : ''
-              }`}
-              onClick={() => handleSelectAssistant(assistant.id)}
-              onKeyDown={(event) => handleAssistantKeyDown(event, assistant.id)}
-              tabIndex={0}
-              role="button"
-              aria-pressed={selectedAssistantId === assistant.id}
-            >
-              <div className="switch-assistant__avatar">
-                <img src={switchAssistantAvatar} alt="" className="switch-assistant__avatar-img" aria-hidden="true" />
-              </div>
-              <div className="switch-assistant__desc">
-                <div className="switch-assistant__desc-row">
-                  <span className="switch-assistant__name">{assistant.name}</span>
-                  <span className="switch-assistant__tag">{assistant.tag}</span>
-                </div>
-                <p className="switch-assistant__summary">{assistant.description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </main>
-
-      <footer className="switch-assistant__actions">
-        <button
-          type="button"
-          className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
-          onClick={handleCancelSelect}
-        >
-          取消选择
-        </button>
-        <button
-          type="button"
-          className="switch-assistant__action-btn switch-assistant__action-btn--confirm"
-          onClick={handleConfirmSwitch}
-        >
-          确认切换
-        </button>
-      </footer>
-    </div>
+    <AssistantSelectionPage
+      title="切换助理"
+      isPcMiniApp={isPc}
+      leftButtonText="取消选择"
+      rightButtonText="确认切换"
+      onLeftButtonClick={handleCancelSelect}
+      onRightButtonClick={handleConfirmSwitch}
+    />
   );
 };
 

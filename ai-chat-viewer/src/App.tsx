@@ -34,11 +34,17 @@ import {
   snapshotMessageToMessage,
 } from './utils/message';
 import { showToast } from './utils/toast';
+import iconWeAgentHistory from './imgs/icon-we-agent-history.svg';
+import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
 import './styles/App.less';
+import './styles/WeAgentCUI.less';
 
 export interface AppProps {
   welinkSessionId?: string;
+  variant?: AppVariant;
 }
+
+export type AppVariant = 'default' | 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -49,8 +55,12 @@ function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
   return (result.page + 1) * result.size < result.total;
 }
 
-function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
+function App({
+  welinkSessionId: welinkSessionIdProp,
+  variant = 'default',
+}: AppProps) {
   const isPc = isPcMiniApp();
+  const isWeAgentCUI = variant === 'weAgentCUI';
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -502,14 +512,30 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
       });
   }, []);
 
+  const handleCreateSession = useCallback(() => {
+    // WeAgentCUI 保留扩展点：新建会话
+  }, []);
+
+  const handleOpenHistory = useCallback(() => {
+    // WeAgentCUI 保留扩展点：历史会话
+  }, []);
+
   return (
-    <div className={`app-container ${isPc ? 'pc-mode' : ''}`.trim()}>
-      <div className="header-wrapper">
-        <Header
-          onMinimize={handleMinimize}
-          onClose={handleClose}
-        />
-      </div>
+    <div
+      className={[
+        'app-container',
+        isPc ? 'pc-mode' : '',
+        isWeAgentCUI ? 'app-container--we-agent-cui' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      {!isWeAgentCUI && (
+        <div className="header-wrapper">
+          <Header
+            onMinimize={handleMinimize}
+            onClose={handleClose}
+          />
+        </div>
+      )}
       <div className="content-wrapper">
         <Content
           messages={messages}
@@ -520,8 +546,37 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
           onLoadMoreHistory={loadMoreHistory}
           onCopy={handleCopy}
           onSendToIM={handleSendToIM}
+          variant={variant}
         />
       </div>
+      {isWeAgentCUI && (
+        <div className="we-agent-cui-actions" aria-label="多功能按钮区">
+          <button
+            type="button"
+            className="we-agent-cui-actions__button"
+            onClick={handleCreateSession}
+            aria-label="新建会话"
+          >
+            <img
+              className="we-agent-cui-actions__icon"
+              src={iconWeAgentNewSession}
+              alt=""
+            />
+          </button>
+          <button
+            type="button"
+            className="we-agent-cui-actions__button"
+            onClick={handleOpenHistory}
+            aria-label="历史会话"
+          >
+            <img
+              className="we-agent-cui-actions__icon"
+              src={iconWeAgentHistory}
+              alt=""
+            />
+          </button>
+        </div>
+      )}
       <div className="footer-wrapper">
         <Footer
           mode={footerMode}
@@ -529,6 +584,7 @@ function App({ welinkSessionId: welinkSessionIdProp }: AppProps) {
           onStop={handleStop}
           onRegenerate={handleRegenerate}
           isPc={isPc}
+          variant={variant}
         />
       </div>
     </div>

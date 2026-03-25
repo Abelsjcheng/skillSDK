@@ -1,7 +1,8 @@
 import React from 'react';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
-import '../styles/AssistantDetail.less';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
+import '../styles/AssistantDetail.less';
+import { isPcMiniApp } from '../utils/hwext';
 
 interface DetailInfoRowProps {
   label: string;
@@ -16,9 +17,11 @@ const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value }) => (
 );
 
 const AssistantDetail: React.FC = () => {
+  const isPc = isPcMiniApp();
+
   return (
     <div className="assistant-detail">
-      <AssistantPageHeader title="助理详情" />
+      <AssistantPageHeader title="助理详情" isPcMiniApp={isPc} />
 
       <main className="assistant-detail__content">
         <section className="assistant-detail__card assistant-detail__card--profile">

@@ -11,8 +11,11 @@ import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
+import type { AppVariant } from '../App';
 import type { Message, MessagePart } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
+import assistantAvatar from '../imgs/assistant-avatar.svg';
+import userAvatar from '../imgs/switch-assistant-avatar.svg';
 import 'katex/dist/katex.min.css';
 
 interface MessageBubbleProps {
@@ -20,6 +23,7 @@ interface MessageBubbleProps {
   welinkSessionId: string;
   onCopy?: (content: string) => void;
   onSendToIM?: (content: string) => void;
+  variant?: AppVariant;
 }
 
 const roleLabels: Record<string, string> = {
@@ -29,14 +33,26 @@ const roleLabels: Record<string, string> = {
   tool: '工具',
 };
 
+function formatMessageTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   welinkSessionId,
   onCopy,
   onSendToIM,
+  variant = 'default',
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
+  const isWeAgentCUI = variant === 'weAgentCUI';
 
   const markdownComponents: Components = useMemo(
     () => ({
@@ -154,6 +170,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
   };
 
+  const messageContent = renderContent();
+
+  if (isWeAgentCUI) {
+    const messageMetaText = `${isUser ? '测试' : '小米'} ${formatMessageTime(message.timestamp)}`;
+
+    return (
+      <div className={`message-block message-we-agent ${isUser ? 'message-user' : 'message-assistant'}`}>
+        <div className={`we-agent-message ${isUser ? 'we-agent-message--user' : 'we-agent-message--assistant'}`}>
+          <div className={`we-agent-message__meta ${isUser ? 'is-user' : 'is-assistant'}`}>
+            {isUser ? (
+              <>
+                <span className="we-agent-message__meta-text">{messageMetaText}</span>
+                <img className="we-agent-message__avatar" src={userAvatar} alt="" />
+              </>
+            ) : (
+              <>
+                <img className="we-agent-message__avatar" src={assistantAvatar} alt="" />
+                <span className="we-agent-message__meta-text">{messageMetaText}</span>
+              </>
+            )}
+          </div>
+          <div className={`we-agent-message__bubble ${isUser ? 'is-user' : 'is-assistant'}`}>
+            <div className="message-content">{messageContent}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`message-block ${isUser ? 'message-user' : 'message-assistant'}`}>
       <div className="message-content">
@@ -162,7 +207,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {roleLabels[normalizedRole] ?? message.role}
           </div>
         )}
-        {renderContent()}
+        {messageContent}
       </div>
       {!isUser && !message.isStreaming && message.content && (
         <div className="message-actions">

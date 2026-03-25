@@ -1,4 +1,6 @@
-﻿import React, { useState, KeyboardEvent, useEffect, useRef } from 'react';
+import React, { useState, KeyboardEvent, useEffect, useRef } from 'react';
+import type { AppVariant } from '../App';
+import iconWeAgentSend from '../imgs/icon-we-agent-send.svg';
 import '../styles/Footer.less';
 
 export type FooterMode = 'generate' | 'generating' | 'regenerate';
@@ -9,6 +11,7 @@ interface FooterProps {
   onStop: () => void;
   onRegenerate: () => void;
   isPc?: boolean;
+  variant?: AppVariant;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -17,12 +20,14 @@ export const Footer: React.FC<FooterProps> = ({
   onStop,
   onRegenerate,
   isPc = false,
+  variant = 'default',
 }) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const showInput = mode === 'generate';
+  const isWeAgentCUI = variant === 'weAgentCUI';
 
   useEffect(() => {
     if (!showInput) {
@@ -98,26 +103,32 @@ export const Footer: React.FC<FooterProps> = ({
 
     return (
       <button
-        className="send-icon-btn"
+        className={`send-icon-btn ${isWeAgentCUI ? 'send-icon-btn--we-agent-cui' : ''}`.trim()}
         onClick={handleGenerate}
         disabled={!value.trim()}
         title="生成"
       >
-        <svg
-          className="send-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <span className="send-btn-text">生成</span>
+        {isWeAgentCUI ? (
+          <img className="send-icon send-icon--we-agent-cui" src={iconWeAgentSend} alt="" />
+        ) : (
+          <>
+            <svg
+              className="send-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="send-btn-text">生成</span>
+          </>
+        )}
       </button>
     );
   };
@@ -127,6 +138,7 @@ export const Footer: React.FC<FooterProps> = ({
       className={[
         'footer-container',
         isPc ? 'footer-pc' : '',
+        isWeAgentCUI ? 'footer-we-agent-cui' : '',
         showInput ? '' : 'footer-without-input',
         showInput && isFocused ? 'footer-focused' : '',
       ].filter(Boolean).join(' ')}
@@ -136,7 +148,7 @@ export const Footer: React.FC<FooterProps> = ({
           ref={inputRef}
           type="text"
           className="footer-input"
-          placeholder="请输入您的问题..."
+          placeholder={isWeAgentCUI ? '有问题尽管问我~' : '请输入您的问题...'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

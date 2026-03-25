@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { ActivateAssistant } from '../../pages/activateAssistant';
+import ActivateAssistant from '../../pages/activateAssistant';
 
 describe('ActivateAssistant', () => {
   it('renders static guide image and enable button', () => {

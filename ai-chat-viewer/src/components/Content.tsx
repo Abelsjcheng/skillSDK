@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { MessageBubble } from './MessageBubble';
+import type { AppVariant } from '../App';
+import assistantAvatar from '../imgs/assistant-avatar.svg';
 import type { Message } from '../types';
 import '../styles/Content.less';
 
@@ -14,6 +16,7 @@ interface ContentProps {
   onLoadMoreHistory: () => void;
   onCopy: (content: string) => void;
   onSendToIM: (content: string) => void;
+  variant?: AppVariant;
 }
 
 export const Content: React.FC<ContentProps> = ({
@@ -25,7 +28,9 @@ export const Content: React.FC<ContentProps> = ({
   onLoadMoreHistory,
   onCopy,
   onSendToIM,
+  variant = 'default',
 }) => {
+  const isWeAgentCUI = variant === 'weAgentCUI';
   const containerRef = useRef<HTMLDivElement>(null);
   const preservingAnchorRef = useRef<{
     active: boolean;
@@ -86,7 +91,6 @@ export const Content: React.FC<ContentProps> = ({
 
     scrollToBottom();
 
-    // Run again in the next frame and a short delay to absorb layout changes.
     const rafId = window.requestAnimationFrame(scrollToBottom);
     const timerId = window.setTimeout(scrollToBottom, 80);
 
@@ -105,7 +109,7 @@ export const Content: React.FC<ContentProps> = ({
 
   if (isLoading) {
     return (
-      <div className="content">
+      <div className={`content ${isWeAgentCUI ? 'content--we-agent-cui' : ''}`.trim()}>
         <div className="loading-container">
           <span className="loading-dot" />
           <span className="loading-dot" />
@@ -117,8 +121,22 @@ export const Content: React.FC<ContentProps> = ({
   }
 
   if (messages.length === 0) {
+    if (isWeAgentCUI) {
+      return (
+        <div className={`content ${isWeAgentCUI ? 'content--we-agent-cui' : ''}`.trim()}>
+          <div className="we-agent-cui-welcome">
+            <div className="we-agent-cui-welcome__avatar-wrap" aria-hidden="true">
+              <img src={assistantAvatar} alt="" className="we-agent-cui-welcome__avatar" />
+            </div>
+            <div className="we-agent-cui-welcome__title">早上好，峰哥</div>
+            <div className="we-agent-cui-welcome__subtitle">CodeAgent | 你的专属编程智能体</div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="content">
+      <div className={`content ${isWeAgentCUI ? 'content--we-agent-cui' : ''}`.trim()}>
         <div className="empty-container">
           <span className="emoji">💬</span>
           <span>发送一条消息开始对话</span>
@@ -128,8 +146,12 @@ export const Content: React.FC<ContentProps> = ({
   }
 
   return (
-    <div className="content" ref={containerRef} onScroll={handleScroll}>
-      <div className="messages-container">
+    <div
+      className={`content ${isWeAgentCUI ? 'content--we-agent-cui' : ''}`.trim()}
+      ref={containerRef}
+      onScroll={handleScroll}
+    >
+      <div className={`messages-container ${isWeAgentCUI ? 'messages-container--we-agent-cui' : ''}`.trim()}>
         {isLoadingHistory && (
           <div className="history-status">加载历史消息中...</div>
         )}
@@ -143,6 +165,7 @@ export const Content: React.FC<ContentProps> = ({
               welinkSessionId={welinkSessionId}
               onCopy={onCopy}
               onSendToIM={onSendToIM}
+              variant={variant}
             />
           </div>
         ))}
