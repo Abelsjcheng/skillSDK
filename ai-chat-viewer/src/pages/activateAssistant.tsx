@@ -23,4 +23,3 @@ const ActivateAssistant: React.FC = () => {
 };
 
 export default ActivateAssistant;
-export { ActivateAssistant };

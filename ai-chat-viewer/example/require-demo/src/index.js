@@ -1,9 +1,12 @@
 const AIChatViewerModule = require('../../../dist/lib/index.js');
 const { createMockHwh5ext } = require('./mockHwh5ext');
+const AIChatViewerGlobal =
+  typeof globalThis !== 'undefined' ? globalThis.AIChatViewer : undefined;
 
 const AIChatViewerExport =
   AIChatViewerModule.default ||
   AIChatViewerModule.AIChatViewer ||
+  AIChatViewerGlobal ||
   AIChatViewerModule;
 
 const mountAIChatViewer =

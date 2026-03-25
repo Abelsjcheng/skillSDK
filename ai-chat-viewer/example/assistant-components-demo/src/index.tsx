@@ -2,18 +2,29 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const AIChatViewerModule = require('../../../dist/lib/index.js');
+const AIChatViewerGlobal =
+  typeof globalThis !== 'undefined' ? (globalThis as typeof globalThis & { AIChatViewer?: unknown }).AIChatViewer : undefined;
 const AIChatViewerExport =
   AIChatViewerModule.default ||
   AIChatViewerModule.AIChatViewer ||
+  AIChatViewerGlobal ||
   AIChatViewerModule;
 
 const AssistantDetail =
   AIChatViewerModule.AssistantDetail ||
-  (AIChatViewerExport && AIChatViewerExport.AssistantDetail);
+  (AIChatViewerExport &&
+    typeof AIChatViewerExport === 'object' &&
+    'AssistantDetail' in AIChatViewerExport
+    ? (AIChatViewerExport as { AssistantDetail?: React.ComponentType }).AssistantDetail
+    : undefined);
 
 const SwitchAssistant =
   AIChatViewerModule.SwitchAssistant ||
-  (AIChatViewerExport && AIChatViewerExport.SwitchAssistant);
+  (AIChatViewerExport &&
+    typeof AIChatViewerExport === 'object' &&
+    'SwitchAssistant' in AIChatViewerExport
+    ? (AIChatViewerExport as { SwitchAssistant?: React.ComponentType }).SwitchAssistant
+    : undefined);
 
 const rootElement = document.getElementById('root');
 

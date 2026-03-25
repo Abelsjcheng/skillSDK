@@ -80,4 +80,3 @@ const PersonalAssistantCreator: React.FC = () => {
 };
 
 export default PersonalAssistantCreator;
-export { PersonalAssistantCreator };

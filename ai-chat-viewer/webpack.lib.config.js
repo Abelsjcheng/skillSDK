@@ -14,9 +14,8 @@ module.exports = {
     library: {
       name: 'AIChatViewer',
       type: 'umd',
-      export: 'default',
     },
-    globalObject: 'this',
+    globalObject: 'globalThis',
     clean: true,
     publicPath: './'
   },

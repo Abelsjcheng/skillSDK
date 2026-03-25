@@ -1,7 +1,7 @@
 ﻿# 创建个人助理组件设计决策文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.50`
+- 文档版本：`v3.56`
 - 创建日期：`2026-03-18`
 - 状态：`设计已确认，可进入计划拆分`
 
@@ -69,6 +69,10 @@
 4. 在 `package.json` 增加页面构建与本地预览脚本（`build:create-assistant-page`、`serve:create-assistant-page`）。
 5. 页面模板需保证 `html/body/#root` 为 `100%` 宽高，确保组件可占满页面。
 6. 页面入口不使用 `React.StrictMode` 包裹，避免开发环境下页面 2 初始化 `useEffect` 双执行导致重复请求。
+7. `example/assistant-components-demo` 继续以 `require('../../../dist/lib/index.js')` 的方式消费库产物，验证真实打包结果，而不是直接引用源码模块。
+8. `webpack.lib.config.js` 的 UMD 根对象改为 `globalThis`，避免 demo 二次打包 `dist/lib/index.js` 时因顶层 `this` 为 `undefined` 导致 `AIChatViewer` 挂载失败。
+9. 取消 `library.export = 'default'`，使库构建产物同时暴露默认导出与命名导出，保障 `AssistantDetail`、`SwitchAssistant`、`mountAIChatViewer`、`unmountAIChatViewer` 在 demo 与宿主侧都可稳定读取。
+10. 源码层页面/组件文件统一采用单一导出策略：组件文件仅保留 `default export`，如需命名导出能力，由 `src/lib/index.ts` 统一转出，避免源码层重复导出。
 
 ## 4. 组件 API 决策
 
@@ -291,7 +295,7 @@ interface CreateDigitalTwinParams {
 
 1. 页面结构拆分为两段：
    - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
-   - 操作区：与内容区间距 `30px`，仅保留“立即启用”主按钮。
+   - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
    - 页面背景图使用 `src/imgs/activate-bg.svg`，底色为 `rgba(102,235,255,1)`。
 2. 内容区仅展示第一张本地图片资源 `src/imgs/activate-guide-1.svg`，不再保留轮播状态与指示器逻辑。
 3. “立即启用”按钮使用固定尺寸 `250x38`、圆角 `99px`、线性渐变背景，当前版本点击事件空实现（预留业务接入）。
@@ -321,12 +325,14 @@ interface CreateDigitalTwinParams {
 
 1. 页面结构采用“标题区 + 列表内容区”，整体宽高占满路由容器。
 2. 标题区复用助理详情页的结构与样式规范（44px 白底头部、左双按钮、右侧占位、居中标题），标题文案使用“切换助理”。
-3. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动。
+3. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动，并隐藏可视滚动条。
 4. 助理列表项样式固定：
    - 列表项间距 `12px`；
    - 单项尺寸 `height: 72px; width: 100%; border-radius: 8px; padding: 16px 12px`；
    - 左侧头像 `40x40`，与右侧说明块间距 `16px`。
-5. 说明块第一行左侧主标题样式为 `16px/500/24px`、`rgba(51,51,51,1)`，右侧 tag 为 `60x16`、`4px` 圆角、`rgba(217,232,255,1)` 背景，tag 文本为 `10px/400/14px`、`rgba(65,142,255,1)`。
+   - 列表项支持单选态，点击后为当前项增加 `1px solid rgba(13,148,255,1)` 边框；未选中项保持透明边框，避免布局抖动。
+   - 列表项去除浏览器默认点击/聚焦高亮，仅保留选中边框作为反馈。
+5. 说明块第一行左侧主标题样式为 `16px/500/24px`、`rgba(51,51,51,1)`，右侧 tag 为内容自适应宽度、`padding: 2px 4px`、`4px` 圆角、`rgba(217,232,255,1)` 背景，tag 文本为 `10px/400/14px`、`rgba(65,142,255,1)`。
 6. 说明块第二行描述文案样式为 `14px/400/22px`、`rgba(102,102,102,1)`，采用单行省略号截断。
 7. 页面底部新增固定操作区，样式为 `height: 68px; width: 100%; padding: 12px 16px`，包含两个按钮分别左右对齐（左“取消选择”、右“确认切换”）：
    - “取消选择”：`156x44`、圆角 `50px`、背景 `rgba(255,255,255,1)`；

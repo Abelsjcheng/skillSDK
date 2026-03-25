@@ -1,7 +1,7 @@
 ﻿# 创建个人助理页面需求文档
 
 - 项目：`ai-chat-viewer`
-- 文档版本：`v3.53`
+- 文档版本：`v3.59`
 - 创建日期：`2026-03-18`
 - 状态：`需求已确认，可进入设计阶段`
 
@@ -36,6 +36,9 @@
 15. `src/pages` 中页面组件采用单文件方式管理（如 `assistantDetail.tsx`、`switchAssistant.tsx`），不再使用页面目录下的 `index.tsx` 结构。
 16. 助理详情页面与切换助理页面需支持组件化导出使用。
 17. `example` 中新增 demo，演示导入并渲染 `AssistantDetail`、`SwitchAssistant` 的组件化导出。
+18. `assistant-components-demo` 需可直接消费 `dist/lib/index.js` 的构建产物并稳定运行，不能在浏览器中出现 `Cannot set properties of undefined (setting 'AIChatViewer')` 报错。
+19. `dist/lib/index.js` 的库导出需同时支持默认导出能力与 `AssistantDetail`、`SwitchAssistant`、`mountAIChatViewer`、`unmountAIChatViewer` 等命名导出读取。
+20. 组件/页面源码文件内部只保留一种导出方式，不允许在同一文件中同时使用 `export default Xxx;` 与 `export { Xxx };` 双导出；对外需要的命名导出统一由库入口文件转出。
 
 ## 3. 页面流程
 
@@ -423,7 +426,7 @@
    - 仅展示第一张引导图：`src/imgs/activate-guide-1.svg`；
    - 不展示轮播按钮区域。
 2. 操作区：
-   - 距离内容区 `30px`；
+   - 距离内容区 `65px`；
    - 水平居中显示“立即启用”按钮；
    - 按钮尺寸 `250px x 38px`；
    - 圆角半径 `99px`；
@@ -468,16 +471,18 @@
 2. 内容区：
    - `padding: 12px 16px`（上下 `12px`、左右 `16px`）；
    - 内部为助理列表容器，超出区域可纵向滚动；
+   - 列表滚动条隐藏，但保留滚动能力；
    - 助理块间距 `12px`；
    - 单个助理块样式：
       - 宽度占满，固定高度 `72px`，圆角 `8px`；
       - `padding: 16px 12px`（需使用 `box-sizing: border-box` 保证总高为 `72px`）；
       - 左侧头像图标尺寸固定 `40px x 40px`；
       - 图标右侧间距 `16px` 为助理说明块。
+   - 点击助理块后，当前选中块仅显示 `1px solid rgba(13,148,255,1)` 边框，不显示额外高亮效果（如背景高亮、系统点击高亮或焦点发光）。
 3. 助理说明块：
    - 第一行：
       - 左侧文本：`编程助理`，样式 `16px/500/24px`，颜色 `rgba(51,51,51,1)`；
-      - 右侧 tag：尺寸 `60px x 16px`，圆角 `4px`，背景 `rgba(217,232,255,1)`；
+      - 右侧 tag：宽度自适应内容，`padding: 2px 4px`，圆角 `4px`，背景 `rgba(217,232,255,1)`；
       - tag 文本：`某某助手`，样式 `10px/400/14px`，颜色 `rgba(65,142,255,1)`。
    - 第二行：
       - 文本：`设计师一枚`，样式 `14px/400/22px`，颜色 `rgba(102,102,102,1)`；

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import switchAssistantAvatar from '../imgs/switch-assistant-avatar.svg';
 import '../styles/SwitchAssistant.less';
-import { AssistantPageHeader } from '../components/assistant/AssistantPageHeader';
+import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 
 interface AssistantItem {
   id: string;
@@ -21,8 +21,22 @@ const ASSISTANT_LIST: AssistantItem[] = [
 ];
 
 const SwitchAssistant: React.FC = () => {
+  const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
+
   const handleCancelSelect = () => {};
   const handleConfirmSwitch = () => {};
+  const handleSelectAssistant = (assistantId: string) => {
+    setSelectedAssistantId(assistantId);
+  };
+
+  const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    handleSelectAssistant(assistantId);
+  };
 
   return (
     <div className="switch-assistant">
@@ -31,7 +45,17 @@ const SwitchAssistant: React.FC = () => {
       <main className="switch-assistant__content">
         <div className="switch-assistant__list">
           {ASSISTANT_LIST.map((assistant) => (
-            <article key={assistant.id} className="switch-assistant__card">
+            <article
+              key={assistant.id}
+              className={`switch-assistant__card${
+                selectedAssistantId === assistant.id ? ' switch-assistant__card--selected' : ''
+              }`}
+              onClick={() => handleSelectAssistant(assistant.id)}
+              onKeyDown={(event) => handleAssistantKeyDown(event, assistant.id)}
+              tabIndex={0}
+              role="button"
+              aria-pressed={selectedAssistantId === assistant.id}
+            >
               <div className="switch-assistant__avatar">
                 <img src={switchAssistantAvatar} alt="" className="switch-assistant__avatar-img" aria-hidden="true" />
               </div>
@@ -68,4 +92,3 @@ const SwitchAssistant: React.FC = () => {
 };
 
 export default SwitchAssistant;
-export { SwitchAssistant };

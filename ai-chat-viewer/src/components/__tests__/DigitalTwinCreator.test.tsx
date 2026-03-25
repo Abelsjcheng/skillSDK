@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
-import { PersonalAssistantCreator } from '../PersonalAssistantCreator';
+import PersonalAssistantCreator from '../PersonalAssistantCreator';
 
 describe('PersonalAssistantCreator', () => {
   const getAgentTypeMock = jest.fn();

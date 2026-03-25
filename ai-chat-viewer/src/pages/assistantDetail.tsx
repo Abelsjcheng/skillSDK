@@ -1,7 +1,7 @@
 import React from 'react';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
 import '../styles/AssistantDetail.less';
-import { AssistantPageHeader } from '../components/assistant/AssistantPageHeader';
+import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 
 interface DetailInfoRowProps {
   label: string;
@@ -47,4 +47,3 @@ const AssistantDetail: React.FC = () => {
 };
 
 export default AssistantDetail;
-export { AssistantDetail };

@@ -31,4 +31,3 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
 );
 
 export default AssistantPageHeader;
-export { AssistantPageHeader };
