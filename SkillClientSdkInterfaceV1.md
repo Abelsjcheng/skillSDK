@@ -1414,17 +1414,19 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
+createNewSession(params: CreateNewSessionParams): Promise<Session>
 ```
 
 ### 入参
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
+| ak | String | 是 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| imGroupId | String | 否 | 关联的 IM 群组 ID |
-| parentAccount | String | 否 | 助理ID |
+| bussinessDomain | String | 是 | 会话关联场域，默认值"miniapp" |
+| bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
+| bussinessType | String | 是 | 会话类型,默认值"direct" |
+| assistantAccount | String | 是 | 助理ID |
 
 ### 入参示例
 
@@ -1432,8 +1434,10 @@ createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
 {
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "imGroupId": "group_abc123",
-  "parentAccount": "x00_1"
+  "bussinessDomain": "miniapp",
+  "bussinessType": "direct",
+  "assistantAccount": "x00_1",
+  "bussinessId": "x00123456"
 }
 ```
 
@@ -1445,7 +1449,10 @@ createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
 | `userId` | String | 用户 ID（从 Cookie 解析） |
 | `ak` | String \| null | Access Key，未关联 Agent 时为 `null` |
 | `title` | String \| null | 会话标题，未设置时为 `null` |
-| `imGroupId` | String \| null | IM 群组 ID，未设置时为 `null` |
+| `bussinessDomain` | String \| null | 会话关联场域 |
+| `bussinessType` | String \| null | 会话类型 |
+| `bussinessId` | String \| null | 单聊场景为对话所属人Id，群里则为群Id |
+| `assistantAccount` | String \| null | 助理Id |
 | `status` | String | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | `toolSessionId` | String \| null | OpenCode Session ID，创建时可为 `null`，后续异步填充 |
 | `createdAt` | String | 创建时间，ISO-8601 |
@@ -1459,7 +1466,10 @@ createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
   "userId": "10001",
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "imGroupId": "group_abc123",
+  "bussinessDomain": "miniapp",
+  "bussinessType": "direct",
+  "bussinessId": "x00123456",
+  "assistantAccount": "group_abc123",
   "status": "ACTIVE",
   "toolSessionId": null,
   "createdAt": "2026-03-08T00:15:00",
@@ -1478,13 +1488,13 @@ createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
      {
        "ak": "ak_xxxxxxxx",
        "title": "帮我创建一个React项目",
-       "imGroupId": "group_abc123",
-       "parentAccount": "x00_1"
+       "bussinessDomain": "miniapp",
+       "bussinessType": "direct",
+       "assistantAccount": "x00_1",
+       "bussinessId": "x00123456"
      }
      ```
-5. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
-6. 若监听器先于 `createNewSession` 注册，则先暂存，待连接建立后自动生效
-7. `createNewSession` 只负责创建会话和建立连接，不发送消息；发送消息需要调用 `sendMessage` 接口
+3. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
 
 ### 错误处理
 
@@ -1502,8 +1512,10 @@ try {
   const session = await createNewSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    imGroupId: "group_abc123",
-    parentAccount: "x00_1"
+    bussinessDomain: "miniapp",
+    bussinessType: "direct",
+    assistantAccount: "x00_1",
+    bussinessId: "x00123456"
   });
 
   console.log("会话创建成功:", session.welinkSessionId);
@@ -1535,11 +1547,11 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | page | number | 否 |  页码，默认值为0 |
-| size | number | 否 |   每页条数，默认值为50 |
+| size | number | 否 |   每页大小，默认值为50 |
 | status | string | 否   | 按状态过滤（`ACTIVE`/`IDLE`/`CLOSED`） |
 | ak | string | 否 |   按agent ak过滤 |
-| imGroupId | string | 否 |   按IM群组过滤 |
-| partnerAccount | string | 否 |   按助理Id过滤 |
+| bussinessId | string | 否 | 按会话所属Id过滤，单聊为用户Id，群聊为群Id  |
+| assistantAccount | string | 否 |   按助理Id过滤 |
 
 
 ### 入参示例
@@ -1547,11 +1559,11 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 ```json
 {
   "ak": "ak_xxxxxxxx",
-  "imGroupId": "group_abc123",
+  "bussinessId": "group_abc123",
   "page": 0,
   "size": 50,
   "status": "IDLE",
-  "partnerAccount": "x001_1"
+  "assistantAccount": "x001_1"
 }
 ```
 
@@ -1569,15 +1581,26 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 
 ```json
 {
-  "welinkSessionId": "42",
-  "userId": "10001",
-  "ak": "ak_xxxxxxxx",
-  "title": "帮我创建一个React项目",
-  "imGroupId": "group_abc123",
-  "status": "ACTIVE",
-  "toolSessionId": null,
-  "createdAt": "2026-03-08T00:15:00",
-  "updatedAt": "2026-03-08T00:15:00"
+  "content": [
+    {
+      "welinkSessionId": "42",
+        "userId": "10001",
+        "ak": "ak_xxxxxxxx",
+        "title": "帮我创建一个React项目",
+        "bussinessDomain": "miniapp",
+        "bussinessType": "direct",
+        "bussinessId": "x00123456",
+        "assistantAccount": "group_abc123",
+        "status": "ACTIVE",
+        "toolSessionId": null,
+        "createdAt": "2026-03-08T00:15:00",
+        "updatedAt": "2026-03-08T00:15:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "total": 1,
+  "totalPages": 1
 }
 ```
 
@@ -1591,11 +1614,11 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
      ```json
      {
        "ak": "ak_xxxxxxxx",
-       "imGroupId": "group_abc123",
+       "bussinessId": "group_abc123",
        "page": 0,
        "size": 50,
        "status": "IDLE",
-       "partnerAccount": "x001_1"
+       "assistantAccount": "x001_1"
      }
      ```
 
@@ -1613,11 +1636,11 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 try {
   const sessionsList = await getHistorySessionsList({
     ak: "ak_xxxxxxxx",
-    status: "ACTIVE",
-    imGroupId: "group_abc123",
-    parentAccount: "x00_1",
+    bussinessId: "group_abc123",
     page: 0,
-    size: 50
+    size: 50,
+    status: "IDLE",
+    assistantAccount: "x001_1"
   });
 } catch (error) {
   //
@@ -1657,10 +1680,12 @@ try {
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| ak | String | 否 | Agent Plugin 对应的 Access Key |
-| title | String | 否 | 会话标题 |
-| imGroupId | String | 否 | 关联的 IM 群组 ID |
-| parentAccount | String | 否 | 助理ID |
+| ak | String | 是 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
+| title | String | 否 | 会话标题，不填则由 AI 自动生成 |
+| bussinessDomain | String | 是 | 会话关联场域，默认值"miniapp" |
+| bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
+| bussinessType | String | 是 | 会话类型,默认值"direct" |
+| assistantAccount | String | 是 | 助理ID |
 
 ### StopSkillParams
 
@@ -2051,3 +2076,21 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | success | boolean | 发送是否成功（服务端字段） |
+
+### Session
+```typescript
+interface Session {
+  welinkSessionId: string;       // welinkSessionId（Snowflake ID，字符串化）
+  userId?: string;               // 会话所有者
+  ak?: string;                   // Agent Key
+  title: string;                 // 会话标题
+  bussinessDomain: string;       // 会话关联场域
+  bussinessType: string;         // 会话类型
+  bussinessId: string;           // 对话所属id，单聊为用户Id，群聊为群Id
+  assistantAccount: string;      // 分身账号id
+  status: 'ACTIVE' | 'IDLE' | 'CLOSED';
+  toolSessionId?: string;        // OpenCode 侧会话 ID（可能未就绪）
+  createdAt: string;             // ISO 时间戳
+  updatedAt: string;
+}
+```
