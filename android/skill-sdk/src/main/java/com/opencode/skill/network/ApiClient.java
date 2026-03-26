@@ -11,6 +11,7 @@ import com.google.gson.reflect.TypeToken;
 import com.opencode.skill.SkillSDKConfig;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.model.AgentType;
+import com.opencode.skill.model.AgentTypeListResult;
 import com.opencode.skill.model.CreateNewSessionParams;
 import com.opencode.skill.model.CreateDigitalTwinResult;
 import com.opencode.skill.model.CreateSessionParams;
@@ -25,9 +26,12 @@ import com.opencode.skill.model.SkillSession;
 import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.WeAgent;
 import com.opencode.skill.model.WeAgentDetails;
+import com.opencode.skill.model.WeAgentDetailsArrayResult;
+import com.opencode.skill.model.WeAgentListResult;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -126,15 +130,27 @@ public class ApiClient {
         executeEnvelope(request, CreateDigitalTwinResult.class, callback);
     }
 
-    public void getAgentType(@NonNull SkillCallback<List<AgentType>> callback) {
+    public void getAgentType(@NonNull SkillCallback<AgentTypeListResult> callback) {
         Request request = newRequestBuilder("/v4-1/we-crew/inner-assistant/list")
                 .get()
                 .build();
         Type type = TypeToken.getParameterized(List.class, AgentType.class).getType();
-        executeEnvelope(request, type, callback);
+        executeEnvelope(request, type, new SkillCallback<List<AgentType>>() {
+            @Override
+            public void onSuccess(@Nullable List<AgentType> result) {
+                AgentTypeListResult payload = new AgentTypeListResult();
+                payload.setContent(result == null ? new ArrayList<>() : result);
+                callback.onSuccess(payload);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
     }
 
-    public void getWeAgentList(int pageSize, int pageNumber, @NonNull SkillCallback<List<WeAgent>> callback) {
+    public void getWeAgentList(int pageSize, int pageNumber, @NonNull SkillCallback<WeAgentListResult> callback) {
         Request request = newRequestBuilder(urlBuilder("/v4-1/we-crew/list")
                         .addQueryParameter("pageSize", String.valueOf(pageSize))
                         .addQueryParameter("pageNumber", String.valueOf(pageNumber))
@@ -142,14 +158,63 @@ public class ApiClient {
                 .get()
                 .build();
         Type type = TypeToken.getParameterized(List.class, WeAgent.class).getType();
-        executeEnvelope(request, type, callback);
+        executeEnvelope(request, type, new SkillCallback<List<WeAgent>>() {
+            @Override
+            public void onSuccess(@Nullable List<WeAgent> result) {
+                WeAgentListResult payload = new WeAgentListResult();
+                payload.setContent(result == null ? new ArrayList<>() : result);
+                callback.onSuccess(payload);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
     }
 
-    public void getWeAgentDetails(@NonNull String partnerAccount, @NonNull SkillCallback<WeAgentDetails> callback) {
-        Request request = newRequestBuilder("/v1/robot-partners/" + partnerAccount)
+    public void getWeAgentDetails(
+            @NonNull List<String> partnerAccounts,
+            @NonNull SkillCallback<WeAgentDetailsArrayResult> callback
+    ) {
+        String joinedPartnerAccounts = String.join(",", partnerAccounts);
+        Request request = newRequestBuilder("/v1/robot-partners/" + joinedPartnerAccounts)
                 .get()
                 .build();
-        executeEnvelope(request, WeAgentDetails.class, callback);
+        executeEnvelope(request, JsonElement.class, new SkillCallback<JsonElement>() {
+            @Override
+            public void onSuccess(@Nullable JsonElement result) {
+                WeAgentDetailsArrayResult payload = new WeAgentDetailsArrayResult();
+                payload.setWeAgentDetailsArray(parseWeAgentDetails(result));
+                callback.onSuccess(payload);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    @NonNull
+    private List<WeAgentDetails> parseWeAgentDetails(@Nullable JsonElement payload) {
+        if (payload == null || payload.isJsonNull()) {
+            return new ArrayList<>();
+        }
+        if (payload.isJsonArray()) {
+            Type listType = TypeToken.getParameterized(List.class, WeAgentDetails.class).getType();
+            List<WeAgentDetails> parsed = gson.fromJson(payload, listType);
+            return parsed == null ? new ArrayList<>() : parsed;
+        }
+        if (payload.isJsonObject()) {
+            WeAgentDetails one = gson.fromJson(payload, WeAgentDetails.class);
+            List<WeAgentDetails> single = new ArrayList<>();
+            if (one != null) {
+                single.add(one);
+            }
+            return single;
+        }
+        return new ArrayList<>();
     }
 
     public void listSessions(@Nullable String imGroupId, @Nullable String ak, @Nullable String status, int page, int size,

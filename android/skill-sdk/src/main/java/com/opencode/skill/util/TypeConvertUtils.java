@@ -5,6 +5,9 @@ import androidx.annotation.Nullable;
 
 import com.opencode.skill.model.SkillSdkException;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Utility helpers for runtime parameter coercion.
  */
@@ -61,6 +64,46 @@ public final class TypeConvertUtils {
             throw new SkillSdkException(1000, fieldName + " is required");
         }
         return converted;
+    }
+
+    @NonNull
+    public static List<String> requireStringList(@Nullable Object value, @NonNull String fieldName) {
+        List<String> converted = optionalStringList(value, fieldName);
+        if (converted == null || converted.isEmpty()) {
+            throw new SkillSdkException(1000, fieldName + " is required");
+        }
+        return converted;
+    }
+
+    @Nullable
+    public static List<String> optionalStringList(@Nullable Object value, @NonNull String fieldName) {
+        if (value == null) {
+            return null;
+        }
+        List<String> result = new ArrayList<>();
+        if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            for (Object item : list) {
+                String converted = optionalString(item);
+                if (converted == null) {
+                    throw new SkillSdkException(1000, fieldName + " must contain non-empty strings");
+                }
+                result.add(converted);
+            }
+            return result;
+        }
+        if (value instanceof Object[]) {
+            Object[] array = (Object[]) value;
+            for (Object item : array) {
+                String converted = optionalString(item);
+                if (converted == null) {
+                    throw new SkillSdkException(1000, fieldName + " must contain non-empty strings");
+                }
+                result.add(converted);
+            }
+            return result;
+        }
+        throw new SkillSdkException(1000, fieldName + " must be a string array");
     }
 
     @Nullable

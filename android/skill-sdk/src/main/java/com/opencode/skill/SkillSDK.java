@@ -10,7 +10,7 @@ import com.opencode.skill.callback.SkillWecodeStatusCallback;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.constant.SessionStatus;
 import com.opencode.skill.constant.SkillWecodeStatus;
-import com.opencode.skill.model.AgentType;
+import com.opencode.skill.model.AgentTypeListResult;
 import com.opencode.skill.model.CloseSkillResult;
 import com.opencode.skill.model.ControlSkillWeCodeParams;
 import com.opencode.skill.model.ControlSkillWeCodeResult;
@@ -45,8 +45,9 @@ import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.StreamMessage;
 import com.opencode.skill.model.UnregisterSessionListenerParams;
 import com.opencode.skill.model.UnregisterSessionListenerResult;
-import com.opencode.skill.model.WeAgent;
+import com.opencode.skill.model.WeAgentDetailsArrayResult;
 import com.opencode.skill.model.WeAgentDetails;
+import com.opencode.skill.model.WeAgentListResult;
 import com.opencode.skill.model.WeAgentUriResult;
 import com.opencode.skill.network.ApiClient;
 import com.opencode.skill.network.StreamingMessageCache;
@@ -58,7 +59,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -749,8 +749,8 @@ public final class SkillSDK {
                     @Override
                     public void onSuccess(@Nullable CreateDigitalTwinResult result) {
                         CreateDigitalTwinResult resolved = result == null ? new CreateDigitalTwinResult() : result;
-                        if (isBlank(resolved.getStatus())) {
-                            resolved.setStatus("success");
+                        if (isBlank(resolved.getMessage())) {
+                            resolved.setMessage("success");
                         }
                         callback.onSuccess(resolved);
                     }
@@ -763,15 +763,16 @@ public final class SkillSDK {
     }
 
     // 17. getAgentType
-    public void getAgentType(@NonNull SkillCallback<List<AgentType>> callback) {
+    public void getAgentType(@NonNull SkillCallback<AgentTypeListResult> callback) {
         if (!isInitialized()) {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        apiClient.getAgentType(new SkillCallback<List<AgentType>>() {
+        apiClient.getAgentType(new SkillCallback<AgentTypeListResult>() {
             @Override
-            public void onSuccess(@Nullable List<AgentType> result) {
-                callback.onSuccess(result == null ? new ArrayList<>() : result);
+            public void onSuccess(@Nullable AgentTypeListResult result) {
+                AgentTypeListResult resolved = result == null ? new AgentTypeListResult() : result;
+                callback.onSuccess(resolved);
             }
 
             @Override
@@ -781,47 +782,8 @@ public final class SkillSDK {
         });
     }
 
-    // 18. getWeAgentList (sync + async refresh)
-    @NonNull
-    public List<WeAgent> getWeAgentList(@NonNull PageParams params) {
-        ensureInitializedForVoid();
-        if (params == null) {
-            throw error(1000, "params is required");
-        }
-
-        final int pageSize;
-        final int pageNumber;
-        pageSize = TypeConvertUtils.requireInteger(params.getPageSize(), "pageSize");
-        pageNumber = TypeConvertUtils.requireInteger(params.getPageNumber(), "pageNumber");
-        if (pageSize <= 0 || pageNumber <= 0) {
-            throw error(1000, "pageSize and pageNumber must be positive integers");
-        }
-        int safePageSize = clamp(pageSize, 1, 100);
-        int safePageNumber = clamp(pageNumber, 1, 1000);
-
-        List<WeAgent> cache = weAgentStorage.getWeAgentList();
-        List<WeAgent> current = paginateWeAgentList(cache, safePageSize, safePageNumber);
-
-        apiClient.getWeAgentList(safePageSize, safePageNumber, new SkillCallback<List<WeAgent>>() {
-            @Override
-            public void onSuccess(@Nullable List<WeAgent> result) {
-                if (result == null) {
-                    return;
-                }
-                weAgentStorage.saveWeAgentList(result);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                // Ignore background refresh errors for sync API contract.
-            }
-        });
-        return current;
-    }
-
-    // 19. getWeAgentDetails
-    public void getWeAgentDetails(@NonNull QueryWeAgentParams params,
-            @NonNull SkillCallback<WeAgentDetails> callback) {
+    // 18. getWeAgentList
+    public void getWeAgentList(@NonNull PageParams params, @NonNull SkillCallback<WeAgentListResult> callback) {
         if (!isInitialized()) {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
@@ -831,20 +793,69 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount;
+        final int pageSize;
+        final int pageNumber;
         try {
-            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+            pageSize = TypeConvertUtils.requireInteger(params.getPageSize(), "pageSize");
+            pageNumber = TypeConvertUtils.requireInteger(params.getPageNumber(), "pageNumber");
         } catch (SkillSdkException e) {
             callback.onError(e);
             return;
         }
+        if (pageSize <= 0 || pageNumber <= 0) {
+            callback.onError(error(1000, "pageSize and pageNumber must be positive integers"));
+            return;
+        }
+        final int safePageSize = clamp(pageSize, 1, 100);
+        final int safePageNumber = clamp(pageNumber, 1, 1000);
 
-        apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetails>() {
+        apiClient.getWeAgentList(safePageSize, safePageNumber, new SkillCallback<WeAgentListResult>() {
             @Override
-            public void onSuccess(@Nullable WeAgentDetails result) {
-                WeAgentDetails details = result == null ? new WeAgentDetails() : result;
-                weAgentStorage.saveCurrentWeAgentDetail(details);
-                callback.onSuccess(details);
+            public void onSuccess(@Nullable WeAgentListResult result) {
+                WeAgentListResult resolved = result == null ? new WeAgentListResult() : result;
+                weAgentStorage.saveWeAgentList(resolved.getContent());
+                callback.onSuccess(resolved);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 19. getWeAgentDetails
+    public void getWeAgentDetails(@NonNull QueryWeAgentParams params,
+            @NonNull SkillCallback<WeAgentDetailsArrayResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final List<String> partnerAccounts;
+        try {
+            partnerAccounts = TypeConvertUtils.requireStringList(params.getPartnerAccounts(), "partnerAccounts");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+        if (partnerAccounts.isEmpty()) {
+            callback.onError(error(1000, "partnerAccounts is required"));
+            return;
+        }
+
+        apiClient.getWeAgentDetails(partnerAccounts, new SkillCallback<WeAgentDetailsArrayResult>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
+                WeAgentDetailsArrayResult resolved = result == null ? new WeAgentDetailsArrayResult() : result;
+                if (partnerAccounts.size() == 1 && !resolved.getWeAgentDetailsArray().isEmpty()) {
+                    weAgentStorage.saveCurrentWeAgentDetail(resolved.getWeAgentDetailsArray().get(0));
+                }
+                callback.onSuccess(resolved);
             }
 
             @Override
@@ -1083,19 +1094,6 @@ public final class SkillSDK {
         return "ACTIVE".equalsIgnoreCase(value)
                 || "IDLE".equalsIgnoreCase(value)
                 || "CLOSED".equalsIgnoreCase(value);
-    }
-
-    @NonNull
-    private static List<WeAgent> paginateWeAgentList(@NonNull List<WeAgent> source, int pageSize, int pageNumber) {
-        if (source.isEmpty()) {
-            return Collections.emptyList();
-        }
-        int from = (pageNumber - 1) * pageSize;
-        if (from >= source.size()) {
-            return Collections.emptyList();
-        }
-        int to = Math.min(from + pageSize, source.size());
-        return new ArrayList<>(source.subList(from, to));
     }
 
     private static int clamp(int value, int min, int max) {

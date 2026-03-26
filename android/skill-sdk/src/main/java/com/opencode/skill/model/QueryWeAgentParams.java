@@ -6,14 +6,14 @@ import androidx.annotation.Nullable;
 @Keep
 public class QueryWeAgentParams {
     @Nullable
-    private final Object partnerAccount;
+    private final Object partnerAccounts;
 
-    public QueryWeAgentParams(@Nullable Object partnerAccount) {
-        this.partnerAccount = partnerAccount;
+    public QueryWeAgentParams(@Nullable Object partnerAccounts) {
+        this.partnerAccounts = partnerAccounts;
     }
 
     @Nullable
-    public Object getPartnerAccount() {
-        return partnerAccount;
+    public Object getPartnerAccounts() {
+        return partnerAccounts;
     }
 }

@@ -3,6 +3,8 @@ package com.opencode.skill.model;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.Objects;
 
 @Keep
@@ -12,7 +14,8 @@ public class CreateDigitalTwinResult {
     @NonNull
     private String partnerAccount = "";
     @NonNull
-    private String status = "success";
+    @SerializedName(value = "message", alternate = {"status"})
+    private String message = "success";
 
     @NonNull
     public String getRobotId() {
@@ -33,11 +36,11 @@ public class CreateDigitalTwinResult {
     }
 
     @NonNull
-    public String getStatus() {
-        return status;
+    public String getMessage() {
+        return message;
     }
 
-    public void setStatus(@NonNull String status) {
-        this.status = Objects.requireNonNull(status, "status == null");
+    public void setMessage(@NonNull String message) {
+        this.message = Objects.requireNonNull(message, "message == null");
     }
 }
