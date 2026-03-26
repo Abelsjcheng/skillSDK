@@ -16,10 +16,23 @@
 | `createDigitalTwin` | `POST /v4-1/we-crew/im-register` | 创建数字分身 |
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
-| `getWeAgentDetails` | `GET /v4-1/we-crew/{partnerAccount}` | 获取助理详情 |
-| `openAssistantCUI` | 无（SDK 本地能力） | 打开助理 CUI（当前空实现） |
+| `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并持久化助理详情 |
+| `getWeAgentUri` | 无（SDK 本地能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外返回业务对象，不透出服务端外层包装字段（`code`/`message`/`error`）。
+
+---
+
+## 持久化存储约定
+
+1. SDK 需要通过 SP 持久化存储“当前助理详情”（`WeAgentDetails`）。
+2. 持久化数据必须按用户隔离：SP 文件名或路径中必须包含 `userId`。
+3. 当前阶段 `userId` 先使用 mock 值：`mock_user_id`。
+4. SP 文件路径示例：`/data/data/{packageName}/shared_prefs/skill_sdk_we_agent_{userId}.xml`。
+5. 建议存储 key：
+   - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
+   - `we_agent_list_cache`：个人助理列表缓存（`WeAgent[]`）
+6. SP 持久化文档路径：待填写。
 
 ---
 
@@ -159,10 +172,12 @@ Skill 小程序调用
 
 分页查询当前用户创建的个人助理列表。
 
+该接口为**同步接口**：调用时同步返回本地缓存中的个人助理列表，同时异步触发服务端刷新缓存。
+
 ### 接口名
 
 ```typescript
-getWeAgentList(params: PageParams): Promise<WeAgent[]>
+getWeAgentList(params: PageParams): WeAgent[]
 ```
 
 ### 入参
@@ -209,10 +224,12 @@ getWeAgentList(params: PageParams): Promise<WeAgent[]>
 
 ### 实现方法
 
-1. 调用服务端 REST API：`GET /v4-1/we-crew/list`
-2. 透传分页查询参数：`pageSize`、`pageNumber`
-3. SDK 解析返回 `data[]`
-4. SDK 返回 `WeAgent[]`
+1. SDK 从本地 **SP 持久化缓存**中读取个人助理列表，并**同步返回**缓存结果（无缓存时返回空数组）。
+2. 本地缓存读取不按分页参数读取（不区分 `pageSize`、`pageNumber` 的缓存分片）；如需分页展示，可在内存中对缓存结果做分页切片。
+3. SDK 在后台异步调用服务端 REST API：`GET /v4-1/we-crew/list`，透传分页查询参数：`pageSize`、`pageNumber`。
+4. 服务端返回后，SDK 解析 `data[]` 并更新 SP 持久化缓存。
+5. 本次接口调用不等待网络请求完成；刷新后的缓存供后续 `getWeAgentList` 调用读取。
+6. 读取和写入缓存时需按 `userId` 做隔离（`userId` 当前使用 mock 值：`mock_user_id`）。
 
 ---
 
@@ -225,6 +242,8 @@ Skill 小程序调用
 ### 接口说明
 
 根据 `partnerAccount` 获取指定助理的详细信息。
+
+调用成功后，SDK 需将助理详情写入 SP 持久化存储（当前助理详情）。
 
 ### 接口名
 
@@ -266,6 +285,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails>
 | `ownerDeptName` | `string` | 责任部门中文名 |
 | `ownerDeptNameEn` | `string` | 责任部门英文名 |
 | `bizRobotId` | `string` | 助理对应业务机器人 ID |
+| `weCodeUrl` | `string` | 助理 We 码地址 |
 
 ### 出参示例
 
@@ -286,19 +306,21 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails>
   "ownerNameEn": "",
   "ownerDeptName": "",
   "ownerDeptNameEn": "",
-  "bizRobotId": ""
+  "bizRobotId": "",
+  "weCodeUrl": "https://xxx"
 }
 ```
 
 ### 实现方法
 
-1. 调用服务端 REST API：`GET /v4-1/we-crew/{partnerAccount}`
+1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`
 2. SDK 解析返回 `data`
-3. SDK 返回 `WeAgentDetails`
+3. 将助理详情写入 SP 持久化存储的 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`）
+4. SDK 返回 `WeAgentDetails`
 
 ---
 
-## 5. 打开助理 CUI 接口
+## 5. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -306,49 +328,44 @@ Skill 小程序调用
 
 ### 接口说明
 
-打开助理 CUI 页面。
-
-当前版本仅保留接口形态，功能为空实现，调用后统一返回成功状态。
+读取持久化的当前助理详情，组装并返回当前助理相关页面 URI。
 
 ### 接口名
 
 ```typescript
-openAssistantCUI(params: OpenAssistantCUIParams): Promise<OpenAssistantCUIResult>
+getWeAgentUri(): WeAgentUriResult
 ```
 
 ### 入参
 
-| 参数名 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `weCodeUrl` | `string` | 是 | 助理 CUI 的 wecode 地址 |
-
-### 入参示例
-
-```json
-{
-  "weCodeUrl": "welink://welinkassistant/cui?assistantAccount=x00123456"
-}
-```
+无
 
 ### 出参
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `status` | `string` | 固定返回 `success` |
+| `weAgentUri` | `string` | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成） |
+| `assistantDetailUri` | `string` | 助理详情地址（`h5://123456/html/index.html` 并追加 `partnerAccount` query） |
+| `switchAssistantUri` | `string` | 切换助理地址（`h5://123456/html/index.html` 并追加 `partnerAccount` query） |
 
 ### 出参示例
 
 ```json
 {
-  "status": "success"
+  "weAgentUri": "h5://123456/html/index.html?wecodePlace=weAgent",
+  "assistantDetailUri": "h5://123456/html/index.html?partnerAccount=x00_1",
+  "switchAssistantUri": "h5://123456/html/index.html?partnerAccount=x00_1"
 }
 ```
 
 ### 实现方法
 
-1. 当前版本不调用服务端接口
-2. 预留打开 CUI 能力实现位置
-3. 直接返回 `OpenAssistantCUIResult`
+1. 从 SP 持久化存储中读取当前助理详情（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`）。
+2. 读取助理详情中的 `weCodeUrl` 与 `partnerAccount`。
+3. 组装 `weAgentUri`：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent`（若原地址已有 query，则使用 `&` 拼接）。
+4. 组装 `assistantDetailUri`：`h5://123456/html/index.html` + query 参数 `partnerAccount={partnerAccount}`。
+5. 组装 `switchAssistantUri`：`h5://123456/html/index.html` + query 参数 `partnerAccount={partnerAccount}`。
+6. 返回 `WeAgentUriResult`。
 
 ---
 
@@ -436,21 +453,16 @@ type WeAgentDetails = {
   ownerDeptName: string
   ownerDeptNameEn: string
   bizRobotId: string
-}
-```
-
-### OpenAssistantCUIParams
-
-```typescript
-type OpenAssistantCUIParams = {
   weCodeUrl: string
 }
 ```
 
-### OpenAssistantCUIResult
+### WeAgentUriResult
 
 ```typescript
-type OpenAssistantCUIResult = {
-  status: 'success'
+type WeAgentUriResult = {
+  weAgentUri: string
+  assistantDetailUri: string
+  switchAssistantUri: string
 }
 ```
