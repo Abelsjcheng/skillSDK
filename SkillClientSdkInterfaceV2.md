@@ -16,10 +16,10 @@
 | `createDigitalTwin` | `POST /v4-1/we-crew/im-register` | 创建数字分身 |
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
-| `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并持久化助理详情 |
-| `getWeAgentUri` | 无（SDK 本地能力） | 获取当前助理相关页面 URI |
+| `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccounts}` | 批量获取并按需持久化助理详情 |
+| `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
-> 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外返回业务对象，不透出服务端外层包装字段（`code`/`message`/`error`）。
+> 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`/`error`），并按接口语义返回业务字段（如 `message`、`content`）。
 
 ---
 
@@ -31,7 +31,7 @@
 4. SP 文件路径示例：`/data/data/{packageName}/shared_prefs/skill_sdk_we_agent_{userId}.xml`。
 5. 建议存储 key：
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
-   - `we_agent_list_cache`：个人助理列表缓存（`WeAgent[]`）
+   - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
 6. SP 持久化文档路径：待填写。
 
 ---
@@ -49,7 +49,7 @@ Skill 小程序调用
 ### 接口名
 
 ```typescript
-createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult>
+createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 ```
 
 ### 入参
@@ -80,7 +80,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinRes
 |---|---|---|
 | `robotId` | `string` | 分身机器人 ID |
 | `partnerAccount` | `string` | 分身的 partnerAccount |
-| `status` | `string` | 固定返回 `success` |
+| `message` | `string` | 消息，接口正常是 `success` |
 
 ### 出参示例
 
@@ -88,7 +88,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinRes
 {
   "robotId": "860306",
   "partnerAccount": "x00123456",
-  "status": "success"
+  "message": "success"
 }
 ```
 
@@ -96,7 +96,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinRes
 
 1. 调用服务端 REST API：`POST /v4-1/we-crew/im-register`
 2. SDK 解析返回 `data.robotId`、`data.partnerAccount`
-3. SDK 统一返回 `CreateDigitalTwinResult`
+3. SDK 统一返回 `CreateResult`
 
 ### 错误码（参考）
 
@@ -122,7 +122,7 @@ Skill 小程序调用
 ### 接口名
 
 ```typescript
-getAgentType(): Promise<AgentType[]>
+getAgentType(): Promise<AgentTypeList>
 ```
 
 ### 入参
@@ -133,32 +133,32 @@ getAgentType(): Promise<AgentType[]>
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `name` | `string` | 助理名称 |
-| `icon` | `string` | 助理图标 |
-| `bizRobotId` | `string` | 助理对应业务机器人 ID |
+| `content` | `Array<AgentType>` | 支持的 agent 类型列表 |
 
 ### 出参示例
 
 ```json
-[
-  {
-    "name": "员工助手",
-    "icon": "http://www.test.com/xxx",
-    "bizRobotId": "8041241"
-  },
-  {
-    "name": "小微助手",
-    "icon": "http://www.test.com/aaa",
-    "bizRobotId": "8041242"
-  }
-]
+{
+  "content": [
+    {
+      "name": "员工助手",
+      "icon": "http://www.test.com/xxx",
+      "bizRobotId": "8041241"
+    },
+    {
+      "name": "小微助手",
+      "icon": "http://www.test.com/aaa",
+      "bizRobotId": "8041242"
+    }
+  ]
+}
 ```
 
 ### 实现方法
 
 1. 调用服务端 REST API：`GET /v4-1/we-crew/inner-assistant/list`
 2. SDK 解析返回 `data[]`
-3. SDK 返回 `AgentType[]`
+3. SDK 返回 `AgentTypeList`
 
 ---
 
@@ -172,12 +172,10 @@ Skill 小程序调用
 
 分页查询当前用户创建的个人助理列表。
 
-该接口为**同步接口**：调用时同步返回本地缓存中的个人助理列表，同时异步触发服务端刷新缓存。
-
 ### 接口名
 
 ```typescript
-getWeAgentList(params: PageParams): WeAgent[]
+getWeAgentList(params: PageParams): Promise<WeAgentList>
 ```
 
 ### 入参
@@ -200,36 +198,32 @@ getWeAgentList(params: PageParams): WeAgent[]
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `name` | `string` | 助理名称 |
-| `icon` | `string` | 助理图标 |
-| `description` | `string` | 助理简介 |
-| `partnerAccount` | `string` | 助理账号 ID |
-| `bizRobotName` | `string` | 助理对应业务机器人名称（中文） |
-| `bizRobotNameEn` | `string` | 助理对应业务机器人名称（英文） |
+| `content` | `Array<WeAgent>` | 用户创建的 WeAgent 列表 |
 
 ### 出参示例
 
 ```json
-[
-  {
-    "name": "员工助手",
-    "icon": "http://www.test.com/xxx",
-    "description": "我是xxx",
-    "partnerAccount": "x00_1",
-    "bizRobotName": "员工助手",
-    "bizRobotNameEn": "yuangongzhushou"
-  }
-]
+{
+  "content": [
+    {
+      "name": "员工助手",
+      "icon": "http://www.test.com/xxx",
+      "description": "我是xxx",
+      "partnerAccount": "x00_1",
+      "bizRobotName": "员工助手",
+      "bizRobotNameEn": "yuangongzhushou",
+      "robotId": "78985451212"
+    }
+  ]
+}
 ```
 
 ### 实现方法
 
-1. SDK 从本地 **SP 持久化缓存**中读取个人助理列表，并**同步返回**缓存结果（无缓存时返回空数组）。
-2. 本地缓存读取不按分页参数读取（不区分 `pageSize`、`pageNumber` 的缓存分片）；如需分页展示，可在内存中对缓存结果做分页切片。
-3. SDK 在后台异步调用服务端 REST API：`GET /v4-1/we-crew/list`，透传分页查询参数：`pageSize`、`pageNumber`。
-4. 服务端返回后，SDK 解析 `data[]` 并更新 SP 持久化缓存。
-5. 本次接口调用不等待网络请求完成；刷新后的缓存供后续 `getWeAgentList` 调用读取。
-6. 读取和写入缓存时需按 `userId` 做隔离（`userId` 当前使用 mock 值：`mock_user_id`）。
+1. SDK 调用服务端 REST API：`GET /v4-1/we-crew/list`，透传查询参数 `pageSize`、`pageNumber`。
+2. SDK 解析返回 `data[]` 并组装为 `WeAgentList`。
+3. SDK 可按 `userId`（当前 mock 值：`mock_user_id`）维度更新本地 `we_agent_list_cache` 缓存，供后续读取优化。
+4. SDK 返回 `Promise<WeAgentList>`。
 
 ---
 
@@ -241,27 +235,27 @@ Skill 小程序调用
 
 ### 接口说明
 
-根据 `partnerAccount` 获取指定助理的详细信息。
+根据 `partnerAccounts` 批量获取指定助理的详细信息。
 
-调用成功后，SDK 需将助理详情写入 SP 持久化存储（当前助理详情）。
+调用成功后，SDK 可按需将助理详情写入 SP 持久化存储。
 
 ### 接口名
 
 ```typescript
-getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails>
+getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 ```
 
 ### 入参
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `partnerAccounts` | `Array<string>` | 是 | 助理账号 ID 数组 |
 
 ### 入参示例
 
 ```json
 {
-  "partnerAccount": "x00_1"
+  "partnerAccounts": ["x00_1", "x00_2"]
 }
 ```
 
@@ -269,54 +263,61 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails>
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `name` | `string` | 助理名称 |
-| `icon` | `string` | 助理图标 |
-| `desc` | `string` | 助理简介 |
-| `moduleId` | `string` | 助理对应模块 ID |
-| `appKey` | `string` | 助理 AK |
-| `appSecret` | `string` | 助理 SK |
-| `partnerAccount` | `string` | 助理账号 ID |
-| `createdBy` | `string` | 创建者 weLinkId |
-| `creatorName` | `string` | 创建者名称 |
-| `creatorNameEn` | `string` | 创建者英文名称 |
-| `ownerWelinkId` | `string` | 责任人 weLinkId |
-| `ownerName` | `string` | 责任人名称 |
-| `ownerNameEn` | `string` | 责任人英文名称 |
-| `ownerDeptName` | `string` | 责任部门中文名 |
-| `ownerDeptNameEn` | `string` | 责任部门英文名 |
-| `bizRobotId` | `string` | 助理对应业务机器人 ID |
-| `weCodeUrl` | `string` | 助理 We 码地址 |
+| `WeAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
 
 ### 出参示例
 
 ```json
 {
-  "name": "员工助手",
-  "icon": "http://www.test.com/xxx",
-  "desc": "我是xxx",
-  "moduleId": "M1000",
-  "partnerAccount": "x00_1",
-  "appKey": "",
-  "appSecret": "",
-  "createdBy": "",
-  "creatorName": "",
-  "creatorNameEn": "",
-  "ownerWelinkId": "",
-  "ownerName": "",
-  "ownerNameEn": "",
-  "ownerDeptName": "",
-  "ownerDeptNameEn": "",
-  "bizRobotId": "",
-  "weCodeUrl": "https://xxx"
+  "WeAgentDetailsArray": [
+    {
+      "name": "员工助手",
+      "icon": "http://www.test.com/xxx",
+      "desc": "我是xxx",
+      "moduleId": "M1000",
+      "partnerAccount": "x00_1",
+      "appKey": "",
+      "appSecret": "",
+      "createdBy": "",
+      "creatorName": "",
+      "creatorNameEn": "",
+      "ownerWelinkId": "",
+      "ownerName": "",
+      "ownerNameEn": "",
+      "ownerDeptName": "",
+      "ownerDeptNameEn": "",
+      "bizRobotId": "",
+      "weCodeUrl": "https://xxx"
+    },
+    {
+      "name": "小微助手",
+      "icon": "http://www.test.com/xxx",
+      "desc": "我是xxx",
+      "moduleId": "M2000",
+      "partnerAccount": "x00_2",
+      "appKey": "",
+      "appSecret": "",
+      "createdBy": "",
+      "creatorName": "",
+      "creatorNameEn": "",
+      "ownerWelinkId": "",
+      "ownerName": "",
+      "ownerNameEn": "",
+      "ownerDeptName": "",
+      "ownerDeptNameEn": "",
+      "bizRobotId": "",
+      "weCodeUrl": "https://xxx"
+    }
+  ]
 }
 ```
 
 ### 实现方法
 
-1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`
-2. SDK 解析返回 `data`
-3. 将助理详情写入 SP 持久化存储的 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`）
-4. SDK 返回 `WeAgentDetails`
+1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccounts}`，其中 `partnerAccounts` 通过英文逗号拼接（如：`x00_1,x00_2`）。
+2. SDK 解析返回 `data[]` 并组装为 `WeAgentDetailsArray`。
+3. 当入参 `partnerAccounts` 仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
+4. SDK 返回 `Promise<WeAgentDetailsArray>`。
 
 ---
 
@@ -329,6 +330,7 @@ Skill 小程序调用
 ### 接口说明
 
 读取持久化的当前助理详情，组装并返回当前助理相关页面 URI。
+该接口为 SDK 本地扩展接口，`DigitalTwinSdkInterfaceV1.md` 无对应服务端接口。
 
 ### 接口名
 
@@ -383,13 +385,13 @@ type CreateDigitalTwinParams = {
 }
 ```
 
-### CreateDigitalTwinResult
+### CreateResult
 
 ```typescript
-type CreateDigitalTwinResult = {
+type CreateResult = {
   robotId: string
   partnerAccount: string
-  status: 'success'
+  message: string
 }
 ```
 
@@ -400,6 +402,14 @@ type AgentType = {
   name: string
   icon: string
   bizRobotId: string
+}
+```
+
+### AgentTypeList
+
+```typescript
+type AgentTypeList = {
+  content: AgentType[]
 }
 ```
 
@@ -416,7 +426,7 @@ type PageParams = {
 
 ```typescript
 type QueryWeAgentParams = {
-  partnerAccount: string
+  partnerAccounts: string[]
 }
 ```
 
@@ -430,6 +440,15 @@ type WeAgent = {
   partnerAccount: string
   bizRobotName: string
   bizRobotNameEn: string
+  robotId: string
+}
+```
+
+### WeAgentList
+
+```typescript
+type WeAgentList = {
+  content: WeAgent[]
 }
 ```
 
@@ -454,6 +473,14 @@ type WeAgentDetails = {
   ownerDeptNameEn: string
   bizRobotId: string
   weCodeUrl: string
+}
+```
+
+### WeAgentDetailsArray
+
+```typescript
+type WeAgentDetailsArray = {
+  WeAgentDetailsArray: WeAgentDetails[]
 }
 ```
 
