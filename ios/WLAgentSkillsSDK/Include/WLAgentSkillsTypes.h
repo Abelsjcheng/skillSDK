@@ -47,6 +47,24 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *imGroupId;
 @end
 
+@interface WLAgentSkillsCreateNewSessionParams : NSObject
+@property (nonatomic, copy) NSString *ak;
+@property (nonatomic, copy, nullable) NSString *title;
+@property (nonatomic, copy) NSString *bussinessDomain;
+@property (nonatomic, copy) NSString *bussinessType;
+@property (nonatomic, copy) NSString *bussinessId;
+@property (nonatomic, copy) NSString *assistantAccount;
+@end
+
+@interface WLAgentSkillsHistorySessionsParams : NSObject
+@property (nonatomic, strong, nullable) NSNumber *page;
+@property (nonatomic, strong, nullable) NSNumber *size;
+@property (nonatomic, copy, nullable) NSString *status;
+@property (nonatomic, copy, nullable) NSString *ak;
+@property (nonatomic, copy, nullable) NSString *bussinessId;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
+@end
+
 @interface WLAgentSkillsStopSkillParams : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
 @end
@@ -104,6 +122,23 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, assign) WLAgentSkillsWecodeAction action;
 @end
 
+@interface WLAgentSkillsCreateDigitalTwinParams : NSObject
+@property (nonatomic, strong, nullable) id name;
+@property (nonatomic, strong, nullable) id icon;
+@property (nonatomic, strong, nullable) id desc;
+@property (nonatomic, strong, nullable) id weCrewType;
+@property (nonatomic, strong, nullable) id bizRobotId;
+@end
+
+@interface WLAgentSkillsPageParams : NSObject
+@property (nonatomic, strong, nullable) id pageSize;
+@property (nonatomic, strong, nullable) id pageNumber;
+@end
+
+@interface WLAgentSkillsQueryWeAgentParams : NSObject
+@property (nonatomic, strong, nullable) id partnerAccount;
+@end
+
 #pragma mark - Data Models
 
 @interface WLAgentSkillsSkillSession : NSObject
@@ -112,6 +147,10 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy, nullable) NSString *imGroupId;
+@property (nonatomic, copy, nullable) NSString *bussinessDomain;
+@property (nonatomic, copy, nullable) NSString *bussinessType;
+@property (nonatomic, copy, nullable) NSString *bussinessId;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, copy, nullable) NSString *toolSessionId;
 @property (nonatomic, copy) NSString *createdAt;
@@ -174,6 +213,69 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, strong) NSNumber *totalElements __attribute__((deprecated("Use total")));
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+@end
+
+@interface WLAgentSkillsSkillSessionPageResult : NSObject
+@property (nonatomic, strong) NSArray<WLAgentSkillsSkillSession *> *content;
+@property (nonatomic, strong) NSNumber *page;
+@property (nonatomic, strong) NSNumber *size;
+@property (nonatomic, strong) NSNumber *total;
+@property (nonatomic, strong) NSNumber *totalPages;
+
+@property (nonatomic, strong) NSNumber *number __attribute__((deprecated("Use page")));
+@property (nonatomic, strong) NSNumber *totalElements __attribute__((deprecated("Use total")));
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+@end
+
+@interface WLAgentSkillsAgentType : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *icon;
+@property (nonatomic, copy) NSString *bizRobotId;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsWeAgent : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *icon;
+@property (nonatomic, copy) NSString *desc;
+@property (nonatomic, copy) NSString *partnerAccount;
+@property (nonatomic, copy) NSString *bizRobotName;
+@property (nonatomic, copy) NSString *bizRobotNameEn;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsWeAgentDetails : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *icon;
+@property (nonatomic, copy) NSString *desc;
+@property (nonatomic, copy) NSString *moduleId;
+@property (nonatomic, copy) NSString *appKey;
+@property (nonatomic, copy) NSString *appSecret;
+@property (nonatomic, copy) NSString *partnerAccount;
+@property (nonatomic, copy) NSString *createdBy;
+@property (nonatomic, copy) NSString *creatorName;
+@property (nonatomic, copy) NSString *creatorNameEn;
+@property (nonatomic, copy) NSString *ownerWelinkId;
+@property (nonatomic, copy) NSString *ownerName;
+@property (nonatomic, copy) NSString *ownerNameEn;
+@property (nonatomic, copy) NSString *ownerDeptName;
+@property (nonatomic, copy) NSString *ownerDeptNameEn;
+@property (nonatomic, copy) NSString *bizRobotId;
+@property (nonatomic, copy) NSString *weCodeUrl;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsWeAgentUriResult : NSObject
+@property (nonatomic, copy) NSString *weAgentUri;
+@property (nonatomic, copy) NSString *assistantDetailUri;
+@property (nonatomic, copy) NSString *switchAssistantUri;
 @end
 
 @interface WLAgentSkillsSessionError : NSObject
@@ -278,6 +380,14 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsSendMessageToIMResult : NSObject
 @property (nonatomic, assign) BOOL success;
+@end
+
+@interface WLAgentSkillsCreateDigitalTwinResult : NSObject
+@property (nonatomic, copy) NSString *robotId;
+@property (nonatomic, copy) NSString *partnerAccount;
+@property (nonatomic, copy) NSString *status;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 @end
 
 @interface WLAgentSkillsSessionStatusResult : NSObject

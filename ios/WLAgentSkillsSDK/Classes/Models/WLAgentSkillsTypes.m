@@ -50,6 +50,22 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 @implementation WLAgentSkillsCreateSessionParams
 @end
 
+@implementation WLAgentSkillsCreateNewSessionParams
+@end
+
+@implementation WLAgentSkillsHistorySessionsParams
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _page = @0;
+        _size = @50;
+    }
+    return self;
+}
+
+@end
+
 @implementation WLAgentSkillsStopSkillParams
 @end
 
@@ -94,6 +110,25 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 @implementation WLAgentSkillsControlSkillWeCodeParams
 @end
 
+@implementation WLAgentSkillsCreateDigitalTwinParams
+@end
+
+@implementation WLAgentSkillsPageParams
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _pageSize = @10;
+        _pageNumber = @1;
+    }
+    return self;
+}
+
+@end
+
+@implementation WLAgentSkillsQueryWeAgentParams
+@end
+
 #pragma mark - Data Models
 
 @implementation WLAgentSkillsSkillSession
@@ -101,19 +136,126 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
     if (self) {
-    _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
-    _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
-    _ak = WLAgentSkillsStringValue(dictionary[@"ak"], nil);
-    _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
-    _imGroupId = WLAgentSkillsStringValue(dictionary[@"imGroupId"], nil);
-    _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
-    _toolSessionId = WLAgentSkillsStringValue(dictionary[@"toolSessionId"], nil);
-    _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
-    _updatedAt = WLAgentSkillsStringValue(dictionary[@"updatedAt"], @"");
+        _welinkSessionId = WLAgentSkillsStringValue(dictionary[@"welinkSessionId"], @"");
+        _userId = WLAgentSkillsStringValue(dictionary[@"userId"], @"");
+        _ak = WLAgentSkillsStringValue(dictionary[@"ak"], nil);
+        _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
+        _imGroupId = WLAgentSkillsStringValue(dictionary[@"imGroupId"], nil);
+        _bussinessDomain = WLAgentSkillsStringValue(dictionary[@"bussinessDomain"], nil);
+        _bussinessType = WLAgentSkillsStringValue(dictionary[@"bussinessType"], nil);
+        _bussinessId = WLAgentSkillsStringValue(dictionary[@"bussinessId"], nil);
+        _assistantAccount = WLAgentSkillsStringValue(dictionary[@"assistantAccount"], nil);
+        _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
+        _toolSessionId = WLAgentSkillsStringValue(dictionary[@"toolSessionId"], nil);
+        _createdAt = WLAgentSkillsStringValue(dictionary[@"createdAt"], @"");
+        _updatedAt = WLAgentSkillsStringValue(dictionary[@"updatedAt"], @"");
     }
     return self;
 }
 
+@end
+
+@implementation WLAgentSkillsAgentType
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
+        _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
+        _bizRobotId = WLAgentSkillsStringValue(dictionary[@"bizRobotId"], @"");
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"name" : self.name ?: @"",
+        @"icon" : self.icon ?: @"",
+        @"bizRobotId" : self.bizRobotId ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsWeAgent
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
+        _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
+        _desc = WLAgentSkillsStringValue(dictionary[@"description"], WLAgentSkillsStringValue(dictionary[@"desc"], @""));
+        _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
+        _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
+        _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"name" : self.name ?: @"",
+        @"icon" : self.icon ?: @"",
+        @"description" : self.desc ?: @"",
+        @"partnerAccount" : self.partnerAccount ?: @"",
+        @"bizRobotName" : self.bizRobotName ?: @"",
+        @"bizRobotNameEn" : self.bizRobotNameEn ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsWeAgentDetails
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
+        _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
+        _desc = WLAgentSkillsStringValue(dictionary[@"desc"], WLAgentSkillsStringValue(dictionary[@"description"], @""));
+        _moduleId = WLAgentSkillsStringValue(dictionary[@"moduleId"], @"");
+        _appKey = WLAgentSkillsStringValue(dictionary[@"appKey"], @"");
+        _appSecret = WLAgentSkillsStringValue(dictionary[@"appSecret"], @"");
+        _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
+        _createdBy = WLAgentSkillsStringValue(dictionary[@"createdBy"], @"");
+        _creatorName = WLAgentSkillsStringValue(dictionary[@"creatorName"], @"");
+        _creatorNameEn = WLAgentSkillsStringValue(dictionary[@"creatorNameEn"], @"");
+        _ownerWelinkId = WLAgentSkillsStringValue(dictionary[@"ownerWelinkId"], @"");
+        _ownerName = WLAgentSkillsStringValue(dictionary[@"ownerName"], @"");
+        _ownerNameEn = WLAgentSkillsStringValue(dictionary[@"ownerNameEn"], @"");
+        _ownerDeptName = WLAgentSkillsStringValue(dictionary[@"ownerDeptName"], @"");
+        _ownerDeptNameEn = WLAgentSkillsStringValue(dictionary[@"ownerDeptNameEn"], @"");
+        _bizRobotId = WLAgentSkillsStringValue(dictionary[@"bizRobotId"], @"");
+        _weCodeUrl = WLAgentSkillsStringValue(dictionary[@"weCodeUrl"], @"");
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"name" : self.name ?: @"",
+        @"icon" : self.icon ?: @"",
+        @"desc" : self.desc ?: @"",
+        @"moduleId" : self.moduleId ?: @"",
+        @"appKey" : self.appKey ?: @"",
+        @"appSecret" : self.appSecret ?: @"",
+        @"partnerAccount" : self.partnerAccount ?: @"",
+        @"createdBy" : self.createdBy ?: @"",
+        @"creatorName" : self.creatorName ?: @"",
+        @"creatorNameEn" : self.creatorNameEn ?: @"",
+        @"ownerWelinkId" : self.ownerWelinkId ?: @"",
+        @"ownerName" : self.ownerName ?: @"",
+        @"ownerNameEn" : self.ownerNameEn ?: @"",
+        @"ownerDeptName" : self.ownerDeptName ?: @"",
+        @"ownerDeptNameEn" : self.ownerDeptNameEn ?: @"",
+        @"bizRobotId" : self.bizRobotId ?: @"",
+        @"weCodeUrl" : self.weCodeUrl ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsWeAgentUriResult
 @end
 
 @implementation WLAgentSkillsSessionMessagePart
@@ -315,6 +457,41 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 
 @end
 
+@implementation WLAgentSkillsSkillSessionPageResult
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        NSMutableArray<WLAgentSkillsSkillSession *> *sessions = [NSMutableArray array];
+        for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"content"])) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [sessions addObject:[[WLAgentSkillsSkillSession alloc] initWithDictionary:item]];
+        }
+        _content = [sessions copy];
+        _page = WLAgentSkillsNumberValue(dictionary[@"page"], WLAgentSkillsNumberValue(dictionary[@"number"], @0));
+        _size = WLAgentSkillsNumberValue(dictionary[@"size"], @50);
+        _total = WLAgentSkillsNumberValue(
+            dictionary[@"total"],
+            WLAgentSkillsNumberValue(
+                dictionary[@"totalElements"],
+                WLAgentSkillsNumberValue(dictionary[@"totalCount"], @((NSInteger)sessions.count))
+            )
+        );
+        NSInteger computedTotalPages = 0;
+        if (_size.integerValue > 0 && _total.longLongValue > 0) {
+            computedTotalPages = (NSInteger)((_total.longLongValue + _size.integerValue - 1) / _size.integerValue);
+        }
+        _totalPages = WLAgentSkillsNumberValue(dictionary[@"totalPages"], @(computedTotalPages));
+        _number = _page;
+        _totalElements = _total;
+    }
+    return self;
+}
+
+@end
+
 @implementation WLAgentSkillsSessionError
 
 - (instancetype)initWithCode:(NSString *)code message:(NSString *)message {
@@ -468,6 +645,20 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 @end
 
 @implementation WLAgentSkillsSendMessageToIMResult
+@end
+
+@implementation WLAgentSkillsCreateDigitalTwinResult
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
+        _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
+        _status = WLAgentSkillsStringValue(dictionary[@"status"], @"success");
+    }
+    return self;
+}
+
 @end
 
 @implementation WLAgentSkillsSessionStatusResult

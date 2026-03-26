@@ -71,6 +71,36 @@ NS_ASSUME_NONNULL_BEGIN
                                         success:(void (^)(WLAgentSkillsControlSkillWeCodeResult *result))success
                                         failure:(void (^)(NSError *error))failure;
 
+#pragma mark - 14. createNewSession
+- (void)createNewSession:(WLAgentSkillsCreateNewSessionParams *)params
+                success:(void (^)(WLAgentSkillsSkillSession *session))success
+                failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 15. getHistorySessionsList
+- (void)getHistorySessionsList:(WLAgentSkillsHistorySessionsParams *)params
+                        success:(void (^)(WLAgentSkillsSkillSessionPageResult *result))success
+                        failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 16. createDigitalTwin
+- (void)createDigitalTwin:(WLAgentSkillsCreateDigitalTwinParams *)params
+                    success:(void (^)(WLAgentSkillsCreateDigitalTwinResult *result))success
+                    failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 17. getAgentType
+- (void)getAgentTypeWithSuccess:(void (^)(NSArray<WLAgentSkillsAgentType *> *result))success
+                        failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 18. getWeAgentList (sync + async refresh)
+- (NSArray<WLAgentSkillsWeAgent *> *)getWeAgentList:(WLAgentSkillsPageParams *)params;
+
+#pragma mark - 19. getWeAgentDetails
+- (void)getWeAgentDetails:(WLAgentSkillsQueryWeAgentParams *)params
+                    success:(void (^)(WLAgentSkillsWeAgentDetails *result))success
+                    failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 20. getWeAgentUri
+- (WLAgentSkillsWeAgentUriResult *)getWeAgentUri;
+
 @end
 
 NS_ASSUME_NONNULL_END

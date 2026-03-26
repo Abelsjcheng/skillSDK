@@ -58,6 +58,71 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
     [self POST:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
 }
 
+- (void)createNewSessionWithAK:(NSString *)ak
+                                        title:(nullable NSString *)title
+                            bussinessDomain:(NSString *)bussinessDomain
+                                bussinessType:(NSString *)bussinessType
+                                    bussinessId:(NSString *)bussinessId
+                            assistantAccount:(NSString *)assistantAccount
+                                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                                        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [@{
+        @"ak" : ak,
+        @"bussinessDomain" : bussinessDomain,
+        @"bussinessType" : bussinessType,
+        @"bussinessId" : bussinessId,
+        @"assistantAccount" : assistantAccount
+    } mutableCopy];
+    if (title != nil && title.length > 0) {
+        parameters[@"title"] = title;
+    }
+
+    [self POST:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
+}
+
+- (void)createDigitalTwinWithName:(NSString *)name
+                                icon:(NSString *)icon
+                        description:(NSString *)description
+                        weCrewType:(NSNumber *)weCrewType
+                        bizRobotId:(nullable NSString *)bizRobotId
+                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                            failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [@{
+        @"name" : name,
+        @"icon" : icon,
+        @"description" : description,
+        @"weCrewType" : weCrewType
+    } mutableCopy];
+    if (bizRobotId != nil && bizRobotId.length > 0) {
+        parameters[@"bizRobotId"] = bizRobotId;
+    }
+
+    [self POST:@"/v4-1/we-crew/im-register" parameters:parameters success:success failure:failure];
+}
+
+- (void)getAgentTypeWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
+                        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self GET:@"/v4-1/we-crew/inner-assistant/list" parameters:nil success:success failure:failure];
+}
+
+- (void)getWeAgentListWithPageSize:(NSNumber *)pageSize
+                        pageNumber:(NSNumber *)pageNumber
+                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                            failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSDictionary *parameters = @{
+        @"pageSize" : pageSize,
+        @"pageNumber" : pageNumber
+    };
+    [self GET:@"/v4-1/we-crew/list" parameters:parameters success:success failure:failure];
+}
+
+- (void)getWeAgentDetailsWithPartnerAccount:(NSString *)partnerAccount
+                                    success:(WLAgentSkillsHTTPSuccessBlock)success
+                                    failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSString *path = [NSString stringWithFormat:@"/v1/robot-partners/%@", partnerAccount];
+    [self GET:path parameters:nil success:success failure:failure];
+}
+
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak
                                                         status:(nullable NSString *)status
@@ -80,6 +145,37 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
     }
     if (size != nil) {
         parameters[@"size"] = size;
+    }
+
+    [self GET:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
+}
+
+- (void)getHistorySessionsWithPage:(nullable NSNumber *)page
+                                                size:(nullable NSNumber *)size
+                                            status:(nullable NSString *)status
+                                                ak:(nullable NSString *)ak
+                                    bussinessId:(nullable NSString *)bussinessId
+                            assistantAccount:(nullable NSString *)assistantAccount
+                                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                                        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
+    if (page != nil) {
+        parameters[@"page"] = page;
+    }
+    if (size != nil) {
+        parameters[@"size"] = size;
+    }
+    if (status != nil && status.length > 0) {
+        parameters[@"status"] = status;
+    }
+    if (ak != nil && ak.length > 0) {
+        parameters[@"ak"] = ak;
+    }
+    if (bussinessId != nil && bussinessId.length > 0) {
+        parameters[@"bussinessId"] = bussinessId;
+    }
+    if (assistantAccount != nil && assistantAccount.length > 0) {
+        parameters[@"assistantAccount"] = assistantAccount;
     }
 
     [self GET:@"/api/skill/sessions" parameters:parameters success:success failure:failure];

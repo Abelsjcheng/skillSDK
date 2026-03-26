@@ -22,6 +22,35 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
+- (void)createNewSessionWithAK:(NSString *)ak
+                                        title:(nullable NSString *)title
+                            bussinessDomain:(NSString *)bussinessDomain
+                                bussinessType:(NSString *)bussinessType
+                                    bussinessId:(NSString *)bussinessId
+                            assistantAccount:(NSString *)assistantAccount
+                                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                                        failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)createDigitalTwinWithName:(NSString *)name
+                                icon:(NSString *)icon
+                        description:(NSString *)description
+                        weCrewType:(NSNumber *)weCrewType
+                        bizRobotId:(nullable NSString *)bizRobotId
+                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                            failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)getAgentTypeWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
+                        failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)getWeAgentListWithPageSize:(NSNumber *)pageSize
+                        pageNumber:(NSNumber *)pageNumber
+                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                            failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)getWeAgentDetailsWithPartnerAccount:(NSString *)partnerAccount
+                                    success:(WLAgentSkillsHTTPSuccessBlock)success
+                                    failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak
                                                         status:(nullable NSString *)status
@@ -29,6 +58,15 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                                             size:(nullable NSNumber *)size
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)getHistorySessionsWithPage:(nullable NSNumber *)page
+                                                size:(nullable NSNumber *)size
+                                            status:(nullable NSString *)status
+                                                ak:(nullable NSString *)ak
+                                    bussinessId:(nullable NSString *)bussinessId
+                            assistantAccount:(nullable NSString *)assistantAccount
+                                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                                        failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)getSessionWithSessionId:(NSString *)welinkSessionId
                                                 success:(WLAgentSkillsHTTPSuccessBlock)success

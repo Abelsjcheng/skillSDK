@@ -8,8 +8,11 @@
 #import "WLAgentSkillsStreamingCache.h"
 #import "WLAgentSkillsWebSocketManager.h"
 #import "WLAgentSkillsConfig.h"
+#import "WLAgentSkillsTypeConverter.h"
+#import "WLAgentSkillsWeAgentStore.h"
 
 static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
+static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.html";
 
 @interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
 
@@ -533,6 +536,338 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
     }
 }
 
+#pragma mark - 14. createNewSession
+
+- (void)createNewSession:(WLAgentSkillsCreateNewSessionParams *)params
+                success:(void (^)(WLAgentSkillsSkillSession *session))success
+                failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *ak = [WLAgentSkillsTypeConverter requiredStringFromValue:params.ak
+                                                              fieldName:@"ak"
+                                                           errorMessage:&errorMessage];
+    if (ak == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *bussinessDomain = [WLAgentSkillsTypeConverter requiredStringFromValue:params.bussinessDomain
+                                                                            fieldName:@"bussinessDomain"
+                                                                         errorMessage:&errorMessage];
+    if (bussinessDomain == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *bussinessType = [WLAgentSkillsTypeConverter requiredStringFromValue:params.bussinessType
+                                                                          fieldName:@"bussinessType"
+                                                                       errorMessage:&errorMessage];
+    if (bussinessType == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *bussinessId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.bussinessId
+                                                                        fieldName:@"bussinessId"
+                                                                     errorMessage:&errorMessage];
+    if (bussinessId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *assistantAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.assistantAccount
+                                                                              fieldName:@"assistantAccount"
+                                                                           errorMessage:&errorMessage];
+    if (assistantAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *title = [WLAgentSkillsTypeConverter optionalStringFromValue:params.title];
+
+    [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] createNewSessionWithAK:ak
+                                                             title:title
+                                                   bussinessDomain:bussinessDomain
+                                                     bussinessType:bussinessType
+                                                       bussinessId:bussinessId
+                                                   assistantAccount:assistantAccount
+                                                            success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsSkillSession *session = [[WLAgentSkillsSkillSession alloc] initWithDictionary:data];
+        if (success) {
+            success(session);
+        }
+    }
+                                                            failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 15. getHistorySessionsList
+
+- (void)getHistorySessionsList:(WLAgentSkillsHistorySessionsParams *)params
+                        success:(void (^)(WLAgentSkillsSkillSessionPageResult *result))success
+                        failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSInteger pageValue = [WLAgentSkillsTypeConverter nonNegativeIntegerFromValue:params.page
+                                                                      defaultValue:0
+                                                                          fieldName:@"page"
+                                                                       errorMessage:&errorMessage];
+    if (errorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSInteger sizeValue = [WLAgentSkillsTypeConverter positiveIntegerFromValue:params.size
+                                                                   defaultValue:50
+                                                                       fieldName:@"size"
+                                                                    errorMessage:&errorMessage];
+    if (errorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSString *status = [WLAgentSkillsTypeConverter optionalStringFromValue:params.status];
+    if (status != nil) {
+        status = [status uppercaseString];
+    }
+    if (status != nil) {
+        NSSet *validStatuses = [NSSet setWithArray:@[@"ACTIVE", @"IDLE", @"CLOSED"]];
+        if (![validStatuses containsObject:status]) {
+            [self dispatchFailure:failure code:1000 message:@"status must be ACTIVE/IDLE/CLOSED."];
+            return;
+        }
+    }
+
+    NSNumber *page = @(pageValue);
+    NSNumber *size = @(sizeValue);
+    NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
+    NSString *bussinessId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessId];
+    NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
+
+    [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getHistorySessionsWithPage:page
+                                                                   size:size
+                                                                 status:status
+                                                                     ak:ak
+                                                             bussinessId:bussinessId
+                                                         assistantAccount:assistantAccount
+                                                                success:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsSkillSessionPageResult *result = [strongSelf normalizedSkillSessionPageResultFromDictionary:data
+                                                                                                     requestPage:page
+                                                                                                     requestSize:size];
+        if (success) {
+            success(result);
+        }
+    }
+                                                                failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 16. createDigitalTwin
+
+- (void)createDigitalTwin:(WLAgentSkillsCreateDigitalTwinParams *)params
+                    success:(void (^)(WLAgentSkillsCreateDigitalTwinResult *result))success
+                    failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *name = [WLAgentSkillsTypeConverter requiredStringFromValue:params.name
+                                                                fieldName:@"name"
+                                                             errorMessage:&errorMessage];
+    if (name == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *icon = [WLAgentSkillsTypeConverter requiredStringFromValue:params.icon
+                                                                fieldName:@"icon"
+                                                             errorMessage:&errorMessage];
+    if (icon == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:params.desc
+                                                                fieldName:@"description"
+                                                             errorMessage:&errorMessage];
+    if (desc == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSInteger weCrewType = [WLAgentSkillsTypeConverter requiredIntegerFromValue:params.weCrewType
+                                                                        fieldName:@"weCrewType"
+                                                                     errorMessage:&errorMessage];
+    if (errorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    if (!(weCrewType == 0 || weCrewType == 1)) {
+        [self dispatchFailure:failure code:1000 message:@"weCrewType must be 0 or 1."];
+        return;
+    }
+    NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bizRobotId];
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] createDigitalTwinWithName:name
+                                                                  icon:icon
+                                                          description:desc
+                                                          weCrewType:@(weCrewType)
+                                                          bizRobotId:bizRobotId
+                                                              success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsCreateDigitalTwinResult *result = [[WLAgentSkillsCreateDigitalTwinResult alloc] initWithDictionary:data];
+        if (result.status == nil || result.status.length == 0) {
+            result.status = @"success";
+        }
+        if (success) {
+            success(result);
+        }
+    }
+                                                              failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 17. getAgentType
+
+- (void)getAgentTypeWithSuccess:(void (^)(NSArray<WLAgentSkillsAgentType *> *result))success
+                        failure:(void (^)(NSError *error))failure {
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getAgentTypeWithSuccess:^(id  _Nullable responseObject) {
+        NSMutableArray<WLAgentSkillsAgentType *> *result = [NSMutableArray array];
+        if ([responseObject isKindOfClass:[NSArray class]]) {
+            for (id item in (NSArray *)responseObject) {
+                if (![item isKindOfClass:[NSDictionary class]]) {
+                    continue;
+                }
+                [result addObject:[[WLAgentSkillsAgentType alloc] initWithDictionary:(NSDictionary *)item]];
+            }
+        }
+        if (success) {
+            success([result copy]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 18. getWeAgentList (sync + async refresh)
+
+- (NSArray<WLAgentSkillsWeAgent *> *)getWeAgentList:(WLAgentSkillsPageParams *)params {
+    if (params == nil) {
+        return @[];
+    }
+
+    NSInteger pageSize = 0;
+    NSInteger pageNumber = 0;
+    NSString *errorMessage = nil;
+
+    pageSize = [WLAgentSkillsTypeConverter requiredIntegerFromValue:params.pageSize
+                                                           fieldName:@"pageSize"
+                                                        errorMessage:&errorMessage];
+    if (errorMessage != nil || pageSize <= 0) {
+        return @[];
+    }
+    pageNumber = [WLAgentSkillsTypeConverter requiredIntegerFromValue:params.pageNumber
+                                                             fieldName:@"pageNumber"
+                                                          errorMessage:&errorMessage];
+    if (errorMessage != nil || pageNumber <= 0) {
+        return @[];
+    }
+
+    pageSize = [self clampInteger:pageSize min:1 max:100];
+    pageNumber = [self clampInteger:pageNumber min:1 max:1000];
+
+    NSArray<NSDictionary *> *cacheDictionaries = [[WLAgentSkillsWeAgentStore sharedStore] loadWeAgentListDictionaries];
+    NSArray<WLAgentSkillsWeAgent *> *cache = [self parseWeAgentListFromResponse:cacheDictionaries];
+    NSArray<WLAgentSkillsWeAgent *> *current = [self pagedWeAgentList:cache pageSize:pageSize pageNumber:pageNumber];
+
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentListWithPageSize:@(pageSize)
+                                                             pageNumber:@(pageNumber)
+                                                                success:^(id  _Nullable responseObject) {
+        NSArray<WLAgentSkillsWeAgent *> *remoteList = [self parseWeAgentListFromResponse:responseObject];
+        if (remoteList.count == 0) {
+            return;
+        }
+        [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentListDictionaries:[self dictionariesFromWeAgentList:remoteList]];
+    }
+                                                                failure:^(__unused NSError * _Nonnull error) {
+        // Ignore background refresh failures for sync contract.
+    }];
+
+    return current;
+}
+
+#pragma mark - 19. getWeAgentDetails
+
+- (void)getWeAgentDetails:(WLAgentSkillsQueryWeAgentParams *)params
+                    success:(void (^)(WLAgentSkillsWeAgentDetails *result))success
+                    failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
+                                                                           fieldName:@"partnerAccount"
+                                                                        errorMessage:&errorMessage];
+    if (partnerAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
+                                                                         success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:data];
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[details toDictionary]];
+        if (success) {
+            success(details);
+        }
+    }
+                                                                         failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 20. getWeAgentUri
+
+- (WLAgentSkillsWeAgentUriResult *)getWeAgentUri {
+    NSDictionary *detailDictionary = [[WLAgentSkillsWeAgentStore sharedStore] loadCurrentWeAgentDetailDictionary];
+    WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary ?: @{}];
+
+    NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
+
+    WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
+    result.weAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"] ?: @"";
+    result.assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                        key:@"partnerAccount"
+                                                      value:partnerAccount] ?: @"";
+    result.switchAssistantUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                        key:@"partnerAccount"
+                                                      value:partnerAccount] ?: @"";
+    return result;
+}
+
 #pragma mark - WLAgentSkillsWebSocketManagerDelegate
 
 - (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
@@ -666,6 +1001,105 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
         @"totalPages" : safeTotalPages
     };
     return [[WLAgentSkillsPageResult alloc] initWithDictionary:normalized];
+}
+
+- (WLAgentSkillsSkillSessionPageResult *)normalizedSkillSessionPageResultFromDictionary:(NSDictionary *)dictionary
+                                                                                 requestPage:(NSNumber *)requestPage
+                                                                                 requestSize:(NSNumber *)requestSize {
+    WLAgentSkillsSkillSessionPageResult *raw = [[WLAgentSkillsSkillSessionPageResult alloc] initWithDictionary:dictionary];
+    NSNumber *safePage = raw.page ?: (requestPage ?: @0);
+    NSInteger safeSizeValue = raw.size != nil && raw.size.integerValue > 0
+        ? raw.size.integerValue
+        : (requestSize != nil && requestSize.integerValue > 0 ? requestSize.integerValue : 50);
+    NSNumber *safeSize = @(safeSizeValue);
+    NSNumber *safeTotal = raw.total ?: @((NSInteger)raw.content.count);
+    NSNumber *safeTotalPages = raw.totalPages;
+    if (safeTotalPages == nil || safeTotalPages.integerValue < 0) {
+        NSInteger totalPages = 0;
+        if (safeTotal.longLongValue > 0 && safeSizeValue > 0) {
+            totalPages = (NSInteger)((safeTotal.longLongValue + safeSizeValue - 1) / safeSizeValue);
+        }
+        safeTotalPages = @(totalPages);
+    }
+
+    raw.page = safePage;
+    raw.size = safeSize;
+    raw.total = safeTotal;
+    raw.totalPages = safeTotalPages;
+    raw.number = safePage;
+    raw.totalElements = safeTotal;
+    return raw;
+}
+
+- (NSArray<WLAgentSkillsWeAgent *> *)parseWeAgentListFromResponse:(id)responseObject {
+    NSMutableArray<WLAgentSkillsWeAgent *> *result = [NSMutableArray array];
+    if (![responseObject isKindOfClass:[NSArray class]]) {
+        return @[];
+    }
+
+    for (id item in (NSArray *)responseObject) {
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        [result addObject:[[WLAgentSkillsWeAgent alloc] initWithDictionary:(NSDictionary *)item]];
+    }
+    return [result copy];
+}
+
+- (NSArray<NSDictionary *> *)dictionariesFromWeAgentList:(NSArray<WLAgentSkillsWeAgent *> *)list {
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray arrayWithCapacity:list.count];
+    for (WLAgentSkillsWeAgent *item in list) {
+        [result addObject:[item toDictionary]];
+    }
+    return [result copy];
+}
+
+- (NSArray<WLAgentSkillsWeAgent *> *)pagedWeAgentList:(NSArray<WLAgentSkillsWeAgent *> *)list
+                                             pageSize:(NSInteger)pageSize
+                                           pageNumber:(NSInteger)pageNumber {
+    if (list.count == 0 || pageSize <= 0 || pageNumber <= 0) {
+        return @[];
+    }
+    NSInteger start = (pageNumber - 1) * pageSize;
+    if (start >= list.count) {
+        return @[];
+    }
+    NSInteger end = MIN(start + pageSize, list.count);
+    NSRange range = NSMakeRange(start, end - start);
+    return [list subarrayWithRange:range];
+}
+
+- (NSInteger)clampInteger:(NSInteger)value min:(NSInteger)minValue max:(NSInteger)maxValue {
+    return MAX(minValue, MIN(value, maxValue));
+}
+
+- (nullable NSString *)appendQueryItemToUri:(nullable NSString *)uri
+                                        key:(NSString *)key
+                                      value:(nullable NSString *)value {
+    NSString *base = [WLAgentSkillsTypeConverter optionalStringFromValue:uri];
+    if (base == nil || base.length == 0) {
+        return nil;
+    }
+    NSString *safeValue = value ?: @"";
+
+    NSURLComponents *components = [NSURLComponents componentsWithString:base];
+    if (components != nil) {
+        NSMutableArray<NSURLQueryItem *> *items = [NSMutableArray array];
+        if (components.queryItems != nil) {
+            [items addObjectsFromArray:components.queryItems];
+        }
+        [items addObject:[NSURLQueryItem queryItemWithName:key value:safeValue]];
+        components.queryItems = items;
+        if (components.string != nil && components.string.length > 0) {
+            return components.string;
+        }
+    }
+
+    NSString *separator = [base containsString:@"?"]
+        ? (([base hasSuffix:@"?"] || [base hasSuffix:@"&"]) ? @"" : @"&")
+        : @"?";
+    NSString *encodedValue = [safeValue stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]] ?: @"";
+    return [NSString stringWithFormat:@"%@%@%@=%@", base, separator, key, encodedValue];
 }
 
 - (BOOL)isSameSessionMessage:(WLAgentSkillsSessionMessage *)left
