@@ -1,5 +1,6 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
+import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
 import '../styles/AssistantDetail.less';
 
@@ -84,8 +85,16 @@ const AssistantDetail: React.FC = () => {
     setIsSecretVisible(false);
   }, [isInternalAssistant, detail?.partnerAccount]);
 
+  const handleBackgroundClick = (event: React.MouseEvent<HTMLDivElement>): void => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    dispatchAssistantCloseEvent();
+  };
+
   return (
-    <div className="assistant-detail">
+    <div className="assistant-detail" onClick={handleBackgroundClick}>
       <AssistantPageHeader title="助理详情" isPcMiniApp={isPc} />
 
       <main className="assistant-detail__content">

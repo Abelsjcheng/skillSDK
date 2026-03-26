@@ -3,6 +3,7 @@ import backIcon from '../../imgs/icon-back.svg';
 import closeIcon from '../../imgs/icon-close.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
+import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
 
 interface AssistantPageHeaderProps {
   title: string;
@@ -28,7 +29,10 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
           type="button"
           className="assistant-page-header__pc-btn"
           aria-label="关闭"
-          onClick={onClose}
+          onClick={() => {
+            dispatchAssistantCloseEvent();
+            onClose();
+          }}
         >
           <img src={closeIcon} alt="" className="assistant-page-header__pc-icon" aria-hidden="true" />
         </button>
@@ -48,7 +52,15 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   return (
     <header className="assistant-page-header assistant-page-header--mobile">
       <div className="assistant-page-header__side assistant-page-header__side--left">
-        <button type="button" className="assistant-page-header__icon-btn" aria-label="返回" onClick={onBack}>
+        <button
+          type="button"
+          className="assistant-page-header__icon-btn"
+          aria-label="返回"
+          onClick={() => {
+            dispatchAssistantCloseEvent();
+            onBack();
+          }}
+        >
           <img src={backIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
         </button>
         <button type="button" className="assistant-page-header__icon-btn" aria-label="客服" onClick={onService}>

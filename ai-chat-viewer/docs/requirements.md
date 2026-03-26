@@ -431,7 +431,7 @@
    - 不展示轮播按钮区域。
 2. 操作区：
    - 距离内容区 `65px`；
-   - 水平居中显示“立即启用”按钮；
+   - 水平居中显示“选择助理”按钮；
    - 按钮尺寸 `250px x 38px`；
    - 圆角半径 `99px`；
    - 背景线性渐变（从左到右）：`rgba(66,176,255,1)` -> `rgba(31,120,255,1)`。
@@ -459,17 +459,27 @@
       - 容器 1 内头像块：`72px x 72px`，水平居中，顶部 `0px`，圆角 `19px`。
       - 容器 1 内名称块：距离头像 `12px`，宽度占满，水平居中，文本 `小咪`，字体 `16px/700/24px`，颜色 `rgba(51,51,51,1)`。
       - 名称右侧 tag：距离名称 `8px`，`48px x 16px`，圆角 `8px`，背景 `rgba(235,240,255,1)`，文本 `员工助手`，字体 `10px/400/12px`，颜色 `rgba(59,112,255,1)`。
+      - `bizRobotId` 有值时显示 tag；`bizRobotId` 为空时隐藏 tag。
       - 对齐规则：仅“名称文本”在容器内水平居中，tag 不参与名称的居中计算（避免“名称+tag”整体居中导致名称偏移）。
       - 容器 2：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding: 12px 12px 0 12px`。
       - 容器 2 内助理简介标题：左对齐，文本 `助理简介`，字体 `14px/500/22px`，颜色 `rgba(51,51,51,1)`。
-      - 容器 2 内助理简介内容：距离标题 `8px`，宽度占满，高度自适应，文本 `你的全能AI生活助理`，字体 `14px/400/22px`，颜色 `rgba(102,102,102,1)`。
-      - 容器 2 内创建者块：距离简介块 `12px`，高度 `48px`，宽度占满，左文案 `创建者`（`14px/500/22px`，`rgba(51,51,51,1)`），右文案 `小米`（`14px/400/22px`，`rgba(102,102,102,1)`）。
-      - 助理简介块与创建者块之间增加描边：`1px solid rgba(0,0,0,0.05)`。
-      - 容器 3：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding-left: 12px; padding-right: 12px;`。
-      - 容器 3 内两个 item 样式与创建者块一致：
-         - item 1：左侧 `部门`，右侧 `测试`；
-         - item 2：左侧 `责任人`，右侧 `测试`。
-      - “部门”与“责任人”两个 item 之间增加描边：`1px solid rgba(0,0,0,0.05)`。
+       - 容器 2 内助理简介内容：距离标题 `8px`，宽度占满，高度自适应，文本 `你的全能AI生活助理`，字体 `14px/400/22px`，颜色 `rgba(102,102,102,1)`。
+       - 容器 2 内创建者块：距离简介块 `12px`，高度 `48px`，宽度占满，左文案 `创建者`（`14px/500/22px`，`rgba(51,51,51,1)`），右文案 `小米`（`14px/400/22px`，`rgba(102,102,102,1)`）。
+       - 助理简介块与创建者块之间增加描边：`1px solid rgba(0,0,0,0.05)`。
+       - 容器 3：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding-left: 12px; padding-right: 12px;`。
+      - 容器 3 内两个 item 样式与创建者块一致，按 `bizRobotId` 分支展示：
+         - `bizRobotId` 有值（内部助理）：
+            - item 1：左侧 `部门`，右侧展示 `ownerDeptName`；
+            - item 2：左侧 `责任人`，右侧展示 `ownerName`。
+         - `bizRobotId` 为空（外部助理）：
+            - item 1：左侧 `APPID`，右侧展示 `appKey`；
+            - item 2：左侧 `密钥`，右侧展示 `appSecret` 的掩码文本（`*`）；
+            - 右侧密钥支持按压查看：按下显示明文，松手恢复 `*` 掩码。
+       - “部门”与“责任人”两个 item 之间增加描边：`1px solid rgba(0,0,0,0.05)`。
+4. 数据渲染约束：
+   - 页面展示数据全部来自 `getWeAgentDetails` 接口返回；
+   - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、部门、责任人、头像）。
+   - 助理类型判断规则：`bizRobotId` 有值视为内部助理，`bizRobotId` 为空视为外部助理。
 
 ## 15. 切换助理页面
 
@@ -490,6 +500,7 @@
       - 左侧头像图标尺寸固定 `40px x 40px`；
       - 图标右侧间距 `16px` 为助理说明块。
    - 点击助理块后，当前选中块仅显示 `1px solid rgba(13,148,255,1)` 边框，不显示额外高亮效果（如背景高亮、系统点击高亮或焦点发光）。
+   - 列表数据完全来自 `getWeAgentList` 接口返回，不使用本地 mock 列表或默认业务数据。
 4. 助理说明块：
    - 第一行：
       - 左侧文本：`编程助理`，样式 `16px/500/24px`，颜色 `rgba(51,51,51,1)`；
@@ -530,6 +541,9 @@
    - 左按钮“创建助理”：`80px x 32px`，圆角 `4px`，背景 `rgba(0,0,0,0.05)`；
    - 右按钮“立即启用”：`80px x 32px`，圆角 `4px`，背景 `rgba(13,148,255,1)`。
 8. PC 底部两个按钮点击事件当前均为空实现（占位）。
+9. 列表数据渲染约束：
+   - 页面助理列表、名称、标签、简介、头像均直接使用 `getWeAgentList` 接口返回值；
+   - 不使用本地默认值/mock 业务数据进行补齐。
 
 ## 17. WeAgentCUI 对话页面
 
@@ -571,6 +585,72 @@
    - 容器 1：AI 头像图标，尺寸 `72px x 72px`，圆角 `124px`，边框 `2px solid rgba(255,255,255,1)`；
    - 容器 2：文本 `早上好，峰哥`，样式 `18px / 500 / 26px`，颜色 `rgba(25,25,25,1)`；
    - 容器 3：文本 `CodeAgent | 你的专属编程智能体`，样式 `14px / 400 / 22px`，颜色 `rgba(89,89,89,1)`。
+
+## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
+
+1. 接口调用端能力适配：
+   - 移动端：通过 `window.HWH5EXT.xxx` 调用对应 JSAPI；
+   - PC 端：通过 `window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'xxx', params})` 调用同名能力；
+   - 页面内统一封装调用入口，保证业务代码按同一方法名调用，不直接耦合端差异。
+2. 激活助理页面（`/activateAssistant`）：
+   - 页面初始化调用 `getWeAgentList` 获取列表，使用返回结构 `content` 作为列表数据源；
+   - 点击“选择助理”时按端能力分支处理：
+      - PC 端（`isPcMiniApp === true`）：
+         - 列表非空：通过 `react-router` 导航（`navigate('/startAssistant')`）跳转；
+         - 列表为空：空实现（不跳转、不打开新页面）。
+      - 移动端（`isPcMiniApp === false`）：
+         - 为空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#createAssistant' })`；
+         - 非空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#startAssistant' })`。
+3. 启动助理页面（`/startAssistant`）：
+   - 页面初始化调用 `getWeAgentList`，并将返回的 `content` 助理信息填充到列表项；
+   - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
+   - 选中某个助理后点击“立即启用”：
+      - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
+      - 读取返回 `WeAgentDetailsArray[0]` 的 `weCodeUrl`，组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
+4. 创建助理页面（`/createAssistant`）：
+   - 页面初始化读取 query 参数 `from`；
+   - 进入第二步后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
+   - 点击“确定”调用 `createDigitalTwin`；
+   - 若 `from=weAgent`：
+      - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
+      - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
+   - 若 `from` 非 `weAgent`：调用预留占位接口（待后续实现）。
+5. 助理详情页面（`/assistantDetail`）：
+   - 读取 query 参数 `partnerAccount`；
+   - 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })` 获取详情并渲染 `WeAgentDetailsArray[0]`。
+6. 切换助理页面（`/switchAssistant`）：
+   - 读取 query 参数 `partnerAccount`；
+   - 调用 `getWeAgentList` 渲染 `content` 列表，并默认选中与 query 匹配的助理项；
+   - 点击“确认切换”：
+      - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
+      - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
+7. `openWeAgentCUI` 参数组装规则：
+   - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
+   - `assistantDetailUri`：`h5://123456/html/index.html` 追加 query `partnerAccount`；
+   - `switchAssistantUri`：`h5://123456/html/index.html` 追加 query `partnerAccount`。
+
+## 19. 宿主事件桥与库打包约束
+
+1. 助理页面需要补充宿主事件桥，统一通过 `window.dispatchEvent(new CustomEvent(...))` 向宿主通知关键交互。
+2. 事件名与触发时机：
+   - `weAgent:assistant-close`：
+      - 点击标题区关闭按钮（PC）时触发；
+      - 点击标题区返回按钮（移动）时触发；
+      - 点击助理详情页或切换助理页根容器空白区域（即背景层）时触发。
+   - `weAgent:switch-assistant-select`：
+      - 切换助理页点击某个助理卡片并完成选中时触发；
+      - `detail` 中带 `{ id: selectedAssistantId }`。
+   - `weAgent:switch-assistant-cancel`：
+      - 点击“取消选择”按钮时触发；
+      - `detail` 中带 `{ id: selectedAssistantId }`（允许为空字符串）。
+   - `weAgent:switch-assistant-confirm`：
+      - 点击“确认切换”按钮时触发；
+      - `detail` 中带 `{ id: selectedAssistantId }`。
+3. `SwitchAssistant` 组件化导出场景支持通过 `defaultSelectedAssistantId` 传入默认选中项；若未传则按页面 query 默认选中规则处理。
+4. 库构建（`webpack.lib.config.js`）需将以下依赖配置为 `externals`，避免宿主集成时重复打包 React 产生运行时冲突：
+   - `react`
+   - `react-dom/client`
+   - `react/jsx-runtime`
 
 
 

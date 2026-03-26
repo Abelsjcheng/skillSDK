@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
 import {
   buildOpenWeAgentCUIParams,
@@ -15,6 +15,10 @@ const DEFAULT_LIST_QUERY = {
   pageNumber: 1,
 };
 
+interface SwitchAssistantProps {
+  defaultSelectedAssistantId?: string;
+}
+
 function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
   return list.map((assistant) => ({
     id: assistant.partnerAccount,
@@ -25,12 +29,13 @@ function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
   }));
 }
 
-const SwitchAssistant: React.FC = () => {
+const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+  const preferredDefaultPartnerAccount = useMemo(() => defaultSelectedAssistantId?.trim() ?? '', [defaultSelectedAssistantId]);
   const assistantItems = useMemo(() => toAssistantItems(assistantList), [assistantList]);
 
   const loadAssistantList = useCallback(async (): Promise<void> => {
@@ -42,6 +47,9 @@ const SwitchAssistant: React.FC = () => {
         if (list.some((assistant) => assistant.partnerAccount === current)) {
           return current;
         }
+        if (preferredDefaultPartnerAccount && list.some((assistant) => assistant.partnerAccount === preferredDefaultPartnerAccount)) {
+          return preferredDefaultPartnerAccount;
+        }
         if (partnerAccount && list.some((assistant) => assistant.partnerAccount === partnerAccount)) {
           return partnerAccount;
         }
@@ -52,7 +60,7 @@ const SwitchAssistant: React.FC = () => {
       setAssistantList([]);
       setSelectedPartnerAccount('');
     }
-  }, [partnerAccount]);
+  }, [partnerAccount, preferredDefaultPartnerAccount]);
 
   useEffect(() => {
     void loadAssistantList();
@@ -85,6 +93,7 @@ const SwitchAssistant: React.FC = () => {
       isPcMiniApp={isPc}
       leftButtonText="取消选择"
       rightButtonText="确认切换"
+      defaultSelectedAssistantId={preferredDefaultPartnerAccount}
       onLeftButtonClick={handleCancelSelect}
       onRightButtonClick={handleConfirmSwitch}
       assistants={assistantItems}

@@ -1,5 +1,11 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../../styles/SwitchAssistant.less';
+import {
+  dispatchAssistantCloseEvent,
+  dispatchSwitchAssistantCancelEvent,
+  dispatchSwitchAssistantConfirmEvent,
+  dispatchSwitchAssistantSelectEvent,
+} from '../../utils/assistantHostBridge';
 import AssistantPageHeader from './AssistantPageHeader';
 
 export interface AssistantItem {
@@ -15,6 +21,7 @@ interface AssistantSelectionPageProps {
   isPcMiniApp?: boolean;
   leftButtonText: string;
   rightButtonText: string;
+  defaultSelectedAssistantId?: string;
   onLeftButtonClick?: () => void;
   onRightButtonClick?: () => void;
   assistants?: AssistantItem[];
@@ -31,6 +38,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   isPcMiniApp = false,
   leftButtonText,
   rightButtonText,
+  defaultSelectedAssistantId,
   onLeftButtonClick = noop,
   onRightButtonClick = noop,
   assistants,
@@ -38,15 +46,32 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   onSelectAssistant,
   rightButtonDisabled = false,
 }) => {
-  const [internalSelectedAssistantId, setInternalSelectedAssistantId] = useState<string>('');
-  const isSelectionControlled = selectedAssistantId !== undefined;
-  const currentSelectedAssistantId = isSelectionControlled ? selectedAssistantId : internalSelectedAssistantId;
   const assistantList = useMemo(() => assistants ?? EMPTY_ASSISTANT_LIST, [assistants]);
+  const isSelectionControlled = selectedAssistantId !== undefined;
+  const resolvedDefaultSelectedAssistantId = useMemo(
+    () => defaultSelectedAssistantId ?? assistantList[0]?.id ?? '',
+    [assistantList, defaultSelectedAssistantId],
+  );
+
+  const [internalSelectedAssistantId, setInternalSelectedAssistantId] = useState<string>(
+    resolvedDefaultSelectedAssistantId,
+  );
+
+  useEffect(() => {
+    if (isSelectionControlled) {
+      return;
+    }
+
+    setInternalSelectedAssistantId(resolvedDefaultSelectedAssistantId);
+  }, [isSelectionControlled, resolvedDefaultSelectedAssistantId]);
+
+  const currentSelectedAssistantId = isSelectionControlled ? (selectedAssistantId ?? '') : internalSelectedAssistantId;
 
   const handleSelectAssistant = (assistantId: string) => {
     if (!isSelectionControlled) {
       setInternalSelectedAssistantId(assistantId);
     }
+    dispatchSwitchAssistantSelectEvent(assistantId);
     onSelectAssistant?.(assistantId);
   };
 
@@ -60,7 +85,14 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   };
 
   return (
-    <div className="switch-assistant">
+    <div
+      className="switch-assistant"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          dispatchAssistantCloseEvent();
+        }
+      }}
+    >
       <AssistantPageHeader title={title} isPcMiniApp={isPcMiniApp} />
 
       <main className="switch-assistant__content">
@@ -103,14 +135,20 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
-          onClick={onLeftButtonClick}
+          onClick={() => {
+            dispatchSwitchAssistantCancelEvent(currentSelectedAssistantId);
+            onLeftButtonClick();
+          }}
         >
           {leftButtonText}
         </button>
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--confirm"
-          onClick={onRightButtonClick}
+          onClick={() => {
+            dispatchSwitchAssistantConfirmEvent(currentSelectedAssistantId);
+            onRightButtonClick();
+          }}
           disabled={rightButtonDisabled}
         >
           {rightButtonText}
