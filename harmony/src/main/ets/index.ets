@@ -5,17 +5,24 @@
 export { SkillSDK } from './sdk/SkillSDK';
 
 export {
+  AgentType,
+  CreateDigitalTwinParams,
+  CreateDigitalTwinResult,
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
+  CreateNewSessionParams,
   CreateSessionParams,
   CloseSkillResult,
   GetSessionMessageParams,
+  HistorySessionsParams,
   MessageContentType,
   MessageRole,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
   PageResult,
+  PageParams,
   PermissionResponse,
+  QueryWeAgentParams,
   RegisterSessionListenerParams,
   RegisterSessionListenerResult,
   RegenerateAnswerParams,
@@ -46,6 +53,9 @@ export {
   StreamMessageType,
   StreamSnapshotMessage,
   StreamingPart,
+  WeAgent,
+  WeAgentDetails,
+  WeAgentUriResult,
   UnregisterSessionListenerParams,
   UnregisterSessionListenerResult
 } from './sdk/types';

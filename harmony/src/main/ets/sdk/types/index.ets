@@ -61,6 +61,7 @@ export interface SkillSDKConfig {
   timeout?: number;
   enableLog?: boolean;
   defaultHeaders?: Record<string, string>;
+  context?: object;
 }
 
 export interface SDKError {
@@ -100,6 +101,10 @@ export interface SkillSession {
   ak: string | null;
   title: string | null;
   imGroupId: string | null;
+  bussinessDomain?: string | null;
+  bussinessType?: string | null;
+  bussinessId?: string | null;
+  assistantAccount?: string | null;
   status: SessionRecordStatus;
   toolSessionId: string | null;
   createdAt: string;
@@ -263,6 +268,24 @@ export interface CreateSessionParams {
   imGroupId: string;
 }
 
+export interface CreateNewSessionParams {
+  ak: string;
+  title?: string;
+  bussinessDomain: string;
+  bussinessType: string;
+  bussinessId: string;
+  assistantAccount: string;
+}
+
+export interface HistorySessionsParams {
+  page?: number;
+  size?: number;
+  status?: SessionRecordStatus;
+  ak?: string;
+  bussinessId?: string;
+  assistantAccount?: string;
+}
+
 export interface CloseSkillResult {
   status: 'success' | 'failed';
 }
@@ -372,4 +395,68 @@ export interface ControlSkillWeCodeParams {
 
 export interface ControlSkillWeCodeResult {
   status: 'success' | 'failed';
+}
+
+export interface CreateDigitalTwinParams {
+  name: unknown;
+  icon: unknown;
+  description: unknown;
+  weCrewType: unknown;
+  bizRobotId?: unknown;
+}
+
+export interface CreateDigitalTwinResult {
+  robotId: string;
+  partnerAccount: string;
+  status: 'success';
+}
+
+export interface AgentType {
+  name: string;
+  icon: string;
+  bizRobotId: string;
+}
+
+export interface PageParams {
+  pageSize: unknown;
+  pageNumber: unknown;
+}
+
+export interface QueryWeAgentParams {
+  partnerAccount: unknown;
+}
+
+export interface WeAgent {
+  name: string;
+  icon: string;
+  description: string;
+  partnerAccount: string;
+  bizRobotName: string;
+  bizRobotNameEn: string;
+}
+
+export interface WeAgentDetails {
+  name: string;
+  icon: string;
+  desc: string;
+  moduleId: string;
+  appKey: string;
+  appSecret: string;
+  partnerAccount: string;
+  createdBy: string;
+  creatorName: string;
+  creatorNameEn: string;
+  ownerWelinkId: string;
+  ownerName: string;
+  ownerNameEn: string;
+  ownerDeptName: string;
+  ownerDeptNameEn: string;
+  bizRobotId: string;
+  weCodeUrl: string;
+}
+
+export interface WeAgentUriResult {
+  weAgentUri: string;
+  assistantDetailUri: string;
+  switchAssistantUri: string;
 }

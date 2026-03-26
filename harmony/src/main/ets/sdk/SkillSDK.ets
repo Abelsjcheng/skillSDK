@@ -4,16 +4,25 @@ import { MessageCacheManager } from './managers/MessageCacheManager';
 import { SessionStateManager } from './managers/SessionStateManager';
 import { WeCodeStateManager } from './managers/WeCodeStateManager';
 import { Logger } from './utils/Logger';
+import { TypeConverter } from './utils/TypeConverter';
 import { Validator } from './utils/Validator';
+import { WeAgentStore } from './utils/WeAgentStore';
 import {
+  AgentType,
   CloseSkillResult,
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
+  CreateDigitalTwinParams,
+  CreateDigitalTwinResult,
+  CreateNewSessionParams,
   CreateSessionParams,
   GetSessionMessageParams,
+  HistorySessionsParams,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
+  PageParams,
   PageResult,
+  QueryWeAgentParams,
   RegisterSessionListenerParams,
   RegisterSessionListenerResult,
   RegenerateAnswerParams,
@@ -33,16 +42,20 @@ import {
   StopSkillParams,
   StopSkillResult,
   StreamMessage,
+  WeAgent,
+  WeAgentDetails,
+  WeAgentUriResult,
   UnregisterSessionListenerParams,
   UnregisterSessionListenerResult
 } from './types';
 
 /**
  * Singleton SDK entry.
- * Exposes 13 public interfaces aligned with SkillClientSdkInterfaceV1.md.
+ * Exposes public interfaces aligned with SkillClientSdkInterfaceV1.md.
  */
 export class SkillSDK {
   private static instance: SkillSDK | null = null;
+  private static readonly ASSISTANT_H5_URI = 'h5://123456/html/index.html';
 
   private config: SkillSDKConfig;
   private readonly logger: Logger;
@@ -51,6 +64,7 @@ export class SkillSDK {
   private readonly messageCacheManager: MessageCacheManager;
   private readonly sessionStateManager: SessionStateManager;
   private readonly weCodeStateManager: WeCodeStateManager;
+  private readonly weAgentStore: WeAgentStore;
 
   private constructor(config: SkillSDKConfig) {
     this.validateConfig(config);
@@ -66,6 +80,7 @@ export class SkillSDK {
     this.messageCacheManager = new MessageCacheManager(this.config.enableLog);
     this.sessionStateManager = new SessionStateManager(this.config.enableLog);
     this.weCodeStateManager = new WeCodeStateManager(this.config.enableLog);
+    this.weAgentStore = new WeAgentStore(this.config.context);
 
     this.wsManager.setMessageHandler((message: StreamMessage) => {
       this.messageCacheManager.onStreamMessage(message);
@@ -106,6 +121,9 @@ export class SkillSDK {
     };
     this.httpClient.updateConfig(nextConfig);
     this.wsManager.updateConfig(nextConfig);
+    if (nextConfig.context !== undefined) {
+      this.weAgentStore.updateContext(nextConfig.context);
+    }
     if (nextConfig.enableLog !== undefined) {
       this.logger.setEnabled(nextConfig.enableLog);
       this.messageCacheManager.setEnableLog(nextConfig.enableLog);
@@ -454,6 +472,192 @@ export class SkillSDK {
     }
   }
 
+  // 14. createNewSession
+  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+    try {
+      Validator.requireObject(params, 'params');
+      const ak = TypeConverter.toRequiredString(params.ak, 'ak');
+      const bussinessDomain = TypeConverter.toRequiredString(params.bussinessDomain, 'bussinessDomain');
+      const bussinessType = TypeConverter.toRequiredString(params.bussinessType, 'bussinessType');
+      const bussinessId = TypeConverter.toRequiredString(params.bussinessId, 'bussinessId');
+      const assistantAccount = TypeConverter.toRequiredString(params.assistantAccount, 'assistantAccount');
+      const title = TypeConverter.toOptionalString(params.title, 'title');
+
+      await this.ensureWebSocketConnected();
+
+      const payload: Record<string, unknown> = {
+        ak,
+        bussinessDomain,
+        bussinessType,
+        bussinessId,
+        assistantAccount
+      };
+      if (title !== undefined) {
+        payload.title = title;
+      }
+
+      return await this.httpClient.post<SkillSession>('/api/skill/sessions', payload);
+    } catch (error) {
+      throw this.normalizeError('createNewSession', error);
+    }
+  }
+
+  // 15. getHistorySessionsList
+  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>> {
+    try {
+      Validator.requireObject(params, 'params');
+      const page = TypeConverter.toNonNegativeInt(params.page, 0, 'page');
+      const size = TypeConverter.toPositiveInt(params.size, 50, 'size');
+
+      let status: string | undefined;
+      if (params.status !== undefined) {
+        status = TypeConverter.toOptionalString(params.status, 'status');
+        if (status !== undefined) {
+          status = status.toUpperCase();
+          Validator.requireEnum(status, ['ACTIVE', 'IDLE', 'CLOSED'], 'status');
+        }
+      }
+
+      const ak = TypeConverter.toOptionalString(params.ak, 'ak');
+      const bussinessId = TypeConverter.toOptionalString(params.bussinessId, 'bussinessId');
+      const assistantAccount = TypeConverter.toOptionalString(params.assistantAccount, 'assistantAccount');
+
+      await this.ensureWebSocketConnected();
+
+      const query: Record<string, string | number> = {
+        page,
+        size
+      };
+      if (status !== undefined) {
+        query.status = status;
+      }
+      if (ak !== undefined) {
+        query.ak = ak;
+      }
+      if (bussinessId !== undefined) {
+        query.bussinessId = bussinessId;
+      }
+      if (assistantAccount !== undefined) {
+        query.assistantAccount = assistantAccount;
+      }
+
+      return await this.fetchServerSessions(query, page, size);
+    } catch (error) {
+      throw this.normalizeError('getHistorySessionsList', error);
+    }
+  }
+
+  // 16. createDigitalTwin
+  async createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const name = TypeConverter.toRequiredString(params.name, 'name');
+      const icon = TypeConverter.toRequiredString(params.icon, 'icon');
+      const description = TypeConverter.toRequiredString(params.description, 'description');
+      const weCrewType = TypeConverter.requireInteger(params.weCrewType, 'weCrewType');
+      if (weCrewType !== 0 && weCrewType !== 1) {
+        throw new SkillSdkException(1000, 'weCrewType must be 0 or 1');
+      }
+      const bizRobotId = TypeConverter.toOptionalString(params.bizRobotId, 'bizRobotId');
+
+      const payload: Record<string, unknown> = {
+        name,
+        icon,
+        description,
+        weCrewType
+      };
+      if (bizRobotId !== undefined) {
+        payload.bizRobotId = bizRobotId;
+      }
+
+      const result = await this.httpClient.post<Record<string, unknown>>(
+        '/v4-1/we-crew/im-register',
+        payload
+      );
+      return this.normalizeCreateDigitalTwinResult(result);
+    } catch (error) {
+      throw this.normalizeError('createDigitalTwin', error);
+    }
+  }
+
+  // 17. getAgentType
+  async getAgentType(): Promise<AgentType[]> {
+    try {
+      const result = await this.httpClient.get<unknown>('/v4-1/we-crew/inner-assistant/list');
+      return this.parseAgentTypeList(result);
+    } catch (error) {
+      throw this.normalizeError('getAgentType', error);
+    }
+  }
+
+  // 18. getWeAgentList (sync + async refresh)
+  getWeAgentList(params: PageParams): WeAgent[] {
+    try {
+      Validator.requireObject(params, 'params');
+      const rawPageSize = TypeConverter.requireInteger(params.pageSize, 'pageSize');
+      const rawPageNumber = TypeConverter.requireInteger(params.pageNumber, 'pageNumber');
+      if (rawPageSize <= 0 || rawPageNumber <= 0) {
+        throw new SkillSdkException(1000, 'pageSize and pageNumber must be positive integers');
+      }
+      const pageSize = this.clamp(rawPageSize, 1, 100);
+      const pageNumber = this.clamp(rawPageNumber, 1, 1000);
+
+      const cache = this.weAgentStore.loadList();
+      const current = this.paginateWeAgentList(cache, pageSize, pageNumber);
+
+      void this.httpClient
+        .get<unknown>('/v4-1/we-crew/list', { pageSize, pageNumber })
+        .then((data: unknown) => {
+          if (!Array.isArray(data)) {
+            return;
+          }
+          const list = this.parseWeAgentList(data);
+          this.weAgentStore.saveList(list);
+        })
+        .catch((error: unknown) => {
+          const normalized = this.normalizeError('getWeAgentList.refresh', error);
+          this.logger.warn(`getWeAgentList refresh failed: [${normalized.errorCode}] ${normalized.errorMessage}`);
+        });
+
+      return current;
+    } catch (error) {
+      throw this.normalizeError('getWeAgentList', error);
+    }
+  }
+
+  // 19. getWeAgentDetails
+  async getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails> {
+    try {
+      Validator.requireObject(params, 'params');
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
+      const result = await this.httpClient.get<Record<string, unknown>>(
+        `/v1/robot-partners/${partnerAccount}`
+      );
+      const details = this.normalizeWeAgentDetails(result);
+      this.weAgentStore.saveCurrentDetail(details);
+      return details;
+    } catch (error) {
+      throw this.normalizeError('getWeAgentDetails', error);
+    }
+  }
+
+  // 20. getWeAgentUri
+  getWeAgentUri(): WeAgentUriResult {
+    try {
+      const details = this.weAgentStore.loadCurrentDetail();
+      const partnerAccount = details?.partnerAccount ?? '';
+      const weCodeUrl = details?.weCodeUrl ?? '';
+
+      return {
+        weAgentUri: this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent'),
+        assistantDetailUri: this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        switchAssistantUri: this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount)
+      };
+    } catch (error) {
+      throw this.normalizeError('getWeAgentUri', error);
+    }
+  }
+
   private async fetchServerMessages(
     welinkSessionId: string,
     page: number,
@@ -478,6 +682,137 @@ export class SkillSDK {
         ? resolvedTotalPages
         : 0
     };
+  }
+
+  private async fetchServerSessions(
+    query: Record<string, string | number>,
+    page: number,
+    size: number
+  ): Promise<PageResult<SkillSession>> {
+    const result = await this.httpClient.get<Record<string, unknown>>('/api/skill/sessions', query);
+    const content = Array.isArray(result.content) ? (result.content as SkillSession[]) : [];
+    const resolvedPage = Number(result.page ?? result.number ?? page);
+    const resolvedSize = Number(result.size ?? size);
+    const resolvedTotal = Number(result.total ?? result.totalElements ?? content.length);
+    const resolvedTotalPages = Number(result.totalPages);
+
+    return {
+      content,
+      page: Number.isFinite(resolvedPage) ? resolvedPage : page,
+      size: Number.isFinite(resolvedSize) && resolvedSize > 0 ? resolvedSize : size,
+      total: Number.isFinite(resolvedTotal) && resolvedTotal >= 0 ? resolvedTotal : content.length,
+      totalPages: Number.isFinite(resolvedTotalPages) && resolvedTotalPages >= 0
+        ? resolvedTotalPages
+        : 0
+    };
+  }
+
+  private normalizeCreateDigitalTwinResult(result: Record<string, unknown>): CreateDigitalTwinResult {
+    const robotId = TypeConverter.toOptionalString(result.robotId, 'robotId') ?? '';
+    const partnerAccount = TypeConverter.toOptionalString(result.partnerAccount, 'partnerAccount') ?? '';
+    const statusRaw = TypeConverter.toOptionalString(result.status, 'status');
+    const status = statusRaw === undefined ? 'success' : statusRaw;
+    return {
+      robotId,
+      partnerAccount,
+      status: status === 'success' ? 'success' : 'success'
+    };
+  }
+
+  private parseAgentTypeList(payload: unknown): AgentType[] {
+    if (!Array.isArray(payload)) {
+      return [];
+    }
+
+    const result: AgentType[] = [];
+    for (const item of payload) {
+      if (typeof item !== 'object' || item === null) {
+        continue;
+      }
+      const row = item as Record<string, unknown>;
+      result.push({
+        name: TypeConverter.toOptionalString(row.name, 'name') ?? '',
+        icon: TypeConverter.toOptionalString(row.icon, 'icon') ?? '',
+        bizRobotId: TypeConverter.toOptionalString(row.bizRobotId, 'bizRobotId') ?? ''
+      });
+    }
+    return result;
+  }
+
+  private parseWeAgentList(payload: unknown): WeAgent[] {
+    if (!Array.isArray(payload)) {
+      return [];
+    }
+
+    const result: WeAgent[] = [];
+    for (const item of payload) {
+      if (typeof item !== 'object' || item === null) {
+        continue;
+      }
+      const row = item as Record<string, unknown>;
+      result.push({
+        name: TypeConverter.toOptionalString(row.name, 'name') ?? '',
+        icon: TypeConverter.toOptionalString(row.icon, 'icon') ?? '',
+        description: TypeConverter.toOptionalString(row.description, 'description')
+          ?? TypeConverter.toOptionalString(row.desc, 'desc')
+          ?? '',
+        partnerAccount: TypeConverter.toOptionalString(row.partnerAccount, 'partnerAccount') ?? '',
+        bizRobotName: TypeConverter.toOptionalString(row.bizRobotName, 'bizRobotName') ?? '',
+        bizRobotNameEn: TypeConverter.toOptionalString(row.bizRobotNameEn, 'bizRobotNameEn') ?? ''
+      });
+    }
+    return result;
+  }
+
+  private normalizeWeAgentDetails(payload: Record<string, unknown>): WeAgentDetails {
+    return {
+      name: TypeConverter.toOptionalString(payload.name, 'name') ?? '',
+      icon: TypeConverter.toOptionalString(payload.icon, 'icon') ?? '',
+      desc: TypeConverter.toOptionalString(payload.desc, 'desc')
+        ?? TypeConverter.toOptionalString(payload.description, 'description')
+        ?? '',
+      moduleId: TypeConverter.toOptionalString(payload.moduleId, 'moduleId') ?? '',
+      appKey: TypeConverter.toOptionalString(payload.appKey, 'appKey') ?? '',
+      appSecret: TypeConverter.toOptionalString(payload.appSecret, 'appSecret') ?? '',
+      partnerAccount: TypeConverter.toOptionalString(payload.partnerAccount, 'partnerAccount') ?? '',
+      createdBy: TypeConverter.toOptionalString(payload.createdBy, 'createdBy') ?? '',
+      creatorName: TypeConverter.toOptionalString(payload.creatorName, 'creatorName') ?? '',
+      creatorNameEn: TypeConverter.toOptionalString(payload.creatorNameEn, 'creatorNameEn') ?? '',
+      ownerWelinkId: TypeConverter.toOptionalString(payload.ownerWelinkId, 'ownerWelinkId') ?? '',
+      ownerName: TypeConverter.toOptionalString(payload.ownerName, 'ownerName') ?? '',
+      ownerNameEn: TypeConverter.toOptionalString(payload.ownerNameEn, 'ownerNameEn') ?? '',
+      ownerDeptName: TypeConverter.toOptionalString(payload.ownerDeptName, 'ownerDeptName') ?? '',
+      ownerDeptNameEn: TypeConverter.toOptionalString(payload.ownerDeptNameEn, 'ownerDeptNameEn') ?? '',
+      bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
+      weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
+    };
+  }
+
+  private paginateWeAgentList(list: WeAgent[], pageSize: number, pageNumber: number): WeAgent[] {
+    if (list.length === 0) {
+      return [];
+    }
+    const start = (pageNumber - 1) * pageSize;
+    if (start >= list.length) {
+      return [];
+    }
+    return list.slice(start, Math.min(start + pageSize, list.length));
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(value, max));
+  }
+
+  private appendQueryParam(baseUrl: string, key: string, value: string): string {
+    const normalizedBase = TypeConverter.toOptionalString(baseUrl, 'baseUrl') ?? '';
+    if (normalizedBase === '') {
+      return '';
+    }
+    const connector = normalizedBase.includes('?')
+      ? (normalizedBase.endsWith('?') || normalizedBase.endsWith('&') ? '' : '&')
+      : '?';
+    const encoded = encodeURIComponent(value ?? '');
+    return `${normalizedBase}${connector}${encodeURIComponent(key)}=${encoded}`;
   }
 
   private isSameMessage(left: SessionMessage, right: SessionMessage): boolean {
