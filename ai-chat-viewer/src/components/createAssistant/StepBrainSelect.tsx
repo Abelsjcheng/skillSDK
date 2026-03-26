@@ -12,9 +12,30 @@ interface StepBrainSelectProps {
   onCancel: () => void;
   onPrev: () => void;
   onConfirm: (payload: DigitalTwinBrainPayload) => void;
+  loadAgentTypes?: () => Promise<InternalAssistantOption[]>;
 }
 
 const GUIDE_DOCUMENT_URL = '';
+
+async function defaultLoadAgentTypes(): Promise<InternalAssistantOption[]> {
+  if (typeof window === 'undefined') {
+    return INTERNAL_ASSISTANTS;
+  }
+
+  const getAgentType = (window as any).getAgentType;
+  if (typeof getAgentType !== 'function') {
+    return INTERNAL_ASSISTANTS;
+  }
+
+  const result = await getAgentType();
+  if (Array.isArray(result)) {
+    return result as InternalAssistantOption[];
+  }
+  if (result && typeof result === 'object' && Array.isArray((result as { content?: unknown }).content)) {
+    return (result as { content: InternalAssistantOption[] }).content;
+  }
+  return INTERNAL_ASSISTANTS;
+}
 
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   isPcMiniApp = true,
@@ -23,26 +44,23 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   onCancel,
   onPrev,
   onConfirm,
+  loadAgentTypes,
 }) => {
   const [brainType, setBrainType] = useState<BrainType | undefined>('internal');
   const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>();
   const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>(INTERNAL_ASSISTANTS);
 
   const fetchAgentTypes = useCallback(async (): Promise<void> => {
-    if (typeof window === 'undefined') return;
-
     try {
-      const getAgentType = (window as any).getAgentType;
-      if (typeof getAgentType !== 'function') {
-        return;
+      const loader = loadAgentTypes ?? defaultLoadAgentTypes;
+      const result = await loader();
+      if (Array.isArray(result)) {
+        setInternalAssistants(result);
       }
-
-      const result = await getAgentType();
-      setInternalAssistants(result as InternalAssistantOption[]);
     } catch (_error) {
       setInternalAssistants(INTERNAL_ASSISTANTS);
     }
-  }, []);
+  }, [loadAgentTypes]);
 
   useEffect(() => {
     fetchAgentTypes();

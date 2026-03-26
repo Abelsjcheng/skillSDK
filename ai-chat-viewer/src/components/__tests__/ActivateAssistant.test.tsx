@@ -1,12 +1,21 @@
-import React from 'react';
+﻿import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import ActivateAssistant from '../../pages/activateAssistant';
 
 describe('ActivateAssistant', () => {
-  it('renders static guide image and enable button', () => {
-    render(<ActivateAssistant />);
+  afterEach(() => {
+    delete (window as any).Pedestal;
+  });
 
-    expect(screen.getByRole('button', { name: '立即启用' })).toBeInTheDocument();
+  it('renders guide image and select button', () => {
+    render(
+      <MemoryRouter>
+        <ActivateAssistant />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: '选择助理' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '激活助理引导图' })).toBeInTheDocument();
   });
 });

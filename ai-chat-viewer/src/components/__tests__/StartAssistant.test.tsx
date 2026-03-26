@@ -1,5 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import StartAssistant from '../../pages/startAssistant';
 
 describe('StartAssistant', () => {
@@ -14,7 +15,11 @@ describe('StartAssistant', () => {
       writable: true,
     });
 
-    render(<StartAssistant />);
+    render(
+      <MemoryRouter>
+        <StartAssistant />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText('启动助理')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '返回' })).toBeInTheDocument();
@@ -26,13 +31,22 @@ describe('StartAssistant', () => {
   it('renders pc layout when in pc miniapp', () => {
     Object.defineProperty(window, 'Pedestal', {
       value: {
-        callMethod: jest.fn(),
+        callMethod: jest.fn((_method: string, payload: { funName: string; params: unknown }) => {
+          if (payload.funName === 'getWeAgentList') {
+            return { content: [] };
+          }
+          return undefined;
+        }),
       },
       configurable: true,
       writable: true,
     });
 
-    render(<StartAssistant />);
+    render(
+      <MemoryRouter>
+        <StartAssistant />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText('启用助理')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '返回' })).not.toBeInTheDocument();

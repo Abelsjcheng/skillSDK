@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import switchAssistantAvatar from '../../imgs/switch-assistant-avatar.svg';
+﻿import React, { useMemo, useState } from 'react';
 import '../../styles/SwitchAssistant.less';
 import AssistantPageHeader from './AssistantPageHeader';
 
-interface AssistantItem {
+export interface AssistantItem {
   id: string;
   name: string;
   tag: string;
   description: string;
+  icon?: string;
 }
 
 interface AssistantSelectionPageProps {
@@ -17,18 +17,13 @@ interface AssistantSelectionPageProps {
   rightButtonText: string;
   onLeftButtonClick?: () => void;
   onRightButtonClick?: () => void;
+  assistants?: AssistantItem[];
+  selectedAssistantId?: string;
+  onSelectAssistant?: (assistantId: string) => void;
+  rightButtonDisabled?: boolean;
 }
 
-const ASSISTANT_LIST: AssistantItem[] = [
-  { id: 'assistant-1', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-2', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-3', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-4', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-5', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-6', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-7', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-];
-
+const EMPTY_ASSISTANT_LIST: AssistantItem[] = [];
 const noop = () => {};
 
 const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
@@ -38,11 +33,21 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   rightButtonText,
   onLeftButtonClick = noop,
   onRightButtonClick = noop,
+  assistants,
+  selectedAssistantId,
+  onSelectAssistant,
+  rightButtonDisabled = false,
 }) => {
-  const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
+  const [internalSelectedAssistantId, setInternalSelectedAssistantId] = useState<string>('');
+  const isSelectionControlled = selectedAssistantId !== undefined;
+  const currentSelectedAssistantId = isSelectionControlled ? selectedAssistantId : internalSelectedAssistantId;
+  const assistantList = useMemo(() => assistants ?? EMPTY_ASSISTANT_LIST, [assistants]);
 
   const handleSelectAssistant = (assistantId: string) => {
-    setSelectedAssistantId(assistantId);
+    if (!isSelectionControlled) {
+      setInternalSelectedAssistantId(assistantId);
+    }
+    onSelectAssistant?.(assistantId);
   };
 
   const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
@@ -60,25 +65,32 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
 
       <main className="switch-assistant__content">
         <div className="switch-assistant__list">
-          {ASSISTANT_LIST.map((assistant) => (
+          {assistantList.map((assistant) => (
             <article
               key={assistant.id}
               className={`switch-assistant__card${
-                selectedAssistantId === assistant.id ? ' switch-assistant__card--selected' : ''
+                currentSelectedAssistantId === assistant.id ? ' switch-assistant__card--selected' : ''
               }`}
               onClick={() => handleSelectAssistant(assistant.id)}
               onKeyDown={(event) => handleAssistantKeyDown(event, assistant.id)}
               tabIndex={0}
               role="button"
-              aria-pressed={selectedAssistantId === assistant.id}
+              aria-pressed={currentSelectedAssistantId === assistant.id}
             >
               <div className="switch-assistant__avatar">
-                <img src={switchAssistantAvatar} alt="" className="switch-assistant__avatar-img" aria-hidden="true" />
+                {assistant.icon ? (
+                  <img
+                    src={assistant.icon}
+                    alt=""
+                    className="switch-assistant__avatar-img"
+                    aria-hidden="true"
+                  />
+                ) : null}
               </div>
               <div className="switch-assistant__desc">
                 <div className="switch-assistant__desc-row">
                   <span className="switch-assistant__name">{assistant.name}</span>
-                  <span className="switch-assistant__tag">{assistant.tag}</span>
+                  {assistant.tag ? <span className="switch-assistant__tag">{assistant.tag}</span> : null}
                 </div>
                 <p className="switch-assistant__summary">{assistant.description}</p>
               </div>
@@ -99,6 +111,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--confirm"
           onClick={onRightButtonClick}
+          disabled={rightButtonDisabled}
         >
           {rightButtonText}
         </button>

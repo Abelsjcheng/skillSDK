@@ -1,33 +1,80 @@
-import React, { useState } from 'react';
-import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
-import switchAssistantAvatar from '../imgs/switch-assistant-avatar.svg';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
+import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
-import { isPcMiniApp } from '../utils/hwext';
+import {
+  buildOpenWeAgentCUIParams,
+  getWeAgentDetails,
+  getWeAgentList,
+  isPcMiniApp,
+  openWeAgentCUI,
+  type WeAgentListItem,
+} from '../utils/hwext';
 
-interface AssistantItem {
-  id: string;
-  name: string;
-  tag: string;
-  description: string;
+const DEFAULT_LIST_QUERY = {
+  pageSize: 20,
+  pageNumber: 1,
+};
+
+function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
+  return list.map((assistant) => ({
+    id: assistant.partnerAccount,
+    name: assistant.name ?? '',
+    tag: assistant.bizRobotName || assistant.bizRobotNameEn || '',
+    description: assistant.description ?? '',
+    icon: assistant.icon ?? '',
+  }));
 }
-
-const ASSISTANT_LIST: AssistantItem[] = [
-  { id: 'assistant-1', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-2', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-3', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-4', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-5', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-6', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-  { id: 'assistant-7', name: '编程助理', tag: '某某助手', description: '设计师一枚，擅长代码实现与技术方案整理' },
-];
 
 const StartAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
+  const navigate = useNavigate();
+  const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 
-  const handleCreateAssistant = () => {};
-  const handleEnableNow = () => {};
+  const assistantItems = useMemo(() => toAssistantItems(assistantList), [assistantList]);
+
+  const loadAssistantList = useCallback(async (): Promise<void> => {
+    try {
+      const result = await getWeAgentList(DEFAULT_LIST_QUERY);
+      const list = result && Array.isArray(result.content) ? result.content : [];
+      setAssistantList(list);
+      setSelectedAssistantId((current) => (
+        list.some((assistant) => assistant.partnerAccount === current) ? current : ''
+      ));
+    } catch (error) {
+      console.error('getWeAgentList failed in StartAssistant:', error);
+      setAssistantList([]);
+      setSelectedAssistantId('');
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAssistantList();
+  }, [loadAssistantList]);
+
+  const handleCreateAssistant = useCallback(() => {
+    navigate('/createAssistant?from=weAgent');
+  }, [navigate]);
+
+  const handleEnableNow = useCallback(async () => {
+    if (!selectedAssistantId) return;
+
+    try {
+      const detailResult = await getWeAgentDetails({ partnerAccounts: [selectedAssistantId] });
+      const detail = detailResult?.WeAgentDetailsArray?.[0];
+      if (!detail) {
+        console.warn('No we-agent detail found for partnerAccount:', selectedAssistantId);
+        return;
+      }
+      const params = buildOpenWeAgentCUIParams(detail.weCodeUrl, selectedAssistantId);
+      await openWeAgentCUI(params);
+    } catch (error) {
+      console.error('openWeAgentCUI failed in StartAssistant:', error);
+    }
+  }, [selectedAssistantId]);
+
   const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
@@ -46,6 +93,10 @@ const StartAssistant: React.FC = () => {
         rightButtonText="立即启用"
         onLeftButtonClick={handleCreateAssistant}
         onRightButtonClick={handleEnableNow}
+        assistants={assistantItems}
+        selectedAssistantId={selectedAssistantId}
+        onSelectAssistant={setSelectedAssistantId}
+        rightButtonDisabled={!selectedAssistantId}
       />
     );
   }
@@ -59,7 +110,7 @@ const StartAssistant: React.FC = () => {
 
         <main className="start-assistant__content">
           <div className="switch-assistant__list">
-            {ASSISTANT_LIST.map((assistant) => (
+            {assistantItems.map((assistant) => (
               <article
                 key={assistant.id}
                 className={`switch-assistant__card${
@@ -72,12 +123,19 @@ const StartAssistant: React.FC = () => {
                 aria-pressed={selectedAssistantId === assistant.id}
               >
                 <div className="switch-assistant__avatar">
-                  <img src={switchAssistantAvatar} alt="" className="switch-assistant__avatar-img" aria-hidden="true" />
+                  {assistant.icon ? (
+                    <img
+                      src={assistant.icon}
+                      alt=""
+                      className="switch-assistant__avatar-img"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </div>
                 <div className="switch-assistant__desc">
                   <div className="switch-assistant__desc-row">
                     <span className="switch-assistant__name">{assistant.name}</span>
-                    <span className="switch-assistant__tag">{assistant.tag}</span>
+                    {assistant.tag ? <span className="switch-assistant__tag">{assistant.tag}</span> : null}
                   </div>
                   <p className="switch-assistant__summary">{assistant.description}</p>
                 </div>
@@ -98,6 +156,7 @@ const StartAssistant: React.FC = () => {
             type="button"
             className="start-assistant__action-btn start-assistant__action-btn--enable"
             onClick={handleEnableNow}
+            disabled={!selectedAssistantId}
           >
             立即启用
           </button>
