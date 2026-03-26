@@ -18,6 +18,14 @@ public class SkillSession {
     private String title;
     @Nullable
     private String imGroupId;
+    @Nullable
+    private String bussinessDomain;
+    @Nullable
+    private String bussinessType;
+    @Nullable
+    private String bussinessId;
+    @Nullable
+    private String assistantAccount;
     @NonNull
     private String status = "ACTIVE";
     @Nullable
@@ -70,6 +78,42 @@ public class SkillSession {
 
     public void setImGroupId(@Nullable String imGroupId) {
         this.imGroupId = imGroupId;
+    }
+
+    @Nullable
+    public String getBussinessDomain() {
+        return bussinessDomain;
+    }
+
+    public void setBussinessDomain(@Nullable String bussinessDomain) {
+        this.bussinessDomain = bussinessDomain;
+    }
+
+    @Nullable
+    public String getBussinessType() {
+        return bussinessType;
+    }
+
+    public void setBussinessType(@Nullable String bussinessType) {
+        this.bussinessType = bussinessType;
+    }
+
+    @Nullable
+    public String getBussinessId() {
+        return bussinessId;
+    }
+
+    public void setBussinessId(@Nullable String bussinessId) {
+        this.bussinessId = bussinessId;
+    }
+
+    @Nullable
+    public String getAssistantAccount() {
+        return assistantAccount;
+    }
+
+    public void setAssistantAccount(@Nullable String assistantAccount) {
+        this.assistantAccount = assistantAccount;
     }
 
     @NonNull

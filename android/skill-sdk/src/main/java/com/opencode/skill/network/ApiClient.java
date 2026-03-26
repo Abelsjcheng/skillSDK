@@ -10,7 +10,11 @@ import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import com.opencode.skill.SkillSDKConfig;
 import com.opencode.skill.callback.SkillCallback;
+import com.opencode.skill.model.AgentType;
+import com.opencode.skill.model.CreateNewSessionParams;
+import com.opencode.skill.model.CreateDigitalTwinResult;
 import com.opencode.skill.model.CreateSessionParams;
+import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.ReplyPermissionResult;
 import com.opencode.skill.model.SendMessageResult;
@@ -19,11 +23,14 @@ import com.opencode.skill.model.SessionMessage;
 import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.SkillSession;
 import com.opencode.skill.model.StopSkillResult;
+import com.opencode.skill.model.WeAgent;
+import com.opencode.skill.model.WeAgentDetails;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -78,6 +85,73 @@ public class ApiClient {
         executeEnvelope(request, SkillSession.class, callback);
     }
 
+    public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+        JsonObject body = new JsonObject();
+        body.addProperty("ak", params.getAk().trim());
+        body.addProperty("bussinessDomain", params.getBussinessDomain().trim());
+        body.addProperty("bussinessType", params.getBussinessType().trim());
+        body.addProperty("bussinessId", params.getBussinessId().trim());
+        body.addProperty("assistantAccount", params.getAssistantAccount().trim());
+
+        if (params.getTitle() != null && !params.getTitle().trim().isEmpty()) {
+            body.addProperty("title", params.getTitle().trim());
+        }
+
+        Request request = newRequestBuilder("/api/skill/sessions")
+                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+                .build();
+        executeEnvelope(request, SkillSession.class, callback);
+    }
+
+    public void createDigitalTwin(
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description,
+            int weCrewType,
+            @Nullable String bizRobotId,
+            @NonNull SkillCallback<CreateDigitalTwinResult> callback
+    ) {
+        JsonObject body = new JsonObject();
+        body.addProperty("name", name);
+        body.addProperty("icon", icon);
+        body.addProperty("description", description);
+        body.addProperty("weCrewType", weCrewType);
+        if (bizRobotId != null && !bizRobotId.trim().isEmpty()) {
+            body.addProperty("bizRobotId", bizRobotId.trim());
+        }
+
+        Request request = newRequestBuilder("/v4-1/we-crew/im-register")
+                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+                .build();
+        executeEnvelope(request, CreateDigitalTwinResult.class, callback);
+    }
+
+    public void getAgentType(@NonNull SkillCallback<List<AgentType>> callback) {
+        Request request = newRequestBuilder("/v4-1/we-crew/inner-assistant/list")
+                .get()
+                .build();
+        Type type = TypeToken.getParameterized(List.class, AgentType.class).getType();
+        executeEnvelope(request, type, callback);
+    }
+
+    public void getWeAgentList(int pageSize, int pageNumber, @NonNull SkillCallback<List<WeAgent>> callback) {
+        Request request = newRequestBuilder(urlBuilder("/v4-1/we-crew/list")
+                        .addQueryParameter("pageSize", String.valueOf(pageSize))
+                        .addQueryParameter("pageNumber", String.valueOf(pageNumber))
+                        .build())
+                .get()
+                .build();
+        Type type = TypeToken.getParameterized(List.class, WeAgent.class).getType();
+        executeEnvelope(request, type, callback);
+    }
+
+    public void getWeAgentDetails(@NonNull String partnerAccount, @NonNull SkillCallback<WeAgentDetails> callback) {
+        Request request = newRequestBuilder("/v1/robot-partners/" + partnerAccount)
+                .get()
+                .build();
+        executeEnvelope(request, WeAgentDetails.class, callback);
+    }
+
     public void listSessions(@Nullable String imGroupId, @Nullable String ak, @Nullable String status, int page, int size,
             @NonNull SkillCallback<PageResult<SkillSession>> callback) {
         HttpUrl.Builder builder = urlBuilder("/api/skill/sessions");
@@ -97,6 +171,32 @@ public class ApiClient {
                 .get()
                 .build();
 
+        Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
+        executeEnvelope(request, type, callback);
+    }
+
+    public void getHistorySessionsList(@NonNull HistorySessionsParams params,
+            @NonNull SkillCallback<PageResult<SkillSession>> callback) {
+        HttpUrl.Builder builder = urlBuilder("/api/skill/sessions")
+                .addQueryParameter("page", String.valueOf(params.getPage()))
+                .addQueryParameter("size", String.valueOf(params.getSize()));
+
+        if (params.getStatus() != null && !params.getStatus().isEmpty()) {
+            builder.addQueryParameter("status", params.getStatus());
+        }
+        if (params.getAk() != null && !params.getAk().isEmpty()) {
+            builder.addQueryParameter("ak", params.getAk());
+        }
+        if (params.getBussinessId() != null && !params.getBussinessId().isEmpty()) {
+            builder.addQueryParameter("bussinessId", params.getBussinessId());
+        }
+        if (params.getAssistantAccount() != null && !params.getAssistantAccount().isEmpty()) {
+            builder.addQueryParameter("assistantAccount", params.getAssistantAccount());
+        }
+
+        Request request = newRequestBuilder(builder.build())
+                .get()
+                .build();
         Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
         executeEnvelope(request, type, callback);
     }

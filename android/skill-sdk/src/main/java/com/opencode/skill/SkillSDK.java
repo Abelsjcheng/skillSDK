@@ -10,14 +10,21 @@ import com.opencode.skill.callback.SkillWecodeStatusCallback;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.constant.SessionStatus;
 import com.opencode.skill.constant.SkillWecodeStatus;
+import com.opencode.skill.model.AgentType;
 import com.opencode.skill.model.CloseSkillResult;
 import com.opencode.skill.model.ControlSkillWeCodeParams;
 import com.opencode.skill.model.ControlSkillWeCodeResult;
+import com.opencode.skill.model.CreateDigitalTwinParams;
+import com.opencode.skill.model.CreateDigitalTwinResult;
+import com.opencode.skill.model.CreateNewSessionParams;
 import com.opencode.skill.model.CreateSessionParams;
 import com.opencode.skill.model.GetSessionMessageParams;
+import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.PageResult;
+import com.opencode.skill.model.PageParams;
+import com.opencode.skill.model.QueryWeAgentParams;
 import com.opencode.skill.model.RegisterSessionListenerParams;
 import com.opencode.skill.model.RegisterSessionListenerResult;
 import com.opencode.skill.model.ReplyPermissionParams;
@@ -38,23 +45,33 @@ import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.StreamMessage;
 import com.opencode.skill.model.UnregisterSessionListenerParams;
 import com.opencode.skill.model.UnregisterSessionListenerResult;
+import com.opencode.skill.model.WeAgent;
+import com.opencode.skill.model.WeAgentDetails;
+import com.opencode.skill.model.WeAgentUriResult;
 import com.opencode.skill.network.ApiClient;
 import com.opencode.skill.network.StreamingMessageCache;
 import com.opencode.skill.network.WebSocketManager;
+import com.opencode.skill.util.TypeConvertUtils;
+import com.opencode.skill.util.WeAgentStorage;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Singleton SDK exposing 13 public APIs from SkillClientSdkInterfaceV1.md.
+ * Singleton SDK exposing public APIs from SkillClientSdkInterfaceV1.md.
  */
 public final class SkillSDK {
     private static volatile SkillSDK instance;
+    private static final String ASSISTANT_H5_URI = "h5://123456/html/index.html";
 
     @NonNull
     private final ApiClient apiClient = new ApiClient();
@@ -62,6 +79,8 @@ public final class SkillSDK {
     private final WebSocketManager webSocketManager = WebSocketManager.getInstance();
     @NonNull
     private final StreamingMessageCache streamingMessageCache = new StreamingMessageCache();
+    @NonNull
+    private final WeAgentStorage weAgentStorage = new WeAgentStorage();
 
     @NonNull
     private final Map<String, SessionStatusCallback> sessionStatusCallbacks = new ConcurrentHashMap<>();
@@ -117,6 +136,7 @@ public final class SkillSDK {
         this.config = config;
         apiClient.configure(config);
         webSocketManager.configure(config);
+        weAgentStorage.configure(config.getContext());
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.addInternalListener(internalStreamListener);
     }
@@ -581,6 +601,278 @@ public final class SkillSDK {
         callback.onSuccess(new ControlSkillWeCodeResult("success"));
     }
 
+    // 14. createNewSession
+    public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+
+        final CreateNewSessionParams normalizedParams;
+        try {
+            String ak = TypeConvertUtils.requireString(params.getAk(), "ak");
+            String bussinessDomain = TypeConvertUtils.requireString(params.getBussinessDomain(), "bussinessDomain");
+            String bussinessType = TypeConvertUtils.requireString(params.getBussinessType(), "bussinessType");
+            String bussinessId = TypeConvertUtils.requireString(params.getBussinessId(), "bussinessId");
+            String assistantAccount = TypeConvertUtils.requireString(params.getAssistantAccount(), "assistantAccount");
+            String title = TypeConvertUtils.optionalString(params.getTitle());
+            normalizedParams = new CreateNewSessionParams(
+                    ak,
+                    title,
+                    bussinessDomain,
+                    bussinessType,
+                    bussinessId,
+                    assistantAccount
+            );
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        ensureConnected(new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean connected) {
+                apiClient.createNewSession(normalizedParams, new SkillCallback<SkillSession>() {
+                    @Override
+                    public void onSuccess(@Nullable SkillSession session) {
+                        if (session == null) {
+                            callback.onError(error(7000, "Create session returned empty data"));
+                            return;
+                        }
+                        callback.onSuccess(session);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 15. getHistorySessionsList
+    public void getHistorySessionsList(@NonNull HistorySessionsParams params,
+            @NonNull SkillCallback<PageResult<SkillSession>> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+
+        final HistorySessionsParams requestParams;
+        String status;
+        try {
+            status = TypeConvertUtils.optionalString(params.getStatus());
+            if (status != null) {
+                status = status.toUpperCase(Locale.ROOT);
+            }
+            int page = TypeConvertUtils.toNonNegativeInt(params.getPage(), 0, "page");
+            int size = TypeConvertUtils.toPositiveInt(params.getSize(), 50, "size");
+            String ak = TypeConvertUtils.optionalString(params.getAk());
+            String bussinessId = TypeConvertUtils.optionalString(params.getBussinessId());
+            String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
+            requestParams = new HistorySessionsParams(page, size, status, ak, bussinessId, assistantAccount);
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        if (status != null && !isSessionRecordStatusValid(status)) {
+            callback.onError(error(1000, "status must be ACTIVE/IDLE/CLOSED"));
+            return;
+        }
+
+        ensureConnected(new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean connected) {
+                apiClient.getHistorySessionsList(requestParams, new SkillCallback<PageResult<SkillSession>>() {
+                    @Override
+                    public void onSuccess(@Nullable PageResult<SkillSession> result) {
+                        PageResult<SkillSession> pageResult = result == null ? new PageResult<>() : result;
+                        callback.onSuccess(pageResult);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 16. createDigitalTwin
+    public void createDigitalTwin(@NonNull CreateDigitalTwinParams params,
+            @NonNull SkillCallback<CreateDigitalTwinResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String name;
+        final String icon;
+        final String description;
+        final int weCrewType;
+        final String bizRobotId;
+        try {
+            name = TypeConvertUtils.requireString(params.getName(), "name");
+            icon = TypeConvertUtils.requireString(params.getIcon(), "icon");
+            description = TypeConvertUtils.requireString(params.getDescription(), "description");
+            weCrewType = TypeConvertUtils.requireInteger(params.getWeCrewType(), "weCrewType");
+            bizRobotId = TypeConvertUtils.optionalString(params.getBizRobotId());
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        if (weCrewType != 0 && weCrewType != 1) {
+            callback.onError(error(1000, "weCrewType must be 0 or 1"));
+            return;
+        }
+
+        apiClient.createDigitalTwin(name, icon, description, weCrewType, bizRobotId,
+                new SkillCallback<CreateDigitalTwinResult>() {
+                    @Override
+                    public void onSuccess(@Nullable CreateDigitalTwinResult result) {
+                        CreateDigitalTwinResult resolved = result == null ? new CreateDigitalTwinResult() : result;
+                        if (isBlank(resolved.getStatus())) {
+                            resolved.setStatus("success");
+                        }
+                        callback.onSuccess(resolved);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
+    }
+
+    // 17. getAgentType
+    public void getAgentType(@NonNull SkillCallback<List<AgentType>> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        apiClient.getAgentType(new SkillCallback<List<AgentType>>() {
+            @Override
+            public void onSuccess(@Nullable List<AgentType> result) {
+                callback.onSuccess(result == null ? new ArrayList<>() : result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 18. getWeAgentList (sync + async refresh)
+    @NonNull
+    public List<WeAgent> getWeAgentList(@NonNull PageParams params) {
+        ensureInitializedForVoid();
+        if (params == null) {
+            throw error(1000, "params is required");
+        }
+
+        final int pageSize;
+        final int pageNumber;
+        pageSize = TypeConvertUtils.requireInteger(params.getPageSize(), "pageSize");
+        pageNumber = TypeConvertUtils.requireInteger(params.getPageNumber(), "pageNumber");
+        if (pageSize <= 0 || pageNumber <= 0) {
+            throw error(1000, "pageSize and pageNumber must be positive integers");
+        }
+        int safePageSize = clamp(pageSize, 1, 100);
+        int safePageNumber = clamp(pageNumber, 1, 1000);
+
+        List<WeAgent> cache = weAgentStorage.getWeAgentList();
+        List<WeAgent> current = paginateWeAgentList(cache, safePageSize, safePageNumber);
+
+        apiClient.getWeAgentList(safePageSize, safePageNumber, new SkillCallback<List<WeAgent>>() {
+            @Override
+            public void onSuccess(@Nullable List<WeAgent> result) {
+                if (result == null) {
+                    return;
+                }
+                weAgentStorage.saveWeAgentList(result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                // Ignore background refresh errors for sync API contract.
+            }
+        });
+        return current;
+    }
+
+    // 19. getWeAgentDetails
+    public void getWeAgentDetails(@NonNull QueryWeAgentParams params,
+            @NonNull SkillCallback<WeAgentDetails> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetails>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetails result) {
+                WeAgentDetails details = result == null ? new WeAgentDetails() : result;
+                weAgentStorage.saveCurrentWeAgentDetail(details);
+                callback.onSuccess(details);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 20. getWeAgentUri
+    @NonNull
+    public WeAgentUriResult getWeAgentUri() {
+        ensureInitializedForVoid();
+        WeAgentDetails details = weAgentStorage.getCurrentWeAgentDetail();
+        String weCodeUrl = details == null ? null : normalizeOptionalString(details.getWeCodeUrl());
+        String partnerAccount = details == null ? null : normalizeOptionalString(details.getPartnerAccount());
+
+        String weAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+        String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
+        String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
+
+        return new WeAgentUriResult(
+                weAgentUri == null ? "" : weAgentUri,
+                assistantDetailUri == null ? "" : assistantDetailUri,
+                switchAssistantUri == null ? "" : switchAssistantUri
+        );
+    }
+
     public synchronized void shutdown() {
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.shutdown();
@@ -785,6 +1077,53 @@ public final class SkillSDK {
 
     private static boolean isPermissionResponseValid(@NonNull String value) {
         return "once".equalsIgnoreCase(value) || "always".equalsIgnoreCase(value) || "reject".equalsIgnoreCase(value);
+    }
+
+    private static boolean isSessionRecordStatusValid(@NonNull String value) {
+        return "ACTIVE".equalsIgnoreCase(value)
+                || "IDLE".equalsIgnoreCase(value)
+                || "CLOSED".equalsIgnoreCase(value);
+    }
+
+    @NonNull
+    private static List<WeAgent> paginateWeAgentList(@NonNull List<WeAgent> source, int pageSize, int pageNumber) {
+        if (source.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int from = (pageNumber - 1) * pageSize;
+        if (from >= source.size()) {
+            return Collections.emptyList();
+        }
+        int to = Math.min(from + pageSize, source.size());
+        return new ArrayList<>(source.subList(from, to));
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
+    }
+
+    @Nullable
+    private static String appendQueryParameter(@Nullable String baseUrl, @NonNull String key, @Nullable String value) {
+        if (baseUrl == null) {
+            return null;
+        }
+        String trimmedBase = baseUrl.trim();
+        if (trimmedBase.isEmpty()) {
+            return null;
+        }
+        String encoded;
+        try {
+            encoded = URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8.name());
+        } catch (Exception ignored) {
+            encoded = value == null ? "" : value;
+        }
+        String connector;
+        if (trimmedBase.contains("?")) {
+            connector = trimmedBase.endsWith("?") || trimmedBase.endsWith("&") ? "" : "&";
+        } else {
+            connector = "?";
+        }
+        return trimmedBase + connector + key + "=" + encoded;
     }
 
     private static boolean isBlank(@Nullable String value) {

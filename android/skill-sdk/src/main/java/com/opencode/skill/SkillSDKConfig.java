@@ -1,5 +1,7 @@
 package com.opencode.skill;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -26,6 +28,8 @@ public class SkillSDKConfig {
     private final Map<String, String> defaultHeaders;
     @NonNull
     private final Map<String, String> webSocketHeaders;
+    @Nullable
+    private final Context context;
 
     private SkillSDKConfig(@NonNull Builder builder) {
         this.baseUrl = builder.baseUrl;
@@ -38,6 +42,7 @@ public class SkillSDKConfig {
         this.autoDisconnectWhenNoListener = builder.autoDisconnectWhenNoListener;
         this.defaultHeaders = Collections.unmodifiableMap(new HashMap<>(builder.defaultHeaders));
         this.webSocketHeaders = Collections.unmodifiableMap(new HashMap<>(builder.webSocketHeaders));
+        this.context = builder.context;
     }
 
     @NonNull
@@ -84,6 +89,11 @@ public class SkillSDKConfig {
         return webSocketHeaders;
     }
 
+    @Nullable
+    public Context getContext() {
+        return context;
+    }
+
     public static class Builder {
         private String baseUrl;
         @Nullable
@@ -96,6 +106,14 @@ public class SkillSDKConfig {
         private boolean autoDisconnectWhenNoListener = false;
         private final Map<String, String> defaultHeaders = new HashMap<>();
         private final Map<String, String> webSocketHeaders = new HashMap<>();
+        @Nullable
+        private Context context;
+
+        @NonNull
+        public Builder context(@Nullable Context context) {
+            this.context = context == null ? null : context.getApplicationContext();
+            return this;
+        }
 
         @NonNull
         public Builder baseUrl(@NonNull String baseUrl) {
