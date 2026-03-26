@@ -29,6 +29,10 @@ NS_ASSUME_NONNULL_BEGIN
                              fieldName:(NSString *)fieldName
                           errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 
++ (nullable NSArray<NSString *> *)requiredStringArrayFromValue:(nullable id)value
+                                                      fieldName:(NSString *)fieldName
+                                                   errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
+
 @end
 
 NS_ASSUME_NONNULL_END

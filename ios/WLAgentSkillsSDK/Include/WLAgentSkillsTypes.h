@@ -125,6 +125,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @interface WLAgentSkillsCreateDigitalTwinParams : NSObject
 @property (nonatomic, strong, nullable) id name;
 @property (nonatomic, strong, nullable) id icon;
+@property (nonatomic, strong, nullable) id descriptionValue;
 @property (nonatomic, strong, nullable) id desc;
 @property (nonatomic, strong, nullable) id weCrewType;
 @property (nonatomic, strong, nullable) id bizRobotId;
@@ -136,7 +137,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsQueryWeAgentParams : NSObject
-@property (nonatomic, strong, nullable) id partnerAccount;
+@property (nonatomic, strong, nullable) id partnerAccounts;
 @end
 
 #pragma mark - Data Models
@@ -244,6 +245,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *partnerAccount;
 @property (nonatomic, copy) NSString *bizRobotName;
 @property (nonatomic, copy) NSString *bizRobotNameEn;
+@property (nonatomic, copy) NSString *robotId;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;
@@ -385,9 +387,21 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @interface WLAgentSkillsCreateDigitalTwinResult : NSObject
 @property (nonatomic, copy) NSString *robotId;
 @property (nonatomic, copy) NSString *partnerAccount;
-@property (nonatomic, copy) NSString *status;
+@property (nonatomic, copy) NSString *message;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+@end
+
+@interface WLAgentSkillsAgentTypeListResult : NSObject
+@property (nonatomic, strong) NSArray<WLAgentSkillsAgentType *> *content;
+@end
+
+@interface WLAgentSkillsWeAgentListResult : NSObject
+@property (nonatomic, strong) NSArray<WLAgentSkillsWeAgent *> *content;
+@end
+
+@interface WLAgentSkillsWeAgentDetailsArrayResult : NSObject
+@property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *WeAgentDetailsArray;
 @end
 
 @interface WLAgentSkillsSessionStatusResult : NSObject

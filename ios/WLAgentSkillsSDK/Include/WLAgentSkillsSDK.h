@@ -87,15 +87,17 @@ NS_ASSUME_NONNULL_BEGIN
                     failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 17. getAgentType
-- (void)getAgentTypeWithSuccess:(void (^)(NSArray<WLAgentSkillsAgentType *> *result))success
-                        failure:(void (^)(NSError *error))failure;
+- (void)getAgentTypeWithSuccess:(void (^)(WLAgentSkillsAgentTypeListResult *result))success
+                         failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 18. getWeAgentList (sync + async refresh)
-- (NSArray<WLAgentSkillsWeAgent *> *)getWeAgentList:(WLAgentSkillsPageParams *)params;
+#pragma mark - 18. getWeAgentList
+- (void)getWeAgentList:(WLAgentSkillsPageParams *)params
+                success:(void (^)(WLAgentSkillsWeAgentListResult *result))success
+                failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 19. getWeAgentDetails
 - (void)getWeAgentDetails:(WLAgentSkillsQueryWeAgentParams *)params
-                    success:(void (^)(WLAgentSkillsWeAgentDetails *result))success
+                    success:(void (^)(WLAgentSkillsWeAgentDetailsArrayResult *result))success
                     failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 20. getWeAgentUri

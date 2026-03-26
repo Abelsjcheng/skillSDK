@@ -116,10 +116,10 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
     [self GET:@"/v4-1/we-crew/list" parameters:parameters success:success failure:failure];
 }
 
-- (void)getWeAgentDetailsWithPartnerAccount:(NSString *)partnerAccount
-                                    success:(WLAgentSkillsHTTPSuccessBlock)success
-                                    failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSString *path = [NSString stringWithFormat:@"/v1/robot-partners/%@", partnerAccount];
+- (void)getWeAgentDetailsWithPartnerAccounts:(NSString *)partnerAccounts
+                                     success:(WLAgentSkillsHTTPSuccessBlock)success
+                                     failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSString *path = [NSString stringWithFormat:@"/v1/robot-partners/%@", partnerAccounts];
     [self GET:path parameters:nil success:success failure:failure];
 }
 

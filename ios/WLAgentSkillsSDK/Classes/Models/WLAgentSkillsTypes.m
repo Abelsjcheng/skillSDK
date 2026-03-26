@@ -111,6 +111,11 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
 @end
 
 @implementation WLAgentSkillsCreateDigitalTwinParams
+
+- (void)setDescription:(id)description {
+    self.descriptionValue = description;
+}
+
 @end
 
 @implementation WLAgentSkillsPageParams
@@ -188,6 +193,7 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
         _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
         _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
+        _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
     }
     return self;
 }
@@ -199,7 +205,8 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
         @"description" : self.desc ?: @"",
         @"partnerAccount" : self.partnerAccount ?: @"",
         @"bizRobotName" : self.bizRobotName ?: @"",
-        @"bizRobotNameEn" : self.bizRobotNameEn ?: @""
+        @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
+        @"robotId" : self.robotId ?: @""
     };
 }
 
@@ -654,7 +661,43 @@ static NSArray *WLAgentSkillsArrayValue(id value) {
     if (self) {
         _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
         _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
-        _status = WLAgentSkillsStringValue(dictionary[@"status"], @"success");
+        _message = WLAgentSkillsStringValue(dictionary[@"message"], WLAgentSkillsStringValue(dictionary[@"status"], @"success"));
+    }
+    return self;
+}
+
+@end
+
+@implementation WLAgentSkillsAgentTypeListResult
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _content = @[];
+    }
+    return self;
+}
+
+@end
+
+@implementation WLAgentSkillsWeAgentListResult
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _content = @[];
+    }
+    return self;
+}
+
+@end
+
+@implementation WLAgentSkillsWeAgentDetailsArrayResult
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _WeAgentDetailsArray = @[];
     }
     return self;
 }

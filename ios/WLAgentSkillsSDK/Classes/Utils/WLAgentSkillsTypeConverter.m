@@ -78,8 +78,8 @@
 }
 
 + (nullable NSNumber *)integerNumberFromValue:(nullable id)value
-                                    fieldName:(NSString *)fieldName
-                                 errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+                                     fieldName:(NSString *)fieldName
+                                  errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
     if (value == nil || value == [NSNull null]) {
         return nil;
     }
@@ -104,6 +104,43 @@
         *errorMessage = [NSString stringWithFormat:@"%@ must be an integer.", fieldName ?: @"field"];
     }
     return nil;
+}
+
++ (nullable NSArray<NSString *> *)requiredStringArrayFromValue:(nullable id)value
+                                                      fieldName:(NSString *)fieldName
+                                                   errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    if (value == nil || value == [NSNull null]) {
+        if (errorMessage != NULL) {
+            *errorMessage = [NSString stringWithFormat:@"%@ is required.", fieldName ?: @"field"];
+        }
+        return nil;
+    }
+    if (![value isKindOfClass:[NSArray class]]) {
+        if (errorMessage != NULL) {
+            *errorMessage = [NSString stringWithFormat:@"%@ must be a string array.", fieldName ?: @"field"];
+        }
+        return nil;
+    }
+
+    NSMutableArray<NSString *> *result = [NSMutableArray array];
+    for (id item in (NSArray *)value) {
+        NSString *converted = [self optionalStringFromValue:item];
+        if (converted == nil) {
+            if (errorMessage != NULL) {
+                *errorMessage = [NSString stringWithFormat:@"%@ must contain non-empty strings.", fieldName ?: @"field"];
+            }
+            return nil;
+        }
+        [result addObject:converted];
+    }
+
+    if (result.count == 0) {
+        if (errorMessage != NULL) {
+            *errorMessage = [NSString stringWithFormat:@"%@ is required.", fieldName ?: @"field"];
+        }
+        return nil;
+    }
+    return [result copy];
 }
 
 @end

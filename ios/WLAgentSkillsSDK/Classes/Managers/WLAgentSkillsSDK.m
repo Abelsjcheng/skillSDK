@@ -703,9 +703,10 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:params.desc
-                                                                fieldName:@"description"
-                                                             errorMessage:&errorMessage];
+    id descriptionCandidate = params.descriptionValue != nil ? params.descriptionValue : params.desc;
+    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:descriptionCandidate
+                                                                 fieldName:@"description"
+                                                              errorMessage:&errorMessage];
     if (desc == nil) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
@@ -732,8 +733,8 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
                                                               success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsCreateDigitalTwinResult *result = [[WLAgentSkillsCreateDigitalTwinResult alloc] initWithDictionary:data];
-        if (result.status == nil || result.status.length == 0) {
-            result.status = @"success";
+        if (result.message == nil || result.message.length == 0) {
+            result.message = @"success";
         }
         if (success) {
             success(result);
@@ -746,32 +747,29 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
 
 #pragma mark - 17. getAgentType
 
-- (void)getAgentTypeWithSuccess:(void (^)(NSArray<WLAgentSkillsAgentType *> *result))success
+- (void)getAgentTypeWithSuccess:(void (^)(WLAgentSkillsAgentTypeListResult *result))success
                         failure:(void (^)(NSError *error))failure {
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] getAgentTypeWithSuccess:^(id  _Nullable responseObject) {
-        NSMutableArray<WLAgentSkillsAgentType *> *result = [NSMutableArray array];
-        if ([responseObject isKindOfClass:[NSArray class]]) {
-            for (id item in (NSArray *)responseObject) {
-                if (![item isKindOfClass:[NSDictionary class]]) {
-                    continue;
-                }
-                [result addObject:[[WLAgentSkillsAgentType alloc] initWithDictionary:(NSDictionary *)item]];
-            }
-        }
+        NSArray<WLAgentSkillsAgentType *> *list = [self parseAgentTypeListFromResponse:responseObject];
+        WLAgentSkillsAgentTypeListResult *result = [[WLAgentSkillsAgentTypeListResult alloc] init];
+        result.content = list;
         if (success) {
-            success([result copy]);
+            success(result);
         }
     } failure:^(NSError * _Nonnull error) {
         [weakSelf dispatchFailureObject:failure error:error];
     }];
 }
 
-#pragma mark - 18. getWeAgentList (sync + async refresh)
+#pragma mark - 18. getWeAgentList
 
-- (NSArray<WLAgentSkillsWeAgent *> *)getWeAgentList:(WLAgentSkillsPageParams *)params {
+- (void)getWeAgentList:(WLAgentSkillsPageParams *)params
+                success:(void (^)(WLAgentSkillsWeAgentListResult *result))success
+                failure:(void (^)(NSError *error))failure {
     if (params == nil) {
-        return @[];
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
     }
 
     NSInteger pageSize = 0;
@@ -782,42 +780,41 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
                                                            fieldName:@"pageSize"
                                                         errorMessage:&errorMessage];
     if (errorMessage != nil || pageSize <= 0) {
-        return @[];
+        [self dispatchFailure:failure code:1000 message:errorMessage ?: @"pageSize must be a positive integer."];
+        return;
     }
     pageNumber = [WLAgentSkillsTypeConverter requiredIntegerFromValue:params.pageNumber
-                                                             fieldName:@"pageNumber"
-                                                          errorMessage:&errorMessage];
+                                                              fieldName:@"pageNumber"
+                                                           errorMessage:&errorMessage];
     if (errorMessage != nil || pageNumber <= 0) {
-        return @[];
+        [self dispatchFailure:failure code:1000 message:errorMessage ?: @"pageNumber must be a positive integer."];
+        return;
     }
 
     pageSize = [self clampInteger:pageSize min:1 max:100];
     pageNumber = [self clampInteger:pageNumber min:1 max:1000];
 
-    NSArray<NSDictionary *> *cacheDictionaries = [[WLAgentSkillsWeAgentStore sharedStore] loadWeAgentListDictionaries];
-    NSArray<WLAgentSkillsWeAgent *> *cache = [self parseWeAgentListFromResponse:cacheDictionaries];
-    NSArray<WLAgentSkillsWeAgent *> *current = [self pagedWeAgentList:cache pageSize:pageSize pageNumber:pageNumber];
-
+    __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] getWeAgentListWithPageSize:@(pageSize)
-                                                             pageNumber:@(pageNumber)
-                                                                success:^(id  _Nullable responseObject) {
+                                                              pageNumber:@(pageNumber)
+                                                                 success:^(id  _Nullable responseObject) {
         NSArray<WLAgentSkillsWeAgent *> *remoteList = [self parseWeAgentListFromResponse:responseObject];
-        if (remoteList.count == 0) {
-            return;
-        }
         [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentListDictionaries:[self dictionariesFromWeAgentList:remoteList]];
+        WLAgentSkillsWeAgentListResult *result = [[WLAgentSkillsWeAgentListResult alloc] init];
+        result.content = remoteList;
+        if (success) {
+            success(result);
+        }
     }
-                                                                failure:^(__unused NSError * _Nonnull error) {
-        // Ignore background refresh failures for sync contract.
+                                                                 failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
     }];
-
-    return current;
 }
 
 #pragma mark - 19. getWeAgentDetails
 
 - (void)getWeAgentDetails:(WLAgentSkillsQueryWeAgentParams *)params
-                    success:(void (^)(WLAgentSkillsWeAgentDetails *result))success
+                    success:(void (^)(WLAgentSkillsWeAgentDetailsArrayResult *result))success
                     failure:(void (^)(NSError *error))failure {
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
@@ -825,25 +822,29 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
     }
 
     NSString *errorMessage = nil;
-    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
-                                                                           fieldName:@"partnerAccount"
-                                                                        errorMessage:&errorMessage];
-    if (partnerAccount == nil) {
+    NSArray<NSString *> *partnerAccounts = [WLAgentSkillsTypeConverter requiredStringArrayFromValue:params.partnerAccounts
+                                                                                            fieldName:@"partnerAccounts"
+                                                                                         errorMessage:&errorMessage];
+    if (partnerAccounts == nil || partnerAccounts.count == 0) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
+    NSString *joinedPartnerAccounts = [partnerAccounts componentsJoinedByString:@","];
 
     __weak typeof(self) weakSelf = self;
-    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
-                                                                         success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:data];
-        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[details toDictionary]];
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccounts:joinedPartnerAccounts
+                                                                          success:^(id  _Nullable responseObject) {
+        NSArray<WLAgentSkillsWeAgentDetails *> *detailsList = [self parseWeAgentDetailsListFromResponse:responseObject];
+        if (partnerAccounts.count == 1 && detailsList.count > 0) {
+            [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[detailsList.firstObject toDictionary]];
+        }
+        WLAgentSkillsWeAgentDetailsArrayResult *result = [[WLAgentSkillsWeAgentDetailsArrayResult alloc] init];
+        result.WeAgentDetailsArray = detailsList;
         if (success) {
-            success(details);
+            success(result);
         }
     }
-                                                                         failure:^(NSError * _Nonnull error) {
+                                                                          failure:^(NSError * _Nonnull error) {
         [weakSelf dispatchFailureObject:failure error:error];
     }];
 }
@@ -1031,6 +1032,21 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
     return raw;
 }
 
+- (NSArray<WLAgentSkillsAgentType *> *)parseAgentTypeListFromResponse:(id)responseObject {
+    NSMutableArray<WLAgentSkillsAgentType *> *result = [NSMutableArray array];
+    if (![responseObject isKindOfClass:[NSArray class]]) {
+        return @[];
+    }
+
+    for (id item in (NSArray *)responseObject) {
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        [result addObject:[[WLAgentSkillsAgentType alloc] initWithDictionary:(NSDictionary *)item]];
+    }
+    return [result copy];
+}
+
 - (NSArray<WLAgentSkillsWeAgent *> *)parseWeAgentListFromResponse:(id)responseObject {
     NSMutableArray<WLAgentSkillsWeAgent *> *result = [NSMutableArray array];
     if (![responseObject isKindOfClass:[NSArray class]]) {
@@ -1046,27 +1062,31 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
     return [result copy];
 }
 
+- (NSArray<WLAgentSkillsWeAgentDetails *> *)parseWeAgentDetailsListFromResponse:(id)responseObject {
+    NSMutableArray<WLAgentSkillsWeAgentDetails *> *result = [NSMutableArray array];
+    if ([responseObject isKindOfClass:[NSDictionary class]]) {
+        [result addObject:[[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:(NSDictionary *)responseObject]];
+        return [result copy];
+    }
+    if (![responseObject isKindOfClass:[NSArray class]]) {
+        return @[];
+    }
+
+    for (id item in (NSArray *)responseObject) {
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        [result addObject:[[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:(NSDictionary *)item]];
+    }
+    return [result copy];
+}
+
 - (NSArray<NSDictionary *> *)dictionariesFromWeAgentList:(NSArray<WLAgentSkillsWeAgent *> *)list {
     NSMutableArray<NSDictionary *> *result = [NSMutableArray arrayWithCapacity:list.count];
     for (WLAgentSkillsWeAgent *item in list) {
         [result addObject:[item toDictionary]];
     }
     return [result copy];
-}
-
-- (NSArray<WLAgentSkillsWeAgent *> *)pagedWeAgentList:(NSArray<WLAgentSkillsWeAgent *> *)list
-                                             pageSize:(NSInteger)pageSize
-                                           pageNumber:(NSInteger)pageNumber {
-    if (list.count == 0 || pageSize <= 0 || pageNumber <= 0) {
-        return @[];
-    }
-    NSInteger start = (pageNumber - 1) * pageSize;
-    if (start >= list.count) {
-        return @[];
-    }
-    NSInteger end = MIN(start + pageSize, list.count);
-    NSRange range = NSMakeRange(start, end - start);
-    return [list subarrayWithRange:range];
 }
 
 - (NSInteger)clampInteger:(NSInteger)value min:(NSInteger)minValue max:(NSInteger)maxValue {
