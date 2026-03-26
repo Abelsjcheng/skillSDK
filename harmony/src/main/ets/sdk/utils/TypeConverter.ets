@@ -1,8 +1,10 @@
 /**
  * Runtime type conversion helpers for SDK params.
  */
+type ConvertibleValue = string | number | boolean | bigint | Object | null | undefined;
+
 export class TypeConverter {
-  static toRequiredString(value: unknown, fieldName: string): string {
+  static toRequiredString(value: ConvertibleValue, fieldName: string): string {
     const converted = this.toOptionalString(value, fieldName);
     if (converted === undefined) {
       throw new Error(`${fieldName} must be a non-empty string`);
@@ -10,7 +12,7 @@ export class TypeConverter {
     return converted;
   }
 
-  static toOptionalString(value: unknown, fieldName: string): string | undefined {
+  static toOptionalString(value: ConvertibleValue, fieldName: string): string | undefined {
     if (value === undefined || value === null) {
       return undefined;
     }
@@ -28,7 +30,7 @@ export class TypeConverter {
     return trimmed === '' ? undefined : trimmed;
   }
 
-  static toNonNegativeInt(value: unknown, defaultValue: number, fieldName: string): number {
+  static toNonNegativeInt(value: ConvertibleValue, defaultValue: number, fieldName: string): number {
     const converted = this.toOptionalInteger(value, fieldName);
     if (converted === undefined) {
       return Math.max(defaultValue, 0);
@@ -36,7 +38,7 @@ export class TypeConverter {
     return Math.max(converted, 0);
   }
 
-  static toPositiveInt(value: unknown, defaultValue: number, fieldName: string): number {
+  static toPositiveInt(value: ConvertibleValue, defaultValue: number, fieldName: string): number {
     const safeDefault = defaultValue > 0 ? defaultValue : 1;
     const converted = this.toOptionalInteger(value, fieldName);
     if (converted === undefined) {
@@ -45,7 +47,7 @@ export class TypeConverter {
     return converted > 0 ? converted : safeDefault;
   }
 
-  static requireInteger(value: unknown, fieldName: string): number {
+  static requireInteger(value: ConvertibleValue, fieldName: string): number {
     const converted = this.toOptionalInteger(value, fieldName);
     if (converted === undefined) {
       throw new Error(`${fieldName} is required`);
@@ -53,7 +55,31 @@ export class TypeConverter {
     return converted;
   }
 
-  private static toOptionalInteger(value: unknown, fieldName: string): number | undefined {
+  static toRequiredStringArray(value: ConvertibleValue, fieldName: string): string[] {
+    if (value === undefined || value === null) {
+      throw new Error(`${fieldName} is required`);
+    }
+    if (!Array.isArray(value)) {
+      throw new Error(`${fieldName} must be a string array`);
+    }
+
+    const typedArray = value as Array<ConvertibleValue>;
+    const result: string[] = [];
+    for (const item of typedArray) {
+      const converted = this.toOptionalString(item, fieldName);
+      if (converted === undefined) {
+        throw new Error(`${fieldName} must contain non-empty strings`);
+      }
+      result.push(converted);
+    }
+
+    if (result.length === 0) {
+      throw new Error(`${fieldName} is required`);
+    }
+    return result;
+  }
+
+  private static toOptionalInteger(value: ConvertibleValue, fieldName: string): number | undefined {
     if (value === undefined || value === null) {
       return undefined;
     }

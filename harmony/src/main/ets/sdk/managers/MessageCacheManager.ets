@@ -21,7 +21,7 @@ interface LocalMessageState {
   final: boolean;
   contentType?: MessageContentType;
   seq?: number | null;
-  meta?: Record<string, any> | null;
+  meta?: Record<string, Object> | null;
 }
 
 interface SessionCacheState {

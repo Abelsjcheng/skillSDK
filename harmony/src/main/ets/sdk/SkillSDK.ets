@@ -9,6 +9,7 @@ import { Validator } from './utils/Validator';
 import { WeAgentStore } from './utils/WeAgentStore';
 import {
   AgentType,
+  AgentTypeList,
   CloseSkillResult,
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
@@ -43,7 +44,9 @@ import {
   StopSkillResult,
   StreamMessage,
   WeAgent,
+  WeAgentDetailsArray,
   WeAgentDetails,
+  WeAgentList,
   WeAgentUriResult,
   UnregisterSessionListenerParams,
   UnregisterSessionListenerResult
@@ -163,7 +166,7 @@ export class SkillSDK {
         return this.pickLatestSession(active);
       }
 
-      const payload: Record<string, unknown> = {};
+      const payload: Record<string, Object> = {};
       if (ak !== undefined) {
         payload.ak = ak;
       }
@@ -302,16 +305,16 @@ export class SkillSDK {
         throw new SkillSdkException(4005, 'No finalized message in local cache');
       }
 
-      const payload: Record<string, unknown> = { content: resolvedContent };
+      const payload: Record<string, Object> = { content: resolvedContent };
       if (chatId !== undefined) {
         payload.chatId = chatId;
       }
 
       await this.ensureWebSocketConnected();
 
-      let raw: Record<string, unknown>;
+      let raw: Record<string, Object>;
       try {
-        raw = await this.httpClient.post<Record<string, unknown>>(
+        raw = await this.httpClient.post<Record<string, Object>>(
           `/api/skill/sessions/${params.welinkSessionId}/send-to-im`,
           payload,
           { expectEnvelope: false }
@@ -408,7 +411,7 @@ export class SkillSDK {
       }
       this.sessionStateManager.markSendMessageTriggered(params.welinkSessionId);
 
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, Object> = {
         content: params.content
       };
       if (params.toolCallId !== undefined) {
@@ -485,7 +488,7 @@ export class SkillSDK {
 
       await this.ensureWebSocketConnected();
 
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, Object> = {
         ak,
         bussinessDomain,
         bussinessType,
@@ -560,7 +563,7 @@ export class SkillSDK {
       }
       const bizRobotId = TypeConverter.toOptionalString(params.bizRobotId, 'bizRobotId');
 
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, Object> = {
         name,
         icon,
         description,
@@ -570,7 +573,7 @@ export class SkillSDK {
         payload.bizRobotId = bizRobotId;
       }
 
-      const result = await this.httpClient.post<Record<string, unknown>>(
+      const result = await this.httpClient.post<Record<string, Object>>(
         '/v4-1/we-crew/im-register',
         payload
       );
@@ -581,17 +584,19 @@ export class SkillSDK {
   }
 
   // 17. getAgentType
-  async getAgentType(): Promise<AgentType[]> {
+  async getAgentType(): Promise<AgentTypeList> {
     try {
-      const result = await this.httpClient.get<unknown>('/v4-1/we-crew/inner-assistant/list');
-      return this.parseAgentTypeList(result);
+      const payload = await this.httpClient.get<Object>('/v4-1/we-crew/inner-assistant/list');
+      return {
+        content: this.parseAgentTypeList(payload)
+      };
     } catch (error) {
       throw this.normalizeError('getAgentType', error);
     }
   }
 
-  // 18. getWeAgentList (sync + async refresh)
-  getWeAgentList(params: PageParams): WeAgent[] {
+  // 18. getWeAgentList
+  async getWeAgentList(params: PageParams): Promise<WeAgentList> {
     try {
       Validator.requireObject(params, 'params');
       const rawPageSize = TypeConverter.requireInteger(params.pageSize, 'pageSize');
@@ -602,40 +607,33 @@ export class SkillSDK {
       const pageSize = this.clamp(rawPageSize, 1, 100);
       const pageNumber = this.clamp(rawPageNumber, 1, 1000);
 
-      const cache = this.weAgentStore.loadList();
-      const current = this.paginateWeAgentList(cache, pageSize, pageNumber);
-
-      void this.httpClient
-        .get<unknown>('/v4-1/we-crew/list', { pageSize, pageNumber })
-        .then((data: unknown) => {
-          if (!Array.isArray(data)) {
-            return;
-          }
-          const list = this.parseWeAgentList(data);
-          this.weAgentStore.saveList(list);
-        })
-        .catch((error: unknown) => {
-          const normalized = this.normalizeError('getWeAgentList.refresh', error);
-          this.logger.warn(`getWeAgentList refresh failed: [${normalized.errorCode}] ${normalized.errorMessage}`);
-        });
-
-      return current;
+      const payload = await this.httpClient.get<Object>('/v4-1/we-crew/list', { pageSize, pageNumber });
+      const list = this.parseWeAgentList(payload);
+      this.weAgentStore.saveList(list);
+      return {
+        content: list
+      };
     } catch (error) {
       throw this.normalizeError('getWeAgentList', error);
     }
   }
 
   // 19. getWeAgentDetails
-  async getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetails> {
+  async getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray> {
     try {
       Validator.requireObject(params, 'params');
-      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
-      const result = await this.httpClient.get<Record<string, unknown>>(
-        `/v1/robot-partners/${partnerAccount}`
+      const partnerAccounts = TypeConverter.toRequiredStringArray(params.partnerAccounts, 'partnerAccounts');
+      const joinedPartnerAccounts = partnerAccounts.join(',');
+      const payload = await this.httpClient.get<Object>(
+        `/v1/robot-partners/${joinedPartnerAccounts}`
       );
-      const details = this.normalizeWeAgentDetails(result);
-      this.weAgentStore.saveCurrentDetail(details);
-      return details;
+      const list = this.parseWeAgentDetailsList(payload);
+      if (partnerAccounts.length === 1 && list.length > 0) {
+        this.weAgentStore.saveCurrentDetail(list[0]);
+      }
+      return {
+        WeAgentDetailsArray: list
+      };
     } catch (error) {
       throw this.normalizeError('getWeAgentDetails', error);
     }
@@ -663,7 +661,7 @@ export class SkillSDK {
     page: number,
     size: number
   ): Promise<PageResult<SessionMessage>> {
-    const result = await this.httpClient.get<Record<string, unknown>>(
+    const result = await this.httpClient.get<Record<string, Object>>(
       `/api/skill/sessions/${welinkSessionId}/messages`,
       { page, size }
     );
@@ -689,7 +687,7 @@ export class SkillSDK {
     page: number,
     size: number
   ): Promise<PageResult<SkillSession>> {
-    const result = await this.httpClient.get<Record<string, unknown>>('/api/skill/sessions', query);
+    const result = await this.httpClient.get<Record<string, Object>>('/api/skill/sessions', query);
     const content = Array.isArray(result.content) ? (result.content as SkillSession[]) : [];
     const resolvedPage = Number(result.page ?? result.number ?? page);
     const resolvedSize = Number(result.size ?? size);
@@ -707,19 +705,20 @@ export class SkillSDK {
     };
   }
 
-  private normalizeCreateDigitalTwinResult(result: Record<string, unknown>): CreateDigitalTwinResult {
+  private normalizeCreateDigitalTwinResult(result: Record<string, Object>): CreateDigitalTwinResult {
     const robotId = TypeConverter.toOptionalString(result.robotId, 'robotId') ?? '';
     const partnerAccount = TypeConverter.toOptionalString(result.partnerAccount, 'partnerAccount') ?? '';
-    const statusRaw = TypeConverter.toOptionalString(result.status, 'status');
-    const status = statusRaw === undefined ? 'success' : statusRaw;
+    const messageRaw = TypeConverter.toOptionalString(result.message, 'message')
+      ?? TypeConverter.toOptionalString(result.status, 'status');
+    const message = messageRaw === undefined ? 'success' : messageRaw;
     return {
       robotId,
       partnerAccount,
-      status: status === 'success' ? 'success' : 'success'
+      message
     };
   }
 
-  private parseAgentTypeList(payload: unknown): AgentType[] {
+  private parseAgentTypeList(payload: Object): AgentType[] {
     if (!Array.isArray(payload)) {
       return [];
     }
@@ -729,7 +728,7 @@ export class SkillSDK {
       if (typeof item !== 'object' || item === null) {
         continue;
       }
-      const row = item as Record<string, unknown>;
+      const row = item as Record<string, Object>;
       result.push({
         name: TypeConverter.toOptionalString(row.name, 'name') ?? '',
         icon: TypeConverter.toOptionalString(row.icon, 'icon') ?? '',
@@ -739,7 +738,7 @@ export class SkillSDK {
     return result;
   }
 
-  private parseWeAgentList(payload: unknown): WeAgent[] {
+  private parseWeAgentList(payload: Object): WeAgent[] {
     if (!Array.isArray(payload)) {
       return [];
     }
@@ -749,7 +748,7 @@ export class SkillSDK {
       if (typeof item !== 'object' || item === null) {
         continue;
       }
-      const row = item as Record<string, unknown>;
+      const row = item as Record<string, Object>;
       result.push({
         name: TypeConverter.toOptionalString(row.name, 'name') ?? '',
         icon: TypeConverter.toOptionalString(row.icon, 'icon') ?? '',
@@ -758,13 +757,31 @@ export class SkillSDK {
           ?? '',
         partnerAccount: TypeConverter.toOptionalString(row.partnerAccount, 'partnerAccount') ?? '',
         bizRobotName: TypeConverter.toOptionalString(row.bizRobotName, 'bizRobotName') ?? '',
-        bizRobotNameEn: TypeConverter.toOptionalString(row.bizRobotNameEn, 'bizRobotNameEn') ?? ''
+        bizRobotNameEn: TypeConverter.toOptionalString(row.bizRobotNameEn, 'bizRobotNameEn') ?? '',
+        robotId: TypeConverter.toOptionalString(row.robotId, 'robotId') ?? ''
       });
     }
     return result;
   }
 
-  private normalizeWeAgentDetails(payload: Record<string, unknown>): WeAgentDetails {
+  private parseWeAgentDetailsList(payload: Object): WeAgentDetails[] {
+    if (typeof payload === 'object' && payload !== null && !Array.isArray(payload)) {
+      return [this.normalizeWeAgentDetails(payload as Record<string, Object>)];
+    }
+    if (!Array.isArray(payload)) {
+      return [];
+    }
+    const result: WeAgentDetails[] = [];
+    for (const item of payload) {
+      if (typeof item !== 'object' || item === null) {
+        continue;
+      }
+      result.push(this.normalizeWeAgentDetails(item as Record<string, Object>));
+    }
+    return result;
+  }
+
+  private normalizeWeAgentDetails(payload: Record<string, Object>): WeAgentDetails {
     return {
       name: TypeConverter.toOptionalString(payload.name, 'name') ?? '',
       icon: TypeConverter.toOptionalString(payload.icon, 'icon') ?? '',
@@ -786,17 +803,6 @@ export class SkillSDK {
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };
-  }
-
-  private paginateWeAgentList(list: WeAgent[], pageSize: number, pageNumber: number): WeAgent[] {
-    if (list.length === 0) {
-      return [];
-    }
-    const start = (pageNumber - 1) * pageSize;
-    if (start >= list.length) {
-      return [];
-    }
-    return list.slice(start, Math.min(start + pageSize, list.length));
   }
 
   private clamp(value: number, min: number, max: number): number {
@@ -826,11 +832,11 @@ export class SkillSDK {
       && left.messageSeq === right.messageSeq;
   }
 
-  private normalizeSendToImResult(raw: Record<string, unknown>): SendMessageToIMResult {
+  private normalizeSendToImResult(raw: Record<string, Object>): SendMessageToIMResult {
     if (typeof raw !== 'object' || raw === null) {
       throw new SkillSdkException(7000, 'Unexpected send-to-im response schema');
     }
-    const payload = raw as Record<string, unknown>;
+    const payload = raw as Record<string, Object>;
 
     if ('code' in payload && 'data' in payload) {
       const code = Number(payload.code);
@@ -839,7 +845,7 @@ export class SkillSDK {
         throw new SkillSdkException(code, errormsg || 'send-to-im failed');
       }
       const data = (typeof payload.data === 'object' && payload.data !== null)
-        ? (payload.data as Record<string, unknown>)
+        ? (payload.data as Record<string, Object>)
         : {};
       const success = ('success' in data)
         ? Boolean(data.success)
@@ -889,7 +895,7 @@ export class SkillSDK {
     }
   }
 
-  private normalizeError(method: string, error: unknown): SkillSdkException {
+  private normalizeError(method: string, error: Object): SkillSdkException {
     if (error instanceof SkillSdkException) {
       this.logger.warn(`${method} failed: [${error.errorCode}] ${error.errorMessage}`);
       return error;
@@ -901,7 +907,7 @@ export class SkillSDK {
       }
       return new SkillSdkException(5000, error.message);
     }
-    this.logger.warn(`${method} failed with unknown error`, error);
-    return new SkillSdkException(5000, 'Unknown SDK error');
+    this.logger.warn(`${method} failed with unexpected error`, error);
+    return new SkillSdkException(5000, 'Unexpected SDK error');
   }
 }

@@ -30,6 +30,7 @@ export type SessionRecordStatus = 'ACTIVE' | 'IDLE' | 'CLOSED';
 export type SessionRuntimeStatus = 'busy' | 'idle' | 'retry';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
+export type ConvertibleParam = string | number | boolean | bigint | Object;
 
 export type StreamMessageType =
   | 'text.delta'
@@ -119,7 +120,7 @@ export interface SessionMessagePart {
   content?: string;
   toolName?: string;
   toolCallId?: string;
-  input?: Record<string, any>;
+  input?: Record<string, Object>;
   output?: string;
   error?: string;
   title?: string;
@@ -128,7 +129,7 @@ export interface SessionMessagePart {
   options?: string[];
   permissionId?: string;
   permType?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, Object>;
   response?: PermissionResponse;
   status?: 'pending' | 'running' | 'completed' | 'error';
   fileName?: string;
@@ -143,7 +144,7 @@ export interface SessionMessage {
   role: MessageRole;
   content?: string | null;
   contentType?: MessageContentType | null;
-  meta?: Record<string, any> | null;
+  meta?: Record<string, Object> | null;
   messageSeq?: number | null;
   parts?: SessionMessagePart[] | null;
   createdAt: string;
@@ -170,7 +171,7 @@ export interface StreamSnapshotMessage {
   content?: string | null;
   contentType?: MessageContentType | null;
   createdAt: string;
-  meta?: Record<string, any> | null;
+  meta?: Record<string, Object> | null;
   parts?: SessionMessagePart[] | null;
 }
 
@@ -182,7 +183,7 @@ export interface StreamingPart {
   toolName?: string;
   toolCallId?: string;
   status?: 'pending' | 'running' | 'completed' | 'error';
-  input?: Record<string, any>;
+  input?: Record<string, Object>;
   output?: string;
   error?: string;
   title?: string;
@@ -191,7 +192,7 @@ export interface StreamingPart {
   options?: string[];
   permissionId?: string;
   permType?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, Object>;
   response?: PermissionResponse;
   fileName?: string;
   fileUrl?: string;
@@ -204,7 +205,7 @@ export interface StreamMessage {
   welinkSessionId: string;
   emittedAt?: string | null;
   createdAt?: string;
-  raw?: Record<string, any>;
+  raw?: Record<string, Object>;
 
   messageId?: string;
   sourceMessageId?: string | null;
@@ -217,7 +218,7 @@ export interface StreamMessage {
   toolName?: string;
   toolCallId?: string;
   status?: 'pending' | 'running' | 'completed' | 'error' | null;
-  input?: Record<string, any>;
+  input?: Record<string, Object>;
   output?: string | null;
   error?: string | null;
   title?: string | null;
@@ -241,7 +242,7 @@ export interface StreamMessage {
   sessionStatus?: SessionRuntimeStatus | null;
   permissionId?: string | null;
   permType?: string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, Object> | null;
   response?: PermissionResponse | null;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
@@ -373,7 +374,7 @@ export interface SendMessageResult {
   role: MessageRole;
   content?: string | null;
   contentType?: MessageContentType | null;
-  meta?: Record<string, any> | null;
+  meta?: Record<string, Object> | null;
   parts?: SessionMessagePart[] | null;
   createdAt: string;
 }
@@ -399,17 +400,17 @@ export interface ControlSkillWeCodeResult {
 }
 
 export interface CreateDigitalTwinParams {
-  name: unknown;
-  icon: unknown;
-  description: unknown;
-  weCrewType: unknown;
-  bizRobotId?: unknown;
+  name: ConvertibleParam;
+  icon: ConvertibleParam;
+  description: ConvertibleParam;
+  weCrewType: ConvertibleParam;
+  bizRobotId?: ConvertibleParam;
 }
 
 export interface CreateDigitalTwinResult {
   robotId: string;
   partnerAccount: string;
-  status: 'success';
+  message: string;
 }
 
 export interface AgentType {
@@ -418,13 +419,17 @@ export interface AgentType {
   bizRobotId: string;
 }
 
+export interface AgentTypeList {
+  content: AgentType[];
+}
+
 export interface PageParams {
-  pageSize: unknown;
-  pageNumber: unknown;
+  pageSize: ConvertibleParam;
+  pageNumber: ConvertibleParam;
 }
 
 export interface QueryWeAgentParams {
-  partnerAccount: unknown;
+  partnerAccounts: ConvertibleParam;
 }
 
 export interface WeAgent {
@@ -434,6 +439,11 @@ export interface WeAgent {
   partnerAccount: string;
   bizRobotName: string;
   bizRobotNameEn: string;
+  robotId: string;
+}
+
+export interface WeAgentList {
+  content: WeAgent[];
 }
 
 export interface WeAgentDetails {
@@ -454,6 +464,10 @@ export interface WeAgentDetails {
   ownerDeptNameEn: string;
   bizRobotId: string;
   weCodeUrl: string;
+}
+
+export interface WeAgentDetailsArray {
+  WeAgentDetailsArray: WeAgentDetails[];
 }
 
 export interface WeAgentUriResult {

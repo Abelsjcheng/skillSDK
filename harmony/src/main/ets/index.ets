@@ -6,6 +6,7 @@ export { SkillSDK } from './sdk/SkillSDK';
 
 export {
   AgentType,
+  AgentTypeList,
   CreateDigitalTwinParams,
   CreateDigitalTwinResult,
   ControlSkillWeCodeParams,
@@ -54,7 +55,9 @@ export {
   StreamSnapshotMessage,
   StreamingPart,
   WeAgent,
+  WeAgentDetailsArray,
   WeAgentDetails,
+  WeAgentList,
   WeAgentUriResult,
   UnregisterSessionListenerParams,
   UnregisterSessionListenerResult

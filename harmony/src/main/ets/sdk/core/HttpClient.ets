@@ -50,7 +50,7 @@ export class HttpClient {
 
   async post<T>(
     path: string,
-    body?: Record<string, any>,
+    body?: Record<string, Object>,
     options?: RequestOptions
   ): Promise<T> {
     return await this.request<T>(path, http.RequestMethod.POST, body, undefined, options);
@@ -63,7 +63,7 @@ export class HttpClient {
   private async request<T>(
     path: string,
     method: http.RequestMethod,
-    body?: Record<string, any>,
+    body?: Record<string, Object>,
     query?: QueryParams,
     options?: RequestOptions
   ): Promise<T> {
@@ -102,7 +102,7 @@ export class HttpClient {
         return {} as T;
       }
 
-      let parsed: any;
+      let parsed: Object;
       try {
         parsed = JSON.parse(responseText);
       } catch (error) {
