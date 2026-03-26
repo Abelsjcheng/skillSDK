@@ -2,10 +2,14 @@ import React from 'react';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import { isPcMiniApp } from '../utils/hwext';
 
-const SwitchAssistant: React.FC = () => {
+interface SwitchAssistantProps {
+  defaultSelectedAssistantId?: string;
+}
+
+const SwitchAssistant: React.FC<SwitchAssistantProps> = ({
+  defaultSelectedAssistantId,
+}) => {
   const isPc = isPcMiniApp();
-  const handleCancelSelect = () => {};
-  const handleConfirmSwitch = () => {};
 
   return (
     <AssistantSelectionPage
@@ -13,8 +17,7 @@ const SwitchAssistant: React.FC = () => {
       isPcMiniApp={isPc}
       leftButtonText="取消选择"
       rightButtonText="确认切换"
-      onLeftButtonClick={handleCancelSelect}
-      onRightButtonClick={handleConfirmSwitch}
+      defaultSelectedAssistantId={defaultSelectedAssistantId}
     />
   );
 };

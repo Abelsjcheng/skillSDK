@@ -22,6 +22,26 @@ module.exports = {
   resolve: {
     extensions: RESOLVE_EXTENSIONS,
   },
+  externals: {
+    react: {
+      commonjs: 'react',
+      commonjs2: 'react',
+      amd: 'react',
+      root: 'React',
+    },
+    'react-dom/client': {
+      commonjs: 'react-dom/client',
+      commonjs2: 'react-dom/client',
+      amd: 'react-dom/client',
+      root: 'ReactDOM',
+    },
+    'react/jsx-runtime': {
+      commonjs: 'react/jsx-runtime',
+      commonjs2: 'react/jsx-runtime',
+      amd: 'react/jsx-runtime',
+      root: 'ReactJSXRuntime',
+    },
+  },
   module: {
     rules: createModuleRules({ singletonStyleTag: true }),
   },

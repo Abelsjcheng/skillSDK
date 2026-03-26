@@ -4,6 +4,16 @@ import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import '../styles/AssistantDetail.less';
 import { isPcMiniApp } from '../utils/hwext';
 
+const ASSISTANT_CLOSE_EVENT = 'weAgent:assistant-close';
+
+const dispatchAssistantCloseEvent = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(ASSISTANT_CLOSE_EVENT));
+};
+
 interface DetailInfoRowProps {
   label: string;
   value: string;
@@ -19,8 +29,18 @@ const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value }) => (
 const AssistantDetail: React.FC = () => {
   const isPc = isPcMiniApp();
 
+  const handleBackgroundClick = (
+    event: React.MouseEvent<HTMLDivElement>,
+  ) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    dispatchAssistantCloseEvent();
+  };
+
   return (
-    <div className="assistant-detail">
+    <div className="assistant-detail" onClick={handleBackgroundClick}>
       <AssistantPageHeader title="助理详情" isPcMiniApp={isPc} />
 
       <main className="assistant-detail__content">

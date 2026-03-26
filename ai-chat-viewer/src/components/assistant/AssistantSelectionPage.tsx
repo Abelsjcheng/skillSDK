@@ -15,6 +15,7 @@ interface AssistantSelectionPageProps {
   isPcMiniApp?: boolean;
   leftButtonText: string;
   rightButtonText: string;
+  defaultSelectedAssistantId?: string;
   onLeftButtonClick?: () => void;
   onRightButtonClick?: () => void;
 }
@@ -30,19 +31,51 @@ const ASSISTANT_LIST: AssistantItem[] = [
 ];
 
 const noop = () => {};
+const SWITCH_ASSISTANT_SELECT_EVENT = 'weAgent:switch-assistant-select';
+const SWITCH_ASSISTANT_CANCEL_EVENT = 'weAgent:switch-assistant-cancel';
+const SWITCH_ASSISTANT_CONFIRM_EVENT = 'weAgent:switch-assistant-confirm';
+const ASSISTANT_CLOSE_EVENT = 'weAgent:assistant-close';
+
+const dispatchAssistantEvent = (eventName: string, id: string) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(eventName, {
+      detail: { id },
+    }),
+  );
+};
+
+const dispatchAssistantCloseEvent = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(ASSISTANT_CLOSE_EVENT));
+};
 
 const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   title,
   isPcMiniApp = false,
   leftButtonText,
   rightButtonText,
+  defaultSelectedAssistantId = ASSISTANT_LIST[0]?.id,
   onLeftButtonClick = noop,
   onRightButtonClick = noop,
 }) => {
-  const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
+  const [selectedAssistantId, setSelectedAssistantId] = useState<string>(
+    defaultSelectedAssistantId,
+  );
+
+  React.useEffect(() => {
+    setSelectedAssistantId(defaultSelectedAssistantId);
+  }, [defaultSelectedAssistantId]);
 
   const handleSelectAssistant = (assistantId: string) => {
     setSelectedAssistantId(assistantId);
+    dispatchAssistantEvent(SWITCH_ASSISTANT_SELECT_EVENT, assistantId);
   };
 
   const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
@@ -55,7 +88,14 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   };
 
   return (
-    <div className="switch-assistant">
+    <div
+      className="switch-assistant"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          dispatchAssistantCloseEvent();
+        }
+      }}
+    >
       <AssistantPageHeader title={title} isPcMiniApp={isPcMiniApp} />
 
       <main className="switch-assistant__content">
@@ -91,14 +131,26 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
-          onClick={onLeftButtonClick}
+          onClick={() => {
+            dispatchAssistantEvent(
+              SWITCH_ASSISTANT_CANCEL_EVENT,
+              selectedAssistantId,
+            );
+            onLeftButtonClick();
+          }}
         >
           {leftButtonText}
         </button>
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--confirm"
-          onClick={onRightButtonClick}
+          onClick={() => {
+            dispatchAssistantEvent(
+              SWITCH_ASSISTANT_CONFIRM_EVENT,
+              selectedAssistantId,
+            );
+            onRightButtonClick();
+          }}
         >
           {rightButtonText}
         </button>
