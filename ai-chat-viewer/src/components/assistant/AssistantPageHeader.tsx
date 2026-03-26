@@ -1,9 +1,10 @@
-import React from 'react';
+﻿import React from 'react';
 import backIcon from '../../imgs/icon-back.svg';
 import closeIcon from '../../imgs/icon-close.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
 import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
+import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 
 interface AssistantPageHeaderProps {
   title: string;
@@ -22,6 +23,8 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   onClose = noop,
   onService = noop,
 }) => {
+  const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
+
   if (isPcMiniApp) {
     return (
       <header className="assistant-page-header assistant-page-header--pc">
@@ -49,8 +52,16 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
     );
   }
 
+  const mobileHeaderStyle = statusBarHeight > 0
+    ? {
+      paddingTop: `${statusBarHeight}px`,
+      height: `${44 + statusBarHeight}px`,
+      minHeight: `${44 + statusBarHeight}px`,
+    }
+    : undefined;
+
   return (
-    <header className="assistant-page-header assistant-page-header--mobile">
+    <header className="assistant-page-header assistant-page-header--mobile" style={mobileHeaderStyle}>
       <div className="assistant-page-header__side assistant-page-header__side--left">
         <button
           type="button"

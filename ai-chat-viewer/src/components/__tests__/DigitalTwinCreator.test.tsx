@@ -150,6 +150,23 @@ describe('PersonalAssistantCreator', () => {
     });
   });
 
+  it('calls Pedestal owner bridge when from is not weAgent', async () => {
+    render(<PersonalAssistantCreator />);
+
+    fireEvent.change(screen.getByLabelText(TEXT.nameLabel), { target: { value: 'assistante' } });
+    fireEvent.change(screen.getByLabelText(TEXT.descLabel), { target: { value: 'desce' } });
+    fireEvent.click(screen.getByRole('button', { name: TEXT.next }));
+    fireEvent.click(await screen.findByLabelText(TEXT.customAssistant));
+    fireEvent.click(screen.getByRole('button', { name: TEXT.confirm }));
+
+    await waitFor(() => {
+      const ownerCall = callMethodMock.mock.calls.find((call) => call[1]?.owner === 'x00_1');
+      expect(ownerCall).toBeTruthy();
+      expect(ownerCall?.[0]).toBe('method://agentSkills/handleSdk');
+      expect(ownerCall?.[1]).toEqual({ owner: 'x00_1' });
+    });
+  });
+
   it('calls createDigitalTwin with internal payload and bizRobotId', async () => {
     render(<PersonalAssistantCreator />);
 

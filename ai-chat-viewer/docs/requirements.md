@@ -614,7 +614,11 @@
    - 若 `from=weAgent`：
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
       - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
-   - 若 `from` 非 `weAgent`：调用预留占位接口（待后续实现）。
+   - 若 `from` 非 `weAgent`：
+      - 业务侧统一调用 `hwext` 封装方法（参考 `getJsApiOrThrow` 风格）；
+      - 封装方法内部按端能力分流：
+         - 移动端（`isPcMiniApp === false`）：调用 `window.HWH5.openIMChat({ chatId: partnerAccount })`；
+         - PC 端（`isPcMiniApp === true`）：调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`。
 5. 助理详情页面（`/assistantDetail`）：
    - 读取 query 参数 `partnerAccount`；
    - 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })` 获取详情并渲染 `WeAgentDetailsArray[0]`。
@@ -628,6 +632,12 @@
    - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
    - `assistantDetailUri`：`h5://123456/html/index.html` 追加 query `partnerAccount`；
    - `switchAssistantUri`：`h5://123456/html/index.html` 追加 query `partnerAccount`。
+8. 移动端标题栏状态栏适配（创建助理/启动助理/切换助理/助理详情）：
+   - 当 `isPcMiniApp === false` 时，需要调用 `window.HWH5.getDeviceInfo()`；
+   - 从出参对象读取 `statusBarHeight`（状态栏高度）；
+   - 将标题栏顶部安全距离设置为 `statusBarHeight`，避免系统状态栏遮挡标题栏内容；
+   - 业务页面在标题组件中直接调用 `hwext.ts` 的 `getDeviceInfo` 获取该值，不使用单独的 `useMobileStatusBarHeight.ts` 方法文件。
+   - `getDeviceInfo/statusBarHeight` 封装实现需遵循最小判空策略：仅保留必要能力判断与数值归一化，不引入重复空判断分支。
 
 ## 19. 宿主事件桥与库打包约束
 

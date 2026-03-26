@@ -1,4 +1,5 @@
-import React from 'react';
+﻿import React from 'react';
+import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 
 const noop = () => {};
 
@@ -18,9 +19,18 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   onMobileBack,
 }) => {
   const handleMobileBack = onMobileBack ?? noop;
+  const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
+  const mobileHeaderStyle = !isPcMiniApp && statusBarHeight > 0
+    ? {
+      paddingTop: `${statusBarHeight}px`,
+      height: `${44 + statusBarHeight}px`,
+      minHeight: `${44 + statusBarHeight}px`,
+      flexBasis: `${44 + statusBarHeight}px`,
+    }
+    : undefined;
 
   return (
-    <header className="digital-twin__header">
+    <header className="digital-twin__header" style={mobileHeaderStyle}>
       {isPcMiniApp ? (
         <>
           <span className="digital-twin__title">创建个人助理</span>

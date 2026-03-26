@@ -166,7 +166,13 @@ interface Pedestal {
 
 interface HWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
+  getDeviceInfo?: () => Promise<unknown> | unknown;
   close?: () => void;
+}
+
+export interface HWH5DeviceInfo {
+  statusBarHeight: number;
+  [key: string]: unknown;
 }
 
 declare global {
@@ -328,6 +334,28 @@ export function openH5Webview(payload: { uri: string }): void {
   } else {
     window.location.href = uri;
   }
+}
+
+function toPositiveNumber(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
+  if (isPcMiniApp()) {
+    return { statusBarHeight: 0 };
+  }
+
+  const result = await Promise.resolve(window.HWH5?.getDeviceInfo?.());
+  const deviceInfo = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+  return {
+    ...deviceInfo,
+    statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
+  };
+}
+
+export async function getStatusBarHeight(): Promise<number> {
+  return (await getDeviceInfo()).statusBarHeight;
 }
 
 export async function regenerateAnswer(params: RegenerateAnswerParams): Promise<RegenerateAnswerResponse> {
