@@ -3,6 +3,7 @@
  * - SkillClientSdkInterfaceV1.md
  * - 01-layer1-miniapp-skill-api.md
  */
+import common from '@ohos.app.ability.common';
 
 // ---------------------------
 // Constants and Enums
@@ -61,7 +62,7 @@ export interface SkillSDKConfig {
   timeout?: number;
   enableLog?: boolean;
   defaultHeaders?: Record<string, string>;
-  context?: object;
+  context?: common.UIAbilityContext;
 }
 
 export interface SDKError {

@@ -1,4 +1,5 @@
 import preferences from '@ohos.data.preferences';
+import common from '@ohos.app.ability.common';
 import { WeAgent, WeAgentDetails } from '../types';
 
 const MOCK_USER_ID = 'mock_user_id';
@@ -12,16 +13,16 @@ const KEY_LIST_CACHE = 'we_agent_list_cache';
  */
 export class WeAgentStore {
   private readonly userId: string;
-  private context: object | undefined;
-  private prefInstance: any = null;
+  private context: common.UIAbilityContext | undefined;
+  private prefInstance: preferences.Preferences | null = null;
   private readonly fallback: Record<string, string> = {};
 
-  constructor(context?: object, userId?: string) {
+  constructor(context?: common.UIAbilityContext, userId?: string) {
     this.userId = userId ?? MOCK_USER_ID;
     this.context = context;
   }
 
-  updateContext(context?: object): void {
+  updateContext(context?: common.UIAbilityContext): void {
     this.context = context;
     this.prefInstance = null;
   }
@@ -59,29 +60,13 @@ export class WeAgentStore {
     }
   }
 
-  private putJson(key: string, value: unknown): void {
+  private putJson(key: string, value: WeAgentDetails | WeAgent[]): void {
     const encoded = JSON.stringify(value);
     const pref = this.getPreferencesInstance();
     if (pref !== null) {
       try {
-        if (typeof pref.putSync === 'function') {
-          pref.putSync(key, encoded);
-          if (typeof pref.flushSync === 'function') {
-            pref.flushSync();
-          }
-        } else if (typeof pref.putStringSync === 'function') {
-          pref.putStringSync(key, encoded);
-          if (typeof pref.flushSync === 'function') {
-            pref.flushSync();
-          }
-        } else if (typeof pref.put === 'function') {
-          void pref.put(key, encoded).then(() => {
-            if (typeof pref.flush === 'function') {
-              return pref.flush();
-            }
-            return undefined;
-          });
-        }
+        pref.putSync(key, encoded);
+        pref.flushSync();
       } catch (_error) {
         // Fall back to in-memory cache.
       }
@@ -93,16 +78,12 @@ export class WeAgentStore {
     const pref = this.getPreferencesInstance();
     if (pref !== null) {
       try {
-        if (typeof pref.getSync === 'function') {
-          const value = pref.getSync(key, '');
-          if (typeof value === 'string') {
-            return value;
-          }
-        } else if (typeof pref.getStringSync === 'function') {
-          const value = pref.getStringSync(key, '');
-          if (typeof value === 'string') {
-            return value;
-          }
+        const value = pref.getSync(key, '');
+        if (typeof value === 'string') {
+          return value;
+        }
+        if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+          return String(value);
         }
       } catch (_error) {
         // Ignore and use fallback.
@@ -111,7 +92,7 @@ export class WeAgentStore {
     return this.fallback[key] ?? null;
   }
 
-  private getPreferencesInstance(): any {
+  private getPreferencesInstance(): preferences.Preferences | null {
     if (this.prefInstance !== null) {
       return this.prefInstance;
     }
@@ -121,11 +102,8 @@ export class WeAgentStore {
 
     try {
       const storeName = `${STORE_NAME_PREFIX}${this.userId}`;
-      const prefsApi = preferences as unknown as Record<string, unknown>;
-      if (typeof prefsApi.getPreferencesSync === 'function') {
-        const fn = prefsApi.getPreferencesSync as (ctx: object, name: string) => unknown;
-        this.prefInstance = fn(this.context, storeName);
-      }
+      const options: preferences.Options = { name: storeName };
+      this.prefInstance = preferences.getPreferencesSync(this.context, options);
     } catch (_error) {
       this.prefInstance = null;
     }
