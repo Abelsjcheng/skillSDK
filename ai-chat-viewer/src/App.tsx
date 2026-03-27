@@ -1,7 +1,9 @@
-﻿import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Content } from './components/Content';
 import { Footer, FooterMode } from './components/Footer';
+import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
+import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   GetSessionMessageResponse,
@@ -22,8 +24,12 @@ import {
   controlSkillWeCode,
   registerSessionListener,
   unregisterSessionListener,
+  createNewSession,
+  getAccountInfoUid,
   getHistorySessionsList,
+  getWeAgentDetails,
   type SkillSession,
+  type WeAgentDetails,
 } from './utils/hwext';
 import { copyTextToClipboard } from './utils/clipboard';
 import {
@@ -36,7 +42,6 @@ import {
   snapshotMessageToMessage,
 } from './utils/message';
 import { showToast } from './utils/toast';
-import iconWeAgentHistory from './imgs/icon-we-agent-history.svg';
 import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
@@ -50,21 +55,6 @@ export interface AppProps {
 export type AppVariant = 'default' | 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
-const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
-
-type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
-
-interface HistorySessionGroup {
-  key: HistorySessionGroupKey;
-  label: string;
-  sessions: SkillSession[];
-}
-
-const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
-  { key: 'today', label: '今天' },
-  { key: 'yesterday', label: '昨天' },
-  { key: 'sevenDaysAgo', label: '7天前' },
-];
 
 function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
   if (typeof result.totalPages === 'number') {
@@ -73,56 +63,15 @@ function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
   return (result.page + 1) * result.size < result.total;
 }
 
-function getStartOfDayTimestamp(value: Date): number {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-}
-
-function resolveHistorySessionGroupKey(updatedAt: string): HistorySessionGroupKey {
-  const updatedTimestamp = new Date(updatedAt).getTime();
-  if (Number.isNaN(updatedTimestamp)) {
-    return 'sevenDaysAgo';
+function getLatestSessionByUpdatedAt(sessions: SkillSession[]): SkillSession | null {
+  if (sessions.length === 0) {
+    return null;
   }
-
-  const todayStart = getStartOfDayTimestamp(new Date());
-  const updatedStart = getStartOfDayTimestamp(new Date(updatedTimestamp));
-  const dayDiff = Math.floor((todayStart - updatedStart) / DAY_MILLISECONDS);
-
-  if (dayDiff <= 0) {
-    return 'today';
-  }
-  if (dayDiff === 1) {
-    return 'yesterday';
-  }
-  return 'sevenDaysAgo';
-}
-
-function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessionGroup[] {
-  const grouped = new Map<HistorySessionGroupKey, SkillSession[]>([
-    ['today', []],
-    ['yesterday', []],
-    ['sevenDaysAgo', []],
-  ]);
-
-  const sortedSessions = [...sessions].sort(
+  return [...sessions].sort(
     (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
-  );
-
-  sortedSessions.forEach((session) => {
-    const key = resolveHistorySessionGroupKey(session.updatedAt);
-    const list = grouped.get(key);
-    if (list) {
-      list.push(session);
-    }
-  });
-
-  return HISTORY_SESSION_GROUP_ORDER
-    .map(({ key, label }) => ({
-      key,
-      label,
-      sessions: grouped.get(key) ?? [],
-    }))
-    .filter((group) => group.sessions.length > 0);
+  )[0] ?? null;
 }
+
 function App({
   welinkSessionId: welinkSessionIdProp,
   variant = 'default',
@@ -137,20 +86,12 @@ function App({
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
-  const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
-  const [isHistorySessionsLoading, setIsHistorySessionsLoading] = useState(false);
-  const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
-  const [selectedHistorySessionId, setSelectedHistorySessionId] = useState('');
-
-  const groupedHistorySessions = useMemo(
-    () => groupHistorySessionsByUpdatedAt(historySessions),
-    [historySessions],
-  );
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
   const assistantAccountRef = useRef(assistantAccount.trim());
+  const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
   const latestUserContentRef = useRef('');
@@ -272,11 +213,40 @@ function App({
     }
   }, [welinkSessionId]);
 
+  const resolveAssistantDetail = useCallback(async (currentAssistantAccount: string) => {
+    const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
+    const detail = detailsResult.WeAgentDetailsArray?.[0];
+    if (!detail) {
+      throw new Error('未获取到助理详情');
+    }
+    assistantDetailRef.current = detail;
+    return detail;
+  }, []);
+
+  const createSessionForAssistant = useCallback(
+    async (currentAssistantAccount: string, appKey: string) => {
+      const uid = await getAccountInfoUid();
+      return createNewSession({
+        ak: appKey,
+        bussinessDomain: 'miniapp',
+        bussinessType: 'direct',
+        assistantAccount: currentAssistantAccount,
+        bussinessId: uid,
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     assistantAccountRef.current = assistantAccount.trim();
+    assistantDetailRef.current = null;
   }, [assistantAccount]);
 
   useEffect(() => {
+    if (isWeAgentCUI) {
+      return;
+    }
+
     if (typeof welinkSessionIdProp === 'string' && welinkSessionIdProp.trim()) {
       setIsLoading(true);
       setWelinkSessionId(welinkSessionIdProp.trim());
@@ -291,7 +261,56 @@ function App({
       console.error('缺少 welinkSessionId 参数');
       setIsLoading(false);
     }
-  }, [welinkSessionIdProp]);
+  }, [isWeAgentCUI, welinkSessionIdProp]);
+
+  useEffect(() => {
+    if (!isWeAgentCUI) {
+      return;
+    }
+
+    const currentAssistantAccount = assistantAccountRef.current.trim();
+    if (!currentAssistantAccount) {
+      console.error('缺少 assistantAccount 参数');
+      setIsLoading(false);
+      return;
+    }
+
+    let disposed = false;
+
+    const initializeWeAgentSession = async () => {
+      setIsLoading(true);
+      try {
+        const detail = await resolveAssistantDetail(currentAssistantAccount);
+        const historyResult = await getHistorySessionsList({
+          assistantAccount: currentAssistantAccount,
+          status: 'ACTIVE',
+        });
+        const activeSessions = (historyResult.content ?? []).filter(
+          (session) => session.status === 'ACTIVE',
+        );
+        const latestActiveSession = getLatestSessionByUpdatedAt(activeSessions);
+        const session = latestActiveSession
+          ?? await createSessionForAssistant(currentAssistantAccount, detail.appKey);
+
+        if (disposed) {
+          return;
+        }
+
+        setWelinkSessionId(session.welinkSessionId);
+      } catch (err) {
+        console.error('Failed to initialize weAgent session:', err);
+        if (!disposed) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void initializeWeAgentSession();
+
+    return () => {
+      disposed = true;
+    };
+  }, [isWeAgentCUI, assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
 
   useEffect(() => {
     if (!welinkSessionId) return;
@@ -595,38 +614,28 @@ function App({
       });
   }, []);
 
-  const handleCreateSession = useCallback(() => {
-    // WeAgentCUI 保留扩展点：新建会话
-  }, []);
+  const handleCreateSession = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current.trim();
+    if (!currentAssistantAccount) {
+      return;
+    }
 
-  const handleOpenHistory = useCallback(async () => {
-    setIsHistorySidebarVisible(true);
-    setIsHistorySessionsLoading(true);
+    setIsLoading(true);
 
     try {
-      const currentAssistantAccount = assistantAccountRef.current.trim();
-      const params = currentAssistantAccount
-        ? { assistantAccount: currentAssistantAccount }
-        : {};
-      const result = await getHistorySessionsList(params);
-      const sessions = Array.isArray(result.content) ? result.content : [];
-      setHistorySessions(sessions);
+      let detail = assistantDetailRef.current;
+      if (!detail || detail.partnerAccount !== currentAssistantAccount) {
+        detail = await resolveAssistantDetail(currentAssistantAccount);
+      }
+
+      const newSession = await createSessionForAssistant(currentAssistantAccount, detail.appKey);
+      setMessages([]);
+      setWelinkSessionId(newSession.welinkSessionId);
     } catch (err) {
-      console.error('Failed to load history sessions:', err);
-      setHistorySessions([]);
-    } finally {
-      setIsHistorySessionsLoading(false);
+      console.error('Failed to create new session:', err);
+      setIsLoading(false);
     }
-  }, []);
-
-  const handleCloseHistorySidebar = useCallback(() => {
-    setIsHistorySidebarVisible(false);
-  }, []);
-
-  const handleHistorySessionClick = useCallback((sessionId: string) => {
-    setSelectedHistorySessionId(sessionId);
-    // WeAgentCUI 保留扩展点：点击历史会话切换
-  }, []);
+  }, [resolveAssistantDetail, createSessionForAssistant]);
 
   return (
     <div
@@ -671,83 +680,28 @@ function App({
               alt=""
             />
           </button>
-          <button
-            type="button"
-            className="we-agent-cui-actions__button"
-            onClick={handleOpenHistory}
-            aria-label="历史会话"
-          >
-            <img
-              className="we-agent-cui-actions__icon"
-              src={iconWeAgentHistory}
-              alt=""
-            />
-          </button>
-        </div>
-      )}
-      {isWeAgentCUI && isHistorySidebarVisible && (
-        <div className="we-agent-history-sidebar" aria-label="历史会话侧边栏">
-          <button
-            type="button"
-            className="we-agent-history-sidebar__mask"
-            aria-label="关闭历史会话侧边栏"
-            onClick={handleCloseHistorySidebar}
-          />
-          <aside
-            className="we-agent-history-sidebar__panel"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {isHistorySessionsLoading && (
-              <div className="we-agent-history-sidebar__status">加载中...</div>
-            )}
-            {!isHistorySessionsLoading && groupedHistorySessions.length === 0 && (
-              <div className="we-agent-history-sidebar__status">暂无历史会话</div>
-            )}
-            {!isHistorySessionsLoading && groupedHistorySessions.map((group) => (
-              <section key={group.key} className="we-agent-history-sidebar__group">
-                <div className="we-agent-history-sidebar__group-title">{group.label}</div>
-                <div className="we-agent-history-sidebar__group-items">
-                  {group.sessions.map((session) => {
-                    const sessionId = session.welinkSessionId;
-                    const sessionTitle = session.title?.trim() || '未命名会话';
-                    const isSelected = selectedHistorySessionId === sessionId;
-
-                    return (
-                      <button
-                        key={sessionId}
-                        type="button"
-                        className={[
-                          'we-agent-history-sidebar__session-item',
-                          isSelected ? 'is-selected' : '',
-                        ].filter(Boolean).join(' ')}
-                        onClick={() => handleHistorySessionClick(sessionId)}
-                        title={sessionTitle}
-                      >
-                        {sessionTitle}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
-          </aside>
+          <WeAgentHistorySidebar assistantAccount={assistantAccount} />
         </div>
       )}
       <div className="footer-wrapper">
-        <Footer
-          mode={footerMode}
-          onGenerate={handleGenerate}
-          onStop={handleStop}
-          onRegenerate={handleRegenerate}
-          isPc={isPc}
-          variant={variant}
-        />
+        {isWeAgentCUI ? (
+          <WeAgentCUIFooter onSend={handleGenerate} />
+        ) : (
+          <Footer
+            mode={footerMode}
+            onGenerate={handleGenerate}
+            onStop={handleStop}
+            onRegenerate={handleRegenerate}
+            isPc={isPc}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 export default App;
+
 
 
 

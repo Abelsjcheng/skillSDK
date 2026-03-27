@@ -66,6 +66,15 @@ export interface ControlSkillWeCodeParams {
   action: 'close' | 'minimize';
 }
 
+export interface CreateNewSessionParams {
+  ak: string;
+  title?: string;
+  bussinessDomain: string;
+  bussinessId: string;
+  bussinessType: string;
+  assistantAccount: string;
+}
+
 export interface GetWeAgentListParams {
   pageSize: number;
   pageNumber: number;
@@ -190,6 +199,7 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
+  createNewSession(params: CreateNewSessionParams): Promise<SkillSession> | SkillSession;
   createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> | CreateDigitalTwinResult;
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
@@ -206,6 +216,7 @@ interface Pedestal {
 interface HWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   getDeviceInfo?: () => Promise<unknown> | unknown;
+  getAccountInfo?: () => Promise<unknown> | unknown;
   navigateBack: () => void;
   close: () => void;
 }
@@ -278,6 +289,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       }));
       return call<ControlSkillWeCodeResponse>('controlSkillWeCode', params);
     },
+    createNewSession: (params) => call<SkillSession>('createNewSession', params),
     createDigitalTwin: (params) => call<CreateDigitalTwinResult>('createDigitalTwin', params),
     getAgentType: () => call<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => call<WeAgentListResult>('getWeAgentList', params),
@@ -505,6 +517,15 @@ export async function replyPermission(params: ReplyPermissionParams): Promise<Re
 
 export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse> {
   return getJsApiOrThrow().controlSkillWeCode(params);
+}
+
+export async function createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  return getJsApiOrThrow().createNewSession(params);
+}
+
+export async function getAccountInfoUid(): Promise<string> {
+  const accountInfo = await Promise.resolve(window.HWH5.getAccountInfo?.());
+  return typeof accountInfo === 'string' ? accountInfo : '';
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {

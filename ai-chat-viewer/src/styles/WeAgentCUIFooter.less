@@ -1,0 +1,57 @@
+.we-agent-cui-footer {
+  width: 100%;
+  height: 40px;
+  padding: 8px 12px;
+  border-radius: 30px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.we-agent-cui-footer__input {
+  flex: 1;
+  height: 24px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: rgba(51, 51, 51, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.we-agent-cui-footer__input::placeholder {
+  color: rgba(153, 153, 153, 1);
+}
+
+.we-agent-cui-footer__send-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.we-agent-cui-footer__send-btn:hover:not(:disabled),
+.we-agent-cui-footer__send-btn:active:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.we-agent-cui-footer__send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.we-agent-cui-footer__send-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: fill;
+}
