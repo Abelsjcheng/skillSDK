@@ -881,10 +881,12 @@ public final class SkillSDK {
         String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
         String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
         String bizRobotId = normalizeOptionalString(details.getBizRobotId());
+        String robotId = normalizeOptionalString(details.getRobotId());
 
         String weAgentUri;
         if (!isBlank(bizRobotId)) {
-            weAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+            String internalWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+            weAgentUri = appendQueryParameter(internalWeAgentUri, "robotId", robotId);
         } else {
             String externalWeAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
             externalWeAgentUri = appendQueryParameter(externalWeAgentUri, "assistantAccount", partnerAccount);

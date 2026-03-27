@@ -38,6 +38,8 @@ public class WeAgentDetails {
     @NonNull
     private String ownerDeptNameEn = "";
     @NonNull
+    private String robotId = "";
+    @NonNull
     private String bizRobotId = "";
     @NonNull
     private String weCodeUrl = "";
@@ -175,6 +177,15 @@ public class WeAgentDetails {
 
     public void setOwnerDeptNameEn(@NonNull String ownerDeptNameEn) {
         this.ownerDeptNameEn = Objects.requireNonNull(ownerDeptNameEn, "ownerDeptNameEn == null");
+    }
+
+    @NonNull
+    public String getRobotId() {
+        return robotId;
+    }
+
+    public void setRobotId(@NonNull String robotId) {
+        this.robotId = Objects.requireNonNull(robotId, "robotId == null");
     }
 
     @NonNull
