@@ -475,7 +475,9 @@
             - item 1：左侧 `APPID`，右侧展示 `appKey`；
             - item 2：左侧 `密钥`，右侧展示 `appSecret` 的掩码文本（`*`）；
             - 右侧密钥支持按压查看：按下显示明文，松手恢复 `*` 掩码。
-       - “部门”与“责任人”两个 item 之间增加描边：`1px solid rgba(0,0,0,0.05)`。
+      - 容器 3 中 `部门`、`责任人`、`APPID`、`密钥` 对应右侧值显示块统一为固定宽度 `200px`。
+      - 值显示块内容超出时不允许溢出容器边界，需在值显示块内横向滚动查看（`overflow-x: auto`）。
+      - “部门”与“责任人”两个 item 之间增加描边：`1px solid rgba(0,0,0,0.05)`。
 4. 数据渲染约束：
    - 页面展示数据全部来自 `getWeAgentDetails` 接口返回；
    - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、部门、责任人、头像）。
@@ -562,12 +564,18 @@
    - 第一行为“对话人名+发送时间 + 头像”，二者间距 `4px`，整行靠右。
    - 文本样式：`12px / 400 / 20px`，颜色 `rgba(57,57,57,1)`，示例：`测试 2026-04-13 08:07`。
    - 头像尺寸：`24px x 24px`，圆角 `12px`。
+   - 用户名数据来源：`window.HWH5.getUserInfo()` 返回 `userNameZH`。
+   - 发送后用户消息时间来源：`sendMessage` 返回结果中的 `createdAt`。
+   - 用户头像来源：静态在线地址 `https://` 拼接 `getUserInfo` 返回的 `corpUserId`。
    - 消息内容块距第一行 `4px`，圆角 `24px 0 24px 24px`，`padding: 10px 20px`，背景 `linear-gradient(270deg, rgba(13,148,255,1), rgba(22,115,246,1) 100%)`，文字白色 `14px / 400 / 22px`。
 5. AI 消息块：
    - 靠左显示。
    - 第一行为“头像 + AI 助理名+发送时间”，二者间距 `4px`。
    - 文本样式：`12px / 400 / 20px`，颜色 `rgba(57,57,57,1)`，示例：`小米 2026-04-13 08:07`。
    - 头像尺寸：`24px x 24px`。
+   - AI 头像来源：助理详情 `icon` 字段，渲染前按 `host` 规则补全地址。
+   - AI 助理名来源：助理详情 `name` 字段。
+   - AI 消息时间来源：消息生成时间（当前消息对象的时间戳）。
    - 消息内容块距第一行 `4px`，圆角 `0 24px 24px 24px`，`padding: 16px`，背景白色。
 6. 多功能按钮区：
    - 按钮间距 `8px`，按钮背景白色。
@@ -717,7 +725,7 @@
          - `bussinessType: 'direct'`
          - `assistantAccount`
          - `ak: 助理详情.appKey`
-         - `bussinessId: window.HWH5.getAccountInfo()` 返回的 `uid` 字符串
+         - `bussinessId: window.HWH5.getUserInfo()` 返回的 `uid` 字符串
    - 将选中/新建会话的 `welinkSessionId` 作为后续 AI 对话与历史消息展示的会话 ID；
    - 点击“新建会话”图标按钮时，按同样参数调用 `createNewSession`，并用新会话 `welinkSessionId` 更新当前对话会话上下文。
 12. 助理头像地址兼容规则（助理详情/切换助理/启用助理）：

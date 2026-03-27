@@ -116,26 +116,34 @@ const AssistantDetail: React.FC = () => {
         </section>
 
         <section className="assistant-detail__card assistant-detail__card--org">
-          <DetailInfoRow label={orgLabel} value={orgValue} />
+          <DetailInfoRow
+            label={orgLabel}
+            valueNode={<span className="assistant-detail__org-value">{orgValue}</span>}
+          />
           {isInternalAssistant ? (
-            <DetailInfoRow label={ownerLabel} value={ownerValue} />
+            <DetailInfoRow
+              label={ownerLabel}
+              valueNode={<span className="assistant-detail__org-value">{ownerValue}</span>}
+            />
           ) : (
             <DetailInfoRow
               label={ownerLabel}
               valueNode={(
-                <button
-                  type="button"
-                  className="assistant-detail__secret-btn"
-                  onMouseDown={showSecret}
-                  onMouseUp={hideSecret}
-                  onMouseLeave={hideSecret}
-                  onTouchStart={showSecret}
-                  onTouchEnd={hideSecret}
-                  onTouchCancel={hideSecret}
-                  onBlur={hideSecret}
-                >
-                  {ownerValue}
-                </button>
+                <div className="assistant-detail__org-value">
+                  <button
+                    type="button"
+                    className="assistant-detail__secret-btn"
+                    onMouseDown={showSecret}
+                    onMouseUp={hideSecret}
+                    onMouseLeave={hideSecret}
+                    onTouchStart={showSecret}
+                    onTouchEnd={hideSecret}
+                    onTouchCancel={hideSecret}
+                    onBlur={hideSecret}
+                  >
+                    {ownerValue}
+                  </button>
+                </div>
               )}
             />
           )}

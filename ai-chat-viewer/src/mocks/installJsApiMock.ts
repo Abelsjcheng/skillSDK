@@ -35,6 +35,12 @@ import type {
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   getDeviceInfo?: () => Promise<{ statusBarHeight: number }>;
+  getUserInfo?: () => Promise<{
+    uid: string;
+    userNameZH: string;
+    userNameEN: string;
+    corpUserId: string;
+  }>;
   getAccountInfo?: () => Promise<string>;
   navigateBack: () => void;
   close: () => void;
@@ -461,6 +467,15 @@ function ensureMockHWH5Bridge(): void {
 
   if (typeof hwh5.getDeviceInfo !== 'function') {
     hwh5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
+  }
+
+  if (typeof hwh5.getUserInfo !== 'function') {
+    hwh5.getUserInfo = async () => ({
+      uid: MOCK_UID,
+      userNameZH: '测试用户',
+      userNameEN: 'Mock User',
+      corpUserId: 'mock-avatar.example.com/user.png',
+    });
   }
 
   if (typeof hwh5.getAccountInfo !== 'function') {

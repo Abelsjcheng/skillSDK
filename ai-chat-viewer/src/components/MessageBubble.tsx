@@ -24,10 +24,14 @@ interface MessageBubbleProps {
   onCopy?: (content: string) => void;
   onSendToIM?: (content: string) => void;
   variant?: AppVariant;
+  weAgentUserName?: string;
+  weAgentUserAvatar?: string;
+  weAgentAssistantName?: string;
+  weAgentAssistantAvatar?: string;
 }
 
 const roleLabels: Record<string, string> = {
-  user: '你',
+  user: '用户',
   assistant: 'OpenCode',
   system: '系统',
   tool: '工具',
@@ -49,6 +53,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onCopy,
   onSendToIM,
   variant = 'default',
+  weAgentUserName = '',
+  weAgentUserAvatar = '',
+  weAgentAssistantName = '',
+  weAgentAssistantAvatar = '',
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
@@ -75,15 +83,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const handleCopy = () => {
     if (onCopy) {
       onCopy(message.content);
-    } else {
-      navigator.clipboard.writeText(message.content);
+      return;
     }
+    navigator.clipboard.writeText(message.content);
   };
 
   const handleSendToIM = () => {
-    if (onSendToIM) {
-      onSendToIM(message.content);
-    }
+    onSendToIM?.(message.content);
   };
 
   const renderPart = (part: MessagePart) => {
@@ -115,7 +121,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       case 'file':
         return (
           <div key={part.partId} className="file-part">
-            <span className="file-part__icon">📄</span>
+            <span className="file-part__icon">📎</span>
             {part.fileUrl ? (
               <a href={part.fileUrl} target="_blank" rel="noopener noreferrer">
                 {part.fileName ?? '文件'}
@@ -173,7 +179,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const messageContent = renderContent();
 
   if (isWeAgentCUI) {
-    const messageMetaText = `${isUser ? '测试' : '小米'} ${formatMessageTime(message.timestamp)}`;
+    const messageTimeText = formatMessageTime(message.timestamp);
+    const userName = weAgentUserName.trim();
+    const assistantName = weAgentAssistantName.trim();
+    const messageMetaText = `${isUser ? userName : assistantName} ${messageTimeText}`.trim();
+    const resolvedUserAvatar = weAgentUserAvatar || userAvatar;
+    const resolvedAssistantAvatar = weAgentAssistantAvatar || assistantAvatar;
 
     return (
       <div className={`message-block message-we-agent ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -182,11 +193,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {isUser ? (
               <>
                 <span className="we-agent-message__meta-text">{messageMetaText}</span>
-                <img className="we-agent-message__avatar" src={userAvatar} alt="" />
+                <img className="we-agent-message__avatar" src={resolvedUserAvatar} alt="" />
               </>
             ) : (
               <>
-                <img className="we-agent-message__avatar" src={assistantAvatar} alt="" />
+                <img className="we-agent-message__avatar" src={resolvedAssistantAvatar} alt="" />
                 <span className="we-agent-message__meta-text">{messageMetaText}</span>
               </>
             )}

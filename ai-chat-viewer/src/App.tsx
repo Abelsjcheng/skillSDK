@@ -4,6 +4,7 @@ import { Content } from './components/Content';
 import { Footer, FooterMode } from './components/Footer';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
+import { resolveAssistantIconUrl } from './components/createAssistant/constants';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   GetSessionMessageResponse,
@@ -25,7 +26,7 @@ import {
   registerSessionListener,
   unregisterSessionListener,
   createNewSession,
-  getAccountInfoUid,
+  getUserInfo,
   getHistorySessionsList,
   getWeAgentDetails,
   type SkillSession,
@@ -55,6 +56,11 @@ export interface AppProps {
 export type AppVariant = 'default' | 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
+
+function buildCorpUserAvatar(corpUserId: string): string {
+  const normalizedCorpUserId = corpUserId.trim();
+  return normalizedCorpUserId ? `https://${normalizedCorpUserId}` : '';
+}
 
 function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
   if (typeof result.totalPages === 'number') {
@@ -86,6 +92,10 @@ function App({
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [weAgentUserName, setWeAgentUserName] = useState('');
+  const [weAgentUserAvatar, setWeAgentUserAvatar] = useState('');
+  const [weAgentAssistantName, setWeAgentAssistantName] = useState('');
+  const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -219,19 +229,22 @@ function App({
     if (!detail) {
       throw new Error('未获取到助理详情');
     }
+
+    setWeAgentAssistantName(detail.name ?? '');
+    setWeAgentAssistantAvatar(resolveAssistantIconUrl(detail.icon));
     assistantDetailRef.current = detail;
     return detail;
   }, []);
 
   const createSessionForAssistant = useCallback(
     async (currentAssistantAccount: string, appKey: string) => {
-      const uid = await getAccountInfoUid();
+      const userInfo = await getUserInfo();
       return createNewSession({
         ak: appKey,
         bussinessDomain: 'miniapp',
         bussinessType: 'direct',
         assistantAccount: currentAssistantAccount,
-        bussinessId: uid,
+        bussinessId: userInfo.uid,
       });
     },
     [],
@@ -240,6 +253,8 @@ function App({
   useEffect(() => {
     assistantAccountRef.current = assistantAccount.trim();
     assistantDetailRef.current = null;
+    setWeAgentAssistantName('');
+    setWeAgentAssistantAvatar('');
   }, [assistantAccount]);
 
   useEffect(() => {
@@ -280,6 +295,12 @@ function App({
     const initializeWeAgentSession = async () => {
       setIsLoading(true);
       try {
+        const userInfo = await getUserInfo();
+        if (!disposed) {
+          setWeAgentUserName(userInfo.userNameZH);
+          setWeAgentUserAvatar(buildCorpUserAvatar(userInfo.corpUserId));
+        }
+
         const detail = await resolveAssistantDetail(currentAssistantAccount);
         const historyResult = await getHistorySessionsList({
           assistantAccount: currentAssistantAccount,
@@ -682,6 +703,10 @@ function App({
           onCopy={handleCopy}
           onSendToIM={handleSendToIM}
           variant={variant}
+          weAgentUserName={weAgentUserName}
+          weAgentUserAvatar={weAgentUserAvatar}
+          weAgentAssistantName={weAgentAssistantName}
+          weAgentAssistantAvatar={weAgentAssistantAvatar}
         />
       </div>
       {isWeAgentCUI && (

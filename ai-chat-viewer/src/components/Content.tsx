@@ -17,6 +17,10 @@ interface ContentProps {
   onCopy: (content: string) => void;
   onSendToIM: (content: string) => void;
   variant?: AppVariant;
+  weAgentUserName?: string;
+  weAgentUserAvatar?: string;
+  weAgentAssistantName?: string;
+  weAgentAssistantAvatar?: string;
 }
 
 export const Content: React.FC<ContentProps> = ({
@@ -29,6 +33,10 @@ export const Content: React.FC<ContentProps> = ({
   onCopy,
   onSendToIM,
   variant = 'default',
+  weAgentUserName = '',
+  weAgentUserAvatar = '',
+  weAgentAssistantName = '',
+  weAgentAssistantAvatar = '',
 }) => {
   const isWeAgentCUI = variant === 'weAgentCUI';
   const containerRef = useRef<HTMLDivElement>(null);
@@ -166,6 +174,10 @@ export const Content: React.FC<ContentProps> = ({
               onCopy={onCopy}
               onSendToIM={onSendToIM}
               variant={variant}
+              weAgentUserName={weAgentUserName}
+              weAgentUserAvatar={weAgentUserAvatar}
+              weAgentAssistantName={weAgentAssistantName}
+              weAgentAssistantAvatar={weAgentAssistantAvatar}
             />
           </div>
         ))}

@@ -228,6 +228,7 @@ interface Pedestal {
 interface HWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   getDeviceInfo?: () => Promise<unknown> | unknown;
+  getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
   navigateBack: () => void;
   close: () => void;
@@ -235,6 +236,14 @@ interface HWH5Bridge {
 
 export interface HWH5DeviceInfo {
   statusBarHeight: number;
+  [key: string]: unknown;
+}
+
+export interface HWH5UserInfo {
+  uid: string;
+  userNameZH: string;
+  userNameEN: string;
+  corpUserId: string;
   [key: string]: unknown;
 }
 
@@ -500,6 +509,10 @@ function toPositiveNumber(value: unknown): number {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
+function toTrimmedString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   if (isPcMiniApp()) {
     return { statusBarHeight: 0 };
@@ -515,6 +528,28 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
 
 export async function getStatusBarHeight(): Promise<number> {
   return (await getDeviceInfo()).statusBarHeight;
+}
+
+export async function getUserInfo(): Promise<HWH5UserInfo> {
+  if (isPcMiniApp()) {
+    return {
+      uid: '',
+      userNameZH: '',
+      userNameEN: '',
+      corpUserId: '',
+    };
+  }
+
+  const result = await Promise.resolve(window.HWH5?.getUserInfo?.());
+  const userInfo = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+
+  return {
+    ...userInfo,
+    uid: toTrimmedString(userInfo.uid),
+    userNameZH: toTrimmedString(userInfo.userNameZH),
+    userNameEN: toTrimmedString(userInfo.userNameEN),
+    corpUserId: toTrimmedString(userInfo.corpUserId),
+  };
 }
 
 export async function regenerateAnswer(params: RegenerateAnswerParams): Promise<RegenerateAnswerResponse> {
@@ -558,8 +593,7 @@ export async function createNewSession(params: CreateNewSessionParams): Promise<
 }
 
 export async function getAccountInfoUid(): Promise<string> {
-  const accountInfo = await Promise.resolve(window.HWH5.getAccountInfo?.());
-  return typeof accountInfo === 'string' ? accountInfo : '';
+  return (await getUserInfo()).uid;
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {
