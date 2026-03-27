@@ -866,9 +866,21 @@ public final class SkillSDK {
     public WeAgentUriResult getWeAgentUri() {
         ensureInitializedForVoid();
         WeAgentDetails details = weAgentStorage.getCurrentWeAgentDetail();
-        String weCodeUrl = details == null ? null : normalizeOptionalString(details.getWeCodeUrl());
-        String partnerAccount = details == null ? null : normalizeOptionalString(details.getPartnerAccount());
-        String bizRobotId = details == null ? null : normalizeOptionalString(details.getBizRobotId());
+
+        if (details == null) {
+            String fallbackWeAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
+            fallbackWeAgentUri = appendHashFragment(fallbackWeAgentUri, "activateAssistant");
+
+            return new WeAgentUriResult(
+                    fallbackWeAgentUri == null ? "" : fallbackWeAgentUri,
+                    "",
+                    ""
+            );
+        }
+
+        String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
+        String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
+        String bizRobotId = normalizeOptionalString(details.getBizRobotId());
 
         String weAgentUri;
         if (!isBlank(bizRobotId)) {
