@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
+import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
 import {
@@ -24,7 +25,7 @@ function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
     name: assistant.name ?? '',
     tag: assistant.bizRobotName || assistant.bizRobotNameEn || '',
     description: assistant.description ?? '',
-    icon: assistant.icon ?? '',
+    icon: resolveAssistantIconUrl(assistant.icon),
   }));
 }
 

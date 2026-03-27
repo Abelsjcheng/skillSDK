@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
+import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   buildOpenWeAgentCUIParams,
@@ -27,7 +28,7 @@ function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
     name: assistant.name ?? '',
     tag: assistant.bizRobotName || assistant.bizRobotNameEn || '',
     description: assistant.description ?? '',
-    icon: assistant.icon ?? '',
+    icon: resolveAssistantIconUrl(assistant.icon),
   }));
 }
 
@@ -125,3 +126,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 };
 
 export default SwitchAssistant;
+
+
+
+

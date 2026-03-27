@@ -41,3 +41,26 @@ export const BRAIN_ILLUSTRATION = createSvgDataUri(`
 export const INTERNAL_ASSISTANTS: InternalAssistantOption[] = [
   { name: '助手', icon: '', bizRobotId: '1234' },
 ];
+
+export const host = 'h5://S008623';
+
+function trimTrailingSlash(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+export function resolveAssistantIconUrl(icon: string | undefined | null): string {
+  const normalizedIcon = (icon ?? '').trim();
+  if (!normalizedIcon) {
+    return '';
+  }
+
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(normalizedIcon)) {
+    return normalizedIcon;
+  }
+
+  if (normalizedIcon.startsWith('/')) {
+    return `${trimTrailingSlash(host)}${normalizedIcon}`;
+  }
+
+  return normalizedIcon;
+}

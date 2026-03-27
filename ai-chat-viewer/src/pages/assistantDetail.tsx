@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
+import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
 import '../styles/AssistantDetail.less';
@@ -57,7 +58,7 @@ const AssistantDetail: React.FC = () => {
   }, [partnerAccount]);
 
   const displayName = detail?.name ?? '';
-  const displayIcon = detail?.icon ?? '';
+  const displayIcon = resolveAssistantIconUrl(detail?.icon);
   const displayTag = detail?.bizRobotName || detail?.bizRobotNameEn || '';
   const displayDescription = detail?.desc ?? '';
   const displayCreator = detail?.creatorName ?? '';
