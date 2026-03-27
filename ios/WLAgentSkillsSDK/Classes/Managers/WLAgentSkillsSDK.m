@@ -866,13 +866,22 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
 
 - (WLAgentSkillsWeAgentUriResult *)getWeAgentUri {
     NSDictionary *detailDictionary = [[WLAgentSkillsWeAgentStore sharedStore] loadCurrentWeAgentDetailDictionary];
-    WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary ?: @{}];
+    WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
+    if (detailDictionary == nil || detailDictionary.count == 0) {
+        NSString *fallbackWeAgentUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                              key:@"wecodePlace"
+                                                            value:@"weAgent"];
+        result.weAgentUri = [self appendHashToUri:fallbackWeAgentUri hash:@"activateAssistant"] ?: @"";
+        result.assistantDetailUri = @"";
+        result.switchAssistantUri = @"";
+        return result;
+    }
 
+    WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary];
     NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
     NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.bizRobotId];
 
-    WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
     if (bizRobotId != nil && bizRobotId.length > 0) {
         result.weAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"] ?: @"";
     } else {
