@@ -58,7 +58,7 @@ import {
  */
 export class SkillSDK {
   private static instance: SkillSDK | null = null;
-  private static readonly ASSISTANT_H5_URI = 'h5://123456/html/index.html';
+  private static readonly ASSISTANT_H5_URI = 'h5://S008623/index.html';
 
   private config: SkillSDKConfig;
   private readonly logger: Logger;
@@ -655,11 +655,33 @@ export class SkillSDK {
       const details = this.weAgentStore.loadCurrentDetail();
       const partnerAccount = details?.partnerAccount ?? '';
       const weCodeUrl = details?.weCodeUrl ?? '';
+      const bizRobotId = details?.bizRobotId ?? '';
+
+      let weAgentUri = '';
+      if (bizRobotId.trim() !== '') {
+        weAgentUri = this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent');
+      } else {
+        const externalWeAgentUri = this.appendQueryParam(
+          this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'wecodePlace', 'weAgent'),
+          'assistantAccount',
+          partnerAccount
+        );
+        weAgentUri = this.appendHashFragment(externalWeAgentUri, 'weAgentCUI');
+      }
+
+      const assistantDetailUri = this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        'assistantDetail'
+      );
+      const switchAssistantUri = this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        'switchAssistant'
+      );
 
       return {
-        weAgentUri: this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent'),
-        assistantDetailUri: this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
-        switchAssistantUri: this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount)
+        weAgentUri,
+        assistantDetailUri,
+        switchAssistantUri
       };
     } catch (error) {
       throw this.normalizeError('getWeAgentUri', error);
@@ -829,6 +851,20 @@ export class SkillSDK {
       : '?';
     const encoded = encodeURIComponent(value ?? '');
     return `${normalizedBase}${connector}${encodeURIComponent(key)}=${encoded}`;
+  }
+
+  private appendHashFragment(baseUrl: string, hash: string): string {
+    const normalizedBase = TypeConverter.toOptionalString(baseUrl, 'baseUrl') ?? '';
+    if (normalizedBase === '') {
+      return '';
+    }
+    const normalizedHash = TypeConverter.toOptionalString(hash, 'hash') ?? '';
+    if (normalizedHash === '') {
+      return normalizedBase;
+    }
+    const hashIndex = normalizedBase.indexOf('#');
+    const baseWithoutHash = hashIndex >= 0 ? normalizedBase.slice(0, hashIndex) : normalizedBase;
+    return `${baseWithoutHash}#${normalizedHash}`;
   }
 
   private isSameMessage(left: SessionMessage, right: SessionMessage): boolean {
