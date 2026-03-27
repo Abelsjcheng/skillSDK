@@ -653,9 +653,21 @@ export class SkillSDK {
   getWeAgentUri(): WeAgentUriResult {
     try {
       const details = this.weAgentStore.loadCurrentDetail();
-      const partnerAccount = details?.partnerAccount ?? '';
-      const weCodeUrl = details?.weCodeUrl ?? '';
-      const bizRobotId = details?.bizRobotId ?? '';
+      if (details === null) {
+        const weAgentUri = this.appendHashFragment(
+          this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'wecodePlace', 'weAgent'),
+          'activateAssistant'
+        );
+        return {
+          weAgentUri,
+          assistantDetailUri: '',
+          switchAssistantUri: ''
+        };
+      }
+
+      const partnerAccount = details.partnerAccount ?? '';
+      const weCodeUrl = details.weCodeUrl ?? '';
+      const bizRobotId = details.bizRobotId ?? '';
 
       let weAgentUri = '';
       if (bizRobotId.trim() !== '') {
