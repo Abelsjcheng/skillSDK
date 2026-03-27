@@ -59,6 +59,7 @@ export type StreamMessageType =
 
 export interface SkillSDKConfig {
   baseUrl: string;
+  assistantBaseUrl?: string;
   wsUrl?: string;
   timeout?: number;
   enableLog?: boolean;
@@ -429,7 +430,7 @@ export interface PageParams {
 }
 
 export interface QueryWeAgentParams {
-  partnerAccounts: ConvertibleParam;
+  partnerAccount: ConvertibleParam;
 }
 
 export interface WeAgent {

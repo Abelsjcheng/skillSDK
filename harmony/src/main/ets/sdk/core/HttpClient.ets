@@ -11,6 +11,7 @@ type QueryParams = Record<string, QueryValue | QueryValue[] | undefined>;
 
 interface RequestOptions {
   expectEnvelope?: boolean;
+  useAssistantBaseUrl?: boolean;
 }
 
 /**
@@ -18,12 +19,14 @@ interface RequestOptions {
  */
 export class HttpClient {
   private baseUrl: string;
+  private assistantBaseUrl: string;
   private timeout: number;
   private defaultHeaders: Record<string, string>;
   private readonly logger: Logger;
 
   constructor(config: SkillSDKConfig) {
     this.baseUrl = this.normalizeBaseUrl(config.baseUrl);
+    this.assistantBaseUrl = this.normalizeBaseUrl(config.assistantBaseUrl ?? config.baseUrl);
     this.timeout = config.timeout ?? 30_000;
     this.defaultHeaders = config.defaultHeaders ?? {};
     this.logger = new Logger('HttpClient', config.enableLog ?? false);
@@ -32,6 +35,11 @@ export class HttpClient {
   updateConfig(config: Partial<SkillSDKConfig>): void {
     if (config.baseUrl !== undefined) {
       this.baseUrl = this.normalizeBaseUrl(config.baseUrl);
+    }
+    if (config.assistantBaseUrl !== undefined) {
+      this.assistantBaseUrl = this.normalizeBaseUrl(config.assistantBaseUrl);
+    } else if (config.baseUrl !== undefined) {
+      this.assistantBaseUrl = this.normalizeBaseUrl(config.baseUrl);
     }
     if (config.timeout !== undefined) {
       this.timeout = config.timeout;
@@ -67,7 +75,7 @@ export class HttpClient {
     query?: QueryParams,
     options?: RequestOptions
   ): Promise<T> {
-    const requestUrl = this.buildUrl(path, query);
+    const requestUrl = this.buildUrl(path, query, options?.useAssistantBaseUrl ?? false);
     const client = http.createHttp();
     const expectEnvelope = options?.expectEnvelope ?? true;
 
@@ -113,16 +121,14 @@ export class HttpClient {
         return parsed as T;
       }
 
-      const envelope = parsed as RestApiResponse<T>;
-      if (typeof envelope.code !== 'number' || !('data' in envelope)) {
-        throw new SkillSdkException(7000, 'Server response envelope is invalid');
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        const envelope = parsed as RestApiResponse<T>;
+        if ('data' in envelope) {
+          return (envelope.data ?? ({} as T)) as T;
+        }
       }
 
-      if (envelope.code !== 0) {
-        throw new SkillSdkException(envelope.code, envelope.errormsg || 'Server returned error');
-      }
-
-      return (envelope.data ?? ({} as T)) as T;
+      return parsed as T;
     } catch (error) {
       if (error instanceof SkillSdkException) {
         throw error;
@@ -133,9 +139,10 @@ export class HttpClient {
     }
   }
 
-  private buildUrl(path: string, query?: QueryParams): string {
+  private buildUrl(path: string, query?: QueryParams, useAssistantBaseUrl?: boolean): string {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const base = `${this.baseUrl}${normalizedPath}`;
+    const selectedBaseUrl = useAssistantBaseUrl ? this.assistantBaseUrl : this.baseUrl;
+    const base = `${selectedBaseUrl}${normalizedPath}`;
     if (query === undefined) {
       return base;
     }

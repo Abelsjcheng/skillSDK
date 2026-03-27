@@ -575,7 +575,8 @@ export class SkillSDK {
 
       const result = await this.httpClient.post<Record<string, Object>>(
         '/v4-1/we-crew/im-register',
-        payload
+        payload,
+        { useAssistantBaseUrl: true }
       );
       return this.normalizeCreateDigitalTwinResult(result);
     } catch (error) {
@@ -586,7 +587,11 @@ export class SkillSDK {
   // 17. getAgentType
   async getAgentType(): Promise<AgentTypeList> {
     try {
-      const payload = await this.httpClient.get<Object>('/v4-1/we-crew/inner-assistant/list');
+      const payload = await this.httpClient.get<Object>(
+        '/v4-1/we-crew/inner-assistant/list',
+        undefined,
+        { useAssistantBaseUrl: true }
+      );
       return {
         content: this.parseAgentTypeList(payload)
       };
@@ -607,7 +612,11 @@ export class SkillSDK {
       const pageSize = this.clamp(rawPageSize, 1, 100);
       const pageNumber = this.clamp(rawPageNumber, 1, 1000);
 
-      const payload = await this.httpClient.get<Object>('/v4-1/we-crew/list', { pageSize, pageNumber });
+      const payload = await this.httpClient.get<Object>(
+        '/v4-1/we-crew/list',
+        { pageSize, pageNumber },
+        { useAssistantBaseUrl: true }
+      );
       const list = this.parseWeAgentList(payload);
       this.weAgentStore.saveList(list);
       return {
@@ -622,13 +631,14 @@ export class SkillSDK {
   async getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray> {
     try {
       Validator.requireObject(params, 'params');
-      const partnerAccounts = TypeConverter.toRequiredStringArray(params.partnerAccounts, 'partnerAccounts');
-      const joinedPartnerAccounts = partnerAccounts.join(',');
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
       const payload = await this.httpClient.get<Object>(
-        `/v1/robot-partners/${joinedPartnerAccounts}`
+        `/v1/robot-partners/${partnerAccount}`,
+        undefined,
+        { useAssistantBaseUrl: true }
       );
       const list = this.parseWeAgentDetailsList(payload);
-      if (partnerAccounts.length === 1 && list.length > 0) {
+      if (list.length > 0) {
         this.weAgentStore.saveCurrentDetail(list[0]);
       }
       return {
@@ -838,21 +848,6 @@ export class SkillSDK {
     }
     const payload = raw as Record<string, Object>;
 
-    if ('code' in payload && 'data' in payload) {
-      const code = Number(payload.code);
-      const errormsg = String(payload.errormsg ?? '');
-      if (code !== 0) {
-        throw new SkillSdkException(code, errormsg || 'send-to-im failed');
-      }
-      const data = (typeof payload.data === 'object' && payload.data !== null)
-        ? (payload.data as Record<string, Object>)
-        : {};
-      const success = ('success' in data)
-        ? Boolean(data.success)
-        : ('status' in data ? String(data.status) === 'success' : true);
-      return { success };
-    }
-
     if ('success' in payload) {
       return { success: Boolean(payload.success) };
     }
@@ -861,7 +856,17 @@ export class SkillSDK {
       return { success: String(payload.status) === 'success' };
     }
 
-    throw new SkillSdkException(7000, 'Unexpected send-to-im response schema');
+    if ('data' in payload && typeof payload.data === 'object' && payload.data !== null) {
+      const data = payload.data as Record<string, Object>;
+      if ('success' in data) {
+        return { success: Boolean(data.success) };
+      }
+      if ('status' in data) {
+        return { success: String(data.status) === 'success' };
+      }
+    }
+
+    return { success: false };
   }
 
   private pickLatestSession(sessions: SkillSession[]): SkillSession {
@@ -890,6 +895,9 @@ export class SkillSDK {
   private validateConfig(config: SkillSDKConfig): void {
     Validator.requireObject(config, 'config');
     Validator.requireHttpUrl(config.baseUrl, 'baseUrl');
+    if (config.assistantBaseUrl !== undefined) {
+      Validator.requireHttpUrl(config.assistantBaseUrl, 'assistantBaseUrl');
+    }
     if (config.wsUrl !== undefined) {
       Validator.requireWebSocketUrl(config.wsUrl, 'wsUrl');
     }
