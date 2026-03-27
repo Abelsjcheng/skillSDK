@@ -270,6 +270,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *ownerNameEn;
 @property (nonatomic, copy) NSString *ownerDeptName;
 @property (nonatomic, copy) NSString *ownerDeptNameEn;
+@property (nonatomic, copy) NSString *robotId;
 @property (nonatomic, copy) NSString *bizRobotId;
 @property (nonatomic, copy) NSString *weCodeUrl;
 

@@ -881,9 +881,11 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
     NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
     NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.bizRobotId];
+    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.robotId];
 
     if (bizRobotId != nil && bizRobotId.length > 0) {
-        result.weAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"] ?: @"";
+        NSString *internalWeAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"];
+        result.weAgentUri = [self appendQueryItemToUri:internalWeAgentUri key:@"robotId" value:robotId] ?: @"";
     } else {
         NSString *externalWeAgentUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
                                                               key:@"wecodePlace"
