@@ -71,6 +71,38 @@ export interface GetWeAgentListParams {
   pageNumber: number;
 }
 
+export interface GetHistorySessionsListParams {
+  page?: number;
+  size?: number;
+  status?: string;
+  ak?: string;
+  bussinessId?: string;
+  assistantAccount?: string;
+}
+
+export interface SkillSession {
+  welinkSessionId: string;
+  userId: string;
+  ak: string | null;
+  title: string | null;
+  bussinessDomain: string | null;
+  bussinessType: string | null;
+  bussinessId: string | null;
+  assistantAccount: string | null;
+  status: string;
+  toolSessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HistorySessionsListResult {
+  content: SkillSession[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface WeAgentListItem {
   name: string;
   icon: string;
@@ -162,6 +194,7 @@ export interface HWH5EXT {
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
   getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> | WeAgentDetailsArrayResult;
+  getHistorySessionsList(params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> | HistorySessionsListResult;
   getWeAgentUri(): Promise<WeAgentUriResult> | WeAgentUriResult;
   openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<OpenWeAgentCUIResult> | OpenWeAgentCUIResult;
 }
@@ -249,6 +282,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getAgentType: () => call<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => call<WeAgentListResult>('getWeAgentList', params),
     getWeAgentDetails: (params) => call<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
+    getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
     openWeAgentCUI: (params) => call<OpenWeAgentCUIResult>('openWeAgentCUI', params),
   };
@@ -354,6 +388,24 @@ function buildAssistantPageUri(partnerAccount: string, hash: 'assistantDetail' |
   parsed.searchParams.set('partnerAccount', partnerAccount);
   parsed.hash = hash;
   return parsed.toString();
+}
+
+function buildExternalWeAgentCUIUri(partnerAccount: string): string {
+  const parsed = parseUrl(ASSISTANT_PAGE_BASE_URI);
+  if (!parsed) return ASSISTANT_PAGE_BASE_URI;
+  parsed.searchParams.set('assistantAccount', partnerAccount);
+  parsed.hash = 'weAgentCUI';
+  return parsed.toString();
+}
+
+export function resolveWeCodeUrlForOpenWeAgentCUI(
+  detail: Pick<WeAgentDetails, 'bizRobotId' | 'weCodeUrl'>,
+  partnerAccount: string,
+): string {
+  if (detail.bizRobotId?.trim()) {
+    return detail.weCodeUrl;
+  }
+  return buildExternalWeAgentCUIUri(partnerAccount?.trim() ?? '');
 }
 
 export function buildOpenWeAgentCUIParams(weCodeUrl: string, partnerAccount: string): OpenWeAgentCUIParams {
@@ -469,6 +521,12 @@ export async function getWeAgentList(params: GetWeAgentListParams): Promise<WeAg
 
 export async function getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> {
   return getJsApiOrThrow().getWeAgentDetails(normalizeGetWeAgentDetailsParams(params));
+}
+
+export async function getHistorySessionsList(
+  params: GetHistorySessionsListParams,
+): Promise<HistorySessionsListResult> {
+  return getJsApiOrThrow().getHistorySessionsList(params);
 }
 
 export async function getWeAgentUri(): Promise<WeAgentUriResult> {

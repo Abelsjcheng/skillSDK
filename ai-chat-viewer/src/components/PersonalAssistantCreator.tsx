@@ -15,6 +15,7 @@ import {
   getWeAgentDetails,
   isPcMiniApp,
   openWeAgentCUI,
+  resolveWeCodeUrlForOpenWeAgentCUI,
   type CreateDigitalTwinResult,
 } from '../utils/hwext';
 import '../styles/DigitalTwinCreator.less';
@@ -95,7 +96,8 @@ const PersonalAssistantCreator: React.FC = () => {
         console.warn('getWeAgentDetails did not return detail for partnerAccount:', partnerAccount);
         return;
       }
-      const openParams = buildOpenWeAgentCUIParams(detail.weCodeUrl, partnerAccount);
+      const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
+      const openParams = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount);
       await openWeAgentCUI(openParams);
       if (!isPc) {
         window.HWH5.close();

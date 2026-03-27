@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Content } from './components/Content';
 import { Footer, FooterMode } from './components/Footer';
@@ -22,6 +22,8 @@ import {
   controlSkillWeCode,
   registerSessionListener,
   unregisterSessionListener,
+  getHistorySessionsList,
+  type SkillSession,
 } from './utils/hwext';
 import { copyTextToClipboard } from './utils/clipboard';
 import {
@@ -42,11 +44,27 @@ import './styles/WeAgentCUI.less';
 export interface AppProps {
   welinkSessionId?: string;
   variant?: AppVariant;
+  assistantAccount?: string;
 }
 
 export type AppVariant = 'default' | 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+
+type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
+
+interface HistorySessionGroup {
+  key: HistorySessionGroupKey;
+  label: string;
+  sessions: SkillSession[];
+}
+
+const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'sevenDaysAgo', label: '7天前' },
+];
 
 function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
   if (typeof result.totalPages === 'number') {
@@ -55,9 +73,60 @@ function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
   return (result.page + 1) * result.size < result.total;
 }
 
+function getStartOfDayTimestamp(value: Date): number {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+}
+
+function resolveHistorySessionGroupKey(updatedAt: string): HistorySessionGroupKey {
+  const updatedTimestamp = new Date(updatedAt).getTime();
+  if (Number.isNaN(updatedTimestamp)) {
+    return 'sevenDaysAgo';
+  }
+
+  const todayStart = getStartOfDayTimestamp(new Date());
+  const updatedStart = getStartOfDayTimestamp(new Date(updatedTimestamp));
+  const dayDiff = Math.floor((todayStart - updatedStart) / DAY_MILLISECONDS);
+
+  if (dayDiff <= 0) {
+    return 'today';
+  }
+  if (dayDiff === 1) {
+    return 'yesterday';
+  }
+  return 'sevenDaysAgo';
+}
+
+function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessionGroup[] {
+  const grouped = new Map<HistorySessionGroupKey, SkillSession[]>([
+    ['today', []],
+    ['yesterday', []],
+    ['sevenDaysAgo', []],
+  ]);
+
+  const sortedSessions = [...sessions].sort(
+    (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
+
+  sortedSessions.forEach((session) => {
+    const key = resolveHistorySessionGroupKey(session.updatedAt);
+    const list = grouped.get(key);
+    if (list) {
+      list.push(session);
+    }
+  });
+
+  return HISTORY_SESSION_GROUP_ORDER
+    .map(({ key, label }) => ({
+      key,
+      label,
+      sessions: grouped.get(key) ?? [],
+    }))
+    .filter((group) => group.sessions.length > 0);
+}
 function App({
   welinkSessionId: welinkSessionIdProp,
   variant = 'default',
+  assistantAccount = '',
 }: AppProps) {
   const isPc = isPcMiniApp();
   const isWeAgentCUI = variant === 'weAgentCUI';
@@ -68,10 +137,20 @@ function App({
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
+  const [isHistorySessionsLoading, setIsHistorySessionsLoading] = useState(false);
+  const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
+  const [selectedHistorySessionId, setSelectedHistorySessionId] = useState('');
+
+  const groupedHistorySessions = useMemo(
+    () => groupHistorySessionsByUpdatedAt(historySessions),
+    [historySessions],
+  );
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
+  const assistantAccountRef = useRef(assistantAccount.trim());
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
   const latestUserContentRef = useRef('');
@@ -192,6 +271,10 @@ function App({
       setIsLoadingHistory(false);
     }
   }, [welinkSessionId]);
+
+  useEffect(() => {
+    assistantAccountRef.current = assistantAccount.trim();
+  }, [assistantAccount]);
 
   useEffect(() => {
     if (typeof welinkSessionIdProp === 'string' && welinkSessionIdProp.trim()) {
@@ -516,8 +599,33 @@ function App({
     // WeAgentCUI 保留扩展点：新建会话
   }, []);
 
-  const handleOpenHistory = useCallback(() => {
-    // WeAgentCUI 保留扩展点：历史会话
+  const handleOpenHistory = useCallback(async () => {
+    setIsHistorySidebarVisible(true);
+    setIsHistorySessionsLoading(true);
+
+    try {
+      const currentAssistantAccount = assistantAccountRef.current.trim();
+      const params = currentAssistantAccount
+        ? { assistantAccount: currentAssistantAccount }
+        : {};
+      const result = await getHistorySessionsList(params);
+      const sessions = Array.isArray(result.content) ? result.content : [];
+      setHistorySessions(sessions);
+    } catch (err) {
+      console.error('Failed to load history sessions:', err);
+      setHistorySessions([]);
+    } finally {
+      setIsHistorySessionsLoading(false);
+    }
+  }, []);
+
+  const handleCloseHistorySidebar = useCallback(() => {
+    setIsHistorySidebarVisible(false);
+  }, []);
+
+  const handleHistorySessionClick = useCallback((sessionId: string) => {
+    setSelectedHistorySessionId(sessionId);
+    // WeAgentCUI 保留扩展点：点击历史会话切换
   }, []);
 
   return (
@@ -577,6 +685,54 @@ function App({
           </button>
         </div>
       )}
+      {isWeAgentCUI && isHistorySidebarVisible && (
+        <div className="we-agent-history-sidebar" aria-label="历史会话侧边栏">
+          <button
+            type="button"
+            className="we-agent-history-sidebar__mask"
+            aria-label="关闭历史会话侧边栏"
+            onClick={handleCloseHistorySidebar}
+          />
+          <aside
+            className="we-agent-history-sidebar__panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {isHistorySessionsLoading && (
+              <div className="we-agent-history-sidebar__status">加载中...</div>
+            )}
+            {!isHistorySessionsLoading && groupedHistorySessions.length === 0 && (
+              <div className="we-agent-history-sidebar__status">暂无历史会话</div>
+            )}
+            {!isHistorySessionsLoading && groupedHistorySessions.map((group) => (
+              <section key={group.key} className="we-agent-history-sidebar__group">
+                <div className="we-agent-history-sidebar__group-title">{group.label}</div>
+                <div className="we-agent-history-sidebar__group-items">
+                  {group.sessions.map((session) => {
+                    const sessionId = session.welinkSessionId;
+                    const sessionTitle = session.title?.trim() || '未命名会话';
+                    const isSelected = selectedHistorySessionId === sessionId;
+
+                    return (
+                      <button
+                        key={sessionId}
+                        type="button"
+                        className={[
+                          'we-agent-history-sidebar__session-item',
+                          isSelected ? 'is-selected' : '',
+                        ].filter(Boolean).join(' ')}
+                        onClick={() => handleHistorySessionClick(sessionId)}
+                        title={sessionTitle}
+                      >
+                        {sessionTitle}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </aside>
+        </div>
+      )}
       <div className="footer-wrapper">
         <Footer
           mode={footerMode}
@@ -592,3 +748,6 @@ function App({
 }
 
 export default App;
+
+
+

@@ -8,6 +8,7 @@ import {
   getWeAgentList,
   isPcMiniApp,
   openWeAgentCUI,
+  resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
 
@@ -77,11 +78,10 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
         console.warn('No we-agent detail found for partnerAccount:', selectedPartnerAccount);
         return;
       }
-      const params = buildOpenWeAgentCUIParams(detail.weCodeUrl, selectedPartnerAccount);
+      const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, selectedPartnerAccount);
+      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedPartnerAccount);
       await openWeAgentCUI(params);
-      if (!isPc) {
-        window.HWH5.close();
-      }
+      window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in SwitchAssistant:', error);
     }

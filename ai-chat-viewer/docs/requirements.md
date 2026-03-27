@@ -585,6 +585,26 @@
    - 容器 1：AI 头像图标，尺寸 `72px x 72px`，圆角 `124px`，边框 `2px solid rgba(255,255,255,1)`；
    - 容器 2：文本 `早上好，峰哥`，样式 `18px / 500 / 26px`，颜色 `rgba(25,25,25,1)`；
    - 容器 3：文本 `CodeAgent | 你的专属编程智能体`，样式 `14px / 400 / 22px`，颜色 `rgba(89,89,89,1)`。
+9. 页面进入解析规则：
+   - 进入 `#/weAgentCUI` 页面时，需从 URL query（含 HashRouter query）中解析 `assistantAccount`；
+   - 解析结果需在页面内保留（用于后续业务逻辑处理），不影响当前对话 UI 展示逻辑。
+10. 历史会话侧边栏：
+   - 点击“历史会话”图标后，在当前页面右侧弹出历史会话侧边栏；
+   - 侧边栏覆盖在当前页面上方，容器宽度 `260px`，高度占满页面可用高度；
+   - 侧边栏左侧显示蒙层，点击蒙层关闭侧边栏；
+   - 侧边栏内容区内边距：`padding: 20px 18px`。
+11. 历史会话数据获取：
+   - 打开侧边栏时调用 `getHistorySessionsList`；
+   - 调用参数需带 `assistantAccount`（来自 `weAgentCUI` 页面入口 query 解析结果）进行过滤查询。
+12. 历史会话分组与展示：
+   - 按 `updatedAt` 将历史会话分为 3 组：`今天`、`昨天`、`7天前`；
+   - 每个分组由“标题区 + 会话项列表”组成，分组内标题与列表间距 `10px`；
+   - 标题区：高度 `40px`，宽度自适应，`padding: 8px 14px`，左对齐，文本为对应分组标题，样式 `16px / 400 / 21px`，颜色 `rgba(153,153,153,1)`；
+   - 会话项：高度 `40px`，宽度自适应，`padding: 8px 14px`，左对齐，文本内容为会话标题 `title`，超出显示 `...`，样式 `16px / 400 / 21px`，颜色 `rgba(51,51,51,1)`。
+13. 会话项选中态：
+   - 点击会话项后显示选中样式：圆角 `12px`，背景 `rgba(216,226,255,1)`；
+   - 选中文本样式：`16px / 500 / 24px`，颜色 `rgba(59,112,255,1)`；
+   - 点击会话项后的会话切换事件当前为空实现（预留后续逻辑）。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
 
@@ -610,14 +630,20 @@
    - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
    - 选中某个助理后点击“立即启用”：
       - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
-      - 读取返回 `WeAgentDetailsArray[0]` 的 `weCodeUrl`，组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
+      - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
+         - 若助理详情 `bizRobotId` 有值：取助理详情 `weCodeUrl`；
+         - 若助理详情 `bizRobotId` 为空：使用 `h5://123456/index.html`，并追加 query `assistantAccount=<partnerAccount>` 与 hash `weAgentCUI`；
+      - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 4. 创建助理页面（`/createAssistant`）：
    - 页面初始化读取 query 参数 `from`；
    - 进入第二步后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
    - 点击“确定”调用 `createDigitalTwin`；
    - 若 `from=weAgent`：
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
-      - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
+      - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
+         - 若助理详情 `bizRobotId` 有值：取助理详情 `weCodeUrl`；
+         - 若助理详情 `bizRobotId` 为空：使用 `h5://123456/index.html`，并追加 query `assistantAccount=<partnerAccount>` 与 hash `weAgentCUI`；
+      - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
    - 若 `from` 非 `weAgent`：
       - 业务侧统一调用 `hwext` 封装方法（参考 `getJsApiOrThrow` 风格）；
       - 封装方法内部按端能力分流：
@@ -637,7 +663,10 @@
          - PC 端：调用 `dispatchSwitchAssistantConfirmEvent`；
          - 移动端：执行 `handleConfirmSwitch` 逻辑：
             - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
-            - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
+            - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
+               - 若助理详情 `bizRobotId` 有值：取助理详情 `weCodeUrl`；
+               - 若助理详情 `bizRobotId` 为空：使用 `h5://123456/index.html`，并追加 query `assistantAccount=<partnerAccount>` 与 hash `weAgentCUI`；
+            - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
             - 处理完成后同步调用 `window.HWH5.close()`。
 7. `openWeAgentCUI` 参数组装规则：
    - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
@@ -652,6 +681,10 @@
 9. 移动端标题栏返回事件（创建助理/助理详情/切换助理/启动助理）：
    - 返回按钮点击后直接调用 `window.HWH5.navigateBack()`；
    - 不增加空判断、可选链或兜底逻辑。
+10. `WeAgentCUI` 历史会话侧边栏联动：
+   - 点击“历史会话”图标时调用 `getHistorySessionsList`；
+   - 查询参数使用页面入口解析得到的 `assistantAccount`；
+   - 接口返回列表按 `updatedAt` 分组展示为 `今天`、`昨天`、`7天前`。
 
 ## 19. 宿主事件桥与库打包约束
 

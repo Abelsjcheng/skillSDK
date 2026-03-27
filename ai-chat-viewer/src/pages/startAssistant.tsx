@@ -9,6 +9,7 @@ import {
   getWeAgentList,
   isPcMiniApp,
   openWeAgentCUI,
+  resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
 
@@ -68,11 +69,10 @@ const StartAssistant: React.FC = () => {
         console.warn('No we-agent detail found for partnerAccount:', selectedAssistantId);
         return;
       }
-      const params = buildOpenWeAgentCUIParams(detail.weCodeUrl, selectedAssistantId);
+      const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, selectedAssistantId);
+      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedAssistantId);
       await openWeAgentCUI(params);
-      if (!isPc) {
-        window.HWH5.close();
-      }
+      window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in StartAssistant:', error);
     }
