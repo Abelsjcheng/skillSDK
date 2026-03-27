@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import backIcon from '../../imgs/icon-back.svg';
 import closeIcon from '../../imgs/icon-close.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
@@ -9,7 +9,6 @@ import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 interface AssistantPageHeaderProps {
   title: string;
   isPcMiniApp?: boolean;
-  onBack?: () => void;
   onClose?: () => void;
   onService?: () => void;
 }
@@ -19,7 +18,6 @@ const noop = () => {};
 const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   title,
   isPcMiniApp = false,
-  onBack = noop,
   onClose = noop,
   onService = noop,
 }) => {
@@ -68,8 +66,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
           className="assistant-page-header__icon-btn"
           aria-label="返回"
           onClick={() => {
-            dispatchAssistantCloseEvent();
-            onBack();
+            window.HWH5.navigateBack();
           }}
         >
           <img src={backIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />

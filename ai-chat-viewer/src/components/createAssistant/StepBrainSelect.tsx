@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 import { INTERNAL_ASSISTANTS } from './constants';
@@ -94,7 +94,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
   return (
     <section className={getStepClassName(isPcMiniApp)}>
-      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} onMobileBack={onPrev} />
+      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} />
 
       <div className="digital-twin__content digital-twin__content--step2">
         <div className="digital-twin__brain-type-block">
@@ -196,5 +196,3 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     </section>
   );
 };
-
-

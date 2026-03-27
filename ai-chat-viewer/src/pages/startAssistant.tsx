@@ -70,10 +70,13 @@ const StartAssistant: React.FC = () => {
       }
       const params = buildOpenWeAgentCUIParams(detail.weCodeUrl, selectedAssistantId);
       await openWeAgentCUI(params);
+      if (!isPc) {
+        window.HWH5.close();
+      }
     } catch (error) {
       console.error('openWeAgentCUI failed in StartAssistant:', error);
     }
-  }, [selectedAssistantId]);
+  }, [isPc, selectedAssistantId]);
 
   const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
     if (event.key !== 'Enter' && event.key !== ' ') {

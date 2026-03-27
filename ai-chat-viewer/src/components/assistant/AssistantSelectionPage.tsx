@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import '../../styles/SwitchAssistant.less';
 import {
   dispatchAssistantCloseEvent,
-  dispatchSwitchAssistantCancelEvent,
-  dispatchSwitchAssistantConfirmEvent,
   dispatchSwitchAssistantSelectEvent,
 } from '../../utils/assistantHostBridge';
 import AssistantPageHeader from './AssistantPageHeader';
@@ -135,20 +133,14 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
-          onClick={() => {
-            dispatchSwitchAssistantCancelEvent(currentSelectedAssistantId);
-            onLeftButtonClick();
-          }}
+          onClick={onLeftButtonClick}
         >
           {leftButtonText}
         </button>
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--confirm"
-          onClick={() => {
-            dispatchSwitchAssistantConfirmEvent(currentSelectedAssistantId);
-            onRightButtonClick();
-          }}
+          onClick={onRightButtonClick}
           disabled={rightButtonDisabled}
         >
           {rightButtonText}

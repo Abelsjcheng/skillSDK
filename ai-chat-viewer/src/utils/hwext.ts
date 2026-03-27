@@ -173,7 +173,8 @@ interface Pedestal {
 interface HWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   getDeviceInfo?: () => Promise<unknown> | unknown;
-  close?: () => void;
+  navigateBack: () => void;
+  close: () => void;
 }
 
 export interface HWH5DeviceInfo {
@@ -185,14 +186,13 @@ declare global {
   interface Window {
     HWH5EXT?: HWH5EXT;
     Pedestal?: Pedestal;
-    HWH5?: HWH5Bridge;
+    HWH5: HWH5Bridge;
   }
 }
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
-export const WE_AGENT_BASE_URI = 'h5://123456/html/index.html';
-export const ASSISTANT_DETAIL_BASE_URI = 'h5://123456/index.html#assistantDetail';
-export const SWITCH_ASSISTANT_BASE_URI = 'h5://123456/index.html#switchAssistant';
+export const WE_AGENT_BASE_URI = 'h5://123456/index.html';
+export const ASSISTANT_PAGE_BASE_URI = 'h5://123456/index.html';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
@@ -304,70 +304,40 @@ function isAbsoluteUrl(value: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
 }
 
-function normalizeSearchInput(routeSearch: string): string {
-  if (!routeSearch) return routeSearch;
-  if (
-    routeSearch.startsWith('?') ||
-    routeSearch.startsWith('#') ||
-    routeSearch.startsWith('/') ||
-    isAbsoluteUrl(routeSearch)
-  ) {
-    return routeSearch;
+export function getQueryParam(key: string, routeSearch = ''): string | null {
+  const normalizedRouteSearch = routeSearch.replace(/^[?#]/, '');
+  if (normalizedRouteSearch) {
+    const routeValue = new URLSearchParams(normalizedRouteSearch).get(key);
+    if (routeValue !== null) {
+      return routeValue;
+    }
   }
-  return `?${routeSearch}`;
-}
 
-function getQueryParamFromHash(hashValue: string, key: string): string | null {
-  if (!hashValue) return null;
-  const normalizedHash = hashValue.startsWith('#') ? hashValue.slice(1) : hashValue;
-  if (!normalizedHash) return null;
-  const hashUrl = parseUrl(normalizedHash);
-  return hashUrl?.searchParams.get(key) ?? null;
-}
+  if (typeof window === 'undefined') {
+    return null;
+  }
 
-function getQueryParamFromUrl(url: URL, key: string): string | null {
-  const directValue = url.searchParams.get(key);
+  const currentUrl = parseUrl(window.location.href);
+  if (!currentUrl) {
+    return null;
+  }
+
+  const directValue = currentUrl.searchParams.get(key);
   if (directValue !== null) {
     return directValue;
   }
-  return getQueryParamFromHash(url.hash, key);
-}
 
-export function getQueryParam(key: string, routeSearch = ''): string | null {
-  const candidates: URL[] = [];
-  if (routeSearch) {
-    const routeUrl = parseUrl(normalizeSearchInput(routeSearch));
-    if (routeUrl) {
-      candidates.push(routeUrl);
-    }
+  const hashValue = currentUrl.hash.startsWith('#') ? currentUrl.hash.slice(1) : currentUrl.hash;
+  if (!hashValue) {
+    return null;
   }
 
-  if (typeof window !== 'undefined') {
-    const currentUrl = parseUrl(window.location.href);
-    if (currentUrl) {
-      candidates.push(currentUrl);
-    }
-  }
-
-  for (const candidate of candidates) {
-    const value = getQueryParamFromUrl(candidate, key);
-    if (value !== null) {
-      return value;
-    }
-  }
-
-  return null;
+  const hashUrl = parseUrl(hashValue);
+  return hashUrl?.searchParams.get(key) ?? null;
 }
 
 export function appendQueryParam(uri: string, key: string, value: string): string {
   if (!uri) return uri;
-  if (uri.startsWith('#')) {
-    const hashUrl = parseUrl(uri.slice(1));
-    if (!hashUrl) return uri;
-    hashUrl.searchParams.set(key, value);
-    const hashPath = hashUrl.pathname.startsWith('/') ? hashUrl.pathname : `/${hashUrl.pathname}`;
-    return `#${hashPath}${hashUrl.search}${hashUrl.hash}`;
-  }
 
   const parsed = parseUrl(uri);
   if (!parsed) return uri;
@@ -378,46 +348,20 @@ export function appendQueryParam(uri: string, key: string, value: string): strin
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
-export function appendHashRouteQueryParam(uri: string, key: string, value: string): string {
-  if (!uri) return uri;
-  const parsed = parseUrl(uri);
-  if (!parsed) return uri;
-
-  const hashValue = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
-  if (!hashValue) {
-    return appendQueryParam(uri, key, value);
-  }
-
-  const hashUrl = parseUrl(hashValue);
-  if (!hashUrl) {
-    return appendQueryParam(uri, key, value);
-  }
-
-  hashUrl.searchParams.set(key, value);
-  const hashPath = hashUrl.pathname.startsWith('/') ? hashUrl.pathname : `/${hashUrl.pathname}`;
-  parsed.hash = `${hashPath}${hashUrl.search}`;
-
-  if (isAbsoluteUrl(uri)) {
-    return parsed.toString();
-  }
-
-  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+function buildAssistantPageUri(partnerAccount: string, hash: 'assistantDetail' | 'switchAssistant'): string {
+  const parsed = parseUrl(ASSISTANT_PAGE_BASE_URI);
+  if (!parsed) return ASSISTANT_PAGE_BASE_URI;
+  parsed.searchParams.set('partnerAccount', partnerAccount);
+  parsed.hash = hash;
+  return parsed.toString();
 }
 
 export function buildOpenWeAgentCUIParams(weCodeUrl: string, partnerAccount: string): OpenWeAgentCUIParams {
   const normalizedPartnerAccount = partnerAccount?.trim() ?? '';
   return {
     weAgentUri: appendQueryParam(weCodeUrl || WE_AGENT_BASE_URI, 'wecodePlace', 'weAgent'),
-    assistantDetailUri: appendHashRouteQueryParam(
-      ASSISTANT_DETAIL_BASE_URI,
-      'partnerAccount',
-      normalizedPartnerAccount,
-    ),
-    switchAssistantUri: appendHashRouteQueryParam(
-      SWITCH_ASSISTANT_BASE_URI,
-      'partnerAccount',
-      normalizedPartnerAccount,
-    ),
+    assistantDetailUri: buildAssistantPageUri(normalizedPartnerAccount, 'assistantDetail'),
+    switchAssistantUri: buildAssistantPageUri(normalizedPartnerAccount, 'switchAssistant'),
   };
 }
 

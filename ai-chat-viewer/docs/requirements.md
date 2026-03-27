@@ -629,19 +629,29 @@
 6. 切换助理页面（`/switchAssistant`）：
    - 读取 query 参数 `partnerAccount`；
    - 调用 `getWeAgentList` 渲染 `content` 列表，并默认选中与 query 匹配的助理项；
-   - 点击“确认切换”：
-      - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
-      - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
+   - 底部按钮点击分端处理（`onLeftButtonClick` 与 `onRightButtonClick` 分开实现）：
+      - 点击“取消选择”：
+         - 移动端：直接调用 `window.HWH5.close()`；
+         - PC 端：调用 `dispatchSwitchAssistantCancelEvent`。
+      - 点击“确认切换”：
+         - PC 端：调用 `dispatchSwitchAssistantConfirmEvent`；
+         - 移动端：执行 `handleConfirmSwitch` 逻辑：
+            - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
+            - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
+            - 处理完成后同步调用 `window.HWH5.close()`。
 7. `openWeAgentCUI` 参数组装规则：
    - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
-   - `assistantDetailUri`：`h5://123456/html/index.html` 追加 query `partnerAccount`；
-   - `switchAssistantUri`：`h5://123456/html/index.html` 追加 query `partnerAccount`。
+   - `assistantDetailUri`：`h5://123456/index.html` 追加 query `partnerAccount`，并追加 hash `assistantDetail`；
+   - `switchAssistantUri`：`h5://123456/index.html` 追加 query `partnerAccount`，并追加 hash `switchAssistant`。
 8. 移动端标题栏状态栏适配（创建助理/启动助理/切换助理/助理详情）：
    - 当 `isPcMiniApp === false` 时，需要调用 `window.HWH5.getDeviceInfo()`；
    - 从出参对象读取 `statusBarHeight`（状态栏高度）；
    - 将标题栏顶部安全距离设置为 `statusBarHeight`，避免系统状态栏遮挡标题栏内容；
    - 业务页面在标题组件中直接调用 `hwext.ts` 的 `getDeviceInfo` 获取该值，不使用单独的 `useMobileStatusBarHeight.ts` 方法文件。
    - `getDeviceInfo/statusBarHeight` 封装实现需遵循最小判空策略：仅保留必要能力判断与数值归一化，不引入重复空判断分支。
+9. 移动端标题栏返回事件（创建助理/助理详情/切换助理/启动助理）：
+   - 返回按钮点击后直接调用 `window.HWH5.navigateBack()`；
+   - 不增加空判断、可选链或兜底逻辑。
 
 ## 19. 宿主事件桥与库打包约束
 
@@ -649,16 +659,15 @@
 2. 事件名与触发时机：
    - `weAgent:assistant-close`：
       - 点击标题区关闭按钮（PC）时触发；
-      - 点击标题区返回按钮（移动）时触发；
       - 点击助理详情页或切换助理页根容器空白区域（即背景层）时触发。
    - `weAgent:switch-assistant-select`：
       - 切换助理页点击某个助理卡片并完成选中时触发；
       - `detail` 中带 `{ id: selectedAssistantId }`。
    - `weAgent:switch-assistant-cancel`：
-      - 点击“取消选择”按钮时触发；
+      - 仅 PC 端点击“取消选择”按钮时触发；
       - `detail` 中带 `{ id: selectedAssistantId }`（允许为空字符串）。
    - `weAgent:switch-assistant-confirm`：
-      - 点击“确认切换”按钮时触发；
+      - 仅 PC 端点击“确认切换”按钮时触发；
       - `detail` 中带 `{ id: selectedAssistantId }`。
 3. `SwitchAssistant` 组件化导出场景支持通过 `defaultSelectedAssistantId` 传入默认选中项；若未传则按页面 query 默认选中规则处理。
 4. 库构建（`webpack.lib.config.js`）需将以下依赖配置为 `externals`，避免宿主集成时重复打包 React 产生运行时冲突：

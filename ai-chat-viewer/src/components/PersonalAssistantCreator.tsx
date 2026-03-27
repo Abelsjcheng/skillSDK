@@ -77,6 +77,9 @@ const PersonalAssistantCreator: React.FC = () => {
 
       if (from !== 'weAgent') {
         await handleCreateForOtherScene(createResult);
+        if (!isPc) {
+          window.HWH5.close();
+        }
         return;
       }
 
@@ -94,10 +97,13 @@ const PersonalAssistantCreator: React.FC = () => {
       }
       const openParams = buildOpenWeAgentCUIParams(detail.weCodeUrl, partnerAccount);
       await openWeAgentCUI(openParams);
+      if (!isPc) {
+        window.HWH5.close();
+      }
     } catch (error) {
       console.error('confirm create assistant failed:', error);
     }
-  }, [from, handleCreateForOtherScene]);
+  }, [from, handleCreateForOtherScene, isPc]);
 
   return (
     <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>

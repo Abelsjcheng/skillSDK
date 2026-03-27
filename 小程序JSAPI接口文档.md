@@ -1234,8 +1234,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
 | weAgentUri | string | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成） |
-| assistantDetailUri | string | 助理详情地址（`h5://123456/index.html#assistantDetail` 并追加 `partnerAccount` query） |
-| switchAssistantUri | string | 切换助理地址（`h5://123456/index.html#switchAssistant` 并追加 `partnerAccount` query） |
+| assistantDetailUri | string | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
+| switchAssistantUri | string | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 
 ### 调用示例
 
@@ -1274,8 +1274,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | weAgentUri | string | 是 | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成） |
-| assistantDetailUri | string | 是 | 助理详情地址（`h5://123456/index.html#assistantDetail` 并追加 `partnerAccount` query） |
-| switchAssistantUri | string | 是 | 切换助理地址（`h5://123456/index.html#switchAssistant` 并追加 `partnerAccount` query） |
+| assistantDetailUri | string | 是 | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
+| switchAssistantUri | string | 是 | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 
 ### 返回值
 
@@ -1297,8 +1297,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 ```javascript
 window.HWH5EXT.openWeAgentCUI({
   weAgentUri: 'h5://123456/html/index.html?wecodePlace=weAgent',
-  assistantDetailUri: 'h5://123456/index.html#assistantDetail?partnerAccount=x00_1',
-  switchAssistantUri: 'h5://123456/index.html#switchAssistant?partnerAccount=x00_1'
+  assistantDetailUri: 'h5://123456/index.html?partnerAccount=x00_1#assistantDetail',
+  switchAssistantUri: 'h5://123456/index.html?partnerAccount=x00_1#switchAssistant'
 }).then((result) => {
   console.log('打开成功:', result.status);
 }).catch((error) => {

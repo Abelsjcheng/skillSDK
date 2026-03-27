@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
+import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   buildOpenWeAgentCUIParams,
   getQueryParam,
@@ -66,10 +67,6 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     void loadAssistantList();
   }, [loadAssistantList]);
 
-  const handleCancelSelect = useCallback(() => {
-    setSelectedPartnerAccount('');
-  }, []);
-
   const handleConfirmSwitch = useCallback(async () => {
     if (!selectedPartnerAccount) return;
 
@@ -82,10 +79,33 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       }
       const params = buildOpenWeAgentCUIParams(detail.weCodeUrl, selectedPartnerAccount);
       await openWeAgentCUI(params);
+      if (!isPc) {
+        window.HWH5.close();
+      }
     } catch (error) {
       console.error('openWeAgentCUI failed in SwitchAssistant:', error);
     }
-  }, [selectedPartnerAccount]);
+  }, [isPc, selectedPartnerAccount]);
+
+  const handleLeftButtonClick = useCallback(() => {
+    if (isPc) {
+      dispatchSwitchAssistantCancelEvent(selectedPartnerAccount);
+      setSelectedPartnerAccount('');
+      return;
+    }
+    window.HWH5.close();
+  }, [isPc, selectedPartnerAccount]);
+
+  const handleRightButtonClick = useCallback(() => {
+    if (!selectedPartnerAccount) return;
+
+    if (isPc) {
+      dispatchSwitchAssistantConfirmEvent(selectedPartnerAccount);
+      return;
+    }
+
+    void handleConfirmSwitch();
+  }, [handleConfirmSwitch, isPc, selectedPartnerAccount]);
 
   return (
     <AssistantSelectionPage
@@ -94,8 +114,8 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       leftButtonText="取消选择"
       rightButtonText="确认切换"
       defaultSelectedAssistantId={preferredDefaultPartnerAccount}
-      onLeftButtonClick={handleCancelSelect}
-      onRightButtonClick={handleConfirmSwitch}
+      onLeftButtonClick={handleLeftButtonClick}
+      onRightButtonClick={handleRightButtonClick}
       assistants={assistantItems}
       selectedAssistantId={selectedPartnerAccount}
       onSelectAssistant={setSelectedPartnerAccount}

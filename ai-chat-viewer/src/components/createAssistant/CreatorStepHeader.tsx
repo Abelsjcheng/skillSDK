@@ -1,12 +1,9 @@
-﻿import React from 'react';
+import React from 'react';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
-
-const noop = () => {};
 
 interface CreatorStepHeaderProps {
   isPcMiniApp: boolean;
   onClose: () => void;
-  onMobileBack?: () => void;
 }
 
 export function getStepClassName(isPcMiniApp: boolean): string {
@@ -16,9 +13,7 @@ export function getStepClassName(isPcMiniApp: boolean): string {
 export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   isPcMiniApp,
   onClose,
-  onMobileBack,
 }) => {
-  const handleMobileBack = onMobileBack ?? noop;
   const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
   const mobileHeaderStyle = !isPcMiniApp && statusBarHeight > 0
     ? {
@@ -45,7 +40,9 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
               type="button"
               className="digital-twin__mobile-back-btn"
               aria-label="返回上一页"
-              onClick={handleMobileBack}
+              onClick={() => {
+                window.HWH5.navigateBack();
+              }}
             >
               {'<'}
             </button>
