@@ -12,7 +12,7 @@
 #import "WLAgentSkillsWeAgentStore.h"
 
 static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
-static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.html";
+static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html";
 
 @interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
 
@@ -870,15 +870,30 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
 
     NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
+    NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.bizRobotId];
 
     WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
-    result.weAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"] ?: @"";
-    result.assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                        key:@"partnerAccount"
-                                                      value:partnerAccount] ?: @"";
-    result.switchAssistantUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                        key:@"partnerAccount"
-                                                      value:partnerAccount] ?: @"";
+    if (bizRobotId != nil && bizRobotId.length > 0) {
+        result.weAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"] ?: @"";
+    } else {
+        NSString *externalWeAgentUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                              key:@"wecodePlace"
+                                                            value:@"weAgent"];
+        externalWeAgentUri = [self appendQueryItemToUri:externalWeAgentUri
+                                                    key:@"assistantAccount"
+                                                  value:partnerAccount];
+        result.weAgentUri = [self appendHashToUri:externalWeAgentUri hash:@"weAgentCUI"] ?: @"";
+    }
+
+    NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                          key:@"partnerAccount"
+                                                        value:partnerAccount];
+    result.assistantDetailUri = [self appendHashToUri:assistantDetailUri hash:@"assistantDetail"] ?: @"";
+
+    NSString *switchAssistantUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                          key:@"partnerAccount"
+                                                        value:partnerAccount];
+    result.switchAssistantUri = [self appendHashToUri:switchAssistantUri hash:@"switchAssistant"] ?: @"";
     return result;
 }
 
@@ -1133,6 +1148,31 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
         : @"?";
     NSString *encodedValue = [safeValue stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]] ?: @"";
     return [NSString stringWithFormat:@"%@%@%@=%@", base, separator, key, encodedValue];
+}
+
+- (nullable NSString *)appendHashToUri:(nullable NSString *)uri
+                                   hash:(nullable NSString *)hash {
+    NSString *base = [WLAgentSkillsTypeConverter optionalStringFromValue:uri];
+    if (base == nil || base.length == 0) {
+        return nil;
+    }
+
+    NSString *safeHash = [WLAgentSkillsTypeConverter optionalStringFromValue:hash] ?: @"";
+    if (safeHash.length == 0) {
+        return base;
+    }
+
+    NSURLComponents *components = [NSURLComponents componentsWithString:base];
+    if (components != nil) {
+        components.fragment = safeHash;
+        if (components.string != nil && components.string.length > 0) {
+            return components.string;
+        }
+    }
+
+    NSRange hashRange = [base rangeOfString:@"#"];
+    NSString *baseWithoutHash = hashRange.location == NSNotFound ? base : [base substringToIndex:hashRange.location];
+    return [NSString stringWithFormat:@"%@#%@", baseWithoutHash, safeHash];
 }
 
 - (BOOL)isSameSessionMessage:(WLAgentSkillsSessionMessage *)left
