@@ -30,7 +30,6 @@ export type SessionRecordStatus = 'ACTIVE' | 'IDLE' | 'CLOSED';
 export type SessionRuntimeStatus = 'busy' | 'idle' | 'retry';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
-export type ConvertibleParam = string | number | boolean | bigint | Object;
 
 export type StreamMessageType =
   | 'text.delta'
@@ -401,11 +400,11 @@ export interface ControlSkillWeCodeResult {
 }
 
 export interface CreateDigitalTwinParams {
-  name: ConvertibleParam;
-  icon: ConvertibleParam;
-  description: ConvertibleParam;
-  weCrewType: ConvertibleParam;
-  bizRobotId?: ConvertibleParam;
+  name: string;
+  icon: string;
+  description: string;
+  weCrewType: number;
+  bizRobotId?: string;
 }
 
 export interface CreateDigitalTwinResult {
@@ -425,12 +424,12 @@ export interface AgentTypeList {
 }
 
 export interface PageParams {
-  pageSize: ConvertibleParam;
-  pageNumber: ConvertibleParam;
+  pageSize: number;
+  pageNumber: number;
 }
 
 export interface QueryWeAgentParams {
-  partnerAccount: ConvertibleParam;
+  partnerAccount: string;
 }
 
 export interface WeAgent {
