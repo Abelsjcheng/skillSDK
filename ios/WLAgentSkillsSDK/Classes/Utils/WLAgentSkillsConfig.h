@@ -10,6 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface WLAgentSkillsConfig : NSObject
 
 @property (nonatomic, copy) NSString *baseURL;
+@property (nonatomic, copy) NSString *assistantBaseURL;
 @property (nonatomic, copy) NSString *webSocketURL;
 @property (nonatomic, assign) NSTimeInterval requestTimeout;
 @property (nonatomic, assign) NSTimeInterval webSocketTimeout;
@@ -18,7 +19,11 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)sharedConfig;
 
 - (void)configureWithBaseURL:(NSString *)baseURL;
+- (void)configureWithBaseURL:(NSString *)baseURL assistantBaseURL:(nullable NSString *)assistantBaseURL;
 - (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL;
+- (void)configureWithBaseURL:(NSString *)baseURL
+            assistantBaseURL:(nullable NSString *)assistantBaseURL
+                webSocketURL:(nullable NSString *)webSocketURL;
 
 @end
 

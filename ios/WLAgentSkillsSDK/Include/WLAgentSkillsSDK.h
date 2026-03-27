@@ -13,7 +13,11 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)sharedInstance;
 
 + (void)configureWithBaseURL:(NSString *)baseURL;
++ (void)configureWithBaseURL:(NSString *)baseURL assistantBaseURL:(nullable NSString *)assistantBaseURL;
 + (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL;
++ (void)configureWithBaseURL:(NSString *)baseURL
+            assistantBaseURL:(nullable NSString *)assistantBaseURL
+                webSocketURL:(nullable NSString *)webSocketURL;
 
 #pragma mark - 1. createSession
 - (void)createSession:(WLAgentSkillsCreateSessionParams *)params

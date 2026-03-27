@@ -137,7 +137,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsQueryWeAgentParams : NSObject
-@property (nonatomic, strong, nullable) id partnerAccounts;
+@property (nonatomic, strong, nullable) id partnerAccount;
 @end
 
 #pragma mark - Data Models
@@ -158,6 +158,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *updatedAt;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsSessionMessagePart : NSObject
@@ -214,6 +215,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, strong) NSNumber *totalElements __attribute__((deprecated("Use total")));
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsSkillSessionPageResult : NSObject
@@ -227,6 +229,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, strong) NSNumber *totalElements __attribute__((deprecated("Use total")));
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsAgentType : NSObject
@@ -278,6 +281,8 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *weAgentUri;
 @property (nonatomic, copy) NSString *assistantDetailUri;
 @property (nonatomic, copy) NSString *switchAssistantUri;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsSessionError : NSObject
@@ -287,6 +292,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 - (instancetype)initWithCode:(NSString *)code message:(NSString *)message;
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsStreamMessage : NSObject
@@ -330,6 +336,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, strong, nullable) NSArray *parts;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 #pragma mark - Result Models
@@ -347,6 +354,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *createdAt;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsStopSkillResult : NSObject
@@ -354,18 +362,25 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *status;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsRegisterSessionListenerResult : NSObject
 @property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsUnregisterSessionListenerResult : NSObject
 @property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsCloseSkillResult : NSObject
 @property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsReplyPermissionResult : NSObject
@@ -374,14 +389,19 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *response;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsControlSkillWeCodeResult : NSObject
 @property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsSendMessageToIMResult : NSObject
 @property (nonatomic, assign) BOOL success;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsCreateDigitalTwinResult : NSObject
@@ -390,28 +410,39 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *message;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsAgentTypeListResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsAgentType *> *content;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsWeAgentListResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsWeAgent *> *content;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsWeAgentDetailsArrayResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *WeAgentDetailsArray;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsSessionStatusResult : NSObject
 @property (nonatomic, assign) WLAgentSkillsClientSessionStatus status;
+
+- (NSDictionary *)toDictionary;
 @end
 
 @interface WLAgentSkillsSkillWecodeStatusResult : NSObject
 @property (nonatomic, assign) WLAgentSkillsWecodeStatus status;
 @property (nonatomic, strong, nullable) NSNumber *timestamp;
 @property (nonatomic, copy, nullable) NSString *message;
+
+- (NSDictionary *)toDictionary;
 @end
 
 NS_ASSUME_NONNULL_END

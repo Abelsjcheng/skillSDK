@@ -20,6 +20,7 @@
     self = [super init];
     if (self) {
         _baseURL = @"http://localhost:8082";
+        _assistantBaseURL = @"http://localhost:8082";
         _webSocketURL = @"ws://localhost:8082/ws/skill/stream";
         _requestTimeout = 30.0;
         _webSocketTimeout = 60.0;
@@ -29,10 +30,20 @@
 }
 
 - (void)configureWithBaseURL:(NSString *)baseURL {
-    [self configureWithBaseURL:baseURL webSocketURL:nil];
+    [self configureWithBaseURL:baseURL assistantBaseURL:nil webSocketURL:nil];
+}
+
+- (void)configureWithBaseURL:(NSString *)baseURL assistantBaseURL:(nullable NSString *)assistantBaseURL {
+    [self configureWithBaseURL:baseURL assistantBaseURL:assistantBaseURL webSocketURL:nil];
 }
 
 - (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL {
+    [self configureWithBaseURL:baseURL assistantBaseURL:nil webSocketURL:webSocketURL];
+}
+
+- (void)configureWithBaseURL:(NSString *)baseURL
+            assistantBaseURL:(nullable NSString *)assistantBaseURL
+                webSocketURL:(nullable NSString *)webSocketURL {
     if (baseURL == nil || baseURL.length == 0) {
         return;
     }
@@ -42,6 +53,13 @@
         return;
     }
     self.baseURL = trimmedBaseURL;
+    if (assistantBaseURL != nil) {
+        NSString *trimmedAssistantBaseURL =
+            [assistantBaseURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        self.assistantBaseURL = trimmedAssistantBaseURL.length == 0 ? trimmedBaseURL : trimmedAssistantBaseURL;
+    } else if (self.assistantBaseURL == nil || self.assistantBaseURL.length == 0) {
+        self.assistantBaseURL = trimmedBaseURL;
+    }
 
     if (webSocketURL != nil && webSocketURL.length > 0) {
         self.webSocketURL = webSocketURL;

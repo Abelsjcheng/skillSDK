@@ -40,8 +40,22 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
     [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
 }
 
++ (void)configureWithBaseURL:(NSString *)baseURL assistantBaseURL:(nullable NSString *)assistantBaseURL {
+    [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL assistantBaseURL:assistantBaseURL];
+    [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
+}
+
 + (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL {
     [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL webSocketURL:webSocketURL];
+    [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
+}
+
++ (void)configureWithBaseURL:(NSString *)baseURL
+            assistantBaseURL:(nullable NSString *)assistantBaseURL
+                webSocketURL:(nullable NSString *)webSocketURL {
+    [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL
+                                            assistantBaseURL:assistantBaseURL
+                                                webSocketURL:webSocketURL];
     [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
 }
 
@@ -822,20 +836,19 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
     }
 
     NSString *errorMessage = nil;
-    NSArray<NSString *> *partnerAccounts = [WLAgentSkillsTypeConverter requiredStringArrayFromValue:params.partnerAccounts
-                                                                                            fieldName:@"partnerAccounts"
-                                                                                         errorMessage:&errorMessage];
-    if (partnerAccounts == nil || partnerAccounts.count == 0) {
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
+                                                                          fieldName:@"partnerAccount"
+                                                                       errorMessage:&errorMessage];
+    if (partnerAccount == nil) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *joinedPartnerAccounts = [partnerAccounts componentsJoinedByString:@","];
 
     __weak typeof(self) weakSelf = self;
-    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccounts:joinedPartnerAccounts
-                                                                          success:^(id  _Nullable responseObject) {
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
+                                                                         success:^(id  _Nullable responseObject) {
         NSArray<WLAgentSkillsWeAgentDetails *> *detailsList = [self parseWeAgentDetailsListFromResponse:responseObject];
-        if (partnerAccounts.count == 1 && detailsList.count > 0) {
+        if (detailsList.count > 0) {
             [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[detailsList.firstObject toDictionary]];
         }
         WLAgentSkillsWeAgentDetailsArrayResult *result = [[WLAgentSkillsWeAgentDetailsArrayResult alloc] init];
@@ -844,7 +857,7 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://123456/html/index.h
             success(result);
         }
     }
-                                                                          failure:^(NSError * _Nonnull error) {
+                                                                         failure:^(NSError * _Nonnull error) {
         [weakSelf dispatchFailureObject:failure error:error];
     }];
 }

@@ -47,7 +47,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                             success:(WLAgentSkillsHTTPSuccessBlock)success
                             failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)getWeAgentDetailsWithPartnerAccounts:(NSString *)partnerAccounts
+- (void)getWeAgentDetailsWithPartnerAccount:(NSString *)partnerAccount
                                      success:(WLAgentSkillsHTTPSuccessBlock)success
                                      failure:(WLAgentSkillsHTTPFailureBlock)failure;
 

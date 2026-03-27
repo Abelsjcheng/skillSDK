@@ -8,12 +8,12 @@
 #import "WLAgentSkillsTypes.h"
 @import AFNetworking;
 
-static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.http";
-
 @interface WLAgentSkillsHTTPClient ()
 
 @property (nonatomic, strong) AFHTTPSessionManager *sessionManager;
+@property (nonatomic, strong) AFHTTPSessionManager *assistantSessionManager;
 @property (nonatomic, copy) NSString *configuredBaseURL;
+@property (nonatomic, copy) NSString *configuredAssistantBaseURL;
 
 @end
 
@@ -97,12 +97,20 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
         parameters[@"bizRobotId"] = bizRobotId;
     }
 
-    [self POST:@"/v4-1/we-crew/im-register" parameters:parameters success:success failure:failure];
+    [self POST:@"/v4-1/we-crew/im-register"
+    parameters:parameters
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
 }
 
 - (void)getAgentTypeWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    [self GET:@"/v4-1/we-crew/inner-assistant/list" parameters:nil success:success failure:failure];
+    [self GET:@"/v4-1/we-crew/inner-assistant/list"
+    parameters:nil
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
 }
 
 - (void)getWeAgentListWithPageSize:(NSNumber *)pageSize
@@ -113,14 +121,22 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
         @"pageSize" : pageSize,
         @"pageNumber" : pageNumber
     };
-    [self GET:@"/v4-1/we-crew/list" parameters:parameters success:success failure:failure];
+    [self GET:@"/v4-1/we-crew/list"
+    parameters:parameters
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
 }
 
-- (void)getWeAgentDetailsWithPartnerAccounts:(NSString *)partnerAccounts
+- (void)getWeAgentDetailsWithPartnerAccount:(NSString *)partnerAccount
                                      success:(WLAgentSkillsHTTPSuccessBlock)success
                                      failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSString *path = [NSString stringWithFormat:@"/v1/robot-partners/%@", partnerAccounts];
-    [self GET:path parameters:nil success:success failure:failure];
+    NSString *path = [NSString stringWithFormat:@"/v1/robot-partners/%@", partnerAccount];
+    [self GET:path
+    parameters:nil
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
 }
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
@@ -250,8 +266,21 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
     parameters:(nullable NSDictionary *)parameters
         success:(WLAgentSkillsHTTPSuccessBlock)success
         failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self GET:path
+    parameters:parameters
+  useAssistantBaseURL:NO
+         success:success
+         failure:failure];
+}
+
+- (void)GET:(NSString *)path
+    parameters:(nullable NSDictionary *)parameters
+  useAssistantBaseURL:(BOOL)useAssistantBaseURL
+        success:(WLAgentSkillsHTTPSuccessBlock)success
+        failure:(WLAgentSkillsHTTPFailureBlock)failure {
     [self ensureConfigurationUpToDate];
-    [self.sessionManager GET:path
+    AFHTTPSessionManager *manager = useAssistantBaseURL ? self.assistantSessionManager : self.sessionManager;
+    [manager GET:path
                                 parameters:parameters
                                         headers:nil
                                     progress:nil
@@ -267,8 +296,21 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
     parameters:(nullable NSDictionary *)parameters
             success:(WLAgentSkillsHTTPSuccessBlock)success
             failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self POST:path
+    parameters:parameters
+  useAssistantBaseURL:NO
+         success:success
+         failure:failure];
+}
+
+- (void)POST:(NSString *)path
+    parameters:(nullable NSDictionary *)parameters
+  useAssistantBaseURL:(BOOL)useAssistantBaseURL
+        success:(WLAgentSkillsHTTPSuccessBlock)success
+        failure:(WLAgentSkillsHTTPFailureBlock)failure {
     [self ensureConfigurationUpToDate];
-    [self.sessionManager POST:path
+    AFHTTPSessionManager *manager = useAssistantBaseURL ? self.assistantSessionManager : self.sessionManager;
+    [manager POST:path
                                     parameters:parameters
                                         headers:nil
                                         progress:nil
@@ -283,40 +325,20 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 - (void)handleResponseObject:(id)responseObject
                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    if (![responseObject isKindOfClass:[NSDictionary class]]) {
-        if (success) {
-            success(responseObject);
-        }
-        return;
-    }
-
-    NSDictionary *dict = (NSDictionary *)responseObject;
-    NSNumber *code = dict[@"code"];
-    if (code != nil) {
-        if (code.integerValue == 0) {
+    (void)failure;
+    if ([responseObject isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dict = (NSDictionary *)responseObject;
+        if ([dict.allKeys containsObject:@"data"]) {
+            id payload = dict[@"data"];
             if (success) {
-                id data = dict[@"data"];
-                success(data);
+                success(payload == [NSNull null] ? nil : payload);
             }
             return;
         }
-
-        NSString *message = [dict[@"errormsg"] isKindOfClass:[NSString class]] ? dict[@"errormsg"] : @"Service error";
-        NSError *error = [NSError errorWithDomain:WLAgentSkillsHTTPErrorDomain
-                                                                                    code:code.integerValue
-                                                                            userInfo:@{
-            NSLocalizedDescriptionKey : message,
-            WLAgentSkillsErrorCodeKey : code,
-            WLAgentSkillsErrorMessageKey : message
-        }];
-        if (failure) {
-            failure(error);
-        }
-        return;
     }
 
     if (success) {
-        success(dict);
+        success(responseObject);
     }
 }
 
@@ -358,8 +380,11 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 }
 
 - (void)ensureConfigurationUpToDate {
-    NSString *baseURL = [WLAgentSkillsConfig sharedConfig].baseURL;
-    if (![baseURL isEqualToString:self.configuredBaseURL]) {
+    WLAgentSkillsConfig *config = [WLAgentSkillsConfig sharedConfig];
+    NSString *baseURL = config.baseURL;
+    NSString *assistantBaseURL = config.assistantBaseURL;
+    if (![baseURL isEqualToString:self.configuredBaseURL]
+        || ![assistantBaseURL isEqualToString:self.configuredAssistantBaseURL]) {
         [self rebuildSessionManager];
     }
 }
@@ -367,13 +392,26 @@ static NSString * const WLAgentSkillsHTTPErrorDomain = @"com.wlagentskills.sdk.h
 - (void)rebuildSessionManager {
     WLAgentSkillsConfig *config = [WLAgentSkillsConfig sharedConfig];
     NSURL *baseURL = [NSURL URLWithString:config.baseURL];
+    NSString *assistantBaseURL = config.assistantBaseURL.length > 0 ? config.assistantBaseURL : config.baseURL;
+    NSURL *assistantURL = [NSURL URLWithString:assistantBaseURL];
+    if (assistantURL == nil) {
+        assistantURL = baseURL;
+    }
+
     self.sessionManager = [[AFHTTPSessionManager alloc] initWithBaseURL:baseURL];
-    self.sessionManager.requestSerializer = [AFJSONRequestSerializer serializer];
-    self.sessionManager.responseSerializer = [AFJSONResponseSerializer serializer];
-    self.sessionManager.requestSerializer.timeoutInterval = config.requestTimeout;
-    [self.sessionManager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [self.sessionManager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+    self.assistantSessionManager = [[AFHTTPSessionManager alloc] initWithBaseURL:assistantURL];
+    [self configureSessionManager:self.sessionManager timeout:config.requestTimeout];
+    [self configureSessionManager:self.assistantSessionManager timeout:config.requestTimeout];
     self.configuredBaseURL = config.baseURL;
+    self.configuredAssistantBaseURL = assistantBaseURL;
+}
+
+- (void)configureSessionManager:(AFHTTPSessionManager *)manager timeout:(NSTimeInterval)timeout {
+    manager.requestSerializer = [AFJSONRequestSerializer serializer];
+    manager.responseSerializer = [AFJSONResponseSerializer serializer];
+    manager.requestSerializer.timeoutInterval = timeout;
+    [manager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [manager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Accept"];
 }
 
 @end
