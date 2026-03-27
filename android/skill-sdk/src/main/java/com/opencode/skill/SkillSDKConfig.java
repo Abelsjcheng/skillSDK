@@ -16,6 +16,8 @@ public class SkillSDKConfig {
 
     @NonNull
     private final String baseUrl;
+    @NonNull
+    private final String assistantBaseUrl;
     @Nullable
     private final String wsUrl;
     private final long connectTimeout;
@@ -33,6 +35,7 @@ public class SkillSDKConfig {
 
     private SkillSDKConfig(@NonNull Builder builder) {
         this.baseUrl = builder.baseUrl;
+        this.assistantBaseUrl = builder.assistantBaseUrl == null ? builder.baseUrl : builder.assistantBaseUrl;
         this.wsUrl = builder.wsUrl;
         this.connectTimeout = builder.connectTimeout;
         this.readTimeout = builder.readTimeout;
@@ -48,6 +51,11 @@ public class SkillSDKConfig {
     @NonNull
     public String getBaseUrl() {
         return baseUrl;
+    }
+
+    @NonNull
+    public String getAssistantBaseUrl() {
+        return assistantBaseUrl;
     }
 
     @Nullable
@@ -97,6 +105,8 @@ public class SkillSDKConfig {
     public static class Builder {
         private String baseUrl;
         @Nullable
+        private String assistantBaseUrl;
+        @Nullable
         private String wsUrl;
         private long connectTimeout = 30000L;
         private long readTimeout = 60000L;
@@ -118,6 +128,17 @@ public class SkillSDKConfig {
         @NonNull
         public Builder baseUrl(@NonNull String baseUrl) {
             this.baseUrl = baseUrl;
+            return this;
+        }
+
+        @NonNull
+        public Builder assistantBaseUrl(@Nullable String assistantBaseUrl) {
+            if (assistantBaseUrl == null) {
+                this.assistantBaseUrl = null;
+                return this;
+            }
+            String trimmed = assistantBaseUrl.trim();
+            this.assistantBaseUrl = trimmed.isEmpty() ? null : trimmed;
             return this;
         }
 
@@ -192,6 +213,9 @@ public class SkillSDKConfig {
         public SkillSDKConfig build() {
             if (baseUrl == null || baseUrl.trim().isEmpty()) {
                 throw new IllegalArgumentException("baseUrl is required");
+            }
+            if (assistantBaseUrl != null && assistantBaseUrl.trim().isEmpty()) {
+                throw new IllegalArgumentException("assistantBaseUrl cannot be empty");
             }
             if (wsUrl != null && !(wsUrl.startsWith("ws://") || wsUrl.startsWith("wss://"))) {
                 throw new IllegalArgumentException("wsUrl must start with ws:// or wss://");

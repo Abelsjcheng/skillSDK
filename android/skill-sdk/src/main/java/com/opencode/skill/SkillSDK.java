@@ -836,23 +836,19 @@ public final class SkillSDK {
             return;
         }
 
-        final List<String> partnerAccounts;
+        final String partnerAccount;
         try {
-            partnerAccounts = TypeConvertUtils.requireStringList(params.getPartnerAccounts(), "partnerAccounts");
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
         } catch (SkillSdkException e) {
             callback.onError(e);
             return;
         }
-        if (partnerAccounts.isEmpty()) {
-            callback.onError(error(1000, "partnerAccounts is required"));
-            return;
-        }
 
-        apiClient.getWeAgentDetails(partnerAccounts, new SkillCallback<WeAgentDetailsArrayResult>() {
+        apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
             @Override
             public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
                 WeAgentDetailsArrayResult resolved = result == null ? new WeAgentDetailsArrayResult() : result;
-                if (partnerAccounts.size() == 1 && !resolved.getWeAgentDetailsArray().isEmpty()) {
+                if (!resolved.getWeAgentDetailsArray().isEmpty()) {
                     weAgentStorage.saveCurrentWeAgentDetail(resolved.getWeAgentDetailsArray().get(0));
                 }
                 callback.onSuccess(resolved);

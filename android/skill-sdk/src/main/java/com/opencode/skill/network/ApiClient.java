@@ -58,11 +58,14 @@ public class ApiClient {
     private OkHttpClient okHttpClient;
     @Nullable
     private String baseUrl;
+    @Nullable
+    private String assistantBaseUrl;
     @NonNull
     private Map<String, String> defaultHeaders = Collections.emptyMap();
 
     public synchronized void configure(@NonNull SkillSDKConfig config) {
         this.baseUrl = trimTrailingSlash(config.getBaseUrl());
+        this.assistantBaseUrl = trimTrailingSlash(config.getAssistantBaseUrl());
         this.defaultHeaders = new HashMap<>(config.getDefaultHeaders());
         this.okHttpClient = new OkHttpClient.Builder()
                 .connectTimeout(config.getConnectTimeout(), TimeUnit.MILLISECONDS)
@@ -124,14 +127,14 @@ public class ApiClient {
             body.addProperty("bizRobotId", bizRobotId.trim());
         }
 
-        Request request = newRequestBuilder("/v4-1/we-crew/im-register")
+        Request request = newRequestBuilder("/v4-1/we-crew/im-register", true)
                 .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
                 .build();
         executeEnvelope(request, CreateDigitalTwinResult.class, callback);
     }
 
     public void getAgentType(@NonNull SkillCallback<AgentTypeListResult> callback) {
-        Request request = newRequestBuilder("/v4-1/we-crew/inner-assistant/list")
+        Request request = newRequestBuilder("/v4-1/we-crew/inner-assistant/list", true)
                 .get()
                 .build();
         Type type = TypeToken.getParameterized(List.class, AgentType.class).getType();
@@ -151,7 +154,7 @@ public class ApiClient {
     }
 
     public void getWeAgentList(int pageSize, int pageNumber, @NonNull SkillCallback<WeAgentListResult> callback) {
-        Request request = newRequestBuilder(urlBuilder("/v4-1/we-crew/list")
+        Request request = newRequestBuilder(urlBuilder("/v4-1/we-crew/list", true)
                         .addQueryParameter("pageSize", String.valueOf(pageSize))
                         .addQueryParameter("pageNumber", String.valueOf(pageNumber))
                         .build())
@@ -174,11 +177,10 @@ public class ApiClient {
     }
 
     public void getWeAgentDetails(
-            @NonNull List<String> partnerAccounts,
+            @NonNull String partnerAccount,
             @NonNull SkillCallback<WeAgentDetailsArrayResult> callback
     ) {
-        String joinedPartnerAccounts = String.join(",", partnerAccounts);
-        Request request = newRequestBuilder("/v1/robot-partners/" + joinedPartnerAccounts)
+        Request request = newRequestBuilder("/v1/robot-partners/" + partnerAccount, true)
                 .get()
                 .build();
         executeEnvelope(request, JsonElement.class, new SkillCallback<JsonElement>() {
@@ -328,9 +330,9 @@ public class ApiClient {
                 .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
                 .build();
 
-        executeRaw(request, new SkillCallback<JsonObject>() {
+        executeRaw(request, new SkillCallback<JsonElement>() {
             @Override
-            public void onSuccess(@Nullable JsonObject result) {
+            public void onSuccess(@Nullable JsonElement result) {
                 try {
                     callback.onSuccess(resolveSendMessageToIMResult(result));
                 } catch (SkillSdkException exception) {
@@ -346,24 +348,28 @@ public class ApiClient {
     }
 
     @NonNull
-    private SendMessageToIMResult resolveSendMessageToIMResult(@Nullable JsonObject result) {
-        if (result == null) {
+    private SendMessageToIMResult resolveSendMessageToIMResult(@Nullable JsonElement result) {
+        if (result == null || result.isJsonNull() || !result.isJsonObject()) {
             return new SendMessageToIMResult(false);
         }
-        if (!result.has("code")) {
-            return new SendMessageToIMResult(readBoolean(result, "success", false));
+
+        JsonObject rootObject = result.getAsJsonObject();
+        Boolean directSuccess = readOptionalBoolean(rootObject, "success");
+        if (directSuccess != null) {
+            return new SendMessageToIMResult(directSuccess);
         }
 
-        int code = result.get("code").getAsInt();
-        if (code != 0) {
-            throw new SkillSdkException(code, getString(result, "errormsg", "Server error"));
+        String directStatus = getString(rootObject, "status", "");
+        if (!directStatus.isEmpty()) {
+            return new SendMessageToIMResult("success".equalsIgnoreCase(directStatus));
         }
 
-        JsonObject dataObj = readObject(result, "data");
-        if (dataObj == null) {
-            return new SendMessageToIMResult(true);
+        JsonObject dataObj = readObject(rootObject, "data");
+        if (dataObj != null) {
+            return new SendMessageToIMResult(resolveSendToImDataSuccess(dataObj));
         }
-        return new SendMessageToIMResult(resolveSendToImDataSuccess(dataObj));
+
+        return new SendMessageToIMResult(false);
     }
 
     private static boolean resolveSendToImDataSuccess(@NonNull JsonObject dataObj) {
@@ -386,31 +392,27 @@ public class ApiClient {
     }
 
     private <T> void executeEnvelope(@NonNull Request request, @NonNull Type type, @NonNull SkillCallback<T> callback) {
-        executeRaw(request, new SkillCallback<JsonObject>() {
+        executeRaw(request, new SkillCallback<JsonElement>() {
             @Override
-            public void onSuccess(@Nullable JsonObject root) {
-                if (root == null) {
-                    callback.onError(new SkillSdkException(5000, "Empty response"));
-                    return;
-                }
-                if (!root.has("code")) {
-                    callback.onError(new SkillSdkException(7000, "Invalid server response"));
-                    return;
-                }
-
-                int code = root.get("code").getAsInt();
-                String errormsg = getString(root, "errormsg", "");
-                if (code != 0) {
-                    callback.onError(new SkillSdkException(code, errormsg.isEmpty() ? "Server error" : errormsg));
-                    return;
-                }
-
-                JsonElement data = root.get("data");
-                if (data == null || data.isJsonNull()) {
+            public void onSuccess(@Nullable JsonElement root) {
+                if (root == null || root.isJsonNull()) {
                     callback.onSuccess(null);
                     return;
                 }
-                callback.onSuccess(gson.fromJson(data, type));
+
+                JsonElement payload = root;
+                if (root.isJsonObject()) {
+                    JsonObject rootObject = root.getAsJsonObject();
+                    if (rootObject.has("data")) {
+                        payload = rootObject.get("data");
+                    }
+                }
+
+                if (payload == null || payload.isJsonNull()) {
+                    callback.onSuccess(null);
+                    return;
+                }
+                callback.onSuccess(gson.fromJson(payload, type));
             }
 
             @Override
@@ -420,7 +422,7 @@ public class ApiClient {
         });
     }
 
-    private void executeRaw(@NonNull Request request, @NonNull SkillCallback<JsonObject> callback) {
+    private void executeRaw(@NonNull Request request, @NonNull SkillCallback<JsonElement> callback) {
         OkHttpClient client = requireClient();
         client.newCall(request).enqueue(new okhttp3.Callback() {
             @Override
@@ -445,11 +447,7 @@ public class ApiClient {
                         return;
                     }
                     JsonElement root = JsonParser.parseString(responseBody);
-                    if (!root.isJsonObject()) {
-                        callback.onError(new SkillSdkException(7000, "Unexpected response JSON type"));
-                        return;
-                    }
-                    callback.onSuccess(root.getAsJsonObject());
+                    callback.onSuccess(root);
                 } catch (Exception e) {
                     callback.onError(new SkillSdkException(5000, "Parse response failed: " + e.getMessage(), e));
                 } finally {
@@ -465,6 +463,11 @@ public class ApiClient {
     }
 
     @NonNull
+    private Request.Builder newRequestBuilder(@NonNull String path, boolean useAssistantBaseUrl) {
+        return newRequestBuilder(urlBuilder(path, useAssistantBaseUrl).build());
+    }
+
+    @NonNull
     private Request.Builder newRequestBuilder(@NonNull HttpUrl url) {
         Request.Builder builder = new Request.Builder().url(url);
         for (Map.Entry<String, String> entry : defaultHeaders.entrySet()) {
@@ -476,6 +479,19 @@ public class ApiClient {
     @NonNull
     private HttpUrl.Builder urlBuilder(@NonNull String path) {
         String base = requireBaseUrl();
+        HttpUrl parsed = HttpUrl.parse(base + path);
+        if (parsed == null) {
+            throw new IllegalStateException("Invalid URL: " + base + path);
+        }
+        return parsed.newBuilder();
+    }
+
+    @NonNull
+    private HttpUrl.Builder urlBuilder(@NonNull String path, boolean useAssistantBaseUrl) {
+        if (!useAssistantBaseUrl) {
+            return urlBuilder(path);
+        }
+        String base = requireAssistantBaseUrl();
         HttpUrl parsed = HttpUrl.parse(base + path);
         if (parsed == null) {
             throw new IllegalStateException("Invalid URL: " + base + path);
@@ -500,6 +516,14 @@ public class ApiClient {
     }
 
     @NonNull
+    private synchronized String requireAssistantBaseUrl() {
+        if (assistantBaseUrl == null || assistantBaseUrl.isEmpty()) {
+            return requireBaseUrl();
+        }
+        return assistantBaseUrl;
+    }
+
+    @NonNull
     private static String trimTrailingSlash(@NonNull String value) {
         if (value.endsWith("/")) {
             return value.substring(0, value.length() - 1);
@@ -517,11 +541,6 @@ public class ApiClient {
             return null;
         }
         return value.getAsJsonObject();
-    }
-
-    private static boolean readBoolean(@NonNull JsonObject object, @NonNull String key, boolean fallback) {
-        Boolean value = readOptionalBoolean(object, key);
-        return value != null ? value : fallback;
     }
 
     @Nullable
