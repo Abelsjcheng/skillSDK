@@ -668,10 +668,12 @@ export class SkillSDK {
       const partnerAccount = details.partnerAccount ?? '';
       const weCodeUrl = details.weCodeUrl ?? '';
       const bizRobotId = details.bizRobotId ?? '';
+      const robotId = details.robotId ?? '';
 
       let weAgentUri = '';
       if (bizRobotId.trim() !== '') {
-        weAgentUri = this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent');
+        const internalWeAgentUri = this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent');
+        weAgentUri = this.appendQueryParam(internalWeAgentUri, 'robotId', robotId);
       } else {
         const externalWeAgentUri = this.appendQueryParam(
           this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'wecodePlace', 'weAgent'),
@@ -844,6 +846,7 @@ export class SkillSDK {
       ownerNameEn: TypeConverter.toOptionalString(payload.ownerNameEn, 'ownerNameEn') ?? '',
       ownerDeptName: TypeConverter.toOptionalString(payload.ownerDeptName, 'ownerDeptName') ?? '',
       ownerDeptNameEn: TypeConverter.toOptionalString(payload.ownerDeptNameEn, 'ownerDeptNameEn') ?? '',
+      robotId: TypeConverter.toOptionalString(payload.robotId, 'robotId') ?? '',
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };

@@ -462,6 +462,7 @@ export interface WeAgentDetails {
   ownerNameEn: string;
   ownerDeptName: string;
   ownerDeptNameEn: string;
+  robotId: string;
   bizRobotId: string;
   weCodeUrl: string;
 }
