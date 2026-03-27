@@ -1,27 +1,22 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
-import androidx.annotation.Nullable;
 
 @Keep
 public class PageParams {
-    @Nullable
-    private final Object pageSize;
-    @Nullable
-    private final Object pageNumber;
+    private final int pageSize;
+    private final int pageNumber;
 
-    public PageParams(@Nullable Object pageSize, @Nullable Object pageNumber) {
+    public PageParams(int pageSize, int pageNumber) {
         this.pageSize = pageSize;
         this.pageNumber = pageNumber;
     }
 
-    @Nullable
-    public Object getPageSize() {
+    public int getPageSize() {
         return pageSize;
     }
 
-    @Nullable
-    public Object getPageNumber() {
+    public int getPageNumber() {
         return pageNumber;
     }
 }

@@ -1,66 +1,67 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import java.util.Objects;
 
 @Keep
 public class CreateDigitalTwinParams {
+    @NonNull
+    private final String name;
+    @NonNull
+    private final String icon;
+    @NonNull
+    private final String description;
+    private final int weCrewType;
     @Nullable
-    private final Object name;
-    @Nullable
-    private final Object icon;
-    @Nullable
-    private final Object description;
-    @Nullable
-    private final Object weCrewType;
-    @Nullable
-    private final Object bizRobotId;
+    private final String bizRobotId;
 
     public CreateDigitalTwinParams(
-            @Nullable Object name,
-            @Nullable Object icon,
-            @Nullable Object description,
-            @Nullable Object weCrewType
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description,
+            int weCrewType
     ) {
         this(name, icon, description, weCrewType, null);
     }
 
     public CreateDigitalTwinParams(
-            @Nullable Object name,
-            @Nullable Object icon,
-            @Nullable Object description,
-            @Nullable Object weCrewType,
-            @Nullable Object bizRobotId
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description,
+            int weCrewType,
+            @Nullable String bizRobotId
     ) {
-        this.name = name;
-        this.icon = icon;
-        this.description = description;
+        this.name = Objects.requireNonNull(name, "name == null");
+        this.icon = Objects.requireNonNull(icon, "icon == null");
+        this.description = Objects.requireNonNull(description, "description == null");
         this.weCrewType = weCrewType;
         this.bizRobotId = bizRobotId;
     }
 
-    @Nullable
-    public Object getName() {
+    @NonNull
+    public String getName() {
         return name;
     }
 
-    @Nullable
-    public Object getIcon() {
+    @NonNull
+    public String getIcon() {
         return icon;
     }
 
-    @Nullable
-    public Object getDescription() {
+    @NonNull
+    public String getDescription() {
         return description;
     }
 
-    @Nullable
-    public Object getWeCrewType() {
+    public int getWeCrewType() {
         return weCrewType;
     }
 
     @Nullable
-    public Object getBizRobotId() {
+    public String getBizRobotId() {
         return bizRobotId;
     }
 }
