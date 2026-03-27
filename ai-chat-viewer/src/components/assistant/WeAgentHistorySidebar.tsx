@@ -12,6 +12,8 @@ interface HistorySessionGroup {
 
 interface WeAgentHistorySidebarProps {
   assistantAccount?: string;
+  currentWelinkSessionId?: string;
+  onSessionSelect?: (welinkSessionId: string) => void;
 }
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
@@ -72,11 +74,14 @@ function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessi
     .filter((group) => group.sessions.length > 0);
 }
 
-const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({ assistantAccount = '' }) => {
+const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
+  assistantAccount = '',
+  currentWelinkSessionId = '',
+  onSessionSelect,
+}) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
-  const [selectedHistorySessionId, setSelectedHistorySessionId] = useState('');
 
   const groupedHistorySessions = useMemo(
     () => groupHistorySessionsByUpdatedAt(historySessions),
@@ -87,7 +92,6 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({ assistant
     setIsVisible(false);
     setIsLoading(false);
     setHistorySessions([]);
-    setSelectedHistorySessionId('');
   }, [assistantAccount]);
 
   const handleOpen = useCallback(async () => {
@@ -115,9 +119,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({ assistant
   }, []);
 
   const handleSessionClick = useCallback((sessionId: string) => {
-    setSelectedHistorySessionId(sessionId);
-    // WeAgentCUI 保留扩展点：点击历史会话切换
-  }, []);
+    onSessionSelect?.(sessionId);
+    setIsVisible(false);
+  }, [onSessionSelect]);
 
   return (
     <>
@@ -158,7 +162,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({ assistant
                   {group.sessions.map((session) => {
                     const sessionId = session.welinkSessionId;
                     const sessionTitle = session.title?.trim() || '未命名会话';
-                    const isSelected = selectedHistorySessionId === sessionId;
+                    const isSelected = currentWelinkSessionId === sessionId;
 
                     return (
                       <button

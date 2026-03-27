@@ -637,6 +637,24 @@ function App({
     }
   }, [resolveAssistantDetail, createSessionForAssistant]);
 
+  const handleSwitchWeAgentSession = useCallback((nextWelinkSessionId: string) => {
+    const normalizedSessionId = nextWelinkSessionId.trim();
+    if (!normalizedSessionId || normalizedSessionId === welinkSessionId) {
+      return;
+    }
+
+    finalizeStreamingMessage();
+    shouldResetFooterOnCompletionRef.current = false;
+    suppressFooterAutoResetRef.current = false;
+    latestUserContentRef.current = '';
+
+    setFooterMode('generate');
+    setSessionStatus('idle');
+    setMessages([]);
+    setIsLoading(true);
+    setWelinkSessionId(normalizedSessionId);
+  }, [finalizeStreamingMessage, welinkSessionId]);
+
   return (
     <div
       className={[
@@ -680,7 +698,11 @@ function App({
               alt=""
             />
           </button>
-          <WeAgentHistorySidebar assistantAccount={assistantAccount} />
+          <WeAgentHistorySidebar
+            assistantAccount={assistantAccount}
+            currentWelinkSessionId={welinkSessionId ?? ''}
+            onSessionSelect={handleSwitchWeAgentSession}
+          />
         </div>
       )}
       <div className="footer-wrapper">

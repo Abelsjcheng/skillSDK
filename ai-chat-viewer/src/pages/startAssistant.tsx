@@ -18,6 +18,14 @@ const DEFAULT_LIST_QUERY = {
   pageSize: 20,
   pageNumber: 1,
 };
+const CREATE_ASSISTANT_ROUTE = '/createAssistant';
+
+function buildCreateAssistantSearch(): string {
+  const params = new URLSearchParams();
+  params.set('from', 'weAgent');
+  params.set('_ts', String(Date.now()));
+  return `?${params.toString()}`;
+}
 
 function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
   return list.map((assistant) => ({
@@ -57,7 +65,20 @@ const StartAssistant: React.FC = () => {
   }, [loadAssistantList]);
 
   const handleCreateAssistant = useCallback(() => {
-    navigate('/createAssistant?from=weAgent');
+    const search = buildCreateAssistantSearch();
+    const targetHash = `#${CREATE_ASSISTANT_ROUTE}${search}`;
+
+    navigate({
+      pathname: CREATE_ASSISTANT_ROUTE,
+      search,
+    });
+
+    window.setTimeout(() => {
+      if (window.location.hash !== targetHash) {
+        window.location.hash = targetHash;
+      }
+      window.location.reload();
+    }, 0);
   }, [navigate]);
 
   const handleEnableNow = useCallback(async () => {
