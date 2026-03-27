@@ -999,6 +999,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | ownerDeptName | string | 责任部门中文名 |
 | ownerDeptNameEn | string | 责任部门英文名 |
 | bizRobotId | string | 助理对应业务机器人 ID |
+| robotId | string | 助理对应机器人 ID（当 `bizRobotId` 不为空时用于拼接 `weAgentUri` 的 `robotId` query） |
 | weCodeUrl | string | 助理 We 码地址 |
 
 ### 行为说明
@@ -1233,7 +1234,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| weAgentUri | string | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成） |
+| weAgentUri | string | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成；当助理详情 `bizRobotId` 不为空且存在 `robotId` 时，追加 `robotId` query） |
 | assistantDetailUri | string | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
 | switchAssistantUri | string | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 
@@ -1273,7 +1274,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| weAgentUri | string | 是 | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成） |
+| weAgentUri | string | 是 | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成；当助理详情 `bizRobotId` 不为空且存在 `robotId` 时，追加 `robotId` query） |
 | assistantDetailUri | string | 是 | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
 | switchAssistantUri | string | 是 | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 

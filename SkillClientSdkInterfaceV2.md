@@ -286,6 +286,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "ownerNameEn": "",
       "ownerDeptName": "",
       "ownerDeptNameEn": "",
+      "robotId": "78985451212",
       "bizRobotId": "",
       "weCodeUrl": "https://xxx"
     }
@@ -327,27 +328,29 @@ getWeAgentUri(): WeAgentUriResult
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `weAgentUri` | `string` | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成） |
-| `assistantDetailUri` | `string` | 助理详情地址（`h5://123456/html/index.html` 并追加 `partnerAccount` query） |
-| `switchAssistantUri` | `string` | 切换助理地址（`h5://123456/html/index.html` 并追加 `partnerAccount` query） |
+| `weAgentUri` | `string` | 当前助理 CUI 地址：若可读取到持久化助理详情且 `bizRobotId` 有值，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `robotId={robotId}`；若读取不到持久化助理详情，则返回 `h5://S008623/index.html` 并追加 query `wecodePlace=weAgent` 与 hash `activateAssistant` |
+| `assistantDetailUri` | `string` | 助理详情地址：`h5://S008623/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`；若读取不到持久化助理详情则返回空字符串 |
+| `switchAssistantUri` | `string` | 切换助理地址：`h5://S008623/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`；若读取不到持久化助理详情则返回空字符串 |
 
 ### 出参示例
 
 ```json
 {
-  "weAgentUri": "h5://123456/html/index.html?wecodePlace=weAgent",
-  "assistantDetailUri": "h5://123456/html/index.html?partnerAccount=x00_1",
-  "switchAssistantUri": "h5://123456/html/index.html?partnerAccount=x00_1"
+  "weAgentUri": "h5://S008623/index.html?wecodePlace=weAgent#activateAssistant",
+  "assistantDetailUri": "h5://S008623/index.html?partnerAccount=x00_1#assistantDetail",
+  "switchAssistantUri": "h5://S008623/index.html?partnerAccount=x00_1#switchAssistant"
 }
 ```
 
 ### 实现方法
 
 1. 从 SP 持久化存储中读取当前助理详情（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`）。
-2. 读取助理详情中的 `weCodeUrl` 与 `partnerAccount`。
-3. 组装 `weAgentUri`：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent`（若原地址已有 query，则使用 `&` 拼接）。
-4. 组装 `assistantDetailUri`：`h5://123456/html/index.html` + query 参数 `partnerAccount={partnerAccount}`。
-5. 组装 `switchAssistantUri`：`h5://123456/html/index.html` + query 参数 `partnerAccount={partnerAccount}`。
+2. 若读取不到持久化助理详情，`weAgentUri` 固定返回：`h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`，`assistantDetailUri` 与 `switchAssistantUri` 返回空字符串。
+3. 若读取到持久化助理详情，读取其中的 `weCodeUrl`、`partnerAccount`、`bizRobotId`、`robotId`，并按原规则组装 `weAgentUri`：
+   - 若 `bizRobotId` 有值：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={robotId}`；
+   - 若 `bizRobotId` 为空：使用 `h5://S008623/index.html`，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`，并追加 hash `weAgentCUI`。
+4. 组装 `assistantDetailUri`：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`。
+5. 组装 `switchAssistantUri`：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
 6. 返回 `WeAgentUriResult`。
 
 ---
@@ -452,6 +455,7 @@ type WeAgentDetails = {
   ownerNameEn: string
   ownerDeptName: string
   ownerDeptNameEn: string
+  robotId: string
   bizRobotId: string
   weCodeUrl: string
 }

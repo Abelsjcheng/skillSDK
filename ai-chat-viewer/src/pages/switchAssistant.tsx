@@ -9,6 +9,7 @@ import {
   getWeAgentList,
   isPcMiniApp,
   openWeAgentCUI,
+  resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
@@ -73,6 +74,9 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     if (!selectedPartnerAccount) return;
 
     try {
+      const selectedAssistant = assistantList.find(
+        (assistant) => assistant.partnerAccount === selectedPartnerAccount,
+      );
       const detailResult = await getWeAgentDetails({ partnerAccount: selectedPartnerAccount });
       const detail = detailResult?.WeAgentDetailsArray?.[0];
       if (!detail) {
@@ -80,13 +84,20 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
         return;
       }
       const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, selectedPartnerAccount);
-      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedPartnerAccount);
+      const robotId = resolveRobotIdForOpenWeAgentCUI({
+        detailRobotId: detail.robotId,
+        listRobotId: selectedAssistant?.robotId,
+      });
+      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedPartnerAccount, {
+        bizRobotId: detail.bizRobotId,
+        robotId,
+      });
       await openWeAgentCUI(params);
       window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in SwitchAssistant:', error);
     }
-  }, [isPc, selectedPartnerAccount]);
+  }, [assistantList, selectedPartnerAccount]);
 
   const handleLeftButtonClick = useCallback(() => {
     if (isPc) {

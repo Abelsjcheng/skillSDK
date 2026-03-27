@@ -1,13 +1,17 @@
 import React, { KeyboardEvent, useState } from 'react';
 import iconWeAgentSend from '../../imgs/icon-we-agent-send.svg';
+import iconWeAgentStop from '../../imgs/icon-we-agent-stop.svg';
 import '../../styles/WeAgentCUIFooter.less';
 
 interface WeAgentCUIFooterProps {
+  mode: 'generate' | 'generating' | 'regenerate';
   onSend: (message: string) => void;
+  onStop: () => void;
 }
 
-const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({ onSend }) => {
+const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({ mode, onSend, onStop }) => {
   const [value, setValue] = useState('');
+  const isGenerating = mode === 'generating';
 
   const handleSend = () => {
     const trimmedValue = value.trim();
@@ -19,6 +23,10 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({ onSend }) => {
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (isGenerating) {
+      return;
+    }
+
     if (event.key !== 'Enter' || event.shiftKey) {
       return;
     }
@@ -38,14 +46,17 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({ onSend }) => {
       />
       <button
         type="button"
-        className="we-agent-cui-footer__send-btn"
-        onClick={handleSend}
-        disabled={!value.trim()}
-        aria-label="发送"
+        className={[
+          'we-agent-cui-footer__send-btn',
+          isGenerating ? 'we-agent-cui-footer__stop-btn' : '',
+        ].filter(Boolean).join(' ')}
+        onClick={isGenerating ? onStop : handleSend}
+        disabled={isGenerating ? false : !value.trim()}
+        aria-label={isGenerating ? '停止' : '发送'}
       >
         <img
           className="we-agent-cui-footer__send-icon"
-          src={iconWeAgentSend}
+          src={isGenerating ? iconWeAgentStop : iconWeAgentSend}
           alt=""
         />
       </button>

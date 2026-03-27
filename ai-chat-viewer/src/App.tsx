@@ -542,7 +542,7 @@ function App({
     try {
       await stopSkill({ welinkSessionId });
       shouldResetFooterOnCompletionRef.current = false;
-      setFooterMode('regenerate');
+      setFooterMode(isWeAgentCUI ? 'generate' : 'regenerate');
       setSessionStatus('idle');
       finalizeStreamingMessage();
     } catch (err) {
@@ -550,7 +550,7 @@ function App({
       console.error('Failed to stop skill:', err);
       setFooterMode('generating');
     }
-  }, [welinkSessionId, finalizeStreamingMessage]);
+  }, [welinkSessionId, finalizeStreamingMessage, isWeAgentCUI]);
 
   const handleRegenerate = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -707,7 +707,11 @@ function App({
       )}
       <div className="footer-wrapper">
         {isWeAgentCUI ? (
-          <WeAgentCUIFooter onSend={handleGenerate} />
+          <WeAgentCUIFooter
+            mode={footerMode}
+            onSend={handleGenerate}
+            onStop={handleStop}
+          />
         ) : (
           <Footer
             mode={footerMode}

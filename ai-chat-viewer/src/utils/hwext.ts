@@ -149,6 +149,7 @@ export interface WeAgentDetails {
   ownerDeptName: string;
   ownerDeptNameEn: string;
   bizRobotId: string;
+  robotId?: string;
   bizRobotName?: string;
   bizRobotNameEn?: string;
   weCodeUrl: string;
@@ -177,6 +178,17 @@ export interface OpenWeAgentCUIParams {
   weAgentUri: string;
   assistantDetailUri: string;
   switchAssistantUri: string;
+}
+
+export interface BuildOpenWeAgentCUIOptions {
+  bizRobotId?: string;
+  robotId?: string;
+}
+
+export interface ResolveRobotIdOptions {
+  detailRobotId?: string;
+  listRobotId?: string;
+  createRobotId?: string;
 }
 
 export interface OpenWeAgentCUIResult {
@@ -394,6 +406,10 @@ export function appendQueryParam(uri: string, key: string, value: string): strin
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
+function normalizeString(value?: string): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function buildAssistantPageUri(partnerAccount: string, hash: 'assistantDetail' | 'switchAssistant'): string {
   const parsed = parseUrl(ASSISTANT_PAGE_BASE_URI);
   if (!parsed) return ASSISTANT_PAGE_BASE_URI;
@@ -420,10 +436,28 @@ export function resolveWeCodeUrlForOpenWeAgentCUI(
   return buildExternalWeAgentCUIUri(partnerAccount?.trim() ?? '');
 }
 
-export function buildOpenWeAgentCUIParams(weCodeUrl: string, partnerAccount: string): OpenWeAgentCUIParams {
+export function resolveRobotIdForOpenWeAgentCUI(options: ResolveRobotIdOptions): string {
+  return normalizeString(options.detailRobotId)
+    || normalizeString(options.listRobotId)
+    || normalizeString(options.createRobotId);
+}
+
+export function buildOpenWeAgentCUIParams(
+  weCodeUrl: string,
+  partnerAccount: string,
+  options?: BuildOpenWeAgentCUIOptions,
+): OpenWeAgentCUIParams {
   const normalizedPartnerAccount = partnerAccount?.trim() ?? '';
+  const normalizedBizRobotId = normalizeString(options?.bizRobotId);
+  const normalizedRobotId = normalizeString(options?.robotId);
+  let weAgentUri = appendQueryParam(weCodeUrl || WE_AGENT_BASE_URI, 'wecodePlace', 'weAgent');
+
+  if (normalizedBizRobotId && normalizedRobotId) {
+    weAgentUri = appendQueryParam(weAgentUri, 'robotId', normalizedRobotId);
+  }
+
   return {
-    weAgentUri: appendQueryParam(weCodeUrl || WE_AGENT_BASE_URI, 'wecodePlace', 'weAgent'),
+    weAgentUri,
     assistantDetailUri: buildAssistantPageUri(normalizedPartnerAccount, 'assistantDetail'),
     switchAssistantUri: buildAssistantPageUri(normalizedPartnerAccount, 'switchAssistant'),
   };

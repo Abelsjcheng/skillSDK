@@ -605,6 +605,25 @@
    - 点击会话项后显示选中样式：圆角 `12px`，背景 `rgba(216,226,255,1)`；
    - 选中文本样式：`16px / 500 / 24px`，颜色 `rgba(59,112,255,1)`；
    - 点击会话项后的会话切换事件当前为空实现（预留后续逻辑）。
+14. 组件化约束：
+   - `WeAgentCUI` 历史会话侧边栏需拆分为 `src/components/assistant` 下的独立组件；
+   - 侧边栏相关逻辑（显隐状态、加载状态、历史列表请求、按 `updatedAt` 分组、会话项选中态）需内聚在该组件内部；
+   - `App.tsx` 仅负责在按钮区使用该组件，不再保留侧边栏内部状态与渲染细节。
+15. 底部操作区组件拆分：
+   - `WeAgentCUI` 页面底部操作区需与旧 `aiChat` 页面底部操作区拆分为不同组件；
+   - `WeAgentCUI` 底部操作区仅保留输入框与纸飞机发送按钮；
+   - 纸飞机发送按钮点击行为需与旧 `aiChat` 页“生成”按钮行为一致（输入非空时发送并清空输入框）；
+   - 发送图标需从 `src/imgs` 中导入使用。
+16. 底部发送/停止按钮切换：
+   - `WeAgentCUI` 底部操作区发送按钮点击后，按钮状态需切换为“停止按钮”，逻辑与旧 `aiChat` 页发送后进入 `generating` 态保持一致；
+   - 点击“停止按钮”并调用 `stopSkill` 成功后，按钮需恢复为“发送按钮”；
+   - 停止按钮样式：`32px x 32px`，圆角 `20px`，背景 `rgba(10,89,247,0.05)`，`padding: 6px`；
+   - 停止按钮内图标尺寸：`20px x 20px`；
+   - 停止图标资源需放在 `src/imgs` 并通过 `import` 导入使用。
+17. 历史会话高亮与会话切换联动：
+   - 侧边栏打开后需根据当前对话页的 `welinkSessionId` 高亮对应会话项（列表由 `assistantAccount` 过滤后展示）；
+   - 点击其他会话项后，需将该项 `welinkSessionId` 同步到对话页主状态；
+   - 同步后对话页需按新会话重新加载消息并刷新会话状态（含加载态、消息列表、监听器绑定）。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
 
@@ -628,6 +647,8 @@
 3. 启动助理页面（`/startAssistant`）：
    - 页面初始化调用 `getWeAgentList`，并将返回的 `content` 助理信息填充到列表项；
    - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
+   - 路由渲染约束：`AppRouter` 需使用 `useLocation` 获取当前路由，并通过 `<Routes location={location} key={pathname+search+hash}>` 驱动页面渲染，保证 HashRouter 下 hash/query 变化后组件正确重渲染；
+   - 点击“创建助理”仅通过 `react-router` 导航处理，不再依赖手动改 `window.location.hash` 与 `window.location.reload()` 强刷页面；
    - 选中某个助理后点击“立即启用”：
       - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
@@ -685,6 +706,24 @@
    - 点击“历史会话”图标时调用 `getHistorySessionsList`；
    - 查询参数使用页面入口解析得到的 `assistantAccount`；
    - 接口返回列表按 `updatedAt` 分组展示为 `今天`、`昨天`、`7天前`。
+   - 侧边栏选中态需与对话页当前 `welinkSessionId` 保持一致；
+   - 点击会话项后需回传 `welinkSessionId` 到对话页并触发会话切换刷新逻辑。
+11. `WeAgentCUI` 会话初始化与新建逻辑：
+   - 页面进入后，基于 query 解析得到的 `assistantAccount` 调用 `getWeAgentDetails` 获取当前助理详情；
+   - 再调用 `getHistorySessionsList({ assistantAccount, status: 'ACTIVE' })` 查询当前助理活跃会话：
+      - 若存在会话：按 `updatedAt` 取最新会话；
+      - 若不存在会话：调用 `createNewSession` 创建会话，入参固定为：
+         - `bussinessDomain: 'miniapp'`
+         - `bussinessType: 'direct'`
+         - `assistantAccount`
+         - `ak: 助理详情.appKey`
+         - `bussinessId: window.HWH5.getAccountInfo()` 返回的 `uid` 字符串
+   - 将选中/新建会话的 `welinkSessionId` 作为后续 AI 对话与历史消息展示的会话 ID；
+   - 点击“新建会话”图标按钮时，按同样参数调用 `createNewSession`，并用新会话 `welinkSessionId` 更新当前对话会话上下文。
+12. 助理头像地址兼容规则（助理详情/切换助理/启用助理）：
+   - 在 `ai-chat-viewer/src/constants.ts` 中维护 `HOST` 常量；
+   - 当接口返回的助理 `icon` 以 `/` 开头时，渲染头像前需拼接 `HOST`；
+   - 当 `icon` 为绝对地址（如 `http://`、`https://`）时保持原值不变。
 
 ## 19. 宿主事件桥与库打包约束
 
@@ -719,6 +758,34 @@
 4. `appendQueryParam` 需使用 `URL.searchParams` 进行 query 设值，保证编码与覆盖行为一致。
 5. `openH5Webview` 在无宿主 `openWebview` 能力时的 fallback 跳转逻辑，需基于 `URL` 对象解析目标 URI，并正确保留 hash 路由与 query 信息。
 6. `parseWelinkSessionId` 读取 `welinkSessionId` 时，需复用统一 query 解析能力，兼容 search/hash 两种位置。
+
+## 21. JSAPI Mock 示例（WeAgentCUI 可对话）
+
+1. 目标：
+   - 基于 `小程序JSAPI接口文档.md`、`SkillClientSdkInterfaceV1.md`、`SkillClientSdkInterfaceV2.md`，提供一套浏览器本地可运行的 JSAPI Mock；
+   - 在无真实 SDK（`window.HWH5EXT` / `window.Pedestal`）时，`weAgentCUI` 页面可完成“会话初始化 -> 发消息 -> 渲染 AI 回复 -> 拉取历史会话”的完整链路。
+2. 启用策略：
+   - 仅在本地调试环境启用（`localhost/127.0.0.1`）或 URL 明确携带 `mockJsApi=1` 时启用；
+   - 启用前仍需满足“非 PC 宿主 + 无真实 `window.HWH5EXT`”条件；
+   - 若已存在真实 SDK，mock 不覆盖真实实现。
+   - mock 初始化失败时仅打印错误日志，不阻断页面渲染（避免首屏白屏）。
+3. mock 覆盖接口（最小闭环）：
+   - V1 对话链路：`createNewSession`、`getHistorySessionsList`、`getSessionMessage`、`registerSessionListener`、`unregisterSessionListener`、`sendMessage`、`regenerateAnswer`、`stopSkill`、`sendMessageToIM`；
+   - V2 助理链路：`getWeAgentList`、`getWeAgentDetails`、`getAgentType`、`createDigitalTwin`、`getWeAgentUri`、`openWeAgentCUI`。
+4. 对话行为要求：
+   - `sendMessage` 返回用户消息对象，并异步通过 `registerSessionListener` 回调 `text.delta` / `text.done` / `session.status`；
+   - `getSessionMessage` 返回当前会话消息列表，确保页面刷新后可回显历史；
+   - `getHistorySessionsList` 返回当前助理维度的会话列表，支持侧边栏分组展示；
+   - `createNewSession` 可创建新会话并生成 `welinkSessionId`。
+5. 默认 mock 数据要求：
+   - 至少包含 1 个助理（`partnerAccount`、`name`、`icon`、`appKey`、`weCodeUrl`）；
+   - 助理详情字段需满足 `WeAgentCUI`、助理详情页、切换页渲染所需；
+   - 默认返回“可对话”会话状态（如 `ACTIVE` / `IDLE`）。
+6. 验收标准：
+   - 本地运行 `ai-chat-viewer` 后进入 `#/weAgentCUI?assistantAccount=<mock_account>`，可发送文本并看到 AI 回复内容渲染；
+   - 点击“新建会话”后能创建并切换到新会话；
+   - 打开“历史会话”侧边栏可看到 mock 会话列表；
+   - 不影响真实 SDK 场景下的接口调用行为。
 
 
 

@@ -10,6 +10,7 @@ import {
   getWeAgentList,
   isPcMiniApp,
   openWeAgentCUI,
+  resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
@@ -85,6 +86,9 @@ const StartAssistant: React.FC = () => {
     if (!selectedAssistantId) return;
 
     try {
+      const selectedAssistant = assistantList.find(
+        (assistant) => assistant.partnerAccount === selectedAssistantId,
+      );
       const detailResult = await getWeAgentDetails({ partnerAccount: selectedAssistantId });
       const detail = detailResult?.WeAgentDetailsArray?.[0];
       if (!detail) {
@@ -92,13 +96,20 @@ const StartAssistant: React.FC = () => {
         return;
       }
       const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, selectedAssistantId);
-      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedAssistantId);
+      const robotId = resolveRobotIdForOpenWeAgentCUI({
+        detailRobotId: detail.robotId,
+        listRobotId: selectedAssistant?.robotId,
+      });
+      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedAssistantId, {
+        bizRobotId: detail.bizRobotId,
+        robotId,
+      });
       await openWeAgentCUI(params);
       window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in StartAssistant:', error);
     }
-  }, [isPc, selectedAssistantId]);
+  }, [assistantList, selectedAssistantId]);
 
   const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
     if (event.key !== 'Enter' && event.key !== ' ') {
