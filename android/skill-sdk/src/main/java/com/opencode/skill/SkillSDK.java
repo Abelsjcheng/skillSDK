@@ -71,7 +71,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class SkillSDK {
     private static volatile SkillSDK instance;
-    private static final String ASSISTANT_H5_URI = "h5://123456/html/index.html";
+    private static final String ASSISTANT_H5_URI = "h5://S008623/index.html";
 
     @NonNull
     private final ApiClient apiClient = new ApiClient();
@@ -868,10 +868,22 @@ public final class SkillSDK {
         WeAgentDetails details = weAgentStorage.getCurrentWeAgentDetail();
         String weCodeUrl = details == null ? null : normalizeOptionalString(details.getWeCodeUrl());
         String partnerAccount = details == null ? null : normalizeOptionalString(details.getPartnerAccount());
+        String bizRobotId = details == null ? null : normalizeOptionalString(details.getBizRobotId());
 
-        String weAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+        String weAgentUri;
+        if (!isBlank(bizRobotId)) {
+            weAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+        } else {
+            String externalWeAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
+            externalWeAgentUri = appendQueryParameter(externalWeAgentUri, "assistantAccount", partnerAccount);
+            weAgentUri = appendHashFragment(externalWeAgentUri, "weAgentCUI");
+        }
+
         String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
+        assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
+
         String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
+        switchAssistantUri = appendHashFragment(switchAssistantUri, "switchAssistant");
 
         return new WeAgentUriResult(
                 weAgentUri == null ? "" : weAgentUri,
@@ -1118,6 +1130,20 @@ public final class SkillSDK {
             connector = "?";
         }
         return trimmedBase + connector + key + "=" + encoded;
+    }
+
+    @Nullable
+    private static String appendHashFragment(@Nullable String baseUrl, @NonNull String hash) {
+        if (baseUrl == null) {
+            return null;
+        }
+        String trimmedBase = baseUrl.trim();
+        if (trimmedBase.isEmpty()) {
+            return null;
+        }
+        int hashIndex = trimmedBase.indexOf('#');
+        String baseWithoutHash = hashIndex >= 0 ? trimmedBase.substring(0, hashIndex) : trimmedBase;
+        return baseWithoutHash + "#" + hash;
     }
 
     private static boolean isBlank(@Nullable String value) {
