@@ -62,7 +62,7 @@ const StartAssistant: React.FC = () => {
     if (!selectedAssistantId) return;
 
     try {
-      const detailResult = await getWeAgentDetails({ partnerAccounts: [selectedAssistantId] });
+      const detailResult = await getWeAgentDetails({ partnerAccount: selectedAssistantId });
       const detail = detailResult?.WeAgentDetailsArray?.[0];
       if (!detail) {
         console.warn('No we-agent detail found for partnerAccount:', selectedAssistantId);

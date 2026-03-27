@@ -86,7 +86,7 @@ const PersonalAssistantCreator: React.FC = () => {
         return;
       }
 
-      const detailResult = await getWeAgentDetails({ partnerAccounts: [partnerAccount] });
+      const detailResult = await getWeAgentDetails({ partnerAccount });
       const detail = detailResult?.WeAgentDetailsArray?.[0];
       if (!detail) {
         console.warn('getWeAgentDetails did not return detail for partnerAccount:', partnerAccount);

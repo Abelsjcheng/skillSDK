@@ -74,7 +74,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     if (!selectedPartnerAccount) return;
 
     try {
-      const detailResult = await getWeAgentDetails({ partnerAccounts: [selectedPartnerAccount] });
+      const detailResult = await getWeAgentDetails({ partnerAccount: selectedPartnerAccount });
       const detail = detailResult?.WeAgentDetailsArray?.[0];
       if (!detail) {
         console.warn('No we-agent detail found for partnerAccount:', selectedPartnerAccount);

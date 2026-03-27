@@ -36,7 +36,7 @@ const AssistantDetail: React.FC = () => {
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getWeAgentDetails({ partnerAccounts: [partnerAccount] });
+        const result = await getWeAgentDetails({ partnerAccount });
         const nextDetail = result?.WeAgentDetailsArray?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);

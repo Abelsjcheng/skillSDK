@@ -592,6 +592,10 @@
    - 移动端：通过 `window.HWH5EXT.xxx` 调用对应 JSAPI；
    - PC 端：通过 `window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'xxx', params})` 调用同名能力；
    - 页面内统一封装调用入口，保证业务代码按同一方法名调用，不直接耦合端差异。
+   - `getWeAgentDetails` 参数适配：
+      - 业务侧统一按单个账号传入 `partnerAccount`；
+      - 封装层在移动端透传 `{ partnerAccount }`；
+      - 封装层在 PC 端转换为 `{ partnerAccounts: [partnerAccount] }`（PC 入参保持数组不变）。
 2. 激活助理页面（`/activateAssistant`）：
    - 页面初始化调用 `getWeAgentList` 获取列表，使用返回结构 `content` 作为列表数据源；
    - 点击“选择助理”时按端能力分支处理：
@@ -605,14 +609,14 @@
    - 页面初始化调用 `getWeAgentList`，并将返回的 `content` 助理信息填充到列表项；
    - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
    - 选中某个助理后点击“立即启用”：
-      - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
+      - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 读取返回 `WeAgentDetailsArray[0]` 的 `weCodeUrl`，组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 4. 创建助理页面（`/createAssistant`）：
    - 页面初始化读取 query 参数 `from`；
    - 进入第二步后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
    - 点击“确定”调用 `createDigitalTwin`；
    - 若 `from=weAgent`：
-      - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
+      - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
    - 若 `from` 非 `weAgent`：
       - 业务侧统一调用 `hwext` 封装方法（参考 `getJsApiOrThrow` 风格）；
@@ -621,12 +625,12 @@
          - PC 端（`isPcMiniApp === true`）：调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`。
 5. 助理详情页面（`/assistantDetail`）：
    - 读取 query 参数 `partnerAccount`；
-   - 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })` 获取详情并渲染 `WeAgentDetailsArray[0]`。
+   - 调用 `getWeAgentDetails({ partnerAccount })` 获取详情并渲染 `WeAgentDetailsArray[0]`（封装层按端能力适配实际入参）。
 6. 切换助理页面（`/switchAssistant`）：
    - 读取 query 参数 `partnerAccount`；
    - 调用 `getWeAgentList` 渲染 `content` 列表，并默认选中与 query 匹配的助理项；
    - 点击“确认切换”：
-      - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccounts: [partnerAccount] })`；
+      - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 使用返回 `WeAgentDetailsArray[0]` 中的 `weCodeUrl` 组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 7. `openWeAgentCUI` 参数组装规则：
    - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
@@ -661,6 +665,18 @@
    - `react`
    - `react-dom/client`
    - `react/jsx-runtime`
+
+## 20. URL Query/Hash 统一处理规范
+
+1. `ai-chat-viewer` 内关于 URL 的 query/hash 取值与设值逻辑统一收敛到 `src/utils/hwext.ts`。
+2. 所有 query/hash 解析必须优先使用 `URL` 对象与 `searchParams`，不再使用字符串 `indexOf/slice/split` 手动拆分。
+3. `getQueryParam` 需同时支持三类来源：
+   - 路由传入的 `routeSearch`；
+   - `window.location.search`；
+   - `window.location.hash` 中的路由 query（HashRouter 场景）。
+4. `appendQueryParam` 需使用 `URL.searchParams` 进行 query 设值，保证编码与覆盖行为一致。
+5. `openH5Webview` 在无宿主 `openWebview` 能力时的 fallback 跳转逻辑，需基于 `URL` 对象解析目标 URI，并正确保留 hash 路由与 query 信息。
+6. `parseWelinkSessionId` 读取 `welinkSessionId` 时，需复用统一 query 解析能力，兼容 search/hash 两种位置。
 
 
 

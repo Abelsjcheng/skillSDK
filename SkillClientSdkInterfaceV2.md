@@ -16,7 +16,7 @@
 | `createDigitalTwin` | `POST /v4-1/we-crew/im-register` | 创建数字分身 |
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
-| `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccounts}` | 批量获取并按需持久化助理详情 |
+| `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并按需持久化助理详情 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`/`error`），并按接口语义返回业务字段（如 `message`、`content`）。
@@ -235,7 +235,7 @@ Skill 小程序调用
 
 ### 接口说明
 
-根据 `partnerAccounts` 批量获取指定助理的详细信息。
+根据 `partnerAccount` 获取指定助理的详细信息。
 
 调用成功后，SDK 可按需将助理详情写入 SP 持久化存储。
 
@@ -249,13 +249,13 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccounts` | `Array<string>` | 是 | 助理账号 ID 数组 |
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
 
 ### 入参示例
 
 ```json
 {
-  "partnerAccounts": ["x00_1", "x00_2"]
+  "partnerAccount": "x00_1"
 }
 ```
 
@@ -288,25 +288,6 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "ownerDeptNameEn": "",
       "bizRobotId": "",
       "weCodeUrl": "https://xxx"
-    },
-    {
-      "name": "小微助手",
-      "icon": "http://www.test.com/xxx",
-      "desc": "我是xxx",
-      "moduleId": "M2000",
-      "partnerAccount": "x00_2",
-      "appKey": "",
-      "appSecret": "",
-      "createdBy": "",
-      "creatorName": "",
-      "creatorNameEn": "",
-      "ownerWelinkId": "",
-      "ownerName": "",
-      "ownerNameEn": "",
-      "ownerDeptName": "",
-      "ownerDeptNameEn": "",
-      "bizRobotId": "",
-      "weCodeUrl": "https://xxx"
     }
   ]
 }
@@ -314,9 +295,9 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ### 实现方法
 
-1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccounts}`，其中 `partnerAccounts` 通过英文逗号拼接（如：`x00_1,x00_2`）。
+1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
 2. SDK 解析返回 `data[]` 并组装为 `WeAgentDetailsArray`。
-3. 当入参 `partnerAccounts` 仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
+3. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
 4. SDK 返回 `Promise<WeAgentDetailsArray>`。
 
 ---
@@ -426,7 +407,7 @@ type PageParams = {
 
 ```typescript
 type QueryWeAgentParams = {
-  partnerAccounts: string[]
+  partnerAccount: string
 }
 ```
 

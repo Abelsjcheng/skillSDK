@@ -81,9 +81,15 @@ export interface WeAgentListItem {
   robotId?: string;
 }
 
-export interface GetWeAgentDetailsParams {
+export interface GetWeAgentDetailsMobileParams {
+  partnerAccount: string;
+}
+
+export interface GetWeAgentDetailsPcParams {
   partnerAccounts: string[];
 }
+
+export type GetWeAgentDetailsParams = GetWeAgentDetailsMobileParams | GetWeAgentDetailsPcParams;
 
 export interface WeAgentDetails {
   name: string;
@@ -185,6 +191,9 @@ declare global {
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = 'h5://123456/html/index.html';
+export const ASSISTANT_DETAIL_BASE_URI = 'h5://123456/index.html#assistantDetail';
+export const SWITCH_ASSISTANT_BASE_URI = 'h5://123456/index.html#switchAssistant';
+const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
   if (typeof window === 'undefined') return false;
@@ -268,29 +277,80 @@ function getJsApiOrThrow(): HWH5EXT {
   return getHWH5EXT();
 }
 
-export function getQueryParam(key: string, routeSearch = ''): string | null {
-  const candidates: string[] = [];
+function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetWeAgentDetailsParams {
+  if (isPcMiniApp()) {
+    if ('partnerAccounts' in params) {
+      return { partnerAccounts: params.partnerAccounts };
+    }
+    return { partnerAccounts: [params.partnerAccount] };
+  }
 
+  if ('partnerAccount' in params) {
+    return { partnerAccount: params.partnerAccount };
+  }
+
+  return { partnerAccount: params.partnerAccounts[0] ?? '' };
+}
+
+function parseUrl(value: string, base = URL_PARSE_BASE): URL | null {
+  try {
+    return new URL(value, base);
+  } catch {
+    return null;
+  }
+}
+
+function isAbsoluteUrl(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
+}
+
+function normalizeSearchInput(routeSearch: string): string {
+  if (!routeSearch) return routeSearch;
+  if (
+    routeSearch.startsWith('?') ||
+    routeSearch.startsWith('#') ||
+    routeSearch.startsWith('/') ||
+    isAbsoluteUrl(routeSearch)
+  ) {
+    return routeSearch;
+  }
+  return `?${routeSearch}`;
+}
+
+function getQueryParamFromHash(hashValue: string, key: string): string | null {
+  if (!hashValue) return null;
+  const normalizedHash = hashValue.startsWith('#') ? hashValue.slice(1) : hashValue;
+  if (!normalizedHash) return null;
+  const hashUrl = parseUrl(normalizedHash);
+  return hashUrl?.searchParams.get(key) ?? null;
+}
+
+function getQueryParamFromUrl(url: URL, key: string): string | null {
+  const directValue = url.searchParams.get(key);
+  if (directValue !== null) {
+    return directValue;
+  }
+  return getQueryParamFromHash(url.hash, key);
+}
+
+export function getQueryParam(key: string, routeSearch = ''): string | null {
+  const candidates: URL[] = [];
   if (routeSearch) {
-    candidates.push(routeSearch);
+    const routeUrl = parseUrl(normalizeSearchInput(routeSearch));
+    if (routeUrl) {
+      candidates.push(routeUrl);
+    }
   }
 
   if (typeof window !== 'undefined') {
-    if (window.location.search) {
-      candidates.push(window.location.search);
-    }
-
-    if (window.location.hash) {
-      const queryIndex = window.location.hash.indexOf('?');
-      if (queryIndex >= 0) {
-        candidates.push(window.location.hash.slice(queryIndex));
-      }
+    const currentUrl = parseUrl(window.location.href);
+    if (currentUrl) {
+      candidates.push(currentUrl);
     }
   }
 
   for (const candidate of candidates) {
-    const search = candidate.startsWith('?') ? candidate.slice(1) : candidate;
-    const value = new URLSearchParams(search).get(key);
+    const value = getQueryParamFromUrl(candidate, key);
     if (value !== null) {
       return value;
     }
@@ -301,20 +361,63 @@ export function getQueryParam(key: string, routeSearch = ''): string | null {
 
 export function appendQueryParam(uri: string, key: string, value: string): string {
   if (!uri) return uri;
+  if (uri.startsWith('#')) {
+    const hashUrl = parseUrl(uri.slice(1));
+    if (!hashUrl) return uri;
+    hashUrl.searchParams.set(key, value);
+    const hashPath = hashUrl.pathname.startsWith('/') ? hashUrl.pathname : `/${hashUrl.pathname}`;
+    return `#${hashPath}${hashUrl.search}${hashUrl.hash}`;
+  }
 
-  const hashIndex = uri.indexOf('#');
-  const beforeHash = hashIndex >= 0 ? uri.slice(0, hashIndex) : uri;
-  const hashSuffix = hashIndex >= 0 ? uri.slice(hashIndex) : '';
-  const separator = beforeHash.includes('?') ? '&' : '?';
-  return `${beforeHash}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hashSuffix}`;
+  const parsed = parseUrl(uri);
+  if (!parsed) return uri;
+  parsed.searchParams.set(key, value);
+  if (isAbsoluteUrl(uri)) {
+    return parsed.toString();
+  }
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+export function appendHashRouteQueryParam(uri: string, key: string, value: string): string {
+  if (!uri) return uri;
+  const parsed = parseUrl(uri);
+  if (!parsed) return uri;
+
+  const hashValue = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+  if (!hashValue) {
+    return appendQueryParam(uri, key, value);
+  }
+
+  const hashUrl = parseUrl(hashValue);
+  if (!hashUrl) {
+    return appendQueryParam(uri, key, value);
+  }
+
+  hashUrl.searchParams.set(key, value);
+  const hashPath = hashUrl.pathname.startsWith('/') ? hashUrl.pathname : `/${hashUrl.pathname}`;
+  parsed.hash = `${hashPath}${hashUrl.search}`;
+
+  if (isAbsoluteUrl(uri)) {
+    return parsed.toString();
+  }
+
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
 export function buildOpenWeAgentCUIParams(weCodeUrl: string, partnerAccount: string): OpenWeAgentCUIParams {
   const normalizedPartnerAccount = partnerAccount?.trim() ?? '';
   return {
     weAgentUri: appendQueryParam(weCodeUrl || WE_AGENT_BASE_URI, 'wecodePlace', 'weAgent'),
-    assistantDetailUri: appendQueryParam(WE_AGENT_BASE_URI, 'partnerAccount', normalizedPartnerAccount),
-    switchAssistantUri: appendQueryParam(WE_AGENT_BASE_URI, 'partnerAccount', normalizedPartnerAccount),
+    assistantDetailUri: appendHashRouteQueryParam(
+      ASSISTANT_DETAIL_BASE_URI,
+      'partnerAccount',
+      normalizedPartnerAccount,
+    ),
+    switchAssistantUri: appendHashRouteQueryParam(
+      SWITCH_ASSISTANT_BASE_URI,
+      'partnerAccount',
+      normalizedPartnerAccount,
+    ),
   };
 }
 
@@ -327,12 +430,26 @@ export function openH5Webview(payload: { uri: string }): void {
   }
 
   const { uri } = payload;
-  const hashIndex = uri.indexOf('#');
-  if (hashIndex >= 0) {
-    const nextHash = uri.slice(hashIndex + 1);
-    window.location.hash = nextHash.startsWith('/') ? nextHash : `/${nextHash}`;
-  } else {
+  const targetUrl = parseUrl(uri, window.location.href);
+  if (!targetUrl) {
     window.location.href = uri;
+    return;
+  }
+
+  if (targetUrl.hash) {
+    const hashUrl = parseUrl(targetUrl.hash.slice(1));
+    if (hashUrl) {
+      const hashPath = hashUrl.pathname.startsWith('/') ? hashUrl.pathname : `/${hashUrl.pathname}`;
+      const hashSearch = hashUrl.search || targetUrl.search;
+      window.location.hash = `${hashPath}${hashSearch}`;
+      return;
+    }
+  }
+
+  if (isAbsoluteUrl(uri)) {
+    window.location.href = targetUrl.toString();
+  } else {
+    window.location.href = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
   }
 }
 
@@ -407,7 +524,7 @@ export async function getWeAgentList(params: GetWeAgentListParams): Promise<WeAg
 }
 
 export async function getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> {
-  return getJsApiOrThrow().getWeAgentDetails(params);
+  return getJsApiOrThrow().getWeAgentDetails(normalizeGetWeAgentDetailsParams(params));
 }
 
 export async function getWeAgentUri(): Promise<WeAgentUriResult> {
@@ -419,9 +536,7 @@ export async function openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<Open
 }
 
 export function parseWelinkSessionId(): string | null {
-  if (typeof window === 'undefined') return null;
-  const urlParams = new URLSearchParams(window.location.search);
-  const sessionId = urlParams.get('welinkSessionId');
+  const sessionId = getQueryParam('welinkSessionId');
   if (!sessionId) return null;
   const normalized = sessionId.trim();
   return normalized.length > 0 ? normalized : null;
