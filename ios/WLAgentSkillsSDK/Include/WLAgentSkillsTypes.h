@@ -123,22 +123,21 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsCreateDigitalTwinParams : NSObject
-@property (nonatomic, copy, nullable) NSString *name;
-@property (nonatomic, copy, nullable) NSString *icon;
-@property (nonatomic, copy, nullable) NSString *description;
-@property (nonatomic, copy, nullable) NSString *descriptionValue __attribute__((deprecated("Use description")));
-@property (nonatomic, copy, nullable) NSString *desc __attribute__((deprecated("Use description")));
-@property (nonatomic, strong, nullable) NSNumber *weCrewType;
-@property (nonatomic, copy, nullable) NSString *bizRobotId;
+@property (nonatomic, strong, nullable) id name;
+@property (nonatomic, strong, nullable) id icon;
+@property (nonatomic, strong, nullable) id descriptionValue;
+@property (nonatomic, strong, nullable) id desc;
+@property (nonatomic, strong, nullable) id weCrewType;
+@property (nonatomic, strong, nullable) id bizRobotId;
 @end
 
 @interface WLAgentSkillsPageParams : NSObject
-@property (nonatomic, strong, nullable) NSNumber *pageSize;
-@property (nonatomic, strong, nullable) NSNumber *pageNumber;
+@property (nonatomic, strong, nullable) id pageSize;
+@property (nonatomic, strong, nullable) id pageNumber;
 @end
 
 @interface WLAgentSkillsQueryWeAgentParams : NSObject
-@property (nonatomic, copy, nullable) NSString *partnerAccount;
+@property (nonatomic, strong, nullable) id partnerAccount;
 @end
 
 #pragma mark - Data Models
@@ -245,8 +244,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @interface WLAgentSkillsWeAgent : NSObject
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *icon;
-@property (nonatomic, copy) NSString *description;
-@property (nonatomic, copy) NSString *desc __attribute__((deprecated("Use description")));
+@property (nonatomic, copy) NSString *desc;
 @property (nonatomic, copy) NSString *partnerAccount;
 @property (nonatomic, copy) NSString *bizRobotName;
 @property (nonatomic, copy) NSString *bizRobotNameEn;

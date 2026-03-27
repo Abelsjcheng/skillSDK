@@ -137,20 +137,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @implementation WLAgentSkillsCreateDigitalTwinParams
 
-- (nullable NSString *)description {
-    return self.descriptionValue;
-}
-
-- (void)setDescription:(nullable NSString *)description {
+- (void)setDescription:(id)description {
     self.descriptionValue = description;
-}
-
-- (nullable NSString *)desc {
-    return self.descriptionValue;
-}
-
-- (void)setDesc:(nullable NSString *)desc {
-    self.descriptionValue = desc;
 }
 
 @end
@@ -244,7 +232,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     if (self) {
         _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
         _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
-        _description = WLAgentSkillsStringValue(dictionary[@"description"], WLAgentSkillsStringValue(dictionary[@"desc"], @""));
+        _desc = WLAgentSkillsStringValue(dictionary[@"description"], WLAgentSkillsStringValue(dictionary[@"desc"], @""));
         _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
         _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
@@ -253,19 +241,11 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     return self;
 }
 
-- (NSString *)desc {
-    return self.description;
-}
-
-- (void)setDesc:(NSString *)desc {
-    self.description = desc;
-}
-
 - (NSDictionary *)toDictionary {
     return @{
         @"name" : self.name ?: @"",
         @"icon" : self.icon ?: @"",
-        @"description" : self.description ?: @"",
+        @"description" : self.desc ?: @"",
         @"partnerAccount" : self.partnerAccount ?: @"",
         @"bizRobotName" : self.bizRobotName ?: @"",
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",

@@ -717,8 +717,7 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *descriptionCandidate = params.description != nil ? params.description
-        : (params.descriptionValue != nil ? params.descriptionValue : params.desc);
+    id descriptionCandidate = params.descriptionValue != nil ? params.descriptionValue : params.desc;
     NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:descriptionCandidate
                                                                  fieldName:@"description"
                                                               errorMessage:&errorMessage];
