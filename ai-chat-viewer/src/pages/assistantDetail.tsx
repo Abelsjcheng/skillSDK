@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
@@ -19,15 +19,20 @@ const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueN
 
 const maskSecret = (secret: string): string => (secret ? '*'.repeat(secret.length) : '');
 
-const AssistantDetail: React.FC = () => {
+export interface AssistantDetailProps {
+  partnerAccount?: string;
+}
+
+const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => {
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
   const [isSecretVisible, setIsSecretVisible] = useState<boolean>(false);
-
-  const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+  const resolvedPartnerAccount = isPc
+    ? (partnerAccount?.trim() ?? '')
+    : (getQueryParam('partnerAccount')?.trim() ?? '');
 
   useEffect(() => {
-    if (!partnerAccount) {
+    if (!resolvedPartnerAccount) {
       setDetail(null);
       return;
     }
@@ -36,7 +41,7 @@ const AssistantDetail: React.FC = () => {
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getWeAgentDetails({ partnerAccount });
+        const result = await getWeAgentDetails({ partnerAccount: resolvedPartnerAccount });
         const nextDetail = result?.WeAgentDetailsArray?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);
@@ -54,7 +59,7 @@ const AssistantDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [partnerAccount]);
+  }, [resolvedPartnerAccount]);
 
   const displayName = detail?.name ?? '';
   const displayIcon = detail?.icon ?? '';

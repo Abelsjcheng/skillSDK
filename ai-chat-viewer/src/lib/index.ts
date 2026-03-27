@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import App, { type AppProps } from '../App';
-import AssistantDetail from '../pages/assistantDetail';
+import AssistantDetail, { type AssistantDetailProps } from '../pages/assistantDetail';
 import SwitchAssistant from '../pages/switchAssistant';
 import type {
   Message,
@@ -14,6 +14,7 @@ import type {
 
 export type {
   AppProps,
+  AssistantDetailProps,
   Message,
   MessagePart,
   StreamMessage,
