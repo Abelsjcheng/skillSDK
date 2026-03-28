@@ -95,6 +95,7 @@ function App({
   const [weAgentUserName, setWeAgentUserName] = useState('');
   const [weAgentUserAvatar, setWeAgentUserAvatar] = useState('');
   const [weAgentAssistantName, setWeAgentAssistantName] = useState('');
+  const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
 
   const assemblerRef = useRef(new StreamAssembler());
@@ -231,6 +232,7 @@ function App({
     }
 
     setWeAgentAssistantName(detail.name ?? '');
+    setWeAgentAssistantDescription(detail.desc ?? '');
     setWeAgentAssistantAvatar(resolveAssistantIconUrl(detail.icon));
     assistantDetailRef.current = detail;
     return detail;
@@ -254,6 +256,7 @@ function App({
     assistantAccountRef.current = assistantAccount.trim();
     assistantDetailRef.current = null;
     setWeAgentAssistantName('');
+    setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
   }, [assistantAccount]);
 
@@ -706,6 +709,7 @@ function App({
           weAgentUserName={weAgentUserName}
           weAgentUserAvatar={weAgentUserAvatar}
           weAgentAssistantName={weAgentAssistantName}
+          weAgentAssistantDescription={weAgentAssistantDescription}
           weAgentAssistantAvatar={weAgentAssistantAvatar}
         />
       </div>

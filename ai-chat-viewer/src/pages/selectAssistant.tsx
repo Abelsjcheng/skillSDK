@@ -20,6 +20,13 @@ const DEFAULT_LIST_QUERY = {
   pageNumber: 1,
 };
 const CREATE_ASSISTANT_ROUTE = '/createAssistant';
+const CUSTOM_ASSISTANT_TAG = '自定义助理';
+
+function resolveAssistantTag(assistant: WeAgentListItem): string {
+  const bizRobotName = assistant.bizRobotName?.trim() ?? '';
+  const bizRobotNameEn = assistant.bizRobotNameEn?.trim() ?? '';
+  return bizRobotName || bizRobotNameEn || CUSTOM_ASSISTANT_TAG;
+}
 
 function buildCreateAssistantSearch(): string {
   const params = new URLSearchParams();
@@ -32,13 +39,13 @@ function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
   return list.map((assistant) => ({
     id: assistant.partnerAccount,
     name: assistant.name ?? '',
-    tag: assistant.bizRobotName || assistant.bizRobotNameEn || '',
+    tag: resolveAssistantTag(assistant),
     description: assistant.description ?? '',
     icon: resolveAssistantIconUrl(assistant.icon),
   }));
 }
 
-const StartAssistant: React.FC = () => {
+const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
   const navigate = useNavigate();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
@@ -55,7 +62,7 @@ const StartAssistant: React.FC = () => {
         list.some((assistant) => assistant.partnerAccount === current) ? current : ''
       ));
     } catch (error) {
-      console.error('getWeAgentList failed in StartAssistant:', error);
+      console.error('getWeAgentList failed in SelectAssistant:', error);
       setAssistantList([]);
       setSelectedAssistantId('');
     }
@@ -107,7 +114,7 @@ const StartAssistant: React.FC = () => {
       await openWeAgentCUI(params);
       window.HWH5.close();
     } catch (error) {
-      console.error('openWeAgentCUI failed in StartAssistant:', error);
+      console.error('openWeAgentCUI failed in SelectAssistant:', error);
     }
   }, [assistantList, selectedAssistantId]);
 
@@ -123,10 +130,10 @@ const StartAssistant: React.FC = () => {
   if (!isPc) {
     return (
       <AssistantSelectionPage
-        title="启动助理"
+        title="选择助理"
         isPcMiniApp={isPc}
         leftButtonText="创建助理"
-        rightButtonText="立即启用"
+        rightButtonText="开始使用"
         onLeftButtonClick={handleCreateAssistant}
         onRightButtonClick={handleEnableNow}
         assistants={assistantItems}
@@ -141,7 +148,7 @@ const StartAssistant: React.FC = () => {
     <div className="start-assistant--pc">
       <div className="start-assistant__panel">
         <header className="start-assistant__header">
-          <h1 className="start-assistant__title">启用助理</h1>
+          <h1 className="start-assistant__title">选择助理</h1>
         </header>
 
         <main className="start-assistant__content">
@@ -194,7 +201,7 @@ const StartAssistant: React.FC = () => {
             onClick={handleEnableNow}
             disabled={!selectedAssistantId}
           >
-            立即启用
+            开始使用
           </button>
         </footer>
       </div>
@@ -202,4 +209,4 @@ const StartAssistant: React.FC = () => {
   );
 };
 
-export default StartAssistant;
+export default SelectAssistant;

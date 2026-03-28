@@ -38,6 +38,13 @@
 .start-assistant__content .switch-assistant__list {
   height: auto;
   max-height: 360px;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.start-assistant__content .switch-assistant__list::-webkit-scrollbar {
+  display: none;
 }
 
 .start-assistant__actions {

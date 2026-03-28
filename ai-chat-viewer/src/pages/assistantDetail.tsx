@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
+import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
+import { copyTextToClipboard } from '../utils/clipboard';
 import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
+import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 
 interface DetailInfoRowProps {
@@ -61,7 +64,7 @@ const AssistantDetail: React.FC = () => {
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
   const displayTag = detail?.bizRobotName || detail?.bizRobotNameEn || '';
   const displayDescription = detail?.desc ?? '';
-  const displayCreator = detail?.creatorName ?? '';
+  const displayCreator = [detail?.creatorName ?? '', detail?.creatorWorkId ?? ''].filter(Boolean).join(' ');
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
   const secret = detail?.appSecret ?? '';
@@ -72,14 +75,22 @@ const AssistantDetail: React.FC = () => {
   const ownerLabel = isInternalAssistant ? '责任人' : '密钥';
   const ownerValue = isInternalAssistant ? (detail?.ownerName ?? '') : displaySecret;
 
-  const showSecret = () => {
+  const toggleSecretVisible = () => {
     if (isInternalAssistant) return;
-    setIsSecretVisible(true);
+    setIsSecretVisible((previous) => !previous);
   };
 
-  const hideSecret = () => {
-    if (isInternalAssistant) return;
-    setIsSecretVisible(false);
+  const handleCopy = async (content: string, successMessage: string) => {
+    if (!content) {
+      return;
+    }
+    try {
+      await copyTextToClipboard(content);
+      showToast(successMessage);
+    } catch (error) {
+      console.error('Copy failed in AssistantDetail:', error);
+      showToast('复制失败');
+    }
   };
 
   useEffect(() => {
@@ -105,7 +116,7 @@ const AssistantDetail: React.FC = () => {
           </div>
           <div className="assistant-detail__name-row">
             <span className="assistant-detail__name">{displayName}</span>
-            {isInternalAssistant ? <span className="assistant-detail__tag">{displayTag}</span> : null}
+            {isInternalAssistant && displayTag ? <span className="assistant-detail__tag">{displayTag}</span> : null}
           </div>
         </section>
 
@@ -118,7 +129,25 @@ const AssistantDetail: React.FC = () => {
         <section className="assistant-detail__card assistant-detail__card--org">
           <DetailInfoRow
             label={orgLabel}
-            valueNode={<span className="assistant-detail__org-value">{orgValue}</span>}
+            valueNode={(
+              isInternalAssistant ? (
+                <span className="assistant-detail__org-value">{orgValue}</span>
+              ) : (
+                <div className="assistant-detail__value-with-actions">
+                  <span className="assistant-detail__org-value">{orgValue}</span>
+                  <button
+                    type="button"
+                    className="assistant-detail__icon-btn"
+                    onClick={() => {
+                      void handleCopy(orgValue, 'APPID已复制');
+                    }}
+                    aria-label="复制APPID"
+                  >
+                    <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                  </button>
+                </div>
+              )
+            )}
           />
           {isInternalAssistant ? (
             <DetailInfoRow
@@ -129,20 +158,28 @@ const AssistantDetail: React.FC = () => {
             <DetailInfoRow
               label={ownerLabel}
               valueNode={(
-                <div className="assistant-detail__org-value">
-                  <button
-                    type="button"
-                    className="assistant-detail__secret-btn"
-                    onMouseDown={showSecret}
-                    onMouseUp={hideSecret}
-                    onMouseLeave={hideSecret}
-                    onTouchStart={showSecret}
-                    onTouchEnd={hideSecret}
-                    onTouchCancel={hideSecret}
-                    onBlur={hideSecret}
-                  >
-                    {ownerValue}
-                  </button>
+                <div className="assistant-detail__value-with-actions">
+                  <span className="assistant-detail__org-value">{ownerValue}</span>
+                  <div className="assistant-detail__action-group">
+                    <button
+                      type="button"
+                      className="assistant-detail__icon-btn"
+                      onClick={toggleSecretVisible}
+                      aria-label={isSecretVisible ? '隐藏密钥' : '查看密钥'}
+                    >
+                      <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                    </button>
+                    <button
+                      type="button"
+                      className="assistant-detail__icon-btn"
+                      onClick={() => {
+                        void handleCopy(secret, '密钥已复制');
+                      }}
+                      aria-label="复制密钥"
+                    >
+                      <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                    </button>
+                  </div>
                 </div>
               )}
             />

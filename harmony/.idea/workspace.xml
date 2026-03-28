@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="54ba933c-0cb9-400f-8803-46255873e148" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/docs/requirements.md" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/docs/requirements.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/components/PersonalAssistantCreator.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/components/PersonalAssistantCreator.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/components/__tests__/SwitchAssistant.test.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/components/__tests__/SwitchAssistant.test.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/components/assistant/AssistantSelectionPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/components/assistant/AssistantSelectionPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/components/createAssistant/StepBrainSelect.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/components/createAssistant/StepBrainSelect.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/activateAssistant.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/activateAssistant.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/assistantDetail.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/assistantDetail.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/startAssistant.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/startAssistant.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/switchAssistant.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/pages/switchAssistant.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ai-chat-viewer/src/utils/hwext.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../ai-chat-viewer/src/utils/hwext.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="HiLogStateProjectLevelPreference">
+    <panelStates>
+      <hilogPanelState>
+        <option name="logPanelType" value="ONLINE" />
+      </hilogPanelState>
+    </panelStates>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="3BTfBflmlsvG87vFnr3YHcaBmTr" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;F:/AIProject/skillSDK/harmony&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.huawei.deveco.sdkmanager.ohos.idea.ui.OhSdkConfigProvider&quot;
+  }
+}</component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+</project>

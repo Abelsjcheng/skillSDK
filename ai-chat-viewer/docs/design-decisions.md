@@ -55,8 +55,8 @@
 30. `example/assistant-components-demo/src/index.tsx`
 31. `example/assistant-components-demo/README.md`
 32. `src/components/assistant/AssistantSelectionPage.tsx`
-33. `src/pages/startAssistant.tsx`
-34. `src/components/__tests__/StartAssistant.test.tsx`
+33. `src/pages/selectAssistant.tsx`
+34. `src/components/__tests__/SelectAssistant.test.tsx`
 
 ### 2.2 修改文件（导出目标）
 
@@ -292,7 +292,7 @@ interface CreateDigitalTwinParams {
    - `/activateAssistant` -> `ActivateAssistant`（激活助理页）
    - `/assistantDetail` -> `AssistantDetail`（助理详情页）
    - `/switchAssistant` -> `SwitchAssistant`（切换助理页）
-   - `/startAssistant` -> `StartAssistant`（启动助理页）
+   - `/selectAssistant` -> `SelectAssistant`（启动助理页）
    - `/` 与 `*` -> 重定向到 `/aiChat`
 3. 页面路由切换不改变原有业务逻辑，只做视图层分发。
 4. `create-assistant-page` 独立打包入口维持现状，用于单页发布场景；与主入口路由方案并存。
@@ -353,7 +353,7 @@ interface CreateDigitalTwinParams {
 
 ## 16. 启动助理页面设计
 
-1. 页面组件放在 `src/pages/startAssistant.tsx`。
+1. 页面组件放在 `src/pages/selectAssistant.tsx`。
 2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
 3. 使用 `isPcMiniApp` 做双端分支：
    - `false`（移动）：继续复用 `AssistantSelectionPage` 的现有样式与交互，不做变更；
@@ -393,6 +393,9 @@ interface CreateDigitalTwinParams {
    - 头像容器 `72x72`，圆角 `124px`，白色 `2px` 边框；
    - 标题文本：`早上好，峰哥`（`18px/500/26px`，`rgba(25,25,25,1)`）；
    - 副标题文本：`CodeAgent | 你的专属编程智能体`（`14px/400/22px`，`rgba(89,89,89,1)`）。
+
+
+
 
 
 

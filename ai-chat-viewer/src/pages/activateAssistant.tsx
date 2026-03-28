@@ -5,7 +5,7 @@ import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from
 import '../styles/ActivateAssistant.less';
 
 const CREATE_ASSISTANT_URI = 'h5://123456/html/index.html?from=weAgent#createAssistant';
-const START_ASSISTANT_URI = 'h5://123456/html/index.html?from=weAgent#startAssistant';
+const SELECT_ASSISTANT_URI = 'h5://123456/html/index.html?from=weAgent#selectAssistant';
 const DEFAULT_LIST_QUERY = {
   pageSize: 20,
   pageNumber: 1,
@@ -37,12 +37,12 @@ const ActivateAssistant: React.FC = () => {
     const latestList = assistantList.length > 0 ? assistantList : await loadAssistantList();
     if (isPc) {
       if (latestList.length > 0) {
-        navigate('/startAssistant');
+        navigate('/selectAssistant');
       }
       return;
     }
 
-    const targetUri = latestList.length === 0 ? CREATE_ASSISTANT_URI : START_ASSISTANT_URI;
+    const targetUri = latestList.length === 0 ? CREATE_ASSISTANT_URI : SELECT_ASSISTANT_URI;
     openH5Webview({ uri: targetUri });
   }, [assistantList, isPc, loadAssistantList, navigate]);
 

@@ -20,6 +20,7 @@ interface ContentProps {
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
+  weAgentAssistantDescription?: string;
   weAgentAssistantAvatar?: string;
 }
 
@@ -36,6 +37,7 @@ export const Content: React.FC<ContentProps> = ({
   weAgentUserName = '',
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
+  weAgentAssistantDescription = '',
   weAgentAssistantAvatar = '',
 }) => {
   const isWeAgentCUI = variant === 'weAgentCUI';
@@ -49,6 +51,9 @@ export const Content: React.FC<ContentProps> = ({
     messageId: null,
     offsetTop: 0,
   });
+  const welcomeTitle = weAgentUserName ? `早上好，${weAgentUserName}` : '早上好';
+  const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
+  const welcomeAvatar = weAgentAssistantAvatar || assistantAvatar;
 
   const getMessageOffsetTop = useCallback((messageId: string | null): number | null => {
     if (!messageId) return null;
@@ -134,10 +139,10 @@ export const Content: React.FC<ContentProps> = ({
         <div className={`content ${isWeAgentCUI ? 'content--we-agent-cui' : ''}`.trim()}>
           <div className="we-agent-cui-welcome">
             <div className="we-agent-cui-welcome__avatar-wrap" aria-hidden="true">
-              <img src={assistantAvatar} alt="" className="we-agent-cui-welcome__avatar" />
+              <img src={welcomeAvatar} alt="" className="we-agent-cui-welcome__avatar" />
             </div>
-            <div className="we-agent-cui-welcome__title">早上好，峰哥</div>
-            <div className="we-agent-cui-welcome__subtitle">CodeAgent | 你的专属编程智能体</div>
+            <div className="we-agent-cui-welcome__title">{welcomeTitle}</div>
+            <div className="we-agent-cui-welcome__subtitle">{welcomeSubtitle}</div>
           </div>
         </div>
       );

@@ -408,7 +408,7 @@
    - `激活助理页面`：哈希路径 `#/activateAssistant`
    - `助理详情页面`：哈希路径 `#/assistantDetail`
    - `切换助理页面`：哈希路径 `#/switchAssistant`
-   - `启动助理页面`：哈希路径 `#/startAssistant`
+   - `启动助理页面`：哈希路径 `#/selectAssistant`
 4. 根路径 `#/` 默认重定向到 `#/aiChat`。
 5. 未匹配路径统一重定向到 `#/aiChat`。
 6. PC 与移动端样式规则不变，路由仅负责页面切换。
@@ -521,7 +521,7 @@
 
 ## 16. 启动助理页面
 
-1. 页面组件文件路径：`src/pages/startAssistant.tsx`。
+1. 页面组件文件路径：`src/pages/selectAssistant.tsx`。
 2. 通过 `isPcMiniApp` 区分端样式：
    - `isPcMiniApp === false`（移动）：保持当前页面样式与交互不变。
    - `isPcMiniApp === true`（PC）：使用本章节新增 PC 样式。
@@ -647,12 +647,12 @@
    - 页面初始化调用 `getWeAgentList` 获取列表，使用返回结构 `content` 作为列表数据源；
    - 点击“选择助理”时按端能力分支处理：
       - PC 端（`isPcMiniApp === true`）：
-         - 列表非空：通过 `react-router` 导航（`navigate('/startAssistant')`）跳转；
+         - 列表非空：通过 `react-router` 导航（`navigate('/selectAssistant')`）跳转；
          - 列表为空：空实现（不跳转、不打开新页面）。
       - 移动端（`isPcMiniApp === false`）：
          - 为空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#createAssistant' })`；
-         - 非空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#startAssistant' })`。
-3. 启动助理页面（`/startAssistant`）：
+         - 非空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#selectAssistant' })`。
+3. 启动助理页面（`/selectAssistant`）：
    - 页面初始化调用 `getWeAgentList`，并将返回的 `content` 助理信息填充到列表项；
    - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
    - 路由渲染约束：`AppRouter` 需使用 `useLocation` 获取当前路由，并通过 `<Routes location={location} key={pathname+search+hash}>` 驱动页面渲染，保证 HashRouter 下 hash/query 变化后组件正确重渲染；
@@ -794,6 +794,8 @@
    - 点击“新建会话”后能创建并切换到新会话；
    - 打开“历史会话”侧边栏可看到 mock 会话列表；
    - 不影响真实 SDK 场景下的接口调用行为。
+
+
 
 
 

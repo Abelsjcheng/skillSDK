@@ -4,7 +4,7 @@ import App from '../App';
 import PersonalAssistantCreator from '../components/PersonalAssistantCreator';
 import ActivateAssistant from '../pages/activateAssistant';
 import AssistantDetail from '../pages/assistantDetail';
-import StartAssistant from '../pages/startAssistant';
+import SelectAssistant from '../pages/selectAssistant';
 import SwitchAssistant from '../pages/switchAssistant';
 import WeAgentCUI from '../pages/weAgentCUI';
 
@@ -50,13 +50,14 @@ export const AppRouter: React.FC = () => (
       )}
     />
     <Route
-      path="/startAssistant"
+      path="/selectAssistant"
       element={(
         <div style={FULL_PAGE_ROUTE_STYLE}>
-          <StartAssistant />
+          <SelectAssistant />
         </div>
       )}
     />
+    <Route path="/startAssistant" element={<Navigate to="/selectAssistant" replace />} />
     <Route path="/" element={<Navigate to="/weAgentCUI" replace />} />
     <Route path="*" element={<Navigate to="/weAgentCUI" replace />} />
   </Routes>

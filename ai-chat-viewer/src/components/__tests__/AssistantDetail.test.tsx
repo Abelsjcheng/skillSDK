@@ -22,6 +22,7 @@ describe('AssistantDetail', () => {
                   partnerAccount: 'x00_1',
                   createdBy: 'u1',
                   creatorName: '小米',
+                  creatorWorkId: '10001',
                   creatorNameEn: 'xiaomi',
                   ownerWelinkId: 'u2',
                   ownerName: '测试负责人',
@@ -61,8 +62,56 @@ describe('AssistantDetail', () => {
     expect(screen.getByText('助理简介')).toBeInTheDocument();
     expect(screen.getByText('你的全能AI生活助理')).toBeInTheDocument();
     expect(screen.getByText('创建者')).toBeInTheDocument();
-    expect(screen.getByText('小米')).toBeInTheDocument();
+    expect(screen.getByText('小米 10001')).toBeInTheDocument();
     expect(screen.getByText('部门')).toBeInTheDocument();
     expect(screen.getByText('责任人')).toBeInTheDocument();
+  });
+
+  it('renders appid and secret actions for external assistant', async () => {
+    Object.defineProperty(window, 'Pedestal', {
+      value: {
+        callMethod: jest.fn((_method: string, payload: { funName: string; params: unknown }) => {
+          if (payload.funName === 'getWeAgentDetails') {
+            return {
+              WeAgentDetailsArray: [
+                {
+                  name: '外部助理',
+                  icon: '',
+                  desc: '面向外部服务',
+                  moduleId: 'M2000',
+                  appKey: 'external-app-key',
+                  appSecret: 'external-app-secret',
+                  partnerAccount: 'x00_1',
+                  createdBy: 'u1',
+                  creatorName: '测试创建者',
+                  creatorNameEn: 'creator',
+                  ownerWelinkId: '',
+                  ownerName: '',
+                  ownerNameEn: '',
+                  ownerDeptName: '',
+                  ownerDeptNameEn: '',
+                  bizRobotId: '',
+                  bizRobotName: '',
+                  bizRobotNameEn: '',
+                  weCodeUrl: 'h5://123456/html/index.html',
+                },
+              ],
+            };
+          }
+          return undefined;
+        }),
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    render(<AssistantDetail />);
+
+    expect(await screen.findByText('外部助理')).toBeInTheDocument();
+    expect(screen.getByText('APPID')).toBeInTheDocument();
+    expect(screen.getByText('密钥')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '复制APPID' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看密钥' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '复制密钥' })).toBeInTheDocument();
   });
 });

@@ -18,6 +18,13 @@ const DEFAULT_LIST_QUERY = {
   pageSize: 20,
   pageNumber: 1,
 };
+const CUSTOM_ASSISTANT_TAG = '自定义助理';
+
+function resolveAssistantTag(assistant: WeAgentListItem): string {
+  const bizRobotName = assistant.bizRobotName?.trim() ?? '';
+  const bizRobotNameEn = assistant.bizRobotNameEn?.trim() ?? '';
+  return bizRobotName || bizRobotNameEn || CUSTOM_ASSISTANT_TAG;
+}
 
 interface SwitchAssistantProps {
   defaultSelectedAssistantId?: string;
@@ -27,7 +34,7 @@ function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
   return list.map((assistant) => ({
     id: assistant.partnerAccount,
     name: assistant.name ?? '',
-    tag: assistant.bizRobotName || assistant.bizRobotNameEn || '',
+    tag: resolveAssistantTag(assistant),
     description: assistant.description ?? '',
     icon: resolveAssistantIconUrl(assistant.icon),
   }));

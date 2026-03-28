@@ -15,8 +15,8 @@ describe('SwitchAssistant', () => {
               icon: '',
               description: '设计师一枚，擅长代码实现与技术方案整理',
               partnerAccount: 'x00_1',
-              bizRobotName: '某某助手',
-              bizRobotNameEn: 'assistant',
+              bizRobotName: '',
+              bizRobotNameEn: '',
             },
           ],
         };
@@ -75,7 +75,7 @@ describe('SwitchAssistant', () => {
     expect(screen.getByRole('button', { name: '确认切换' })).toBeInTheDocument();
 
     expect(await screen.findByText('编程助理')).toBeInTheDocument();
-    expect(await screen.findByText('某某助手')).toBeInTheDocument();
+    expect(await screen.findByText('自定义助理')).toBeInTheDocument();
     expect(await screen.findByText(/设计师一枚/)).toBeInTheDocument();
   });
 });

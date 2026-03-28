@@ -142,6 +142,7 @@ export interface WeAgentDetails {
   partnerAccount: string;
   createdBy: string;
   creatorName: string;
+  creatorWorkId?: string;
   creatorNameEn: string;
   ownerWelinkId: string;
   ownerName: string;
