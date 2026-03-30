@@ -95,6 +95,12 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, assign) BOOL isFirst;
 @end
 
+@interface WLAgentSkillsGetSessionMessageHistoryParams : NSObject
+@property (nonatomic, strong, nullable) id welinkSessionId;
+@property (nonatomic, strong, nullable) id beforeSeq;
+@property (nonatomic, strong, nullable) id size;
+@end
+
 @interface WLAgentSkillsRegisterSessionListenerParams : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) WLAgentSkillsSessionMessageCallback onMessage;
@@ -218,6 +224,16 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 - (NSDictionary *)toDictionary;
 @end
 
+@interface WLAgentSkillsCursorResult : NSObject
+@property (nonatomic, strong) NSArray<WLAgentSkillsSessionMessage *> *content;
+@property (nonatomic, strong) NSNumber *size;
+@property (nonatomic, assign) BOOL hasMore;
+@property (nonatomic, strong, nullable) NSNumber *nextBeforeSeq;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
 @interface WLAgentSkillsSkillSessionPageResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsSkillSession *> *content;
 @property (nonatomic, strong) NSNumber *page;
@@ -270,7 +286,9 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *ownerNameEn;
 @property (nonatomic, copy) NSString *ownerDeptName;
 @property (nonatomic, copy) NSString *ownerDeptNameEn;
-@property (nonatomic, copy) NSString *robotId;
+@property (nonatomic, copy) NSString *id;
+@property (nonatomic, copy) NSString *bizRobotName;
+@property (nonatomic, copy) NSString *bizRobotNameEn;
 @property (nonatomic, copy) NSString *bizRobotId;
 @property (nonatomic, copy) NSString *weCodeUrl;
 

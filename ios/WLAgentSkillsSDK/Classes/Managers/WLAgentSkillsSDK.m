@@ -428,6 +428,71 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
     }];
 }
 
+#pragma mark - 8.1 getSessionMessageHistory
+
+- (void)getSessionMessageHistory:(WLAgentSkillsGetSessionMessageHistoryParams *)params
+                                success:(void (^)(WLAgentSkillsCursorResult *result))success
+                                failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                           fieldName:@"welinkSessionId"
+                                                                        errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSNumber *beforeSeq = [WLAgentSkillsTypeConverter integerNumberFromValue:params.beforeSeq
+                                                                    fieldName:@"beforeSeq"
+                                                                 errorMessage:&errorMessage];
+    if (errorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    if (beforeSeq != nil && beforeSeq.integerValue < 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: beforeSeq must be greater than or equal to 0."];
+        return;
+    }
+
+    NSInteger sizeValue = [WLAgentSkillsTypeConverter positiveIntegerFromValue:params.size
+                                                                   defaultValue:50
+                                                                       fieldName:@"size"
+                                                                    errorMessage:&errorMessage];
+    if (errorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSNumber *size = @(sizeValue);
+
+    [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getMessageHistoryWithSessionId:welinkSessionId
+                                                                  beforeSeq:beforeSeq
+                                                                       size:size
+                                                                    success:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsCursorResult *result = [strongSelf normalizedCursorResultFromDictionary:data requestSize:size];
+        [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:result.content
+                                                           forSessionId:welinkSessionId];
+        if (success) {
+            success(result);
+        }
+    }
+                                                                    failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
 #pragma mark - 9. registerSessionListener
 
 - (WLAgentSkillsRegisterSessionListenerResult *)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params {
@@ -881,13 +946,16 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
     NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
     NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.bizRobotId];
-    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.robotId];
+    NSString *detailId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.id];
 
     if (bizRobotId != nil && bizRobotId.length > 0) {
         NSString *internalWeAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"];
-        result.weAgentUri = [self appendQueryItemToUri:internalWeAgentUri key:@"robotId" value:robotId] ?: @"";
+        result.weAgentUri = [self appendQueryItemToUri:internalWeAgentUri key:@"robotId" value:detailId] ?: @"";
     } else {
-        NSString *externalWeAgentUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+        NSString *externalBase = (weCodeUrl != nil && weCodeUrl.length > 0)
+            ? weCodeUrl
+            : [NSString stringWithFormat:@"%@#weAgentCUI", WLAgentSkillsAssistantH5URI];
+        NSString *externalWeAgentUri = [self appendQueryItemToUri:externalBase
                                                               key:@"wecodePlace"
                                                             value:@"weAgent"];
         externalWeAgentUri = [self appendQueryItemToUri:externalWeAgentUri
@@ -1041,6 +1109,44 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
         @"totalPages" : safeTotalPages
     };
     return [[WLAgentSkillsPageResult alloc] initWithDictionary:normalized];
+}
+
+- (WLAgentSkillsCursorResult *)normalizedCursorResultFromDictionary:(NSDictionary *)dictionary
+                                                         requestSize:(NSNumber *)requestSize {
+    WLAgentSkillsCursorResult *raw = [[WLAgentSkillsCursorResult alloc] initWithDictionary:dictionary];
+    NSInteger safeSizeValue = raw.size != nil && raw.size.integerValue > 0
+        ? raw.size.integerValue
+        : (requestSize != nil && requestSize.integerValue > 0 ? requestSize.integerValue : 50);
+    NSNumber *safeSize = @(safeSizeValue);
+
+    NSMutableArray *dictContent = [NSMutableArray arrayWithCapacity:raw.content.count];
+    for (WLAgentSkillsSessionMessage *message in raw.content) {
+        [dictContent addObject:[message toDictionary]];
+    }
+
+    NSDictionary *normalized = @{
+        @"content" : dictContent,
+        @"size" : safeSize,
+        @"hasMore" : @([self resolveBoolValue:dictionary[@"hasMore"] fallback:raw.hasMore]),
+        @"nextBeforeSeq" : raw.nextBeforeSeq ?: [NSNull null]
+    };
+    return [[WLAgentSkillsCursorResult alloc] initWithDictionary:normalized];
+}
+
+- (BOOL)resolveBoolValue:(id)value fallback:(BOOL)fallback {
+    if ([value isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)value boolValue];
+    }
+    if ([value isKindOfClass:[NSString class]]) {
+        NSString *normalized = [((NSString *)value) lowercaseString];
+        if ([normalized isEqualToString:@"true"] || [normalized isEqualToString:@"1"]) {
+            return YES;
+        }
+        if ([normalized isEqualToString:@"false"] || [normalized isEqualToString:@"0"]) {
+            return NO;
+        }
+    }
+    return fallback;
 }
 
 - (WLAgentSkillsSkillSessionPageResult *)normalizedSkillSessionPageResultFromDictionary:(NSDictionary *)dictionary

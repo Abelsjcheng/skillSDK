@@ -54,6 +54,11 @@ NS_ASSUME_NONNULL_BEGIN
                                     success:(void (^)(WLAgentSkillsPageResult *result))success
                                     failure:(void (^)(NSError *error))failure;
 
+#pragma mark - 8.1 getSessionMessageHistory
+- (void)getSessionMessageHistory:(WLAgentSkillsGetSessionMessageHistoryParams *)params
+                                success:(void (^)(WLAgentSkillsCursorResult *result))success
+                                failure:(void (^)(NSError *error))failure;
+
 #pragma mark - 9. registerSessionListener
 - (WLAgentSkillsRegisterSessionListenerResult *)registerSessionListener:(WLAgentSkillsRegisterSessionListenerParams *)params;
 

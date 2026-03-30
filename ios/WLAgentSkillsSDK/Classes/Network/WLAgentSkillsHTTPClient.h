@@ -78,6 +78,12 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
+- (void)getMessageHistoryWithSessionId:(NSString *)welinkSessionId
+                                                     beforeSeq:(nullable NSNumber *)beforeSeq
+                                                            size:(nullable NSNumber *)size
+                                                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                                                        failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId

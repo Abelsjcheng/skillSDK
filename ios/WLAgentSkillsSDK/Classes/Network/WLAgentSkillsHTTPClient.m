@@ -217,6 +217,20 @@
     [self GET:path parameters:parameters success:success failure:failure];
 }
 
+- (void)getMessageHistoryWithSessionId:(NSString *)welinkSessionId
+                                                     beforeSeq:(nullable NSNumber *)beforeSeq
+                                                            size:(nullable NSNumber *)size
+                                                        success:(WLAgentSkillsHTTPSuccessBlock)success
+                                                        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages/history", welinkSessionId];
+    NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
+    parameters[@"size"] = size ?: @50;
+    if (beforeSeq != nil) {
+        parameters[@"beforeSeq"] = beforeSeq;
+    }
+    [self GET:path parameters:parameters success:success failure:failure];
+}
+
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId

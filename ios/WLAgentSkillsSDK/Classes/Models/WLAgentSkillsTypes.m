@@ -120,6 +120,18 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
+@implementation WLAgentSkillsGetSessionMessageHistoryParams
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _size = @50;
+    }
+    return self;
+}
+
+@end
+
 @implementation WLAgentSkillsRegisterSessionListenerParams
 @end
 
@@ -275,7 +287,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _ownerNameEn = WLAgentSkillsStringValue(dictionary[@"ownerNameEn"], @"");
         _ownerDeptName = WLAgentSkillsStringValue(dictionary[@"ownerDeptName"], @"");
         _ownerDeptNameEn = WLAgentSkillsStringValue(dictionary[@"ownerDeptNameEn"], @"");
-        _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
+        _id = WLAgentSkillsStringValue(dictionary[@"id"], WLAgentSkillsStringValue(dictionary[@"robotId"], @""));
+        _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
+        _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
         _bizRobotId = WLAgentSkillsStringValue(dictionary[@"bizRobotId"], @"");
         _weCodeUrl = WLAgentSkillsStringValue(dictionary[@"weCodeUrl"], @"");
     }
@@ -299,7 +313,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"ownerNameEn" : self.ownerNameEn ?: @"",
         @"ownerDeptName" : self.ownerDeptName ?: @"",
         @"ownerDeptNameEn" : self.ownerDeptNameEn ?: @"",
-        @"robotId" : self.robotId ?: @"",
+        @"id" : self.id ?: @"",
+        @"bizRobotName" : self.bizRobotName ?: @"",
+        @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
         @"bizRobotId" : self.bizRobotId ?: @"",
         @"weCodeUrl" : self.weCodeUrl ?: @""
     };
@@ -525,6 +541,45 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"totalPages" : self.totalPages ?: @0,
         @"number" : self.number ?: @0,
         @"totalElements" : self.totalElements ?: @0
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsCursorResult
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        NSMutableArray<WLAgentSkillsSessionMessage *> *messages = [NSMutableArray array];
+        for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"content"])) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [messages addObject:[[WLAgentSkillsSessionMessage alloc] initWithDictionary:item]];
+        }
+        _content = [messages copy];
+        _size = WLAgentSkillsNumberValue(dictionary[@"size"], @50);
+        id hasMoreValue = dictionary[@"hasMore"];
+        if ([hasMoreValue isKindOfClass:[NSNumber class]]) {
+            _hasMore = [(NSNumber *)hasMoreValue boolValue];
+        } else if ([hasMoreValue isKindOfClass:[NSString class]]) {
+            NSString *normalized = [((NSString *)hasMoreValue) lowercaseString];
+            _hasMore = [normalized isEqualToString:@"true"] || [normalized isEqualToString:@"1"];
+        } else {
+            _hasMore = NO;
+        }
+        _nextBeforeSeq = WLAgentSkillsNumberValue(dictionary[@"nextBeforeSeq"], nil);
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"content" : WLAgentSkillsSerializeModelArray(self.content),
+        @"size" : self.size ?: @0,
+        @"hasMore" : @(self.hasMore),
+        @"nextBeforeSeq" : WLAgentSkillsNullObject(self.nextBeforeSeq)
     };
 }
 
