@@ -66,6 +66,11 @@ public final class TypeConvertUtils {
         return converted;
     }
 
+    @Nullable
+    public static Integer optionalInteger(@Nullable Object value, @NonNull String fieldName) {
+        return parseInteger(value, fieldName);
+    }
+
     @NonNull
     public static List<String> requireStringList(@Nullable Object value, @NonNull String fieldName) {
         List<String> converted = optionalStringList(value, fieldName);

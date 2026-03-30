@@ -3,6 +3,8 @@ package com.opencode.skill.model;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.Objects;
 
 @Keep
@@ -38,7 +40,12 @@ public class WeAgentDetails {
     @NonNull
     private String ownerDeptNameEn = "";
     @NonNull
-    private String robotId = "";
+    @SerializedName(value = "id", alternate = {"robotId"})
+    private String id = "";
+    @NonNull
+    private String bizRobotName = "";
+    @NonNull
+    private String bizRobotNameEn = "";
     @NonNull
     private String bizRobotId = "";
     @NonNull
@@ -180,12 +187,30 @@ public class WeAgentDetails {
     }
 
     @NonNull
-    public String getRobotId() {
-        return robotId;
+    public String getId() {
+        return id;
     }
 
-    public void setRobotId(@NonNull String robotId) {
-        this.robotId = Objects.requireNonNull(robotId, "robotId == null");
+    public void setId(@NonNull String id) {
+        this.id = Objects.requireNonNull(id, "id == null");
+    }
+
+    @NonNull
+    public String getBizRobotName() {
+        return bizRobotName;
+    }
+
+    public void setBizRobotName(@NonNull String bizRobotName) {
+        this.bizRobotName = Objects.requireNonNull(bizRobotName, "bizRobotName == null");
+    }
+
+    @NonNull
+    public String getBizRobotNameEn() {
+        return bizRobotNameEn;
+    }
+
+    public void setBizRobotNameEn(@NonNull String bizRobotNameEn) {
+        this.bizRobotNameEn = Objects.requireNonNull(bizRobotNameEn, "bizRobotNameEn == null");
     }
 
     @NonNull

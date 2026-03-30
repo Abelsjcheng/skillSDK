@@ -15,6 +15,7 @@ import com.opencode.skill.model.AgentTypeListResult;
 import com.opencode.skill.model.CreateNewSessionParams;
 import com.opencode.skill.model.CreateDigitalTwinResult;
 import com.opencode.skill.model.CreateSessionParams;
+import com.opencode.skill.model.CursorResult;
 import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.ReplyPermissionResult;
@@ -304,6 +305,22 @@ public class ApiClient {
                 .build();
         Request request = newRequestBuilder(url).get().build();
         Type type = TypeToken.getParameterized(PageResult.class, SessionMessage.class).getType();
+        executeEnvelope(request, type, callback);
+    }
+
+    public void getMessagesHistory(
+            @NonNull String welinkSessionId,
+            @Nullable Integer beforeSeq,
+            int size,
+            @NonNull SkillCallback<CursorResult<SessionMessage>> callback
+    ) {
+        HttpUrl.Builder urlBuilder = urlBuilder("/api/skill/sessions/" + welinkSessionId + "/messages/history")
+                .addQueryParameter("size", String.valueOf(size));
+        if (beforeSeq != null) {
+            urlBuilder.addQueryParameter("beforeSeq", String.valueOf(beforeSeq));
+        }
+        Request request = newRequestBuilder(urlBuilder.build()).get().build();
+        Type type = TypeToken.getParameterized(CursorResult.class, SessionMessage.class).getType();
         executeEnvelope(request, type, callback);
     }
 

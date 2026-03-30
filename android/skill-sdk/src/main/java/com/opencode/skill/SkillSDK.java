@@ -18,7 +18,9 @@ import com.opencode.skill.model.CreateDigitalTwinParams;
 import com.opencode.skill.model.CreateDigitalTwinResult;
 import com.opencode.skill.model.CreateNewSessionParams;
 import com.opencode.skill.model.CreateSessionParams;
+import com.opencode.skill.model.CursorResult;
 import com.opencode.skill.model.GetSessionMessageParams;
+import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
@@ -447,6 +449,64 @@ public final class SkillSDK {
         });
     }
 
+    // 8.1 getSessionMessageHistory
+    public void getSessionMessageHistory(
+            @NonNull GetSessionMessageHistoryParams params,
+            @NonNull SkillCallback<CursorResult<SessionMessage>> callback
+    ) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        final String welinkSessionId;
+        final Integer beforeSeq;
+        final int size;
+        try {
+            welinkSessionId = TypeConvertUtils.requireString(params.getWelinkSessionId(), "welinkSessionId");
+            beforeSeq = TypeConvertUtils.optionalInteger(params.getBeforeSeq(), "beforeSeq");
+            if (beforeSeq != null && beforeSeq < 0) {
+                callback.onError(error(1000, "beforeSeq must be greater than or equal to 0"));
+                return;
+            }
+            size = TypeConvertUtils.toPositiveInt(params.getSize(), 50, "size");
+        } catch (SkillSdkException exception) {
+            callback.onError(exception);
+            return;
+        }
+
+        ensureConnected(new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean connected) {
+                apiClient.getMessagesHistory(
+                        welinkSessionId,
+                        beforeSeq,
+                        size,
+                        new SkillCallback<CursorResult<SessionMessage>>() {
+                            @Override
+                            public void onSuccess(@Nullable CursorResult<SessionMessage> result) {
+                                CursorResult<SessionMessage> cursorResult = normalizeSessionMessageCursor(result, size);
+                                streamingMessageCache.ingestServerMessages(
+                                        welinkSessionId,
+                                        cursorResult.getContent()
+                                );
+                                callback.onSuccess(cursorResult);
+                            }
+
+                            @Override
+                            public void onError(@NonNull Throwable error) {
+                                callback.onError(wrapError(error));
+                            }
+                        }
+                );
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
     @NonNull
     private static PageResult<SessionMessage> normalizeSessionMessagePage(@Nullable PageResult<SessionMessage> pageResult,
             int requestPage, int requestSize) {
@@ -464,6 +524,23 @@ public final class SkillSDK {
         normalized.setSize(safeSize);
         normalized.setTotal(safeTotal);
         normalized.setTotalPages(safeTotalPages);
+        return normalized;
+    }
+
+    @NonNull
+    private static CursorResult<SessionMessage> normalizeSessionMessageCursor(
+            @Nullable CursorResult<SessionMessage> cursorResult,
+            int requestSize
+    ) {
+        CursorResult<SessionMessage> source = cursorResult == null ? new CursorResult<>() : cursorResult;
+        int safeSize = source.getSize() <= 0 ? requestSize : source.getSize();
+        List<SessionMessage> safeContent = new ArrayList<>(source.getContent());
+
+        CursorResult<SessionMessage> normalized = new CursorResult<>();
+        normalized.setContent(safeContent);
+        normalized.setSize(safeSize);
+        normalized.setHasMore(source.isHasMore());
+        normalized.setNextBeforeSeq(source.getNextBeforeSeq());
         return normalized;
     }
 
@@ -881,14 +958,15 @@ public final class SkillSDK {
         String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
         String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
         String bizRobotId = normalizeOptionalString(details.getBizRobotId());
-        String robotId = normalizeOptionalString(details.getRobotId());
+        String detailId = normalizeOptionalString(details.getId());
 
         String weAgentUri;
         if (!isBlank(bizRobotId)) {
             String internalWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
-            weAgentUri = appendQueryParameter(internalWeAgentUri, "robotId", robotId);
+            weAgentUri = appendQueryParameter(internalWeAgentUri, "robotId", detailId);
         } else {
-            String externalWeAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
+            String externalBase = !isBlank(weCodeUrl) ? weCodeUrl : (ASSISTANT_H5_URI + "#weAgentCUI");
+            String externalWeAgentUri = appendQueryParameter(externalBase, "wecodePlace", "weAgent");
             externalWeAgentUri = appendQueryParameter(externalWeAgentUri, "assistantAccount", partnerAccount);
             weAgentUri = appendHashFragment(externalWeAgentUri, "weAgentCUI");
         }
@@ -1131,6 +1209,12 @@ public final class SkillSDK {
         if (trimmedBase.isEmpty()) {
             return null;
         }
+        String fragment = null;
+        int hashIndex = trimmedBase.indexOf('#');
+        if (hashIndex >= 0) {
+            fragment = trimmedBase.substring(hashIndex + 1);
+            trimmedBase = trimmedBase.substring(0, hashIndex);
+        }
         String encoded;
         try {
             encoded = URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8.name());
@@ -1143,7 +1227,11 @@ public final class SkillSDK {
         } else {
             connector = "?";
         }
-        return trimmedBase + connector + key + "=" + encoded;
+        String result = trimmedBase + connector + key + "=" + encoded;
+        if (fragment == null || fragment.isEmpty()) {
+            return result;
+        }
+        return result + "#" + fragment;
     }
 
     @Nullable
