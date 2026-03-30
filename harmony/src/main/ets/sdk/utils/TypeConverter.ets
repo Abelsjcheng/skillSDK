@@ -79,7 +79,7 @@ export class TypeConverter {
     return result;
   }
 
-  private static toOptionalInteger(value: ConvertibleValue, fieldName: string): number | undefined {
+  static toOptionalInteger(value: ConvertibleValue, fieldName: string): number | undefined {
     if (value === undefined || value === null) {
       return undefined;
     }

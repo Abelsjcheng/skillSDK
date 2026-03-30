@@ -158,6 +158,13 @@ export interface PageResult<T> {
   totalPages: number;
 }
 
+export interface CursorResult<T> {
+  content: T[];
+  size: number;
+  hasMore: boolean;
+  nextBeforeSeq: number | null;
+}
+
 // ---------------------------
 // WebSocket entities
 // ---------------------------
@@ -341,6 +348,12 @@ export interface GetSessionMessageParams {
   isFirst?: boolean;
 }
 
+export interface GetSessionMessageHistoryParams {
+  welinkSessionId: string;
+  beforeSeq?: number;
+  size?: number;
+}
+
 export interface RegisterSessionListenerParams {
   welinkSessionId: string;
   onMessage: (message: StreamMessage) => void;
@@ -462,7 +475,9 @@ export interface WeAgentDetails {
   ownerNameEn: string;
   ownerDeptName: string;
   ownerDeptNameEn: string;
-  robotId: string;
+  id: string;
+  bizRobotName: string;
+  bizRobotNameEn: string;
   bizRobotId: string;
   weCodeUrl: string;
 }

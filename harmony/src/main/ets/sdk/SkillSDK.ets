@@ -17,7 +17,9 @@ import {
   CreateDigitalTwinResult,
   CreateNewSessionParams,
   CreateSessionParams,
+  CursorResult,
   GetSessionMessageParams,
+  GetSessionMessageHistoryParams,
   HistorySessionsParams,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
@@ -372,6 +374,26 @@ export class SkillSDK {
     }
   }
 
+  // 8.1 getSessionMessageHistory
+  async getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<CursorResult<SessionMessage>> {
+    try {
+      Validator.requireObject(params, 'params');
+      const welinkSessionId = TypeConverter.toRequiredString(params.welinkSessionId, 'welinkSessionId');
+      const beforeSeq = TypeConverter.toOptionalInteger(params.beforeSeq, 'beforeSeq');
+      if (beforeSeq !== undefined && beforeSeq < 0) {
+        throw new SkillSdkException(1000, 'beforeSeq must be greater than or equal to 0');
+      }
+      const size = TypeConverter.toPositiveInt(params.size, 50, 'size');
+      await this.ensureWebSocketConnected();
+
+      const result = await this.fetchServerMessageHistory(welinkSessionId, beforeSeq, size);
+      this.messageCacheManager.cacheHistory(welinkSessionId, result.content);
+      return result;
+    } catch (error) {
+      throw this.normalizeError('getSessionMessageHistory', error);
+    }
+  }
+
   // 9. registerSessionListener
   registerSessionListener(params: RegisterSessionListenerParams): RegisterSessionListenerResult {
     Validator.requireObject(params, 'params');
@@ -668,15 +690,16 @@ export class SkillSDK {
       const partnerAccount = details.partnerAccount ?? '';
       const weCodeUrl = details.weCodeUrl ?? '';
       const bizRobotId = details.bizRobotId ?? '';
-      const robotId = details.robotId ?? '';
+      const detailId = details.id ?? '';
 
       let weAgentUri = '';
       if (bizRobotId.trim() !== '') {
         const internalWeAgentUri = this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent');
-        weAgentUri = this.appendQueryParam(internalWeAgentUri, 'robotId', robotId);
+        weAgentUri = this.appendQueryParam(internalWeAgentUri, 'robotId', detailId);
       } else {
+        const externalBase = weCodeUrl.trim() !== '' ? weCodeUrl : `${SkillSDK.ASSISTANT_H5_URI}#weAgentCUI`;
         const externalWeAgentUri = this.appendQueryParam(
-          this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'wecodePlace', 'weAgent'),
+          this.appendQueryParam(externalBase, 'wecodePlace', 'weAgent'),
           'assistantAccount',
           partnerAccount
         );
@@ -728,6 +751,32 @@ export class SkillSDK {
     };
   }
 
+  private async fetchServerMessageHistory(
+    welinkSessionId: string,
+    beforeSeq: number | undefined,
+    size: number
+  ): Promise<CursorResult<SessionMessage>> {
+    const query: Record<string, string | number> = { size };
+    if (beforeSeq !== undefined) {
+      query.beforeSeq = beforeSeq;
+    }
+    const result = await this.httpClient.get<Record<string, Object>>(
+      `/api/skill/sessions/${welinkSessionId}/messages/history`,
+      query
+    );
+    const content = Array.isArray(result.content) ? (result.content as SessionMessage[]) : [];
+    const resolvedSize = Number(result.size ?? size);
+    const hasMore = this.resolveBooleanValue(result.hasMore, false);
+    const nextBeforeSeq = this.resolveOptionalNumberValue(result.nextBeforeSeq);
+
+    return {
+      content,
+      size: Number.isFinite(resolvedSize) && resolvedSize > 0 ? resolvedSize : size,
+      hasMore,
+      nextBeforeSeq
+    };
+  }
+
   private async fetchServerSessions(
     query: Record<string, string | number>,
     page: number,
@@ -762,6 +811,38 @@ export class SkillSDK {
       partnerAccount,
       message
     };
+  }
+
+  private resolveBooleanValue(value: Object | undefined, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0') {
+        return false;
+      }
+    }
+    return fallback;
+  }
+
+  private resolveOptionalNumberValue(value: Object | undefined): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
   }
 
   private parseAgentTypeList(payload: Object): AgentType[] {
@@ -846,7 +927,11 @@ export class SkillSDK {
       ownerNameEn: TypeConverter.toOptionalString(payload.ownerNameEn, 'ownerNameEn') ?? '',
       ownerDeptName: TypeConverter.toOptionalString(payload.ownerDeptName, 'ownerDeptName') ?? '',
       ownerDeptNameEn: TypeConverter.toOptionalString(payload.ownerDeptNameEn, 'ownerDeptNameEn') ?? '',
-      robotId: TypeConverter.toOptionalString(payload.robotId, 'robotId') ?? '',
+      id: TypeConverter.toOptionalString(payload.id, 'id')
+        ?? TypeConverter.toOptionalString(payload.robotId, 'robotId')
+        ?? '',
+      bizRobotName: TypeConverter.toOptionalString(payload.bizRobotName, 'bizRobotName') ?? '',
+      bizRobotNameEn: TypeConverter.toOptionalString(payload.bizRobotNameEn, 'bizRobotNameEn') ?? '',
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };
@@ -861,11 +946,18 @@ export class SkillSDK {
     if (normalizedBase === '') {
       return '';
     }
-    const connector = normalizedBase.includes('?')
-      ? (normalizedBase.endsWith('?') || normalizedBase.endsWith('&') ? '' : '&')
+    const hashIndex = normalizedBase.indexOf('#');
+    const fragment = hashIndex >= 0 ? normalizedBase.slice(hashIndex + 1) : '';
+    const baseWithoutHash = hashIndex >= 0 ? normalizedBase.slice(0, hashIndex) : normalizedBase;
+    const connector = baseWithoutHash.includes('?')
+      ? (baseWithoutHash.endsWith('?') || baseWithoutHash.endsWith('&') ? '' : '&')
       : '?';
     const encoded = encodeURIComponent(value ?? '');
-    return `${normalizedBase}${connector}${encodeURIComponent(key)}=${encoded}`;
+    const result = `${baseWithoutHash}${connector}${encodeURIComponent(key)}=${encoded}`;
+    if (fragment === '') {
+      return result;
+    }
+    return `${result}#${fragment}`;
   }
 
   private appendHashFragment(baseUrl: string, hash: string): string {
