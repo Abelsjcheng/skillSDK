@@ -218,11 +218,14 @@ function App({
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       console.error('Failed to load more history messages:', err);
+      if (isWeAgentCUI) {
+        showToast('获取历史消息失败');
+      }
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
     }
-  }, [welinkSessionId]);
+  }, [welinkSessionId, isWeAgentCUI]);
 
   const resolveAssistantDetail = useCallback(async (currentAssistantAccount: string) => {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
@@ -363,6 +366,9 @@ function App({
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
+        if (isWeAgentCUI) {
+          showToast('获取历史消息失败');
+        }
       }
     };
 
@@ -534,7 +540,7 @@ function App({
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, finalizeStreamingMessage]);
+  }, [welinkSessionId, finalizeStreamingMessage, isWeAgentCUI]);
 
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;

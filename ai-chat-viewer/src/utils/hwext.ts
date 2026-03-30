@@ -9,6 +9,7 @@ import type {
   ControlSkillWeCodeResponse,
 } from '../types';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
+import { APP_ID } from '../constants';
 
 export interface HWH5EXTError {
   code?: string;
@@ -257,8 +258,8 @@ declare global {
 }
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
-export const WE_AGENT_BASE_URI = 'h5://123456/index.html';
-export const ASSISTANT_PAGE_BASE_URI = 'h5://123456/index.html';
+export const WE_AGENT_BASE_URI = `h5://${APP_ID}/index.html#weAgentCUI`;
+export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
@@ -428,22 +429,17 @@ function buildAssistantPageUri(partnerAccount: string, hash: 'assistantDetail' |
   return parsed.toString();
 }
 
-function buildExternalWeAgentCUIUri(partnerAccount: string): string {
-  const parsed = parseUrl(ASSISTANT_PAGE_BASE_URI);
-  if (!parsed) return ASSISTANT_PAGE_BASE_URI;
-  parsed.searchParams.set('assistantAccount', partnerAccount);
-  parsed.hash = 'weAgentCUI';
-  return parsed.toString();
-}
-
 export function resolveWeCodeUrlForOpenWeAgentCUI(
   detail: Pick<WeAgentDetails, 'bizRobotId' | 'weCodeUrl'>,
-  partnerAccount: string,
+  _partnerAccount: string,
 ): string {
+  const normalizedWeCodeUrl = normalizeString(detail.weCodeUrl);
+
   if (detail.bizRobotId?.trim()) {
-    return detail.weCodeUrl;
+    return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
   }
-  return buildExternalWeAgentCUIUri(partnerAccount?.trim() ?? '');
+
+  return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
 }
 
 export function resolveRobotIdForOpenWeAgentCUI(options: ResolveRobotIdOptions): string {
@@ -624,6 +620,8 @@ export async function getWeAgentUri(): Promise<WeAgentUriResult> {
 }
 
 export async function openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<OpenWeAgentCUIResult> {
+  console.log('params', params);
+  
   return getJsApiOrThrow().openWeAgentCUI(params);
 }
 

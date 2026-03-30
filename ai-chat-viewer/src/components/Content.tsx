@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+﻿import React, { useCallback, useEffect, useRef } from 'react';
 import { MessageBubble } from './MessageBubble';
 import type { AppVariant } from '../App';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
@@ -51,6 +51,7 @@ export const Content: React.FC<ContentProps> = ({
     messageId: null,
     offsetTop: 0,
   });
+
   const welcomeTitle = weAgentUserName ? `早上好，${weAgentUserName}` : '早上好';
   const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
   const welcomeAvatar = weAgentAssistantAvatar || assistantAvatar;
@@ -120,19 +121,6 @@ export const Content: React.FC<ContentProps> = ({
     }
   }, [isLoadingHistory]);
 
-  if (isLoading) {
-    return (
-      <div className={`content ${isWeAgentCUI ? 'content--we-agent-cui' : ''}`.trim()}>
-        <div className="loading-container">
-          <span className="loading-dot" />
-          <span className="loading-dot" />
-          <span className="loading-dot" />
-          &nbsp;加载消息中...
-        </div>
-      </div>
-    );
-  }
-
   if (messages.length === 0) {
     if (isWeAgentCUI) {
       return (
@@ -165,7 +153,7 @@ export const Content: React.FC<ContentProps> = ({
       onScroll={handleScroll}
     >
       <div className={`messages-container ${isWeAgentCUI ? 'messages-container--we-agent-cui' : ''}`.trim()}>
-        {isLoadingHistory && (
+        {!isWeAgentCUI && isLoadingHistory && (
           <div className="history-status">加载历史消息中...</div>
         )}
         {!isLoadingHistory && !hasMoreHistory && (

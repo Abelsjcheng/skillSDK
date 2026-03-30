@@ -593,6 +593,8 @@
    - 容器 1：AI 头像图标，尺寸 `72px x 72px`，圆角 `124px`，边框 `2px solid rgba(255,255,255,1)`；
    - 容器 2：文本 `早上好，峰哥`，样式 `18px / 500 / 26px`，颜色 `rgba(25,25,25,1)`；
    - 容器 3：文本 `CodeAgent | 你的专属编程智能体`，样式 `14px / 400 / 22px`，颜色 `rgba(89,89,89,1)`。
+   - 页面进入时优先显示欢迎块，不展示“加载历史消息中”loading 文案；历史消息加载完成后若存在消息则切换为消息列表展示。
+   - `Content.tsx` 中不再展示“加载消息中...”loading 文案（含三点动画），加载中阶段按当前消息态渲染欢迎块或空态。
 9. 页面进入解析规则：
    - 进入 `#/weAgentCUI` 页面时，需从 URL query（含 HashRouter query）中解析 `assistantAccount`；
    - 解析结果需在页面内保留（用于后续业务逻辑处理），不影响当前对话 UI 展示逻辑。
@@ -604,6 +606,7 @@
 11. 历史会话数据获取：
    - 打开侧边栏时调用 `getHistorySessionsList`；
    - 调用参数需带 `assistantAccount`（来自 `weAgentCUI` 页面入口 query 解析结果）进行过滤查询。
+   - 获取历史消息（`getSessionMessage`）接口失败时，页面需通过 toast 弹窗提示失败信息。
 12. 历史会话分组与展示：
    - 按 `updatedAt` 将历史会话分为 3 组：`今天`、`昨天`、`7天前`；
    - 每个分组由“标题区 + 会话项列表”组成，分组内标题与列表间距 `10px`；
@@ -729,9 +732,15 @@
    - 将选中/新建会话的 `welinkSessionId` 作为后续 AI 对话与历史消息展示的会话 ID；
    - 点击“新建会话”图标按钮时，按同样参数调用 `createNewSession`，并用新会话 `welinkSessionId` 更新当前对话会话上下文。
 12. 助理头像地址兼容规则（助理详情/切换助理/启用助理）：
-   - 在 `ai-chat-viewer/src/constants.ts` 中维护 `HOST` 常量；
+   - 在 `ai-chat-viewer/src/constants.tsx` 中维护 `HOST` 常量；
+   - `HOST` 需通过环境变量 `isProEnv` 动态取值：
+      - `isProEnv=true`（production）：`h5://921535418692659`
+      - `isProEnv=false`（uat）：`h5://S008623`
    - 当接口返回的助理 `icon` 以 `/` 开头时，渲染头像前需拼接 `HOST`；
    - 当 `icon` 为绝对地址（如 `http://`、`https://`）时保持原值不变。
+13. 新增 UAT 打包能力：
+   - 在 `package.json` 中新增 `build:uat` 脚本，产物需通过 `isProEnv=false` 进入 uat 常量分支；
+   - 默认 `build`（production）产物保持不变。
 
 ## 19. 宿主事件桥与库打包约束
 

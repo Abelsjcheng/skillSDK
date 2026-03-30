@@ -1274,7 +1274,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| weAgentUri | string | 是 | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成；当助理详情 `bizRobotId` 不为空且存在 `robotId` 时，追加 `robotId` query） |
+| weAgentUri | string | 是 | 当前助理 CUI 地址：当助理详情 `bizRobotId` 为空时，若 `weCodeUrl` 不为空则取 `weCodeUrl`（服务端下发格式：`h5://123456/index.html#weAgentCUI`）；若 `weCodeUrl` 为空则取 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`）；随后追加 `wecodePlace=weAgent` query，最终 URL 形态为 `h5://123456/index.html?wecodePlace=weAgent#weAgentCUI`。当助理详情 `bizRobotId` 不为空且存在 `robotId` 时，继续追加 `robotId` query。 |
 | assistantDetailUri | string | 是 | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
 | switchAssistantUri | string | 是 | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 
@@ -1297,7 +1297,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 
 ```javascript
 window.HWH5EXT.openWeAgentCUI({
-  weAgentUri: 'h5://123456/html/index.html?wecodePlace=weAgent',
+  weAgentUri: 'h5://123456/index.html?wecodePlace=weAgent#weAgentCUI',
   assistantDetailUri: 'h5://123456/index.html?partnerAccount=x00_1#assistantDetail',
   switchAssistantUri: 'h5://123456/index.html?partnerAccount=x00_1#switchAssistant'
 }).then((result) => {

@@ -1,4 +1,5 @@
 ﻿import type { DefaultAvatarOption, InternalAssistantOption } from '../../types/digitalTwin';
+import { HOST } from '../../constants';
 
 function createSvgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -42,8 +43,6 @@ export const INTERNAL_ASSISTANTS: InternalAssistantOption[] = [
   { name: '助手', icon: '', bizRobotId: '1234' },
 ];
 
-export const host = 'h5://S008623';
-
 function trimTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
@@ -59,7 +58,7 @@ export function resolveAssistantIconUrl(icon: string | undefined | null): string
   }
 
   if (normalizedIcon.startsWith('/')) {
-    return `${trimTrailingSlash(host)}${normalizedIcon}`;
+    return `${trimTrailingSlash(HOST)}${normalizedIcon}`;
   }
 
   return normalizedIcon;

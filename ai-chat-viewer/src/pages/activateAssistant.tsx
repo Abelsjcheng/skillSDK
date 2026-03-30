@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router';
 import activateGuide1 from '../imgs/activate-guide-1.svg';
 import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from '../utils/hwext';
 import '../styles/ActivateAssistant.less';
+import { APP_ID } from '../constants';
 
-const CREATE_ASSISTANT_URI = 'h5://123456/html/index.html?from=weAgent#createAssistant';
-const SELECT_ASSISTANT_URI = 'h5://123456/html/index.html?from=weAgent#selectAssistant';
+const CREATE_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#createAssistant`;
+const SELECT_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#selectAssistant`;
 const DEFAULT_LIST_QUERY = {
   pageSize: 20,
   pageNumber: 1,

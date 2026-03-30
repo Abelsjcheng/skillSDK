@@ -31,6 +31,7 @@ import type {
   WeAgentListResult,
   WeAgentUriResult,
 } from '../utils/hwext';
+import { HOST } from '../constants';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
@@ -67,7 +68,7 @@ declare global {
 }
 
 const URL_BASE = 'https://ai-chat-viewer.mock.local';
-const BASE_PAGE_URI = 'h5://S008623/index.html';
+const BASE_PAGE_URI = `${HOST}/index.html`;
 const DEFAULT_ASSISTANT_ACCOUNT = 'mock_assistant_001';
 const MOCK_UID = 'mock_uid_10001';
 const DEFAULT_PAGE_SIZE = 50;
@@ -367,7 +368,7 @@ function seedMockData(): void {
     bizRobotId: 'biz_robot_1001',
     bizRobotName: 'Staff Assistant',
     bizRobotNameEn: 'Staff Assistant',
-    weCodeUrl: buildExternalWeAgentUri(DEFAULT_ASSISTANT_ACCOUNT),
+    weCodeUrl: 'h5://921535418692659/index.html',
   };
 
   const customAssistant: WeAgentDetails = {
@@ -389,7 +390,7 @@ function seedMockData(): void {
     bizRobotId: '',
     bizRobotName: '',
     bizRobotNameEn: '',
-    weCodeUrl: buildExternalWeAgentUri('mock_assistant_002'),
+    weCodeUrl: 'h5://921535418692659/index.html#weAgentCUI',
   };
 
   assistantDetailsStore.set(internalAssistant.partnerAccount, internalAssistant);
