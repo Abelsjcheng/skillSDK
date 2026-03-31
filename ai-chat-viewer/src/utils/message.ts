@@ -80,6 +80,7 @@ export function sessionMessageToMessage(sessionMessage: SessionMessage): Message
     content: sessionMessage.content ?? '',
     timestamp: new Date(sessionMessage.createdAt).getTime(),
     isStreaming: false,
+    fromHistory: true,
     parts: mapRawParts(sessionMessage.parts, false),
   };
 }
@@ -146,5 +147,59 @@ export function syncToolCallIdForQuestionParts(parts: MessagePart[]): MessagePar
       ...part,
       toolCallId: currentToolCallId,
     };
+  });
+}
+
+function resolveUserAnswerToolCallId(message: Message): string {
+  const toolCallId = message.parts?.find((part) => typeof part.toolCallId === 'string' && part.toolCallId.trim())?.toolCallId;
+  return typeof toolCallId === 'string' ? toolCallId.trim() : '';
+}
+
+export function applyHistoryQuestionState(messages: Message[]): Message[] {
+  const answerByToolCallId = new Map<string, string>();
+
+  messages.forEach((message) => {
+    if (normalizeRole(message.role) !== 'user') {
+      return;
+    }
+    const toolCallId = resolveUserAnswerToolCallId(message);
+    const answerContent = message.content.trim();
+    if (!toolCallId || !answerContent) {
+      return;
+    }
+    answerByToolCallId.set(toolCallId, answerContent);
+  });
+
+  return messages.map((message) => {
+    if (!message.fromHistory || !message.parts || message.parts.length === 0) {
+      return message;
+    }
+
+    let changed = false;
+    const nextParts = message.parts.map((part) => {
+      if (part.type !== 'question') {
+        return part;
+      }
+
+      const answerContent = part.toolCallId ? answerByToolCallId.get(part.toolCallId.trim()) ?? '' : '';
+      const isAnswered = Boolean(answerContent);
+      const nextPart: MessagePart = {
+        ...part,
+        answered: isAnswered,
+        answeredContent: answerContent || undefined,
+        readOnly: true,
+      };
+
+      if (
+        part.answered !== nextPart.answered
+        || part.answeredContent !== nextPart.answeredContent
+        || part.readOnly !== nextPart.readOnly
+      ) {
+        changed = true;
+      }
+      return nextPart;
+    });
+
+    return changed ? { ...message, parts: nextParts } : message;
   });
 }

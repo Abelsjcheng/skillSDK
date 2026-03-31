@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { MessagePart } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { sendMessage } from '../utils/hwext';
@@ -7,18 +7,33 @@ interface QuestionCardProps {
   part: MessagePart;
   welinkSessionId: string;
   onAnswered?: () => void;
+  readOnly?: boolean;
+}
+
+function resolveInitialAnswer(part: MessagePart): string {
+  return (part.answeredContent ?? '').trim();
 }
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   part,
   welinkSessionId,
   onAnswered,
+  readOnly = false,
 }) => {
-  const [customInput, setCustomInput] = useState('');
+  const initialAnswer = useMemo(() => resolveInitialAnswer(part), [part]);
+  const [customInput, setCustomInput] = useState(initialAnswer);
   const [answered, setAnswered] = useState(part.answered ?? false);
+  const [selectedAnswer, setSelectedAnswer] = useState(initialAnswer);
   const [submitting, setSubmitting] = useState(false);
 
-  const isLocked = answered || submitting;
+  useEffect(() => {
+    const nextAnswer = resolveInitialAnswer(part);
+    setCustomInput(nextAnswer);
+    setAnswered(part.answered ?? false);
+    setSelectedAnswer(nextAnswer);
+  }, [part.answered, part.answeredContent, part.partId]);
+
+  const isLocked = readOnly || answered || submitting;
   const trimmedInput = customInput.trim();
 
   const submitAnswer = async (value: string) => {
@@ -42,11 +57,23 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   const handleSelect = (option: string) => {
+    setSelectedAnswer(option);
+    setCustomInput(option);
     void submitAnswer(option);
   };
 
   const handleSubmit = () => {
-    void submitAnswer(customInput);
+    const nextAnswer = customInput.trim();
+    if (!nextAnswer) {
+      return;
+    }
+    setSelectedAnswer(nextAnswer);
+    void submitAnswer(nextAnswer);
+  };
+
+  const shouldHighlightOption = (option: string): boolean => {
+    const normalizedSelectedAnswer = selectedAnswer.trim();
+    return Boolean(normalizedSelectedAnswer) && normalizedSelectedAnswer === option;
   };
 
   return (
@@ -64,7 +91,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           {part.options.map((opt, i) => (
             <button
               key={i}
-              className="question-card__option"
+              className={`question-card__option ${shouldHighlightOption(opt) ? 'is-selected' : ''}`.trim()}
               onClick={(event) => {
                 runButtonClickWithDebounce(event, () => {
                   handleSelect(opt);

@@ -26,6 +26,7 @@ import {
   type WeAgentDetails,
 } from './utils/hwext';
 import {
+  applyHistoryQuestionState,
   genMessageId,
   getLatestUserContent,
   mapRawParts,
@@ -78,7 +79,7 @@ function getLatestAvailableSessionByUpdatedAt(sessions: SkillSession[]): SkillSe
 }
 
 function App({ assistantAccount = '' }: AppProps) {
-  const isPc = true;
+  const isPc = isPcMiniApp();
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -185,7 +186,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
 
       if (olderMessages.length > 0) {
-        setMessages((prev) => [...olderMessages, ...prev]);
+        setMessages((prev) => applyHistoryQuestionState([...olderMessages, ...prev]));
       }
 
       nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
@@ -299,7 +300,7 @@ function App({ assistantAccount = '' }: AppProps) {
           welinkSessionId,
           size: HISTORY_PAGE_SIZE,
         });
-        const mapped = result.content.map(sessionMessageToMessage);
+        const mapped = applyHistoryQuestionState(result.content.map(sessionMessageToMessage));
         setMessages(mapped);
         latestUserContentRef.current = getLatestUserContent(mapped);
 

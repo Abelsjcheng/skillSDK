@@ -143,12 +143,35 @@ function splitReplyContent(content: string): string[] {
   return chunks.length > 0 ? chunks : [content];
 }
 
-function buildTextPart(partId: string, content: string): SessionMessage['parts'] {
-  return [{
+function buildTextPart(partId: string, content: string, toolCallId?: string): SessionMessage['parts'] {
+  const part: NonNullable<SessionMessage['parts']>[number] = {
     partId,
     partSeq: 1,
     type: 'text',
     content,
+    status: 'completed',
+  };
+  if (toolCallId) {
+    part.toolCallId = toolCallId;
+  }
+  return [part];
+}
+
+function buildQuestionPart(
+  partId: string,
+  toolCallId: string,
+  question: string,
+  options: string[],
+): SessionMessage['parts'] {
+  return [{
+    partId,
+    partSeq: 1,
+    type: 'question',
+    content: question,
+    toolCallId,
+    header: '历史提问',
+    question,
+    options,
     status: 'completed',
   }];
 }
@@ -434,6 +457,52 @@ function seedMockData(): void {
   seedRecord.nextMessageSeq += 1;
   upsertSessionRecord(seedRecord, firstAssistantMessage);
 
+  const historyQuestionText = '你希望后续回复使用哪种格式？';
+  const historyQuestionOptions = ['Markdown', '纯文本'];
+  const historyQuestionToolCallId = nextId('tool_call_history_question');
+  const historyQuestionPartId = nextId('part_history_question');
+  const historyQuestionMessage = createMessage(
+    seedSession.welinkSessionId,
+    'assistant',
+    historyQuestionText,
+    seedRecord.nextMessageSeq,
+  );
+  historyQuestionMessage.parts = buildQuestionPart(
+    historyQuestionPartId,
+    historyQuestionToolCallId,
+    historyQuestionText,
+    historyQuestionOptions,
+  );
+  seedRecord.nextMessageSeq += 1;
+  upsertSessionRecord(seedRecord, historyQuestionMessage);
+
+  const historyAnsweredContent = 'Markdown';
+  const historyAnswerPartId = nextId('part_history_answer');
+  const historyAnswerMessage = createMessage(
+    seedSession.welinkSessionId,
+    'user',
+    historyAnsweredContent,
+    seedRecord.nextMessageSeq,
+    historyAnswerPartId,
+  );
+  historyAnswerMessage.parts = buildTextPart(
+    historyAnswerPartId,
+    historyAnsweredContent,
+    historyQuestionToolCallId,
+  );
+  seedRecord.nextMessageSeq += 1;
+  upsertSessionRecord(seedRecord, historyAnswerMessage);
+
+  const historyFollowupMessage = createMessage(
+    seedSession.welinkSessionId,
+    'assistant',
+    '好的，后续我会优先使用 Markdown 回复。',
+    seedRecord.nextMessageSeq,
+    nextId('part_history_followup'),
+  );
+  seedRecord.nextMessageSeq += 1;
+  upsertSessionRecord(seedRecord, historyFollowupMessage);
+
   sessionStore.set(seedSession.welinkSessionId, seedRecord);
 }
 
@@ -602,12 +671,18 @@ function buildMockApi(): HWH5EXT {
 
     sendMessage: async (params: SendMessageParams): Promise<SendMessageResponse> => {
       const record = getSessionRecordOrThrow(params.welinkSessionId);
+      const normalizedToolCallId = params.toolCallId?.trim();
+      const userPartId = normalizedToolCallId ? nextId('part_user_answer') : undefined;
       const userMessage = createMessage(
         record.session.welinkSessionId,
         'user',
         params.content,
         record.nextMessageSeq,
+        userPartId,
       );
+      if (normalizedToolCallId && userPartId) {
+        userMessage.parts = buildTextPart(userPartId, params.content, normalizedToolCallId);
+      }
       record.nextMessageSeq += 1;
       upsertSessionRecord(record, userMessage);
       scheduleAssistantReply(record, params.content);
