@@ -1,4 +1,4 @@
-﻿import type { BrainType, GetFilePathResult } from '../types/digitalTwin';
+﻿import type { BrainType } from '../types/digitalTwin';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
@@ -60,8 +60,17 @@ export function canConfirm(brainType?: BrainType, bizRobotId?: string): boolean 
   return Boolean(bizRobotId?.trim());
 }
 
-export function validateAvatarFile(file: GetFilePathResult): AvatarValidationResult {
-  const ext = file.filePath.split('.').pop()?.toLowerCase();
+export function validateAvatarFile(file: File): AvatarValidationResult {
+  if (file.size >= MAX_AVATAR_SIZE) {
+    return { valid: false, reason: '图片大小需小于2MB', code: 'size' };
+  }
+
+  const fileType = file.type.toLowerCase();
+  if (ALLOWED_MIME_TYPES.has(fileType)) {
+    return { valid: true };
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase();
   if (ext && ALLOWED_EXTENSIONS.has(ext)) {
     return { valid: true };
   }

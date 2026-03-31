@@ -204,21 +204,6 @@ export interface OpenWeAgentCUIResult {
   status: 'success' | string;
 }
 
-export interface UploadFileParams {
-  serverlUrl: string;
-  filePath: string;
-  name: string;
-  formData: object;
-}
-
-export interface ChooseImageParams {
-  flag: number;
-  imagePickerMode: string;
-  maxSelectedCount: number;
-  showOrigin: boolean;
-  type: number;
-}
-
 export interface WeAgentUriResult {
   weAgentUri: string;
   assistantDetailUri: string;
@@ -252,8 +237,6 @@ interface Pedestal {
 
 interface HWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
-  uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
-  chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
@@ -659,30 +642,6 @@ export async function openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<Open
   console.log('params', params);
   
   return getJsApiOrThrow().openWeAgentCUI(params);
-}
-
-export async function uploadFile(params: UploadFileParams): Promise<unknown> {
-  if (isPcMiniApp()) {
-    throw new Error('HWH5.uploadFile is not available in PC miniapp environment.');
-  }
-
-  if (typeof window === 'undefined' || typeof window.HWH5?.uploadFile !== 'function') {
-    throw new Error('HWH5.uploadFile is not available.');
-  }
-
-  return Promise.resolve(window.HWH5.uploadFile(params));
-}
-
-export async function chooseImage(params: ChooseImageParams): Promise<unknown> {
-  if (isPcMiniApp()) {
-    throw new Error('HWH5.chooseImage is not available in PC miniapp environment.');
-  }
-
-  if (typeof window === 'undefined' || typeof window.HWH5?.chooseImage !== 'function') {
-    throw new Error('HWH5.chooseImage is not available.');
-  }
-
-  return Promise.resolve(window.HWH5.chooseImage(params));
 }
 
 export function parseWelinkSessionId(): string | null {

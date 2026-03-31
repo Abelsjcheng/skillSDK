@@ -1,6 +1,4 @@
 import React from 'react';
-import closeIcon from '../../imgs/close_icon.png';
-import backIcon from '../../imgs/back_icon.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 
@@ -42,7 +40,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
               });
             }}
           >
-            <img src={closeIcon} alt="" className="digital-twin__close-icon" aria-hidden="true" />
+            ×
           </button>
         </>
       ) : (
@@ -52,14 +50,14 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
               type="button"
               className="digital-twin__mobile-back-btn"
               aria-label="返回上一页"
-                onClick={(event) => {
-                  runButtonClickWithDebounce(event, () => {
-                    window.HWH5.navigateBack();
-                  });
-                }}
-              >
-                <img src={backIcon} alt="" className="digital-twin__mobile-back-icon" aria-hidden="true" />
-              </button>
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  window.HWH5.navigateBack();
+                });
+              }}
+            >
+              {'<'}
+            </button>
           </div>
           <span className="digital-twin__mobile-title">创建个人助理</span>
           <div className="digital-twin__mobile-header-side" aria-hidden="true" />
