@@ -79,7 +79,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
-            readOnly={Boolean(part.readOnly)}
           />
         );
 

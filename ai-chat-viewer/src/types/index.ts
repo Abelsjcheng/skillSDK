@@ -149,8 +149,6 @@ export interface MessagePart
   content: string;
   isStreaming: boolean;
   answered?: boolean;
-  answeredContent?: string;
-  readOnly?: boolean;
   permResolved?: boolean;
 }
 
@@ -161,7 +159,6 @@ export interface Message {
   content: string;
   timestamp: number;
   isStreaming?: boolean;
-  fromHistory?: boolean;
   parts?: MessagePart[];
   meta?: {
     tokens?: StreamMessage['tokens'];
