@@ -261,6 +261,9 @@ public class ApiClient {
         if (params.getAssistantAccount() != null && !params.getAssistantAccount().isEmpty()) {
             builder.addQueryParameter("assistantAccount", params.getAssistantAccount());
         }
+        if (params.getBusinessSessionDomain() != null && !params.getBusinessSessionDomain().isEmpty()) {
+            builder.addQueryParameter("businessSessionDomain", params.getBusinessSessionDomain());
+        }
 
         Request request = newRequestBuilder(builder.build())
                 .get()

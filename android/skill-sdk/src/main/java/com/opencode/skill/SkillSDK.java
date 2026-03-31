@@ -743,6 +743,7 @@ public final class SkillSDK {
 
         final HistorySessionsParams requestParams;
         String status;
+        String businessSessionDomain;
         try {
             status = TypeConvertUtils.optionalString(params.getStatus());
             if (status != null) {
@@ -753,7 +754,19 @@ public final class SkillSDK {
             String ak = TypeConvertUtils.optionalString(params.getAk());
             String bussinessId = TypeConvertUtils.optionalString(params.getBussinessId());
             String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
-            requestParams = new HistorySessionsParams(page, size, status, ak, bussinessId, assistantAccount);
+            businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
+            if (businessSessionDomain != null) {
+                businessSessionDomain = businessSessionDomain.toLowerCase(Locale.ROOT);
+            }
+            requestParams = new HistorySessionsParams(
+                    page,
+                    size,
+                    status,
+                    ak,
+                    bussinessId,
+                    assistantAccount,
+                    businessSessionDomain
+            );
         } catch (SkillSdkException e) {
             callback.onError(e);
             return;
@@ -761,6 +774,12 @@ public final class SkillSDK {
 
         if (status != null && !isSessionRecordStatusValid(status)) {
             callback.onError(error(1000, "status must be ACTIVE/IDLE/CLOSED"));
+            return;
+        }
+        if (businessSessionDomain != null
+                && !"miniapp".equals(businessSessionDomain)
+                && !"im".equals(businessSessionDomain)) {
+            callback.onError(error(1000, "businessSessionDomain must be miniapp/im"));
             return;
         }
 
