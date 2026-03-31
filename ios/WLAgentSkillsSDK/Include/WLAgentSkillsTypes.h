@@ -63,6 +63,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *bussinessId;
 @property (nonatomic, copy, nullable) NSString *assistantAccount;
+@property (nonatomic, copy, nullable) NSString *businessSessionDomain;
 @end
 
 @interface WLAgentSkillsStopSkillParams : NSObject

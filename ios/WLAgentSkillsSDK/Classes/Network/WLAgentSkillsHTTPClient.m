@@ -172,6 +172,7 @@
                                                 ak:(nullable NSString *)ak
                                     bussinessId:(nullable NSString *)bussinessId
                             assistantAccount:(nullable NSString *)assistantAccount
+                    businessSessionDomain:(nullable NSString *)businessSessionDomain
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
@@ -192,6 +193,9 @@
     }
     if (assistantAccount != nil && assistantAccount.length > 0) {
         parameters[@"assistantAccount"] = assistantAccount;
+    }
+    if (businessSessionDomain != nil && businessSessionDomain.length > 0) {
+        parameters[@"businessSessionDomain"] = businessSessionDomain;
     }
 
     [self GET:@"/api/skill/sessions" parameters:parameters success:success failure:failure];

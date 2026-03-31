@@ -729,6 +729,15 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
     NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
     NSString *bussinessId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessId];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
+    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
+    if (businessSessionDomain != nil) {
+        businessSessionDomain = [businessSessionDomain lowercaseString];
+        NSSet *validBusinessSessionDomains = [NSSet setWithArray:@[@"miniapp", @"im"]];
+        if (![validBusinessSessionDomains containsObject:businessSessionDomain]) {
+            [self dispatchFailure:failure code:1000 message:@"businessSessionDomain must be miniapp/im."];
+            return;
+        }
+    }
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
@@ -739,6 +748,7 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
                                                                      ak:ak
                                                              bussinessId:bussinessId
                                                          assistantAccount:assistantAccount
+                                                    businessSessionDomain:businessSessionDomain
                                                                 success:^(id  _Nullable responseObject) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (strongSelf == nil) {

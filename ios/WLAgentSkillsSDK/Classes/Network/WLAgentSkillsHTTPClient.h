@@ -65,6 +65,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                                 ak:(nullable NSString *)ak
                                     bussinessId:(nullable NSString *)bussinessId
                             assistantAccount:(nullable NSString *)assistantAccount
+                    businessSessionDomain:(nullable NSString *)businessSessionDomain
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
