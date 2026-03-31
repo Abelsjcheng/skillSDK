@@ -112,17 +112,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     }
   }, []);
 
-  const handleMobileInputTouchStart = useCallback((event: React.TouchEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (isPcMiniApp) return;
-    event.preventDefault();
-    const target = event.currentTarget;
-    try {
-      target.focus({ preventScroll: true });
-    } catch {
-      target.focus();
-    }
-  }, [isPcMiniApp]);
-
   const handleNext = useCallback(() => {
     if (!canNext) return;
     onNext({
@@ -197,7 +186,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             value={name}
             placeholder="例如：智能助手"
             onChange={(event) => setName(event.target.value)}
-            onTouchStart={handleMobileInputTouchStart}
           />
         </div>
 
@@ -211,7 +199,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             value={description}
             placeholder="介绍助理的功能和应用场景"
             onChange={(event) => setDescription(event.target.value)}
-            onTouchStart={handleMobileInputTouchStart}
           />
         </div>
       </div>

@@ -23,6 +23,10 @@ const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueN
 );
 
 const maskSecret = (secret: string): string => (secret ? '*'.repeat(secret.length) : '');
+const joinDisplayValue = (...values: Array<string | undefined | null>): string => values
+  .map((value) => (value ?? '').trim())
+  .filter(Boolean)
+  .join(' ');
 
 const AssistantDetail: React.FC = () => {
   const isPc = isPcMiniApp();
@@ -65,7 +69,7 @@ const AssistantDetail: React.FC = () => {
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
   const displayTag = detail?.bizRobotName || detail?.bizRobotNameEn || '';
   const displayDescription = detail?.desc ?? '';
-  const displayCreator = [detail?.creatorName ?? '', detail?.creatorWorkId ?? ''].filter(Boolean).join(' ');
+  const displayCreator = joinDisplayValue(detail?.creatorName, detail?.createdBy);
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
   const secret = detail?.appSecret ?? '';
@@ -74,7 +78,9 @@ const AssistantDetail: React.FC = () => {
   const orgLabel = isInternalAssistant ? '部门' : 'APPID';
   const orgValue = isInternalAssistant ? (detail?.ownerDeptName ?? '') : (detail?.appKey ?? '');
   const ownerLabel = isInternalAssistant ? '责任人' : '密钥';
-  const ownerValue = isInternalAssistant ? (detail?.ownerName ?? '') : displaySecret;
+  const ownerValue = isInternalAssistant
+    ? joinDisplayValue(detail?.ownerName, detail?.ownerWelinkId)
+    : displaySecret;
 
   const toggleSecretVisible = () => {
     if (isInternalAssistant) return;

@@ -95,6 +95,7 @@ export interface GetHistorySessionsListParams {
   ak?: string;
   bussinessId?: string;
   assistantAccount?: string;
+  businessSessionDomain?: 'miniapp' | 'im' | string;
 }
 
 export interface SkillSession {

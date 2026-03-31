@@ -46,6 +46,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
+  const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
 
   const markdownComponents: Components = useMemo(
     () => ({
@@ -79,6 +80,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
+            readonly={isHistoryAssistantReadonly}
           />
         );
 
@@ -88,6 +90,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
+            readonly={isHistoryAssistantReadonly}
           />
         );
 

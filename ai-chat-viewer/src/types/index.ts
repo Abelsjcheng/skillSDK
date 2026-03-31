@@ -159,6 +159,7 @@ export interface Message {
   content: string;
   timestamp: number;
   isStreaming?: boolean;
+  isHistory?: boolean;
   parts?: MessagePart[];
   meta?: {
     tokens?: StreamMessage['tokens'];

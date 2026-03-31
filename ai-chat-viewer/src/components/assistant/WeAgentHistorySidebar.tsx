@@ -102,8 +102,8 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     try {
       const currentAssistantAccount = assistantAccount.trim();
       const params = currentAssistantAccount
-        ? { assistantAccount: currentAssistantAccount }
-        : {};
+        ? { assistantAccount: currentAssistantAccount, businessSessionDomain: 'miniapp' as const }
+        : { businessSessionDomain: 'miniapp' as const };
       const result = await getHistorySessionsList(params);
       const sessions = Array.isArray(result.content) ? result.content : [];
       setHistorySessions(sessions);
@@ -188,7 +188,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                         }}
                         title={sessionTitle}
                       >
-                        {sessionTitle}
+                        <span className="we-agent-history-sidebar__session-item-text">{sessionTitle}</span>
                       </button>
                     );
                   })}

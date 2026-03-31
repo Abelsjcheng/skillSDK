@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import type { MessagePart } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
@@ -7,6 +7,7 @@ interface PermissionCardProps {
   part: MessagePart;
   welinkSessionId: string;
   onResolved?: () => void;
+  readonly?: boolean;
 }
 
 const permTypeLabels: Record<string, string> = {
@@ -22,12 +23,15 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
   part,
   welinkSessionId,
   onResolved,
+  readonly = false,
 }) => {
   const [resolved, setResolved] = useState(part.permResolved ?? false);
   const [submitting, setSubmitting] = useState(false);
+  const isLocked = submitting || readonly;
 
   const handleDecision = async (response: 'once' | 'always' | 'reject') => {
-    if (resolved || submitting || !part.permissionId) return;
+    if (resolved || isLocked || !part.permissionId) return;
+
     setSubmitting(true);
     try {
       await replyPermission({
@@ -73,9 +77,9 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
                 void handleDecision('once');
               });
             }}
-            disabled={submitting}
+            disabled={isLocked}
           >
-            ✅ 允许
+            允许
           </button>
           <button
             className="permission-card__btn permission-card__btn--always"
@@ -84,9 +88,9 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
                 void handleDecision('always');
               });
             }}
-            disabled={submitting}
+            disabled={isLocked}
           >
-            ✅ 始终允许
+            始终允许
           </button>
           <button
             className="permission-card__btn permission-card__btn--deny"
@@ -95,9 +99,9 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
                 void handleDecision('reject');
               });
             }}
-            disabled={submitting}
+            disabled={isLocked}
           >
-            ❌ 拒绝
+            拒绝
           </button>
         </div>
       ) : (

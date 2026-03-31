@@ -185,7 +185,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
 
       if (olderMessages.length > 0) {
-        setMessages((prev) => [...olderMessages, ...prev]);
+        setMessages((prev) => [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev]);
       }
 
       nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
@@ -259,6 +259,7 @@ function App({ assistantAccount = '' }: AppProps) {
         const detail = await resolveAssistantDetail(currentAssistantAccount);
         const historyResult = await getHistorySessionsList({
           assistantAccount: currentAssistantAccount,
+          businessSessionDomain: 'miniapp',
         });
         const latestAvailableSession = getLatestAvailableSessionByUpdatedAt(historyResult.content ?? []);
         const session = latestAvailableSession
@@ -299,7 +300,10 @@ function App({ assistantAccount = '' }: AppProps) {
           welinkSessionId,
           size: HISTORY_PAGE_SIZE,
         });
-        const mapped = result.content.map(sessionMessageToMessage);
+        const mapped = result.content.map((message) => ({
+          ...sessionMessageToMessage(message),
+          isHistory: true,
+        }));
         setMessages(mapped);
         latestUserContentRef.current = getLatestUserContent(mapped);
 

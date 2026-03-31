@@ -1227,6 +1227,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getHistory
 | ak | string | 否 | 按 Agent AK 过滤 |
 | bussinessId | string | 否 | 按会话归属 ID 过滤 |
 | assistantAccount | string | 否 | 按助理账号 ID 过滤 |
+| businessSessionDomain | string | 否 | 会话来源域过滤：`miniapp` / `im` |
 
 ### 返回值
 
@@ -1272,6 +1273,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getHistory
 window.HWH5EXT.getHistorySessionsList({
   ak: 'ak_xxxxxxxx',
   bussinessId: 'group_abc123',
+  businessSessionDomain: 'miniapp',
   page: 0,
   size: 50,
   status: 'IDLE',

@@ -7,18 +7,20 @@ interface QuestionCardProps {
   part: MessagePart;
   welinkSessionId: string;
   onAnswered?: () => void;
+  readonly?: boolean;
 }
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   part,
   welinkSessionId,
   onAnswered,
+  readonly = false,
 }) => {
   const [customInput, setCustomInput] = useState('');
   const [answered, setAnswered] = useState(part.answered ?? false);
   const [submitting, setSubmitting] = useState(false);
 
-  const isLocked = answered || submitting;
+  const isLocked = answered || submitting || readonly;
   const trimmedInput = customInput.trim();
 
   const submitAnswer = async (value: string) => {

@@ -62,9 +62,10 @@ describe('AssistantDetail', () => {
     expect(screen.getByText('助理简介')).toBeInTheDocument();
     expect(screen.getByText('你的全能AI生活助理')).toBeInTheDocument();
     expect(screen.getByText('创建者')).toBeInTheDocument();
-    expect(screen.getByText('小米 10001')).toBeInTheDocument();
+    expect(screen.getByText('小米 u1')).toBeInTheDocument();
     expect(screen.getByText('部门')).toBeInTheDocument();
     expect(screen.getByText('责任人')).toBeInTheDocument();
+    expect(screen.getByText('测试负责人 u2')).toBeInTheDocument();
   });
 
   it('renders appid and secret actions for external assistant', async () => {
