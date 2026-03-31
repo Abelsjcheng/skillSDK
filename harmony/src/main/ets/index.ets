@@ -7,6 +7,7 @@ export { SkillSDK } from './sdk/SkillSDK';
 export {
   AgentType,
   AgentTypeList,
+  BusinessSessionDomain,
   CreateDigitalTwinParams,
   CreateDigitalTwinResult,
   ControlSkillWeCodeParams,

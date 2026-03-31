@@ -28,6 +28,7 @@ export enum SkillWeCodeAction {
 export type PermissionResponse = 'once' | 'always' | 'reject';
 export type SessionRecordStatus = 'ACTIVE' | 'IDLE' | 'CLOSED';
 export type SessionRuntimeStatus = 'busy' | 'idle' | 'retry';
+export type BusinessSessionDomain = 'miniapp' | 'im';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
 
@@ -293,6 +294,7 @@ export interface HistorySessionsParams {
   ak?: string;
   bussinessId?: string;
   assistantAccount?: string;
+  businessSessionDomain?: BusinessSessionDomain;
 }
 
 export interface CloseSkillResult {

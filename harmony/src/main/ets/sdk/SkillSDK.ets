@@ -546,6 +546,14 @@ export class SkillSDK {
       const ak = TypeConverter.toOptionalString(params.ak, 'ak');
       const bussinessId = TypeConverter.toOptionalString(params.bussinessId, 'bussinessId');
       const assistantAccount = TypeConverter.toOptionalString(params.assistantAccount, 'assistantAccount');
+      let businessSessionDomain = TypeConverter.toOptionalString(
+        params.businessSessionDomain,
+        'businessSessionDomain'
+      );
+      if (businessSessionDomain !== undefined) {
+        businessSessionDomain = businessSessionDomain.toLowerCase();
+        Validator.requireEnum(businessSessionDomain, ['miniapp', 'im'], 'businessSessionDomain');
+      }
 
       await this.ensureWebSocketConnected();
 
@@ -564,6 +572,9 @@ export class SkillSDK {
       }
       if (assistantAccount !== undefined) {
         query.assistantAccount = assistantAccount;
+      }
+      if (businessSessionDomain !== undefined) {
+        query.businessSessionDomain = businessSessionDomain;
       }
 
       return await this.fetchServerSessions(query, page, size);
