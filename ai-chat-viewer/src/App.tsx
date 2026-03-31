@@ -1,38 +1,30 @@
-﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Header } from './components/Header';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Content } from './components/Content';
-import { Footer, FooterMode } from './components/Footer';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
 import { resolveAssistantIconUrl } from './components/createAssistant/constants';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
-  GetSessionMessageResponse,
+  GetSessionMessageHistoryResponse,
   Message,
-  RegenerateAnswerResponse,
   SendMessageResponse,
-  StreamMessage,
   SessionStatus,
+  StreamMessage,
 } from './types';
 import {
-  parseWelinkSessionId,
-  isPcMiniApp,
-  getSessionMessage,
-  sendMessage as sendMessageApi,
-  regenerateAnswer,
-  stopSkill,
-  sendMessageToIM,
-  controlSkillWeCode,
-  registerSessionListener,
-  unregisterSessionListener,
   createNewSession,
-  getUserInfo,
   getHistorySessionsList,
+  getSessionMessageHistory,
+  getUserInfo,
   getWeAgentDetails,
+  isPcMiniApp,
+  registerSessionListener,
+  sendMessage as sendMessageApi,
+  stopSkill,
+  unregisterSessionListener,
   type SkillSession,
   type WeAgentDetails,
 } from './utils/hwext';
-import { copyTextToClipboard } from './utils/clipboard';
 import {
   genMessageId,
   getLatestUserContent,
@@ -48,12 +40,10 @@ import './styles/App.less';
 import './styles/WeAgentCUI.less';
 
 export interface AppProps {
-  welinkSessionId?: string;
-  variant?: AppVariant;
   assistantAccount?: string;
 }
 
-export type AppVariant = 'default' | 'weAgentCUI';
+export type AppVariant = 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -62,11 +52,8 @@ function buildCorpUserAvatar(corpUserId: string): string {
   return normalizedCorpUserId ? `https://${normalizedCorpUserId}` : '';
 }
 
-function hasMoreHistoryByPage(result: GetSessionMessageResponse): boolean {
-  if (typeof result.totalPages === 'number') {
-    return result.page + 1 < result.totalPages;
-  }
-  return (result.page + 1) * result.size < result.total;
+function hasMoreHistoryByCursor(result: GetSessionMessageHistoryResponse): boolean {
+  return result.hasMore;
 }
 
 function getLatestSessionByUpdatedAt(sessions: SkillSession[]): SkillSession | null {
@@ -78,17 +65,12 @@ function getLatestSessionByUpdatedAt(sessions: SkillSession[]): SkillSession | n
   )[0] ?? null;
 }
 
-function App({
-  welinkSessionId: welinkSessionIdProp,
-  variant = 'default',
-  assistantAccount = '',
-}: AppProps) {
+function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
-  const isWeAgentCUI = variant === 'weAgentCUI';
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
-  const [footerMode, setFooterMode] = useState<FooterMode>('generate');
+  const [footerMode, setFooterMode] = useState<'generate' | 'generating' | 'regenerate'>('generate');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
@@ -106,7 +88,7 @@ function App({
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
   const latestUserContentRef = useRef('');
-  const historyPageRef = useRef(0);
+  const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
 
@@ -119,13 +101,6 @@ function App({
     errorMessage?: string;
   }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
-
-  const closeHwh5 = () => {
-    const hwh5 = (window as unknown as { HWH5?: { close?: () => void } }).HWH5;
-    if (typeof hwh5?.close === 'function') {
-      hwh5.close();
-    }
-  };
 
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
@@ -147,7 +122,7 @@ function App({
   }, []);
 
   const appendMessageFromOperation = useCallback(
-    (messageOperation: SendMessageResponse | RegenerateAnswerResponse) => {
+    (messageOperation: SendMessageResponse) => {
       const mappedMessage = messageOperationToMessage(messageOperation);
       if (mappedMessage.role === 'user' && mappedMessage.content.trim()) {
         latestUserContentRef.current = mappedMessage.content.trim();
@@ -189,43 +164,30 @@ function App({
     setIsLoadingHistory(true);
 
     try {
-      const nextPage = historyPageRef.current + 1;
-      const result = await getSessionMessage({
+      const result = await getSessionMessageHistory({
         welinkSessionId,
-        page: nextPage,
+        beforeSeq: nextBeforeSeqRef.current ?? undefined,
         size: HISTORY_PAGE_SIZE,
-        isFirst: false,
       });
 
-      const olderMessages = result.content
-        .map((message) => sessionMessageToMessage(message))
-        .reverse();
+      const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
 
       if (olderMessages.length > 0) {
-        setMessages((prev) => {
-          const existingIds = new Set(prev.map((msg) => msg.id));
-          const prependMessages = olderMessages.filter((msg) => !existingIds.has(msg.id));
-          if (prependMessages.length === 0) {
-            return prev;
-          }
-          return [...prependMessages, ...prev];
-        });
+        setMessages((prev) => [...olderMessages, ...prev]);
       }
 
-      historyPageRef.current = result.page;
-      const nextHasMoreHistory = hasMoreHistoryByPage(result);
+      nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
+      const nextHasMoreHistory = hasMoreHistoryByCursor(result);
       hasMoreHistoryRef.current = nextHasMoreHistory;
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       console.error('Failed to load more history messages:', err);
-      if (isWeAgentCUI) {
-        showToast('获取历史消息失败');
-      }
+      showToast('获取历史消息失败');
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
     }
-  }, [welinkSessionId, isWeAgentCUI]);
+  }, [welinkSessionId]);
 
   const resolveAssistantDetail = useCallback(async (currentAssistantAccount: string) => {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
@@ -264,31 +226,6 @@ function App({
   }, [assistantAccount]);
 
   useEffect(() => {
-    if (isWeAgentCUI) {
-      return;
-    }
-
-    if (typeof welinkSessionIdProp === 'string' && welinkSessionIdProp.trim()) {
-      setIsLoading(true);
-      setWelinkSessionId(welinkSessionIdProp.trim());
-      return;
-    }
-
-    const sessionId = parseWelinkSessionId();
-    if (sessionId) {
-      setIsLoading(true);
-      setWelinkSessionId(sessionId);
-    } else {
-      console.error('缺少 welinkSessionId 参数');
-      setIsLoading(false);
-    }
-  }, [isWeAgentCUI, welinkSessionIdProp]);
-
-  useEffect(() => {
-    if (!isWeAgentCUI) {
-      return;
-    }
-
     const currentAssistantAccount = assistantAccountRef.current.trim();
     if (!currentAssistantAccount) {
       console.error('缺少 assistantAccount 参数');
@@ -337,12 +274,12 @@ function App({
     return () => {
       disposed = true;
     };
-  }, [isWeAgentCUI, assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
+  }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
 
   useEffect(() => {
     if (!welinkSessionId) return;
 
-    historyPageRef.current = 0;
+    nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
     setHasMoreHistory(false);
@@ -350,25 +287,21 @@ function App({
 
     const loadMessages = async () => {
       try {
-        const result = await getSessionMessage({
+        const result = await getSessionMessageHistory({
           welinkSessionId,
-          page: 0,
           size: HISTORY_PAGE_SIZE,
-          isFirst: true,
         });
-        const mapped = result.content.map(sessionMessageToMessage).reverse();
+        const mapped = result.content.map(sessionMessageToMessage);
         setMessages(mapped);
         latestUserContentRef.current = getLatestUserContent(mapped);
 
-        historyPageRef.current = result.page;
-        const nextHasMoreHistory = hasMoreHistoryByPage(result);
+        nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
+        const nextHasMoreHistory = hasMoreHistoryByCursor(result);
         hasMoreHistoryRef.current = nextHasMoreHistory;
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
-        if (isWeAgentCUI) {
-          showToast('获取历史消息失败');
-        }
+        showToast('获取历史消息失败');
       }
     };
 
@@ -530,7 +463,7 @@ function App({
       }
     };
 
-    initSession();
+    void initSession();
 
     return () => {
       if (listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
@@ -540,7 +473,7 @@ function App({
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, finalizeStreamingMessage, isWeAgentCUI]);
+  }, [welinkSessionId, finalizeStreamingMessage]);
 
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
@@ -572,7 +505,7 @@ function App({
     try {
       await stopSkill({ welinkSessionId });
       shouldResetFooterOnCompletionRef.current = false;
-      setFooterMode(isWeAgentCUI ? 'generate' : 'regenerate');
+      setFooterMode('generate');
       setSessionStatus('idle');
       finalizeStreamingMessage();
     } catch (err) {
@@ -580,69 +513,7 @@ function App({
       console.error('Failed to stop skill:', err);
       setFooterMode('generating');
     }
-  }, [welinkSessionId, finalizeStreamingMessage, isWeAgentCUI]);
-
-  const handleRegenerate = useCallback(async () => {
-    if (!welinkSessionId) return;
-
-    setSessionStatus('busy');
-    setFooterMode('generating');
-    shouldResetFooterOnCompletionRef.current = true;
-    suppressFooterAutoResetRef.current = false;
-
-    try {
-      const result = await regenerateAnswer({ welinkSessionId });
-      appendMessageFromOperation(result);
-    } catch (err) {
-      shouldResetFooterOnCompletionRef.current = false;
-      setSessionStatus('idle');
-      setFooterMode('regenerate');
-      console.error('重新生成失败:', err);
-    }
-  }, [welinkSessionId, appendMessageFromOperation]);
-
-  const handleSendToIM = useCallback(async (_content: string) => {
-    if (!welinkSessionId) return;
-    try {
-      await sendMessageToIM({
-        welinkSessionId,
-      });
-      showToast('已发送到IM');
-    } catch (err) {
-      console.error('Failed to send to IM:', err);
-    }
-  }, [welinkSessionId]);
-
-  const handleMinimize = useCallback(async () => {
-    try {
-      await controlSkillWeCode({ action: 'minimize' });
-    } catch (err) {
-      console.error('Failed to minimize:', err);
-    } finally {
-      closeHwh5();
-    }
-  }, []);
-
-  const handleClose = useCallback(async () => {
-    try {
-      await controlSkillWeCode({ action: 'close' });
-    } catch (err) {
-      console.error('Failed to close:', err);
-    } finally {
-      closeHwh5();
-    }
-  }, []);
-
-  const handleCopy = useCallback((content: string) => {
-    copyTextToClipboard(content)
-      .then(() => {
-        showToast('已复制到剪贴板');
-      })
-      .catch((err) => {
-        console.error('复制失败:', err);
-        showToast('复制失败');
-      });
-  }, []);
+  }, [welinkSessionId, finalizeStreamingMessage]);
 
   const handleCreateSession = useCallback(async () => {
     const currentAssistantAccount = assistantAccountRef.current.trim();
@@ -686,21 +557,7 @@ function App({
   }, [finalizeStreamingMessage, welinkSessionId]);
 
   return (
-    <div
-      className={[
-        'app-container',
-        isPc ? 'pc-mode' : '',
-        isWeAgentCUI ? 'app-container--we-agent-cui' : '',
-      ].filter(Boolean).join(' ')}
-    >
-      {!isWeAgentCUI && (
-        <div className="header-wrapper">
-          <Header
-            onMinimize={handleMinimize}
-            onClose={handleClose}
-          />
-        </div>
-      )}
+    <div className={['app-container', isPc ? 'pc-mode' : '', 'app-container--we-agent-cui'].filter(Boolean).join(' ')}>
       <div className="content-wrapper">
         <Content
           messages={messages}
@@ -709,9 +566,6 @@ function App({
           isLoadingHistory={isLoadingHistory}
           hasMoreHistory={hasMoreHistory}
           onLoadMoreHistory={loadMoreHistory}
-          onCopy={handleCopy}
-          onSendToIM={handleSendToIM}
-          variant={variant}
           weAgentUserName={weAgentUserName}
           weAgentUserAvatar={weAgentUserAvatar}
           weAgentAssistantName={weAgentAssistantName}
@@ -719,50 +573,36 @@ function App({
           weAgentAssistantAvatar={weAgentAssistantAvatar}
         />
       </div>
-      {isWeAgentCUI && (
-        <div className="we-agent-cui-actions" aria-label="多功能按钮区">
-          <button
-            type="button"
-            className="we-agent-cui-actions__button"
-            onClick={handleCreateSession}
-            aria-label="新建会话"
-          >
-            <img
-              className="we-agent-cui-actions__icon"
-              src={iconWeAgentNewSession}
-              alt=""
-            />
-          </button>
-          <WeAgentHistorySidebar
-            assistantAccount={assistantAccount}
-            currentWelinkSessionId={welinkSessionId ?? ''}
-            onSessionSelect={handleSwitchWeAgentSession}
+
+      <div className="we-agent-cui-actions" aria-label="多功能按钮区">
+        <button
+          type="button"
+          className="we-agent-cui-actions__button"
+          onClick={handleCreateSession}
+          aria-label="新建会话"
+        >
+          <img
+            className="we-agent-cui-actions__icon"
+            src={iconWeAgentNewSession}
+            alt=""
           />
-        </div>
-      )}
+        </button>
+        <WeAgentHistorySidebar
+          assistantAccount={assistantAccount}
+          currentWelinkSessionId={welinkSessionId ?? ''}
+          onSessionSelect={handleSwitchWeAgentSession}
+        />
+      </div>
+
       <div className="footer-wrapper">
-        {isWeAgentCUI ? (
-          <WeAgentCUIFooter
-            mode={footerMode}
-            onSend={handleGenerate}
-            onStop={handleStop}
-          />
-        ) : (
-          <Footer
-            mode={footerMode}
-            onGenerate={handleGenerate}
-            onStop={handleStop}
-            onRegenerate={handleRegenerate}
-            isPc={isPc}
-          />
-        )}
+        <WeAgentCUIFooter
+          mode={footerMode}
+          onSend={handleGenerate}
+          onStop={handleStop}
+        />
       </div>
     </div>
   );
 }
 
 export default App;
-
-
-
-

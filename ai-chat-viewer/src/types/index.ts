@@ -244,6 +244,13 @@ export interface GetSessionMessageResponse {
   totalPages: number;
 }
 
+export interface GetSessionMessageHistoryResponse {
+  content: SessionMessage[];
+  size: number;
+  hasMore: boolean;
+  nextBeforeSeq: number | null;
+}
+
 export interface StopSkillResponse {
   welinkSessionId: string;
   status: 'aborted';

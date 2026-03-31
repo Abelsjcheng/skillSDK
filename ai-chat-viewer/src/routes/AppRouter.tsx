@@ -1,6 +1,5 @@
 import React from 'react';
 import { Navigate, Route, Routes } from 'react-router';
-import App from '../App';
 import PersonalAssistantCreator from '../components/PersonalAssistantCreator';
 import ActivateAssistant from '../pages/activateAssistant';
 import AssistantDetail from '../pages/assistantDetail';
@@ -15,7 +14,6 @@ const FULL_PAGE_ROUTE_STYLE: React.CSSProperties = {
 
 export const AppRouter: React.FC = () => (
   <Routes>
-    <Route path="/aiChat" element={<App />} />
     <Route path="/weAgentCUI" element={<WeAgentCUI />} />
     <Route
       path="/createAssistant"

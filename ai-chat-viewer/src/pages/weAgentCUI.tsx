@@ -7,7 +7,6 @@ const WeAgentCUI: React.FC = () => {
 
   return (
     <App
-      variant="weAgentCUI"
       assistantAccount={assistantAccount}
     />
   );

@@ -1,6 +1,6 @@
 ﻿import React, { ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
-import { canProceedNext, hasInvalidBasicTextChar, validateAvatarFile } from '../../utils/digitalTwinValidation';
+import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 import { CreatorStepFooter } from './CreatorStepFooter';
@@ -56,12 +56,9 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     initialValue?.avatarType === 'custom' ? initialValue.icon : undefined,
   );
 
-  const nameHasInvalidChar = useMemo(() => hasInvalidBasicTextChar(name), [name]);
-  const descriptionHasInvalidChar = useMemo(() => hasInvalidBasicTextChar(description), [description]);
-  const canNext = useMemo(
-    () => canProceedNext(name, description) && !nameHasInvalidChar && !descriptionHasInvalidChar,
-    [description, descriptionHasInvalidChar, name, nameHasInvalidChar],
-  );
+  const nameIsInvalid = useMemo(() => hasInvalidName(name), [name]);
+  const descriptionIsInvalid = useMemo(() => hasInvalidDescription(description), [description]);
+  const canNext = useMemo(() => canProceedNext(name, description), [description, name]);
 
   const currentAvatarSrc =
     avatarType === 'custom'
@@ -108,6 +105,17 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     handleAvatarUpload(file);
     event.target.value = '';
   };
+
+  const handleMobileInputTouchStart = useCallback((event: React.TouchEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (isPcMiniApp) return;
+    event.preventDefault();
+    const target = event.currentTarget;
+    try {
+      target.focus({ preventScroll: true });
+    } catch {
+      target.focus();
+    }
+  }, [isPcMiniApp]);
 
   const handleNext = useCallback(() => {
     if (!canNext) return;
@@ -179,11 +187,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           </label>
           <input
             id="digital-twin-name"
-            className={`digital-twin__input ${nameHasInvalidChar ? 'is-invalid' : ''}`.trim()}
+            className={`digital-twin__input ${nameIsInvalid ? 'is-invalid' : ''}`.trim()}
             type="text"
             value={name}
             placeholder="例如：智能助手"
             onChange={(event) => setName(event.target.value)}
+            onTouchStart={handleMobileInputTouchStart}
           />
         </div>
 
@@ -193,10 +202,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           </label>
           <textarea
             id="digital-twin-description"
-            className={`digital-twin__textarea ${descriptionHasInvalidChar ? 'is-invalid' : ''}`.trim()}
+            className={`digital-twin__textarea ${descriptionIsInvalid ? 'is-invalid' : ''}`.trim()}
             value={description}
             placeholder="介绍助理的功能和应用场景"
             onChange={(event) => setDescription(event.target.value)}
+            onTouchStart={handleMobileInputTouchStart}
           />
         </div>
       </div>

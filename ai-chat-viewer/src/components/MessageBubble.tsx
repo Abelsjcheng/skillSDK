@@ -11,7 +11,6 @@ import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
-import type { AppVariant } from '../App';
 import type { Message, MessagePart } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
@@ -21,21 +20,11 @@ import 'katex/dist/katex.min.css';
 interface MessageBubbleProps {
   message: Message;
   welinkSessionId: string;
-  onCopy?: (content: string) => void;
-  onSendToIM?: (content: string) => void;
-  variant?: AppVariant;
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
 }
-
-const roleLabels: Record<string, string> = {
-  user: '用户',
-  assistant: 'OpenCode',
-  system: '系统',
-  tool: '工具',
-};
 
 function formatMessageTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -50,9 +39,6 @@ function formatMessageTime(timestamp: number): string {
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   welinkSessionId,
-  onCopy,
-  onSendToIM,
-  variant = 'default',
   weAgentUserName = '',
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
@@ -60,7 +46,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
-  const isWeAgentCUI = variant === 'weAgentCUI';
 
   const markdownComponents: Components = useMemo(
     () => ({
@@ -79,18 +64,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }),
     [],
   );
-
-  const handleCopy = () => {
-    if (onCopy) {
-      onCopy(message.content);
-      return;
-    }
-    navigator.clipboard.writeText(message.content);
-  };
-
-  const handleSendToIM = () => {
-    onSendToIM?.(message.content);
-  };
 
   const renderPart = (part: MessagePart) => {
     switch (part.type) {
@@ -121,13 +94,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       case 'file':
         return (
           <div key={part.partId} className="file-part">
-            <span className="file-part__icon">📎</span>
+            <span className="file-part__icon">馃搸</span>
             {part.fileUrl ? (
               <a href={part.fileUrl} target="_blank" rel="noopener noreferrer">
-                {part.fileName ?? '文件'}
+                {part.fileName ?? '鏂囦欢'}
               </a>
             ) : (
-              <span>{part.fileName ?? '文件'}</span>
+              <span>{part.fileName ?? '鏂囦欢'}</span>
             )}
           </div>
         );
@@ -177,67 +150,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const messageContent = renderContent();
-
-  if (isWeAgentCUI) {
-    const messageTimeText = formatMessageTime(message.timestamp);
-    const userName = weAgentUserName.trim();
-    const assistantName = weAgentAssistantName.trim();
-    const messageMetaText = `${isUser ? userName : assistantName} ${messageTimeText}`.trim();
-    const resolvedUserAvatar = weAgentUserAvatar || userAvatar;
-    const resolvedAssistantAvatar = weAgentAssistantAvatar || assistantAvatar;
-
-    return (
-      <div className={`message-block message-we-agent ${isUser ? 'message-user' : 'message-assistant'}`}>
-        <div className={`we-agent-message ${isUser ? 'we-agent-message--user' : 'we-agent-message--assistant'}`}>
-          <div className={`we-agent-message__meta ${isUser ? 'is-user' : 'is-assistant'}`}>
-            {isUser ? (
-              <>
-                <span className="we-agent-message__meta-text">{messageMetaText}</span>
-                <img className="we-agent-message__avatar" src={resolvedUserAvatar} alt="" />
-              </>
-            ) : (
-              <>
-                <img className="we-agent-message__avatar" src={resolvedAssistantAvatar} alt="" />
-                <span className="we-agent-message__meta-text">{messageMetaText}</span>
-              </>
-            )}
-          </div>
-          <div className={`we-agent-message__bubble ${isUser ? 'is-user' : 'is-assistant'}`}>
-            <div className="message-content">{messageContent}</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const messageTimeText = formatMessageTime(message.timestamp);
+  const userName = weAgentUserName.trim();
+  const assistantName = weAgentAssistantName.trim();
+  const messageMetaText = `${isUser ? userName : assistantName} ${messageTimeText}`.trim();
+  const resolvedUserAvatar = weAgentUserAvatar || userAvatar;
+  const resolvedAssistantAvatar = weAgentAssistantAvatar || assistantAvatar;
 
   return (
-    <div className={`message-block ${isUser ? 'message-user' : 'message-assistant'}`}>
-      <div className="message-content">
-        {!isUser && (
-          <div className="message-role-label">
-            {roleLabels[normalizedRole] ?? message.role}
-          </div>
-        )}
-        {messageContent}
-      </div>
-      {!isUser && !message.isStreaming && message.content && (
-        <div className="message-actions">
-          <button
-            className="action-btn copy-btn"
-            onClick={handleCopy}
-            title="复制内容"
-          >
-            📋 复制
-          </button>
-          <button
-            className="action-btn send-btn"
-            onClick={handleSendToIM}
-            title="发送到聊天"
-          >
-            ↗️ 发送
-          </button>
+    <div className={`message-block message-we-agent ${isUser ? 'message-user' : 'message-assistant'}`}>
+      <div className={`we-agent-message ${isUser ? 'we-agent-message--user' : 'we-agent-message--assistant'}`}>
+        <div className={`we-agent-message__meta ${isUser ? 'is-user' : 'is-assistant'}`}>
+          {isUser ? (
+            <>
+              <span className="we-agent-message__meta-text">{messageMetaText}</span>
+              <img className="we-agent-message__avatar" src={resolvedUserAvatar} alt="" />
+            </>
+          ) : (
+            <>
+              <img className="we-agent-message__avatar" src={resolvedAssistantAvatar} alt="" />
+              <span className="we-agent-message__meta-text">{messageMetaText}</span>
+            </>
+          )}
         </div>
-      )}
+        <div className={`we-agent-message__bubble ${isUser ? 'is-user' : 'is-assistant'}`}>
+          <div className="message-content">{messageContent}</div>
+        </div>
+      </div>
     </div>
   );
 };

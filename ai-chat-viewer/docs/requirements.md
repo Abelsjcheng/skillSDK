@@ -181,8 +181,14 @@
 4. 自定义头像上传校验为强限制，不因“下一步”按钮状态放宽：
    - 格式不合法提示：`仅支持JPG/PNG格式`（toast 弹窗提示）；
    - 大小超限提示：`图片大小需小于2MB`（toast 弹窗提示）。
-5. “名称”和“简介”输入内容仅允许：汉字 / 字母 / 数字。
-6. 当“名称”或“简介”包含非“汉字/字母/数字”字符时：
+5. “名称”输入校验规则：
+   - 仅允许：汉字 / 字母 / 数字；
+   - 长度限制：`2-50` 个字符。
+6. “简介”输入校验规则：
+   - 仅允许：汉字 / 字母 / 数字 / 常用标点符号；
+   - 常用标点包含中英文常见句读（如 `，。！？；：、,.!?;:()【】《》“”‘’` 等）；
+   - 长度限制：`2-256` 个字符。
+7. 当“名称”或“简介”任一项不满足字符集或长度规则时：
    - 对应输入框显示红色高亮边框提醒；
    - “下一步”不可点击（保持禁用态）。
 
@@ -378,6 +384,7 @@
 3. 操作区：
    - 高度 `68px`，宽度 `100%`，`padding: 12px 16px`。
    - 仅保留一个“下一步”按钮：高度 `44px`，宽度占满，圆角 `999px`。
+4. 点击“名称/简介”输入框时，不允许页面整体上抬，页面视觉位置保持稳定。
 
 ### 10.2 移动端页面 2（大脑选择）
 
@@ -401,16 +408,15 @@
 
 1. 主工程入口（`src/index.tsx`）需通过 `react-router` 管理页面路由。
 2. 路由模式使用 Hash 路由（`HashRouter`）。
-3. 当前保留七个页面路由：
-   - `AI 对话页面`：哈希路径 `#/aiChat`
+3. 当前保留六个页面路由：
    - `WeAgentCUI 对话页面`：哈希路径 `#/weAgentCUI`
    - `创建个人助理页面`：哈希路径 `#/createAssistant`
    - `激活助理页面`：哈希路径 `#/activateAssistant`
    - `助理详情页面`：哈希路径 `#/assistantDetail`
    - `切换助理页面`：哈希路径 `#/switchAssistant`
    - `启动助理页面`：哈希路径 `#/selectAssistant`
-4. 根路径 `#/` 默认重定向到 `#/aiChat`。
-5. 未匹配路径统一重定向到 `#/aiChat`。
+4. 根路径 `#/` 默认重定向到 `#/weAgentCUI`。
+5. 未匹配路径统一重定向到 `#/weAgentCUI`。
 6. PC 与移动端样式规则不变，路由仅负责页面切换。
 7. `create-assistant-page` 独立打包入口继续保留，不受主路由改造影响。
 
@@ -425,12 +431,17 @@
    - 内容区容器宽度为自适应 `100%`；
    - 内容区容器高度为内容自适应；
    - 页面整体背景使用线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`；
-   - 图片展示容器尺寸跟随图片原始尺寸（不做固定宽高拉伸），水平居中；
-   - 距离页面顶部 `78px`；
-   - 仅展示第一张引导图：`src/imgs/activate-guide-1.svg`；
+   - 图片展示容器与“选择助理”按钮作为整体在页面中水平垂直居中；
+   - 移动端（`isPcMiniApp === false`）图片容器尺寸为 `322px x 350px`；
+   - PC 端（`isPcMiniApp === true`）图片容器尺寸为 `500px x 347px`；
+   - 图片自适应容器大小展示；
+   - 激活引导图按端区分：
+      - `isPcMiniApp === true`（PC）使用 `src/imgs/activate-guide-pc.png`；
+      - `isPcMiniApp === false`（移动）使用 `src/imgs/activate-guide.png`；
    - 不展示轮播按钮区域。
 2. 操作区：
-   - 距离内容区 `65px`；
+   - 移动端按钮距离图片 `63px`；
+   - PC 端按钮距离图片 `80px`；
    - 水平居中显示“选择助理”按钮；
    - 按钮尺寸 `250px x 38px`；
    - 圆角半径 `99px`；
@@ -549,7 +560,7 @@
 
 ## 17. WeAgentCUI 对话页面
 
-1. 新增 AI 对话页面 `WeAgentCUI`，页面功能与 `aiChat` 保持一致，仅调整页面样式。
+1. `WeAgentCUI` 为当前唯一对话页面，页面功能按本章节定义实现。
 2. 整体布局：
    - 页面根容器内边距：左右 `12px`、上下 `8px`（`padding: 8px 12px`）。
    - 页面分为 3 个区域：对话内容区、多功能按钮区、底部输入区。
@@ -606,7 +617,10 @@
 11. 历史会话数据获取：
    - 打开侧边栏时调用 `getHistorySessionsList`；
    - 调用参数需带 `assistantAccount`（来自 `weAgentCUI` 页面入口 query 解析结果）进行过滤查询。
-   - 获取历史消息（`getSessionMessage`）接口失败时，页面需通过 toast 弹窗提示失败信息。
+   - 获取历史消息统一使用 `getSessionMessageHistory` 接口；
+   - `getSessionMessageHistory` 返回 `content` 顺序为“从旧到新”，页面按接口顺序直接渲染（不额外 reverse）；
+   - 上拉加载更早消息时，使用上一批返回的 `nextBeforeSeq` 作为 `beforeSeq` 继续拉取；
+   - 获取历史消息（`getSessionMessageHistory`）接口失败时，页面需通过 toast 弹窗提示失败信息。
 12. 历史会话分组与展示：
    - 按 `updatedAt` 将历史会话分为 3 组：`今天`、`昨天`、`7天前`；
    - 每个分组由“标题区 + 会话项列表”组成，分组内标题与列表间距 `10px`；
@@ -621,12 +635,12 @@
    - 侧边栏相关逻辑（显隐状态、加载状态、历史列表请求、按 `updatedAt` 分组、会话项选中态）需内聚在该组件内部；
    - `App.tsx` 仅负责在按钮区使用该组件，不再保留侧边栏内部状态与渲染细节。
 15. 底部操作区组件拆分：
-   - `WeAgentCUI` 页面底部操作区需与旧 `aiChat` 页面底部操作区拆分为不同组件；
+- `WeAgentCUI` 页面底部操作区需拆分为独立组件；
    - `WeAgentCUI` 底部操作区仅保留输入框与纸飞机发送按钮；
-   - 纸飞机发送按钮点击行为需与旧 `aiChat` 页“生成”按钮行为一致（输入非空时发送并清空输入框）；
+- 纸飞机发送按钮点击行为：输入非空时发送并清空输入框；
    - 发送图标需从 `src/imgs` 中导入使用。
 16. 底部发送/停止按钮切换：
-   - `WeAgentCUI` 底部操作区发送按钮点击后，按钮状态需切换为“停止按钮”，逻辑与旧 `aiChat` 页发送后进入 `generating` 态保持一致；
+- `WeAgentCUI` 底部操作区发送按钮点击后，按钮状态需切换为“停止按钮”，并进入 `generating` 态；
    - 点击“停止按钮”并调用 `stopSkill` 成功后，按钮需恢复为“发送按钮”；
    - 停止按钮样式：`32px x 32px`，圆角 `20px`，背景 `rgba(10,89,247,0.05)`，`padding: 6px`；
    - 停止按钮内图标尺寸：`20px x 20px`；
@@ -635,6 +649,7 @@
    - 侧边栏打开后需根据当前对话页的 `welinkSessionId` 高亮对应会话项（列表由 `assistantAccount` 过滤后展示）；
    - 点击其他会话项后，需将该项 `welinkSessionId` 同步到对话页主状态；
    - 同步后对话页需按新会话重新加载消息并刷新会话状态（含加载态、消息列表、监听器绑定）。
+18. `WeAgentCUI` 消息区不提供“复制消息”和“发送到IM”操作，组件链路中移除 `onCopy`、`onSendToIM` 未使用参数。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
 
@@ -702,6 +717,7 @@
             - 处理完成后同步调用 `window.HWH5.close()`。
 7. `openWeAgentCUI` 参数组装规则：
    - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
+   - 当助理详情 `bizRobotId` 为空时，`weAgentUri` 需额外追加 query `assistantAccount=<partnerAccount>`；
    - `assistantDetailUri`：`h5://123456/index.html` 追加 query `partnerAccount`，并追加 hash `assistantDetail`；
    - `switchAssistantUri`：`h5://123456/index.html` 追加 query `partnerAccount`，并追加 hash `switchAssistant`。
 8. 移动端标题栏状态栏适配（创建助理/启动助理/切换助理/助理详情）：
@@ -787,11 +803,11 @@
    - 若已存在真实 SDK，mock 不覆盖真实实现。
    - mock 初始化失败时仅打印错误日志，不阻断页面渲染（避免首屏白屏）。
 3. mock 覆盖接口（最小闭环）：
-   - V1 对话链路：`createNewSession`、`getHistorySessionsList`、`getSessionMessage`、`registerSessionListener`、`unregisterSessionListener`、`sendMessage`、`regenerateAnswer`、`stopSkill`、`sendMessageToIM`；
+   - V1 对话链路：`createNewSession`、`getHistorySessionsList`、`getSessionMessageHistory`、`registerSessionListener`、`unregisterSessionListener`、`sendMessage`、`regenerateAnswer`、`stopSkill`、`sendMessageToIM`；
    - V2 助理链路：`getWeAgentList`、`getWeAgentDetails`、`getAgentType`、`createDigitalTwin`、`getWeAgentUri`、`openWeAgentCUI`。
 4. 对话行为要求：
    - `sendMessage` 返回用户消息对象，并异步通过 `registerSessionListener` 回调 `text.delta` / `text.done` / `session.status`；
-   - `getSessionMessage` 返回当前会话消息列表，确保页面刷新后可回显历史；
+   - `getSessionMessageHistory` 返回当前会话历史消息列表，且顺序为“从旧到新”，确保页面刷新后可回显历史；
    - `getHistorySessionsList` 返回当前助理维度的会话列表，支持侧边栏分组展示；
    - `createNewSession` 可创建新会话并生成 `welinkSessionId`。
 5. 默认 mock 数据要求：

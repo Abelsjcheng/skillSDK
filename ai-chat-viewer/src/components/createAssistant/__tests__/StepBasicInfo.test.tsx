@@ -57,11 +57,41 @@ describe('StepBasicInfo', () => {
     expect(nextButton).toBeDisabled();
 
     fireEvent.change(nameInput, { target: { value: '智能助手1' } });
-    fireEvent.change(descriptionInput, { target: { value: '说明ABC#' } });
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC🙂' } });
     expect(descriptionInput).toHaveClass('is-invalid');
     expect(nextButton).toBeDisabled();
 
-    fireEvent.change(descriptionInput, { target: { value: '说明ABC123' } });
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC123，支持!?' } });
+    expect(nameInput).not.toHaveClass('is-invalid');
+    expect(descriptionInput).not.toHaveClass('is-invalid');
+    expect(nextButton).not.toBeDisabled();
+  });
+
+  it('disables next and highlights when name or description length is out of range', () => {
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={Noop}
+        onCancel={Noop}
+        onNext={Noop}
+      />,
+    );
+
+    const nameInput = screen.getByLabelText('名称');
+    const descriptionInput = screen.getByLabelText('简介');
+    const nextButton = screen.getByRole('button', { name: '下一步' });
+
+    fireEvent.change(nameInput, { target: { value: '助' } });
+    fireEvent.change(descriptionInput, { target: { value: '介绍内容' } });
+    expect(nameInput).toHaveClass('is-invalid');
+    expect(nextButton).toBeDisabled();
+
+    fireEvent.change(nameInput, { target: { value: '智能助手' } });
+    fireEvent.change(descriptionInput, { target: { value: '介' } });
+    expect(descriptionInput).toHaveClass('is-invalid');
+    expect(nextButton).toBeDisabled();
+
+    fireEvent.change(descriptionInput, { target: { value: '介绍内容，支持中英文标点。' } });
     expect(nameInput).not.toHaveClass('is-invalid');
     expect(descriptionInput).not.toHaveClass('is-invalid');
     expect(nextButton).not.toBeDisabled();

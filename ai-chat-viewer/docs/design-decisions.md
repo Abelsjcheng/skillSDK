@@ -285,15 +285,14 @@ interface CreateDigitalTwinParams {
 ## 11. 路由实现决策
 
 1. 在主入口 `src/index.tsx` 基于 `react-router` 引入 `HashRouter`，路由配置下沉到独立路由组件。
-2. 路由表包含七个业务页与重定向规则：
-   - `/aiChat` -> `App`（AI 对话页）
-   - `/weAgentCUI` -> `App(variant='weAgentCUI')`（WeAgentCUI 对话页）
+2. 路由表包含六个业务页与重定向规则：
+   - `/weAgentCUI` -> `App`（WeAgentCUI 对话页）
    - `/createAssistant` -> `PersonalAssistantCreator`（创建个人助理页）
    - `/activateAssistant` -> `ActivateAssistant`（激活助理页）
    - `/assistantDetail` -> `AssistantDetail`（助理详情页）
    - `/switchAssistant` -> `SwitchAssistant`（切换助理页）
    - `/selectAssistant` -> `SelectAssistant`（启动助理页）
-   - `/` 与 `*` -> 重定向到 `/aiChat`
+   - `/` 与 `*` -> 重定向到 `/weAgentCUI`
 3. 页面路由切换不改变原有业务逻辑，只做视图层分发。
 4. `create-assistant-page` 独立打包入口维持现状，用于单页发布场景；与主入口路由方案并存。
 
@@ -368,9 +367,8 @@ interface CreateDigitalTwinParams {
 
 ## 17. WeAgentCUI 页面设计
 
-1. 新增 `WeAgentCUI` 路由页，功能复用现有 `aiChat` 数据流与会话能力（消息加载、发送、流式更新、停止、重试、历史分页）。
-2. 为减少逻辑重复，`App` 增加 `variant` 视图变体能力：默认值为 `default`；`weAgentCUI` 仅切换布局与样式，不改业务逻辑。
-3. `weAgentCUI` 变体下页面结构改为：`对话内容区 + 多功能按钮区 + 底部输入区`，不渲染原 `Header` 区。
+1. `WeAgentCUI` 为当前唯一对话页，`App` 仅保留 `weAgentCUI` 数据流与会话能力（消息加载、发送、流式更新、停止、历史分页）。
+2. 页面结构为：`对话内容区 + 多功能按钮区 + 底部输入区`。
 4. `weAgentCUI` 页面根容器背景统一使用线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
 5. 多功能按钮区提供“新建会话”“历史会话”两个按钮，当前点击行为为空实现，仅预留扩展点。
 6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
@@ -381,18 +379,19 @@ interface CreateDigitalTwinParams {
    - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px; background: #fff`；
    - placeholder 固定为“有问题尽管问我~”；
    - 发送按钮为 `24x24` 图标按钮，图标尺寸 `20x20`。
-8. 新增样式文件 `src/styles/WeAgentCUI.less`，集中维护变体布局；并通过 class 前缀 `we-agent-cui-` 约束样式作用域，避免影响现有 `aiChat` 页面。
+8. 样式文件 `src/styles/WeAgentCUI.less` 负责维护 WeAgentCUI 布局，class 前缀统一使用 `we-agent-cui-`。
 9. 新增图标资源：
    - `src/imgs/icon-we-agent-new-session.svg`
    - `src/imgs/icon-we-agent-history.svg`
    - `src/imgs/icon-we-agent-send.svg`
-10. 视觉样式改造仅在 `variant='weAgentCUI'` 时生效，保持 `/aiChat` 现有 UI 与交互不变。
+10. `aiChat` 页面及其相关逻辑已移除，不再保留 `variant` 分支与 `/aiChat` 路由。
 11. 在 `weAgentCUI` 变体下，当消息列表为空时，`Content` 区渲染欢迎块（头像 + 标题 + 副标题），样式规则如下：
    - 顶部间距 `27px`；
    - 纵向 `12px` 间距、水平居中；
    - 头像容器 `72x72`，圆角 `124px`，白色 `2px` 边框；
    - 标题文本：`早上好，峰哥`（`18px/500/26px`，`rgba(25,25,25,1)`）；
    - 副标题文本：`CodeAgent | 你的专属编程智能体`（`14px/400/22px`，`rgba(89,89,89,1)`）。
+12. `WeAgentCUI` 消息区不保留“复制消息”“发送到IM”入口，`App -> Content -> MessageBubble` 组件链路中移除 `onCopy`、`onSendToIM` 参数透传。
 
 
 

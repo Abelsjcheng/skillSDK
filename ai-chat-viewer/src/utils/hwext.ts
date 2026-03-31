@@ -2,6 +2,7 @@ import type {
   StreamMessage,
   SendMessageResponse,
   GetSessionMessageResponse,
+  GetSessionMessageHistoryResponse,
   StopSkillResponse,
   SendMessageToIMResponse,
   ReplyPermissionResponse,
@@ -41,6 +42,12 @@ export interface GetSessionMessageParams {
   page?: number;
   size?: number;
   isFirst?: boolean;
+}
+
+export interface GetSessionMessageHistoryParams {
+  welinkSessionId: string;
+  beforeSeq?: number;
+  size?: number;
 }
 
 export interface StopSkillParams {
@@ -207,6 +214,7 @@ export interface HWH5EXT {
   regenerateAnswer(params: RegenerateAnswerParams): Promise<RegenerateAnswerResponse>;
   sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResponse>;
   getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse>;
+  getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<GetSessionMessageHistoryResponse>;
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
@@ -289,6 +297,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     regenerateAnswer: (params) => call<RegenerateAnswerResponse>('regenerateAnswer', params),
     sendMessageToIM: (params) => call<SendMessageToIMResponse>('sendMessageToIM', params),
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
+    getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     registerSessionListener: (params) => {
       window.addEventListener('agentSkills_registerSessionListener_onMessage', (e: any) => {
         const msg = e.detail.msg;
@@ -458,6 +467,10 @@ export function buildOpenWeAgentCUIParams(
   const normalizedRobotId = normalizeString(options?.robotId);
   let weAgentUri = appendQueryParam(weCodeUrl || WE_AGENT_BASE_URI, 'wecodePlace', 'weAgent');
 
+  if (!normalizedBizRobotId && normalizedPartnerAccount) {
+    weAgentUri = appendQueryParam(weAgentUri, 'assistantAccount', normalizedPartnerAccount);
+  }
+
   if (normalizedBizRobotId && normalizedRobotId) {
     weAgentUri = appendQueryParam(weAgentUri, 'robotId', normalizedRobotId);
   }
@@ -559,6 +572,12 @@ export async function sendMessageToIM(params: SendMessageToIMParams): Promise<Se
 
 export async function getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse> {
   return getJsApiOrThrow().getSessionMessage(params);
+}
+
+export async function getSessionMessageHistory(
+  params: GetSessionMessageHistoryParams,
+): Promise<GetSessionMessageHistoryResponse> {
+  return getJsApiOrThrow().getSessionMessageHistory(params);
 }
 
 export function registerSessionListener(params: RegisterSessionListenerParams): void {

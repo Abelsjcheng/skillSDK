@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import activateGuide1 from '../imgs/activate-guide-1.svg';
+import activateGuideMobile from '../imgs/activate-guide.png';
+import activateGuidePc from '../imgs/activate-guide-pc.png';
 import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from '../utils/hwext';
 import '../styles/ActivateAssistant.less';
 import { APP_ID } from '../constants';
@@ -13,7 +14,8 @@ const DEFAULT_LIST_QUERY = {
 };
 
 const ActivateAssistant: React.FC = () => {
-  const isPc = isPcMiniApp();
+  const isPc = true;
+  const activateGuideImage = isPc ? activateGuidePc : activateGuideMobile;
   const navigate = useNavigate();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
 
@@ -48,18 +50,20 @@ const ActivateAssistant: React.FC = () => {
   }, [assistantList, isPc, loadAssistantList, navigate]);
 
   return (
-    <div className="activate-assistant">
-      <section className="activate-assistant__content">
-        <div className="activate-assistant__carousel">
-          <img src={activateGuide1} alt="激活助理引导图" className="activate-assistant__image" />
-        </div>
-      </section>
+    <div className={`activate-assistant ${isPc ? 'activate-assistant--pc' : 'activate-assistant--mobile'}`}>
+      <div className="activate-assistant__center">
+        <section className="activate-assistant__content">
+          <div className="activate-assistant__carousel">
+            <img src={activateGuideImage} alt="激活助理引导图" className="activate-assistant__image" />
+          </div>
+        </section>
 
-      <section className="activate-assistant__actions">
-        <button type="button" className="activate-assistant__enable-btn" onClick={handleSelectAssistant}>
-          选择助理
-        </button>
-      </section>
+        <section className="activate-assistant__actions">
+          <button type="button" className="activate-assistant__enable-btn" onClick={handleSelectAssistant}>
+            选择助理
+          </button>
+        </section>
+      </div>
     </div>
   );
 };

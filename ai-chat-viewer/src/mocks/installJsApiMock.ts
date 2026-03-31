@@ -1,4 +1,5 @@
 import type {
+  GetSessionMessageHistoryResponse,
   GetSessionMessageResponse,
   RegenerateAnswerResponse,
   SendMessageResponse,
@@ -10,6 +11,7 @@ import type {
   AgentTypeListResult,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  GetSessionMessageHistoryParams,
   GetHistorySessionsListParams,
   GetSessionMessageParams,
   GetWeAgentDetailsParams,
@@ -548,6 +550,38 @@ function buildMockApi(): HWH5EXT {
         size,
         total,
         totalPages,
+      };
+    },
+
+    getSessionMessageHistory: async (
+      params: GetSessionMessageHistoryParams,
+    ): Promise<GetSessionMessageHistoryResponse> => {
+      const record = getSessionRecordOrThrow(params.welinkSessionId);
+      const size = Math.max(1, params.size ?? DEFAULT_PAGE_SIZE);
+
+      const sortedMessages = [...record.messages].sort((left, right) => {
+        const leftSeq = left.seq ?? left.messageSeq ?? 0;
+        const rightSeq = right.seq ?? right.messageSeq ?? 0;
+        return leftSeq - rightSeq;
+      });
+
+      const beforeSeq = params.beforeSeq;
+      const scopedMessages = typeof beforeSeq === 'number'
+        ? sortedMessages.filter((message) => (message.seq ?? message.messageSeq ?? 0) < beforeSeq)
+        : sortedMessages;
+
+      const startIndex = Math.max(0, scopedMessages.length - size);
+      const content = scopedMessages.slice(startIndex).map(cloneSessionMessage);
+      const hasMore = startIndex > 0;
+      const nextBeforeSeq = hasMore
+        ? (content[0]?.seq ?? content[0]?.messageSeq ?? null)
+        : null;
+
+      return {
+        content,
+        size,
+        hasMore,
+        nextBeforeSeq,
       };
     },
 
