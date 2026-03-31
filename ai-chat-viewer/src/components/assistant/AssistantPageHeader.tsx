@@ -1,6 +1,6 @@
 import React from 'react';
-import backIcon from '../../imgs/icon-back.svg';
-import closeIcon from '../../imgs/icon-close.svg';
+import backIcon from '../../imgs/back_icon.svg';
+import closeIcon from '../../imgs/close_icon.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
 import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';

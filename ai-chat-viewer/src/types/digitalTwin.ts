@@ -46,3 +46,12 @@ export interface CreateDigitalTwinParams {
   weCrewType: 0 | 1;
   bizRobotId?: string;
 }
+
+export interface UploadTinyImageResult {
+  isOk: boolean;
+  tinyImageUrl: string;
+}
+
+export interface GetFilePathResult {
+  filePath: string
+}
