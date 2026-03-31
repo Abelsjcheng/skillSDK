@@ -40,7 +40,7 @@ describe('StepBrainSelect', () => {
     const confirmButton = screen.getByRole('button', { name: '确定' });
     expect(confirmButton).toBeDisabled();
 
-    fireEvent.click(screen.getByLabelText('自定义助手'));
+    fireEvent.click(screen.getByLabelText('自定义'));
     expect(confirmButton).not.toBeDisabled();
     expect(confirmButton).toHaveClass('is-active');
   });
@@ -56,7 +56,7 @@ describe('StepBrainSelect', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('内部助手'));
+    fireEvent.click(screen.getByLabelText('内部提供方'));
     await screen.findByRole('button', { name: '写作助手' });
 
     const confirmButton = screen.getByRole('button', { name: '确定' });
@@ -75,12 +75,37 @@ describe('StepBrainSelect', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('内部助手'));
+    fireEvent.click(screen.getByLabelText('内部提供方'));
     const assistantButton = await screen.findByRole('button', { name: '写作助手' });
     fireEvent.click(assistantButton);
 
     expect(assistantButton).toHaveClass('is-selected');
     expect(screen.getByRole('button', { name: '确定' })).not.toBeDisabled();
+  });
+
+  it('shows illustration only for internal provider and opens guide when clicked', async () => {
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    render(
+      <StepBrainSelect
+        illustration={BRAIN_ILLUSTRATION}
+        onClose={Noop}
+        onCancel={Noop}
+        onPrev={Noop}
+        onConfirm={Noop}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
+    });
+
+    const illustration = screen.getByAltText('个人助理插画');
+    fireEvent.click(illustration);
+    expect(openSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('自定义'));
+    expect(screen.queryByAltText('个人助理插画')).toBeNull();
+    openSpy.mockRestore();
   });
 
   it('calls onPrev when clicking previous button', () => {

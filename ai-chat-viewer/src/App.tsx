@@ -34,6 +34,7 @@ import {
   sessionMessageToMessage,
   snapshotMessageToMessage,
 } from './utils/message';
+import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import { showToast } from './utils/toast';
 import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
 import './styles/App.less';
@@ -56,17 +57,28 @@ function hasMoreHistoryByCursor(result: GetSessionMessageHistoryResponse): boole
   return result.hasMore;
 }
 
-function getLatestSessionByUpdatedAt(sessions: SkillSession[]): SkillSession | null {
-  if (sessions.length === 0) {
+function isSessionClosed(status: string | null | undefined): boolean {
+  const normalizedStatus = (status ?? '').trim().toLowerCase();
+  return normalizedStatus === 'close' || normalizedStatus === 'closed';
+}
+
+function getSessionUpdatedAtTimestamp(session: SkillSession): number {
+  const timestamp = new Date(session.updatedAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function getLatestAvailableSessionByUpdatedAt(sessions: SkillSession[]): SkillSession | null {
+  const availableSessions = sessions.filter((session) => !isSessionClosed(session.status));
+  if (availableSessions.length === 0) {
     return null;
   }
-  return [...sessions].sort(
-    (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  return [...availableSessions].sort(
+    (left, right) => getSessionUpdatedAtTimestamp(right) - getSessionUpdatedAtTimestamp(left),
   )[0] ?? null;
 }
 
 function App({ assistantAccount = '' }: AppProps) {
-  const isPc = isPcMiniApp();
+  const isPc = true;
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -247,13 +259,9 @@ function App({ assistantAccount = '' }: AppProps) {
         const detail = await resolveAssistantDetail(currentAssistantAccount);
         const historyResult = await getHistorySessionsList({
           assistantAccount: currentAssistantAccount,
-          status: 'ACTIVE',
         });
-        const activeSessions = (historyResult.content ?? []).filter(
-          (session) => session.status === 'ACTIVE',
-        );
-        const latestActiveSession = getLatestSessionByUpdatedAt(activeSessions);
-        const session = latestActiveSession
+        const latestAvailableSession = getLatestAvailableSessionByUpdatedAt(historyResult.content ?? []);
+        const session = latestAvailableSession
           ?? await createSessionForAssistant(currentAssistantAccount, detail.appKey);
 
         if (disposed) {
@@ -578,7 +586,11 @@ function App({ assistantAccount = '' }: AppProps) {
         <button
           type="button"
           className="we-agent-cui-actions__button"
-          onClick={handleCreateSession}
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              void handleCreateSession();
+            });
+          }}
           aria-label="新建会话"
         >
           <img
@@ -596,6 +608,7 @@ function App({ assistantAccount = '' }: AppProps) {
 
       <div className="footer-wrapper">
         <WeAgentCUIFooter
+          isPcMiniApp={isPc}
           mode={footerMode}
           onSend={handleGenerate}
           onStop={handleStop}

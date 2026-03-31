@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router';
 import activateGuideMobile from '../imgs/activate-guide.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
+import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from '../utils/hwext';
 import '../styles/ActivateAssistant.less';
 import { APP_ID } from '../constants';
@@ -14,7 +15,7 @@ const DEFAULT_LIST_QUERY = {
 };
 
 const ActivateAssistant: React.FC = () => {
-  const isPc = true;
+  const isPc = isPcMiniApp();
   const activateGuideImage = isPc ? activateGuidePc : activateGuideMobile;
   const navigate = useNavigate();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
@@ -59,7 +60,15 @@ const ActivateAssistant: React.FC = () => {
         </section>
 
         <section className="activate-assistant__actions">
-          <button type="button" className="activate-assistant__enable-btn" onClick={handleSelectAssistant}>
+          <button
+            type="button"
+            className="activate-assistant__enable-btn"
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleSelectAssistant();
+              });
+            }}
+          >
             选择助理
           </button>
         </section>

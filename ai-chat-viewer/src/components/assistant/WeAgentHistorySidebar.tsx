@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
+import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
 
 type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
@@ -128,7 +129,11 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       <button
         type="button"
         className="we-agent-cui-actions__button"
-        onClick={handleOpen}
+        onClick={(event) => {
+          runButtonClickWithDebounce(event, () => {
+            void handleOpen();
+          });
+        }}
         aria-label="历史会话"
       >
         <img
@@ -143,7 +148,11 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
             type="button"
             className="we-agent-history-sidebar__mask"
             aria-label="关闭历史会话侧边栏"
-            onClick={handleClose}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                handleClose();
+              });
+            }}
           />
           <aside
             className="we-agent-history-sidebar__panel"
@@ -172,7 +181,11 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                           'we-agent-history-sidebar__session-item',
                           isSelected ? 'is-selected' : '',
                         ].filter(Boolean).join(' ')}
-                        onClick={() => handleSessionClick(sessionId)}
+                        onClick={(event) => {
+                          runButtonClickWithDebounce(event, () => {
+                            handleSessionClick(sessionId);
+                          });
+                        }}
                         title={sessionTitle}
                       >
                         {sessionTitle}

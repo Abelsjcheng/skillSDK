@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { MessagePart } from '../types';
+import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { sendMessage } from '../utils/hwext';
 
 interface QuestionCardProps {
@@ -64,7 +65,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             <button
               key={i}
               className="question-card__option"
-              onClick={() => handleSelect(opt)}
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  handleSelect(opt);
+                });
+              }}
               disabled={isLocked}
             >
               {opt}
@@ -85,7 +90,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         />
         <button
           className="question-card__submit"
-          onClick={handleSubmit}
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              handleSubmit();
+            });
+          }}
           disabled={isLocked || !trimmedInput}
         >
           提交

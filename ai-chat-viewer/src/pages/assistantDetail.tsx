@@ -3,6 +3,7 @@ import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
+import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
 import { showToast } from '../utils/toast';
@@ -123,7 +124,10 @@ const AssistantDetail: React.FC = () => {
         <section className="assistant-detail__card assistant-detail__card--intro">
           <h3 className="assistant-detail__section-title">助理简介</h3>
           <p className="assistant-detail__section-desc">{displayDescription}</p>
-          <DetailInfoRow label="创建者" value={displayCreator} />
+          <DetailInfoRow
+            label="创建者"
+            valueNode={<span className="assistant-detail__org-value">{displayCreator}</span>}
+          />
         </section>
 
         <section className="assistant-detail__card assistant-detail__card--org">
@@ -132,14 +136,18 @@ const AssistantDetail: React.FC = () => {
             valueNode={(
               isInternalAssistant ? (
                 <span className="assistant-detail__org-value">{orgValue}</span>
+              ) : !isPc ? (
+                <span className="assistant-detail__org-value">{orgValue}</span>
               ) : (
                 <div className="assistant-detail__value-with-actions">
                   <span className="assistant-detail__org-value">{orgValue}</span>
                   <button
                     type="button"
                     className="assistant-detail__icon-btn"
-                    onClick={() => {
-                      void handleCopy(orgValue, 'APPID已复制');
+                    onClick={(event) => {
+                      runButtonClickWithDebounce(event, () => {
+                        void handleCopy(orgValue, 'APPID已复制');
+                      });
                     }}
                     aria-label="复制APPID"
                   >
@@ -154,6 +162,11 @@ const AssistantDetail: React.FC = () => {
               label={ownerLabel}
               valueNode={<span className="assistant-detail__org-value">{ownerValue}</span>}
             />
+          ) : !isPc ? (
+            <DetailInfoRow
+              label={ownerLabel}
+              valueNode={<span className="assistant-detail__org-value">{ownerValue}</span>}
+            />
           ) : (
             <DetailInfoRow
               label={ownerLabel}
@@ -164,7 +177,11 @@ const AssistantDetail: React.FC = () => {
                     <button
                       type="button"
                       className="assistant-detail__icon-btn"
-                      onClick={toggleSecretVisible}
+                      onClick={(event) => {
+                        runButtonClickWithDebounce(event, () => {
+                          toggleSecretVisible();
+                        });
+                      }}
                       aria-label={isSecretVisible ? '隐藏密钥' : '查看密钥'}
                     >
                       <img src={iconCopy} alt="" className="assistant-detail__icon" />
@@ -172,8 +189,10 @@ const AssistantDetail: React.FC = () => {
                     <button
                       type="button"
                       className="assistant-detail__icon-btn"
-                      onClick={() => {
-                        void handleCopy(secret, '密钥已复制');
+                      onClick={(event) => {
+                        runButtonClickWithDebounce(event, () => {
+                          void handleCopy(secret, '密钥已复制');
+                        });
                       }}
                       aria-label="复制密钥"
                     >

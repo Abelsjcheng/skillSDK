@@ -2,6 +2,7 @@
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import '../styles/CodeBlock.less';
+import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 
 interface CodeBlockProps {
   code: string;
@@ -63,7 +64,15 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
     <div className="code-block">
       <div className="code-block__header">
         <span className="code-block__lang">{normalizedLanguage}</span>
-        <button className="code-block__copy-btn" onClick={handleCopy} type="button">
+        <button
+          className="code-block__copy-btn"
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              handleCopy();
+            });
+          }}
+          type="button"
+        >
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>

@@ -4,6 +4,7 @@ import closeIcon from '../../imgs/icon-close.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
 import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
+import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 
 interface AssistantPageHeaderProps {
@@ -30,9 +31,11 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
           type="button"
           className="assistant-page-header__pc-btn"
           aria-label="关闭"
-          onClick={() => {
-            dispatchAssistantCloseEvent();
-            onClose();
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              dispatchAssistantCloseEvent();
+              onClose();
+            });
           }}
         >
           <img src={closeIcon} alt="" className="assistant-page-header__pc-icon" aria-hidden="true" />
@@ -42,7 +45,11 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
           type="button"
           className="assistant-page-header__pc-btn"
           aria-label="客服"
-          onClick={onService}
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              onService();
+            });
+          }}
         >
           <img src={serviceIcon} alt="" className="assistant-page-header__pc-icon" aria-hidden="true" />
         </button>
@@ -65,13 +72,24 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
           type="button"
           className="assistant-page-header__icon-btn"
           aria-label="返回"
-          onClick={() => {
-            window.HWH5.navigateBack();
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              window.HWH5.navigateBack();
+            });
           }}
         >
           <img src={backIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
         </button>
-        <button type="button" className="assistant-page-header__icon-btn" aria-label="客服" onClick={onService}>
+        <button
+          type="button"
+          className="assistant-page-header__icon-btn"
+          aria-label="客服"
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              onService();
+            });
+          }}
+        >
           <img src={serviceIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
         </button>
       </div>

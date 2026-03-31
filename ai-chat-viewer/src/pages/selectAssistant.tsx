@@ -4,6 +4,8 @@ import AssistantSelectionPage, { type AssistantItem } from '../components/assist
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
+import { resolveAssistantTag } from '../utils/assistantTag';
+import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import {
   buildOpenWeAgentCUIParams,
   getWeAgentDetails,
@@ -20,13 +22,6 @@ const DEFAULT_LIST_QUERY = {
   pageNumber: 1,
 };
 const CREATE_ASSISTANT_ROUTE = '/createAssistant';
-const CUSTOM_ASSISTANT_TAG = '自定义助理';
-
-function resolveAssistantTag(assistant: WeAgentListItem): string {
-  const bizRobotName = assistant.bizRobotName?.trim() ?? '';
-  const bizRobotNameEn = assistant.bizRobotNameEn?.trim() ?? '';
-  return bizRobotName || bizRobotNameEn || CUSTOM_ASSISTANT_TAG;
-}
 
 function buildCreateAssistantSearch(): string {
   const params = new URLSearchParams();
@@ -191,14 +186,22 @@ const SelectAssistant: React.FC = () => {
           <button
             type="button"
             className="start-assistant__action-btn start-assistant__action-btn--create"
-            onClick={handleCreateAssistant}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                handleCreateAssistant();
+              });
+            }}
           >
             创建助理
           </button>
           <button
             type="button"
             className="start-assistant__action-btn start-assistant__action-btn--enable"
-            onClick={handleEnableNow}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleEnableNow();
+              });
+            }}
             disabled={!selectedAssistantId}
           >
             开始使用

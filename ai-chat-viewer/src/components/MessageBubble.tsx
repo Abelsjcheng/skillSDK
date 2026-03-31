@@ -150,7 +150,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const messageContent = renderContent();
-  const messageTimeText = formatMessageTime(message.timestamp);
+  const messageTimeText = formatMessageTime(message.timestamp || new Date().getTime());
   const userName = weAgentUserName.trim();
   const assistantName = weAgentAssistantName.trim();
   const messageMetaText = `${isUser ? userName : assistantName} ${messageTimeText}`.trim();

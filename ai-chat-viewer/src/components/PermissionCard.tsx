@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { MessagePart } from '../types';
+import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
 
 interface PermissionCardProps {
@@ -67,21 +68,33 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
         <div className="permission-card__actions">
           <button
             className="permission-card__btn permission-card__btn--allow"
-            onClick={() => handleDecision('once')}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleDecision('once');
+              });
+            }}
             disabled={submitting}
           >
             ✅ 允许
           </button>
           <button
             className="permission-card__btn permission-card__btn--always"
-            onClick={() => handleDecision('always')}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleDecision('always');
+              });
+            }}
             disabled={submitting}
           >
             ✅ 始终允许
           </button>
           <button
             className="permission-card__btn permission-card__btn--deny"
-            onClick={() => handleDecision('reject')}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleDecision('reject');
+              });
+            }}
             disabled={submitting}
           >
             ❌ 拒绝

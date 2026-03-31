@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
+import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 import { INTERNAL_ASSISTANTS } from './constants';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
@@ -98,8 +99,8 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
       <div className="digital-twin__content digital-twin__content--step2">
         <div className="digital-twin__brain-type-block">
-          <h3 className="digital-twin__brain-title">请选择你的「个人助理」大脑：</h3>
-          <div className="digital-twin__brain-radios" role="radiogroup" aria-label="个人助理大脑类型">
+          <h3 className="digital-twin__brain-title">请选择你的「个人助理」能力提供方：</h3>
+          <div className="digital-twin__brain-radios" role="radiogroup" aria-label="个人助理能力提供方">
             <label className="digital-twin__radio-item">
               <input
                 type="radio"
@@ -107,7 +108,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                 checked={brainType === 'internal'}
                 onChange={() => handleBrainTypeChange('internal')}
               />
-              <span>内部助手</span>
+              <span>内部提供方</span>
             </label>
             <label className="digital-twin__radio-item">
               <input
@@ -116,7 +117,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                 checked={brainType === 'custom'}
                 onChange={() => handleBrainTypeChange('custom')}
               />
-              <span>自定义助手</span>
+              <span>自定义</span>
             </label>
           </div>
         </div>
@@ -134,7 +135,11 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                         key={assistant.bizRobotId}
                         type="button"
                         className={`digital-twin__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
-                        onClick={() => setSelectedBizRobotId(assistant.bizRobotId)}
+                        onClick={(event) => {
+                          runButtonClickWithDebounce(event, () => {
+                            setSelectedBizRobotId(assistant.bizRobotId);
+                          });
+                        }}
                         aria-label={assistant.name}
                       >
                         <span className="digital-twin__assistant-content">
@@ -173,9 +178,17 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           ) : null}
         </div>
 
-        <div className="digital-twin__brain-illustration-wrap">
-          <img className="digital-twin__brain-illustration" src={illustration} alt="个人助理插画" />
-        </div>
+        {brainType === 'internal' ? (
+          <a
+            href={GUIDE_DOCUMENT_URL}
+            className="digital-twin__brain-illustration-wrap"
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleOpenGuideDocument}
+          >
+            <img className="digital-twin__brain-illustration" src={illustration} alt="个人助理插画" />
+          </a>
+        ) : null}
       </div>
 
       <CreatorStepFooter

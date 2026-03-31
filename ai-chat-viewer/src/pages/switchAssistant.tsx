@@ -2,6 +2,7 @@
 import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
+import { resolveAssistantTag } from '../utils/assistantTag';
 import {
   buildOpenWeAgentCUIParams,
   getQueryParam,
@@ -18,14 +19,6 @@ const DEFAULT_LIST_QUERY = {
   pageSize: 20,
   pageNumber: 1,
 };
-const CUSTOM_ASSISTANT_TAG = '自定义助理';
-
-function resolveAssistantTag(assistant: WeAgentListItem): string {
-  const bizRobotName = assistant.bizRobotName?.trim() ?? '';
-  const bizRobotNameEn = assistant.bizRobotNameEn?.trim() ?? '';
-  return bizRobotName || bizRobotNameEn || CUSTOM_ASSISTANT_TAG;
-}
-
 interface SwitchAssistantProps {
   defaultSelectedAssistantId?: string;
 }
@@ -144,6 +137,8 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 };
 
 export default SwitchAssistant;
+
+
 
 
 

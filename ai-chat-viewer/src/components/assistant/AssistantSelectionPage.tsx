@@ -4,6 +4,7 @@ import {
   dispatchAssistantCloseEvent,
   dispatchSwitchAssistantSelectEvent,
 } from '../../utils/assistantHostBridge';
+import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import AssistantPageHeader from './AssistantPageHeader';
 
 export interface AssistantItem {
@@ -133,14 +134,22 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
-          onClick={onLeftButtonClick}
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              onLeftButtonClick();
+            });
+          }}
         >
           {leftButtonText}
         </button>
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--confirm"
-          onClick={onRightButtonClick}
+          onClick={(event) => {
+            runButtonClickWithDebounce(event, () => {
+              onRightButtonClick();
+            });
+          }}
           disabled={rightButtonDisabled}
         >
           {rightButtonText}

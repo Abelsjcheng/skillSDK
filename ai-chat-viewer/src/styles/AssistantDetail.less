@@ -41,7 +41,7 @@
 .assistant-detail__avatar-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -119,7 +119,7 @@
   height: 48px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   box-sizing: border-box;
 }
 
@@ -130,6 +130,28 @@
 
 .assistant-detail__card--org .assistant-detail__info-row + .assistant-detail__info-row {
   border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.assistant-detail__card--intro .assistant-detail__info-label,
+.assistant-detail__card--org .assistant-detail__info-label {
+  flex-shrink: 0;
+}
+
+.assistant-detail__card--intro .assistant-detail__info-value,
+.assistant-detail__card--intro .assistant-detail__org-value,
+.assistant-detail__card--org .assistant-detail__info-value,
+.assistant-detail__card--org .assistant-detail__org-value,
+.assistant-detail__card--org .assistant-detail__value-with-actions {
+  margin-left: 16px;
+}
+
+.assistant-detail__card--intro .assistant-detail__info-value,
+.assistant-detail__card--intro .assistant-detail__org-value,
+.assistant-detail__card--org .assistant-detail__info-value,
+.assistant-detail__card--org .assistant-detail__org-value {
+  flex: 1;
+  text-align: right;
+  min-width: 0;
 }
 
 .assistant-detail__info-label {
@@ -147,7 +169,7 @@
 }
 
 .assistant-detail__org-value {
-  width: 200px;
+  width: auto;
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
@@ -174,17 +196,18 @@
   justify-content: flex-end;
   min-width: 0;
   flex: 1;
+  gap: 16px;
 }
 
 .assistant-detail__value-with-actions .assistant-detail__icon-btn {
-  margin-left: 16px;
+  margin-left: 0;
 }
 
 .assistant-detail__action-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 16px;
+  margin-left: 0;
 }
 
 .assistant-detail__action-group .assistant-detail__icon-btn {

@@ -1,5 +1,6 @@
 ﻿import React, { ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
+import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
@@ -152,7 +153,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                 role="listitem"
                 className={`digital-twin__avatar-option ${selected ? 'is-selected' : ''}`.trim()}
                 aria-label={`选择默认头像 ${avatar.id}`}
-                onClick={() => handleSelectDefaultAvatar(avatar.id)}
+                onClick={(event) => {
+                  runButtonClickWithDebounce(event, () => {
+                    handleSelectDefaultAvatar(avatar.id);
+                  });
+                }}
               >
                 <img src={avatar.image} alt={`默认头像 ${avatar.id}`} className="digital-twin__avatar-option-img" />
                 {selected ? <span className="digital-twin__check">✓</span> : null}
@@ -166,7 +171,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
               avatarType === 'custom' ? 'is-selected' : ''
             }`.trim()}
             aria-label="上传自定义头像"
-            onClick={handleChooseUpload}
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                handleChooseUpload();
+              });
+            }}
           >
             +
             {avatarType === 'custom' ? <span className="digital-twin__check">✓</span> : null}

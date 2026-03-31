@@ -1,4 +1,5 @@
 import React from 'react';
+import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
 type FooterButtonVariant = 'cancel' | 'next' | 'confirm';
 
@@ -50,7 +51,11 @@ function renderButton(button: CreatorStepFooterButton, includeMobilePrimary = fa
       type="button"
       className={resolveButtonClassName(button, includeMobilePrimary)}
       disabled={!isEnabled}
-      onClick={button.onClick}
+      onClick={(event) => {
+        runButtonClickWithDebounce(event, () => {
+          button.onClick();
+        });
+      }}
     >
       {button.label}
     </button>
