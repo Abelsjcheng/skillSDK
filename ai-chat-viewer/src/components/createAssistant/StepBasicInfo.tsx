@@ -1,10 +1,11 @@
 ﻿import React, { ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
-import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
+import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, GetFilePathResult, UploadTinyImageResult } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 import { CreatorStepFooter } from './CreatorStepFooter';
+import { chooseImage, uploadFile } from '../../utils/hwext';
 
 interface StepBasicInfoProps {
   isPcMiniApp?: boolean;
@@ -52,10 +53,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const [name, setName] = useState(initialValue?.name ?? '');
   const [description, setDescription] = useState(initialValue?.description ?? '');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const lastObjectUrlRef = useRef<string | undefined>(
-    initialValue?.avatarType === 'custom' ? initialValue.icon : undefined,
-  );
 
   const nameIsInvalid = useMemo(() => hasInvalidName(name), [name]);
   const descriptionIsInvalid = useMemo(() => hasInvalidDescription(description), [description]);
@@ -66,8 +63,19 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       ? customAvatarPreview
       : defaultAvatars.find((item) => item.id === avatarId)?.image ?? defaultAvatars[0]?.image;
 
-  const handleChooseUpload = useCallback(() => {
-    fileInputRef.current?.click();
+  const handleChooseUpload = useCallback(async () => {
+    try {
+      const fileResult: GetFilePathResult = await chooseImage({
+        flag: 1,
+        imagePickerMode: 'IMAGE',
+        maxSelectedCount: 1,
+        showOrigin: true,
+        type: 1
+      }) as GetFilePathResult
+      handleAvatarUpload(fileResult)
+    } catch (error) {
+      console.error();
+    }
   }, []);
 
   const handleSelectDefaultAvatar = useCallback((selectedAvatarId: string) => {
@@ -75,7 +83,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     setAvatarId(selectedAvatarId);
   }, []);
 
-  const handleAvatarUpload = useCallback((file: File) => {
+  const handleAvatarUpload = useCallback(async (file: GetFilePathResult) => {
     const result = validateAvatarFile(file);
     if (!result.valid) {
       showToast(result.reason, {
@@ -84,28 +92,25 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       });
       return;
     }
-
-    if (lastObjectUrlRef.current && typeof URL.revokeObjectURL === 'function') {
-      URL.revokeObjectURL(lastObjectUrlRef.current);
-      lastObjectUrlRef.current = undefined;
+    try {
+      const uploadFileResult: UploadTinyImageResult = await uploadFile({
+        serverlUrl: '',
+        filePath: file.filePath,
+        name: 'file',
+        formData: {
+          'app': 'athena'
+        }
+      }) as UploadTinyImageResult
+      const urlObj = new URL(uploadFileResult.tinyImageUrl);
+      setAvatarType('custom');
+      setCustomAvatarPreview(urlObj.pathname);
+    } catch (error) {
+      showToast('上传头像失败', {
+        toastClassName: 'digital-twin-toast',
+        hideClassName: 'digital-twin-toast-hide',
+      });
     }
-
-    const previewUrl = typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : undefined;
-
-    if (previewUrl) {
-      lastObjectUrlRef.current = previewUrl;
-    }
-
-    setAvatarType('custom');
-    setCustomAvatarPreview(previewUrl);
   }, []);
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    handleAvatarUpload(file);
-    event.target.value = '';
-  };
 
   const handleMobileInputTouchStart = useCallback((event: React.TouchEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (isPcMiniApp) return;
@@ -167,9 +172,8 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
           <button
             type="button"
-            className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${
-              avatarType === 'custom' ? 'is-selected' : ''
-            }`.trim()}
+            className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${avatarType === 'custom' ? 'is-selected' : ''
+              }`.trim()}
             aria-label="上传自定义头像"
             onClick={(event) => {
               runButtonClickWithDebounce(event, () => {
@@ -180,14 +184,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             +
             {avatarType === 'custom' ? <span className="digital-twin__check">✓</span> : null}
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-            className="digital-twin__hidden-file"
-            onChange={handleFileChange}
-            data-testid="avatar-upload-input"
-          />
         </div>
 
         <div className="digital-twin__field">

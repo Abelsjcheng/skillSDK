@@ -27,7 +27,7 @@ function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
 }
 
 const PersonalAssistantCreator: React.FC = () => {
-  const isPc = isPcMiniApp();
+  const isPc = true;
   const [step, setStep] = useState<1 | 2>(1);
   const basicInfoRef = useRef<DigitalTwinBasicInfoPayload | null>(null);
 
