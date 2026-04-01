@@ -11,7 +11,7 @@ import type {
 } from '../types';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
 import { APP_ID } from '../constants';
-import { showErrorToast } from './toast';
+import { showToast } from './toast';
 
 export interface HWH5EXTError {
   code?: string;
@@ -291,7 +291,7 @@ const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
   if (typeof window === 'undefined') return false;
-  return true;
+  return typeof window.Pedestal?.callMethod === 'function';
 }
 
 function tryGetPedestal(): Pedestal | null {
@@ -324,13 +324,13 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       });
       void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
         console.error('registerSessionListener failed:', err);
-        showErrorToast(err, '注册会话监听失败');
+        showToast('注册会话监听失败');
       });
     },
     unregisterSessionListener: (params) => {
       void call<void>('unregisterSessionListener', params).catch((err) => {
         console.error('unregisterSessionListener failed:', err);
-        showErrorToast(err, '取消会话监听失败');
+        showToast('取消会话监听失败');
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),

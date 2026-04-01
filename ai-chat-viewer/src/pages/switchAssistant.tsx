@@ -14,7 +14,7 @@ import {
   resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
-import { showErrorToast } from '../utils/toast';
+import { showToast } from '../utils/toast';
 
 const DEFAULT_LIST_QUERY = {
   pageSize: 20,
@@ -62,7 +62,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       });
     } catch (error) {
       console.error('getWeAgentList failed in SwitchAssistant:', error);
-      showErrorToast(error, '获取助理列表失败');
+      showToast('获取助理列表失败');
       setAssistantList([]);
       setSelectedPartnerAccount('');
     }
@@ -98,7 +98,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in SwitchAssistant:', error);
-      showErrorToast(error, '打开助理失败');
+      showToast('打开助理失败');
     }
   }, [assistantList, selectedPartnerAccount]);
 

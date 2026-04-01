@@ -63,6 +63,17 @@ interface SessionListener {
   onClose?: RegisterSessionListenerParams['onClose'];
 }
 
+type MockReplyScenario =
+  | {
+    type: 'normal';
+    assistantContent: string;
+  }
+  | {
+    type: 'session.error' | 'error';
+    prelude: string;
+    errorMessage: string;
+  };
+
 declare global {
   interface Window {
     __AI_CHAT_VIEWER_JSAPI_MOCK__?: boolean;
@@ -199,6 +210,40 @@ function buildAssistantReply(content: string): string {
   ].join('\n');
 }
 
+function resolveMockReplyScenario(content: string): MockReplyScenario {
+  const normalized = content.trim().toLowerCase();
+
+  if (
+    normalized.includes('触发session.error')
+    || normalized.includes('mock-session-error')
+    || normalized.includes('session.error')
+  ) {
+    return {
+      type: 'session.error',
+      prelude: 'Mock AI is preparing an answer before session-level failure...',
+      errorMessage: 'Mock session error: agent connection lost while generating response.',
+    };
+  }
+
+  if (
+    normalized.includes('触发error事件')
+    || normalized.includes('触发ai错误')
+    || normalized.includes('mock-error')
+    || normalized === 'error'
+  ) {
+    return {
+      type: 'error',
+      prelude: 'Mock AI is preparing an answer before generic stream failure...',
+      errorMessage: 'Mock stream error: internal server error from local JSAPI mock.',
+    };
+  }
+
+  return {
+    type: 'normal',
+    assistantContent: buildAssistantReply(content),
+  };
+}
+
 function createMessage(
   sessionId: string,
   role: 'user' | 'assistant',
@@ -277,7 +322,8 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
 
   record.session.status = 'ACTIVE';
   const sessionId = record.session.welinkSessionId;
-  const assistantContent = buildAssistantReply(userContent);
+  const scenario = resolveMockReplyScenario(userContent);
+  const assistantContent = scenario.type === 'normal' ? scenario.assistantContent : scenario.prelude;
   const partId = nextId('part_assistant');
   const chunks = splitReplyContent(assistantContent);
 
@@ -302,26 +348,36 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
   });
 
   const doneTimer = window.setTimeout(() => {
-    const assistantMessage = createMessage(
-      sessionId,
-      'assistant',
-      assistantContent,
-      record.nextMessageSeq,
-      partId,
-    );
-    record.nextMessageSeq += 1;
-    upsertSessionRecord(record, assistantMessage);
-
     emit(sessionId, {
       type: 'text.done',
       role: 'assistant',
       partId,
       content: assistantContent,
     });
-    emit(sessionId, {
-      type: 'session.status',
-      sessionStatus: 'idle',
-    });
+
+    if (scenario.type === 'normal') {
+      const assistantMessage = createMessage(
+        sessionId,
+        'assistant',
+        assistantContent,
+        record.nextMessageSeq,
+        partId,
+      );
+      record.nextMessageSeq += 1;
+      upsertSessionRecord(record, assistantMessage);
+
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+    } else {
+      emit(sessionId, {
+        type: scenario.type,
+        role: 'assistant',
+        messageId: nextId('mock_error_message'),
+        error: scenario.errorMessage,
+      });
+    }
 
     clearSessionTimers(record);
   }, 180 + chunks.length * 80);

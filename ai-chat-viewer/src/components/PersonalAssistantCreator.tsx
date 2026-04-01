@@ -19,7 +19,7 @@ import {
   resolveWeCodeUrlForOpenWeAgentCUI,
   type CreateDigitalTwinResult,
 } from '../utils/hwext';
-import { showErrorToast } from '../utils/toast';
+import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
 
 function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
@@ -113,7 +113,7 @@ const PersonalAssistantCreator: React.FC = () => {
       }
     } catch (error) {
       console.error('confirm create assistant failed:', error);
-      showErrorToast(error, '创建助理失败');
+      showToast('创建助理失败');
     }
   }, [from, handleCreateForOtherScene, isPc]);
 

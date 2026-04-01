@@ -17,37 +17,28 @@ const ICON_TOAST_CLASS_NAMES: Record<string, { icon: string; text: string }> = {
   },
 };
 
-function normalizeMessage(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
+const PAGE_HEADER_SELECTORS = [
+  '.digital-twin__header',
+  '.assistant-page-header',
+  '.start-assistant__header',
+];
 
-export function getErrorToastMessage(error: unknown, fallbackMessage: string): string {
-  if (typeof error === 'string') {
-    return normalizeMessage(error) || fallbackMessage;
+function resolveToastTop(): number {
+  if (typeof document === 'undefined') {
+    return 10;
   }
 
-  if (error && typeof error === 'object') {
-    const errorRecord = error as Record<string, unknown>;
-    const candidateMessages = [
-      errorRecord.errorMessage,
-      errorRecord.message,
-      errorRecord.msg,
-      errorRecord.code,
-    ];
-
-    for (const candidate of candidateMessages) {
-      const normalized = normalizeMessage(candidate);
-      if (normalized) {
-        return normalized;
-      }
+  for (const selector of PAGE_HEADER_SELECTORS) {
+    const header = document.querySelector<HTMLElement>(selector);
+    if (!header) {
+      continue;
     }
+
+    const rect = header.getBoundingClientRect();
+    return Math.max(10, Math.round(rect.top + 10));
   }
 
-  return fallbackMessage;
-}
-
-export function showErrorToast(error: unknown, fallbackMessage: string): void {
-  showToast(getErrorToastMessage(error, fallbackMessage));
+  return 10;
 }
 
 export function showToast(message: string, options?: ToastOptions): void {
@@ -61,6 +52,7 @@ export function showToast(message: string, options?: ToastOptions): void {
 
   const toast = document.createElement('div');
   toast.className = toastClassName;
+  toast.style.top = `${resolveToastTop()}px`;
   const iconToastClassNames = ICON_TOAST_CLASS_NAMES[toastClassName];
 
   if (iconToastClassNames) {

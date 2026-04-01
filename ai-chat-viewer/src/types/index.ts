@@ -25,7 +25,7 @@ export type StreamMessageType =
   | 'snapshot'
   | 'streaming';
 
-export type MessagePartType = 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file';
+export type MessagePartType = 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file' | 'error';
 export type PartStatus = 'pending' | 'running' | 'completed' | 'error';
 export type PermissionResponse = 'once' | 'always' | 'reject';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';

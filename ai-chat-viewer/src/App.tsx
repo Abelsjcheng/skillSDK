@@ -7,6 +7,7 @@ import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   GetSessionMessageHistoryResponse,
   Message,
+  MessagePart,
   SendMessageResponse,
   SessionStatus,
   StreamMessage,
@@ -35,7 +36,7 @@ import {
   snapshotMessageToMessage,
 } from './utils/message';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
-import { showErrorToast } from './utils/toast';
+import { showToast } from './utils/toast';
 import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
@@ -78,7 +79,7 @@ function getLatestAvailableSessionByUpdatedAt(sessions: SkillSession[]): SkillSe
 }
 
 function App({ assistantAccount = '' }: AppProps) {
-  const isPc = true;
+  const isPc = isPcMiniApp();
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -128,6 +129,57 @@ function App({ assistantAccount = '' }: AppProps) {
         ),
       );
     }
+
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
+  }, []);
+
+  const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
+    const normalizedMessage = message.trim() || fallbackMessage;
+    const currentStreamingMessageId = streamingMsgIdRef.current;
+    const assemblerText = assemblerRef.current.getText();
+    const assemblerParts = assemblerRef.current
+      .getParts()
+      .map((part) => ({ ...part, isStreaming: false }));
+    const errorPart: MessagePart = {
+      partId: genMessageId('error_part'),
+      type: 'error',
+      content: normalizedMessage,
+      isStreaming: false,
+    };
+
+    setMessages((prev) => {
+      if (currentStreamingMessageId) {
+        const streamingMessageIndex = prev.findIndex((messageItem) => messageItem.id === currentStreamingMessageId);
+        if (streamingMessageIndex >= 0) {
+          const nextMessages = [...prev];
+          const currentMessage = nextMessages[streamingMessageIndex];
+          const baseParts = currentMessage.parts && currentMessage.parts.length > 0
+            ? currentMessage.parts.map((part) => ({ ...part, isStreaming: false }))
+            : assemblerParts;
+
+          nextMessages[streamingMessageIndex] = {
+            ...currentMessage,
+            content: currentMessage.content || assemblerText || normalizedMessage,
+            isStreaming: false,
+            parts: [...baseParts, errorPart],
+          };
+          return nextMessages;
+        }
+      }
+
+      return [
+        ...prev,
+        {
+          id: genMessageId('assistant_error'),
+          role: 'assistant',
+          content: normalizedMessage,
+          timestamp: Date.now(),
+          isStreaming: false,
+          parts: [errorPart],
+        },
+      ];
+    });
 
     assemblerRef.current.reset();
     streamingMsgIdRef.current = null;
@@ -194,7 +246,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       console.error('Failed to load more history messages:', err);
-      showErrorToast(err, '获取历史消息失败');
+      showToast('获取历史消息失败');
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
@@ -273,7 +325,7 @@ function App({ assistantAccount = '' }: AppProps) {
       } catch (err) {
         console.error('Failed to initialize weAgent session:', err);
         if (!disposed) {
-          showErrorToast(err, '初始化会话失败');
+          showToast('初始化会话失败');
           setIsLoading(false);
         }
       }
@@ -314,7 +366,7 @@ function App({ assistantAccount = '' }: AppProps) {
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
-        showErrorToast(err, '获取历史消息失败');
+        showToast('获取历史消息失败');
       }
     };
 
@@ -408,15 +460,17 @@ function App({ assistantAccount = '' }: AppProps) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          finalizeStreamingMessage();
+          appendAssistantErrorBlock(msg.error ?? '', 'AI回复失败');
           break;
 
         case 'error':
+          setSessionStatus('error');
           console.error(msg.error ?? '未知错误');
           if (!suppressFooterAutoResetRef.current) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
+          appendAssistantErrorBlock(msg.error ?? '', 'AI回复失败');
           break;
 
         case 'snapshot':
@@ -455,7 +509,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const errorCode = err.code ?? (err.errorCode !== undefined ? String(err.errorCode) : 'unknown');
       const errorMessage = err.message ?? err.errorMessage ?? 'unknown error';
       console.error('Session listener error:', `${errorCode}: ${errorMessage}`);
-      showErrorToast(err, '会话监听异常');
+      showToast('会话监听异常');
     };
 
     onCloseRef.current = (reason) => {
@@ -487,7 +541,7 @@ function App({ assistantAccount = '' }: AppProps) {
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, finalizeStreamingMessage]);
+  }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage]);
 
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
@@ -508,7 +562,7 @@ function App({ assistantAccount = '' }: AppProps) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
-      showErrorToast(err, '发送消息失败');
+      showToast('发送消息失败');
       console.error('发送消息失败:', err);
     }
   }, [welinkSessionId, appendMessageFromOperation]);
@@ -526,7 +580,7 @@ function App({ assistantAccount = '' }: AppProps) {
     } catch (err) {
       suppressFooterAutoResetRef.current = false;
       console.error('Failed to stop skill:', err);
-      showErrorToast(err, '停止生成失败');
+      showToast('停止生成失败');
       setFooterMode('generating');
     }
   }, [welinkSessionId, finalizeStreamingMessage]);
@@ -550,7 +604,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setWelinkSessionId(newSession.welinkSessionId);
     } catch (err) {
       console.error('Failed to create new session:', err);
-      showErrorToast(err, '新建会话失败');
+      showToast('新建会话失败');
       setIsLoading(false);
     }
   }, [resolveAssistantDetail, createSessionForAssistant]);

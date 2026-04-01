@@ -242,7 +242,7 @@ interface CreateDigitalTwinParams {
    - `description`：页面 1 简介输入值
    - `weCrewType`：页面 2 单选值映射（`internal => 1`，`custom => 0`）
    - `bizRobotId`：仅 `weCrewType = 1` 时传，值为选中内部助手项的 `bizRobotId`
-13. 所有 `HWH5EXT` / `HWH5` 能力调用在业务层进入 `catch` 分支时，统一通过 toast 告知用户；错误文案优先透传宿主返回的 `message/errorMessage`，否则回退到场景化兜底文案，避免仅保留控制台日志。
+13. 所有 `HWH5EXT` / `HWH5` 能力调用在业务层进入 `catch` 分支时，统一直接通过 `showToast(固定错误文案)` 告知用户，不再解析 `error.message/errorMessage`；toast 自身负责根据当前页面是否存在标题区动态定位，有标题区时显示在标题区顶部 `10px`，无标题区时显示在页面顶部 `10px`，并保持水平居中。
 
 ## 8. 样式与实现约束
 
@@ -402,6 +402,8 @@ interface CreateDigitalTwinParams {
 16. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
 17. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
 18. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。
+19. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
+20. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 
 
 

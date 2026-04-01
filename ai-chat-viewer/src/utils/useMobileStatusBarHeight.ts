@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { getStatusBarHeight } from './hwext';
-import { showErrorToast } from './toast';
+import { showToast } from './toast';
 
 export function useMobileStatusBarHeight(isPcMiniApp: boolean): number {
   const [statusBarHeight, setStatusBarHeight] = useState<number>(0);
@@ -24,7 +24,7 @@ export function useMobileStatusBarHeight(isPcMiniApp: boolean): number {
           setStatusBarHeight(0);
         }
         console.error('getStatusBarHeight failed:', error);
-        showErrorToast(error, '获取状态栏高度失败');
+        showToast('获取状态栏高度失败');
       }
     };
 

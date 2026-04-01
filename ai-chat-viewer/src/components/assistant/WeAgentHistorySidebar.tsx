@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
-import { showErrorToast } from '../../utils/toast';
+import { showToast } from '../../utils/toast';
 
 type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
 
@@ -110,7 +110,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       setHistorySessions(sessions);
     } catch (err) {
       console.error('Failed to load history sessions:', err);
-      showErrorToast(err, '获取历史会话失败');
+      showToast('获取历史会话失败');
       setHistorySessions([]);
     } finally {
       setIsLoading(false);

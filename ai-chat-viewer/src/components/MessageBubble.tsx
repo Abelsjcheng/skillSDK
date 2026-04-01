@@ -11,6 +11,7 @@ import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
+import { ErrorBlock } from './ErrorBlock';
 import type { Message, MessagePart } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
@@ -107,6 +108,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         );
+
+      case 'error':
+        return <ErrorBlock key={part.partId} part={part} />;
 
       case 'text':
       default:

@@ -2,7 +2,7 @@
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, GetFilePathResult, UploadTinyImageResult } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
-import { showErrorToast, showToast } from '../../utils/toast';
+import { showToast } from '../../utils/toast';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { chooseImage, uploadFile } from '../../utils/hwext';
@@ -103,7 +103,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       setCustomAvatarPreview(urlObj.pathname);
     } catch (error) {
       console.error('uploadFile failed in StepBasicInfo:', error);
-      showErrorToast(error, '上传头像失败');
+      showToast('上传头像失败');
     }
   }, []);
 
