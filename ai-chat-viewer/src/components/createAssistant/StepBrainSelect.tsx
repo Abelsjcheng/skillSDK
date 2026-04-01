@@ -95,7 +95,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
   return (
     <section className={getStepClassName(isPcMiniApp)}>
-      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} />
+      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} onMobileBack={onPrev} />
 
       <div className="digital-twin__content digital-twin__content--step2">
         <div className="digital-twin__brain-type-block">

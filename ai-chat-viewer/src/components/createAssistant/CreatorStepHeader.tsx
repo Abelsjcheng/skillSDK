@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import closeIcon from '../../imgs/close_icon.png';
 import backIcon from '../../imgs/back_icon.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
@@ -7,6 +7,7 @@ import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 interface CreatorStepHeaderProps {
   isPcMiniApp: boolean;
   onClose: () => void;
+  onMobileBack?: () => void;
 }
 
 export function getStepClassName(isPcMiniApp: boolean): string {
@@ -16,6 +17,7 @@ export function getStepClassName(isPcMiniApp: boolean): string {
 export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   isPcMiniApp,
   onClose,
+  onMobileBack,
 }) => {
   const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
   const mobileHeaderStyle = !isPcMiniApp && statusBarHeight > 0
@@ -26,6 +28,14 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
       flexBasis: `${44 + statusBarHeight}px`,
     }
     : undefined;
+
+  const handleMobileBack = useCallback(() => {
+    if (onMobileBack) {
+      onMobileBack();
+      return;
+    }
+    window.HWH5.navigateBack();
+  }, [onMobileBack]);
 
   return (
     <header className="digital-twin__header" style={mobileHeaderStyle}>
@@ -52,14 +62,14 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
               type="button"
               className="digital-twin__mobile-back-btn"
               aria-label="返回上一页"
-                onClick={(event) => {
-                  runButtonClickWithDebounce(event, () => {
-                    window.HWH5.navigateBack();
-                  });
-                }}
-              >
-                <img src={backIcon} alt="" className="digital-twin__mobile-back-icon" aria-hidden="true" />
-              </button>
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  handleMobileBack();
+                });
+              }}
+            >
+              <img src={backIcon} alt="" className="digital-twin__mobile-back-icon" aria-hidden="true" />
+            </button>
           </div>
           <span className="digital-twin__mobile-title">创建个人助理</span>
           <div className="digital-twin__mobile-header-side" aria-hidden="true" />

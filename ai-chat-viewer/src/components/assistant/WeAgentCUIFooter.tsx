@@ -1,6 +1,7 @@
 import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import iconWeAgentSend from '../../imgs/icon-we-agent-send.svg';
-import iconWeAgentStop from '../../imgs/icon-we-agent-stop.svg';
+import send_icon from '../../imgs/send_icon.svg';
+import stop_icon from '../../imgs/stop_icon.svg';
+import check_icon from '../../imgs/check.svg';
 import '../../styles/WeAgentCUIFooter.less';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
@@ -117,7 +118,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
           className={[
             'we-agent-cui-footer__send-btn',
             isGenerating ? 'we-agent-cui-footer__stop-btn' : '',
-          ].filter(Boolean).join(' ')}
+          ]
+            .filter(Boolean)
+            .join(' ')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               if (isGenerating) {
@@ -133,7 +136,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         >
           <img
             className="we-agent-cui-footer__send-icon"
-            src={isGenerating ? iconWeAgentStop : iconWeAgentSend}
+            src={isGenerating ? stop_icon : send_icon}
             alt=""
           />
         </button>
@@ -162,7 +165,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                   className={[
                     'we-agent-cui-footer__shortcut-item',
                     shortcutMode === 'enter' ? 'is-selected' : '',
-                  ].filter(Boolean).join(' ')}
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   onClick={(event) => {
                     runButtonClickWithDebounce(event, () => {
                       selectShortcutMode('enter');
@@ -170,7 +175,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                   }}
                 >
                   <span className="we-agent-cui-footer__shortcut-check-slot">
-                    {shortcutMode === 'enter' ? <span className="we-agent-cui-footer__shortcut-check">✓</span> : null}
+                    {shortcutMode === 'enter' ? (
+                      <img className="we-agent-cui-footer__shortcut-check-icon" src={check_icon} alt="" />
+                    ) : null}
                   </span>
                   <span className="we-agent-cui-footer__shortcut-text">Enter键发送消息</span>
                 </button>
@@ -179,7 +186,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                   className={[
                     'we-agent-cui-footer__shortcut-item',
                     shortcutMode === 'ctrlEnter' ? 'is-selected' : '',
-                  ].filter(Boolean).join(' ')}
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   onClick={(event) => {
                     runButtonClickWithDebounce(event, () => {
                       selectShortcutMode('ctrlEnter');
@@ -188,7 +197,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                 >
                   <span className="we-agent-cui-footer__shortcut-check-slot">
                     {shortcutMode === 'ctrlEnter' ? (
-                      <span className="we-agent-cui-footer__shortcut-check">✓</span>
+                      <img className="we-agent-cui-footer__shortcut-check-icon" src={check_icon} alt="" />
                     ) : null}
                   </span>
                   <span className="we-agent-cui-footer__shortcut-text">Ctrl+Enter键发送消息</span>
@@ -202,7 +211,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                 className={[
                   'we-agent-cui-footer__send-btn',
                   isGenerating ? 'we-agent-cui-footer__stop-btn' : '',
-                ].filter(Boolean).join(' ')}
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 onClick={(event) => {
                   runButtonClickWithDebounce(event, () => {
                     if (isGenerating) {
@@ -218,7 +229,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
               >
                 <img
                   className="we-agent-cui-footer__send-icon"
-                  src={isGenerating ? iconWeAgentStop : iconWeAgentSend}
+                  src={isGenerating ? stop_icon : send_icon}
                   alt=""
                 />
               </button>
@@ -236,7 +247,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                   className={[
                     'we-agent-cui-footer__shortcut-arrow-icon',
                     isShortcutPopupOpen ? 'is-open' : '',
-                  ].filter(Boolean).join(' ')}
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                 />
               </button>
             </div>

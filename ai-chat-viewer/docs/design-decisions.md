@@ -177,10 +177,10 @@ interface CreateDigitalTwinParams {
 1. 端类型判断通过 `isPcMiniApp` 完成：
    - `true`：维持当前 PC 布局与交互；
    - `false`：启用移动端布局覆盖。
-2. 页面 1 移动端头部改为三段式：左返回区（空实现）/中标题/右占位，头部高度 `44px`。
+2. 页面 1 移动端头部改为三段式：左返回区（调用 `window.HWH5.navigateBack()`）/中标题/右占位，头部高度 `44px`。
 3. 页面 1 移动端头像预览改为 `48x48`（圆角 `60px`），头像选项圆角改为 `100px`。
 4. 页面 1 移动端底部操作区仅保留“下一步”按钮，`44px` 高、全宽、圆角 `999px`。
-5. 页面 2 移动端头部改为三段式：左返回区（调用 `onPrev`）/中标题/右占位，头部高度 `44px`。
+5. 页面 2 移动端头部改为三段式：左返回区（调用 `onPrev` 返回第一页）/中标题/右占位，头部高度 `44px`。
 6. 页面 2 移动端大脑类型单选改为两列等宽按钮样式：高度 `48px`、间距 `16px`、边框 `1px rgba(0,0,0,0.05)`、圆角 `8px`。
 7. 页面 2 移动端单选圆点尺寸改为：容器 `24px`、外环 `20px`、内实心 `13.33px`。
 8. 页面 2 移动端内部助手按钮组改为 1 列，每项高度 `48px`。
@@ -225,16 +225,17 @@ interface CreateDigitalTwinParams {
 4. 页面切换不清空已输入数据。
 5. 点击“上一步”时从页面 2 返回页面 1，且页面 1 的头像选择、名称和简介保持不变。
 6. 页面 1 的“名称”和“简介”输入仅允许汉字/字母/数字字符；检测到其他字符时，对应输入框应用红色高亮边框，且“下一步”保持禁用。
-7. 点击 `X` 与“取消”时直接调用 `window.Pedestal.remote.getCurrentWindow().close()`。
-8. 页面 2 初始化时调用 `window.getAgentType()`；返回项中：
+7. 页面 1 移动端输入框（名称/简介）点击时，为降低 WebView 自动上抬概率，保留触摸聚焦兜底策略：在 `onTouchStart` 中优先执行 `focus({ preventScroll: true })`，并在下一帧恢复滚动位置；该策略禁止使用 `event.preventDefault()`，确保系统默认文本选择与复制能力不被拦截。
+8. 点击 `X` 与“取消”时直接调用 `window.Pedestal.remote.getCurrentWindow().close()`。
+9. 页面 2 初始化时调用 `window.getAgentType()`；返回项中：
    - `internalAssistants` 初始默认值来自 `constants.ts` 中的 `INTERNAL_ASSISTANTS = [{ name: '助手', icon: '', bizRobotId: '1234' }]`
    - `name` 显示为内部助手按钮文本
    - `icon` 显示为内部助手按钮图标
    - `bizRobotId` 用作内部助手唯一标识与确认入参
    - `getAgentType` 返回值直接通过 `setInternalAssistants` 设置，不做 `normalizeInternalAssistants` 归一化
    - 不渲染“内部助手加载中...”与“暂无可用内部助手”提示文案
-9. 页面 2 选择“自定义助手”时，提示文案固定为“需在本地电脑自定义部署第三方助手，点击查看指导文档→”；其中“指导文档→”采用超链接渲染，点击打开 web 页面，链接地址当前留空；链接文本颜色固定为 `rgb(9,146,255)`。
-10. 点击“确定”时调用 `window.createDigitalTwin(params)`，`params` 字段映射：
+10. 页面 2 选择“自定义助手”时，提示文案固定为“需在本地电脑自定义部署第三方助手，点击查看指导文档→”；其中“指导文档→”采用超链接渲染，点击打开 web 页面，链接地址当前留空；链接文本颜色固定为 `rgb(9,146,255)`。
+11. 点击“确定”时调用 `window.createDigitalTwin(params)`，`params` 字段映射：
    - `name`：页面 1 名称输入值
    - `icon`：页面 1 当前选中头像地址
    - `description`：页面 1 简介输入值
@@ -303,7 +304,7 @@ interface CreateDigitalTwinParams {
    - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
    - 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
 2. 内容区仅展示第一张本地图片资源 `src/imgs/activate-guide-1.svg`，不再保留轮播状态与指示器逻辑。
-3. “立即启用”按钮使用固定尺寸 `250x38`、圆角 `99px`、线性渐变背景，当前版本点击事件空实现（预留业务接入）。
+3. “选择助理/立即启用”按钮按端区分样式：移动端使用 `250x38`、圆角 `99px`；PC 端使用 `140x32`、圆角 `4px`；背景统一为线性渐变 `linear-gradient(90deg, #1f78ff 0%, #42b0ff 100%)`，当前版本点击事件空实现（预留业务接入）。
 
 ## 13. 依赖版本兼容决策
 
@@ -395,6 +396,8 @@ interface CreateDigitalTwinParams {
 13. 历史消息中的 AI `Question` / `Permission` 卡片统一按只读展示处理：`App` 在历史消息映射阶段标记来源，`MessageBubble` 将该标记透传到 `QuestionCard` 与 `PermissionCard`，并在组件内部禁用选项点击、输入提交及授权按钮点击。
 14. 全页面取消“禁止复制”限制：不通过触摸事件 `preventDefault` 或样式策略阻断系统默认文本选择与复制行为。
 15. 历史会话侧栏的每个会话 item 标题按单行省略处理，超出宽度显示 `...`。
+16. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
+17. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
 
 
 

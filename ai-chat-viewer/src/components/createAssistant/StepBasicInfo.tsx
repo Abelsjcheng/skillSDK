@@ -112,6 +112,20 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     }
   }, []);
 
+  const handleMobileInputTouchStart = useCallback((event: React.TouchEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (isPcMiniApp) return;
+    const target = event.currentTarget;
+    const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    try {
+      target.focus({ preventScroll: true });
+    } catch {
+      target.focus();
+    }
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollTop, left: 0, behavior: 'auto' });
+    });
+  }, [isPcMiniApp]);
+
   const handleNext = useCallback(() => {
     if (!canNext) return;
     onNext({
@@ -125,7 +139,13 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
   return (
     <section className={getStepClassName(isPcMiniApp)}>
-      <CreatorStepHeader isPcMiniApp={isPcMiniApp} onClose={onClose} />
+      <CreatorStepHeader
+        isPcMiniApp={isPcMiniApp}
+        onClose={onClose}
+        onMobileBack={() => {
+          window.HWH5.navigateBack();
+        }}
+      />
 
       <div className="digital-twin__content digital-twin__content--step1">
         <div className="digital-twin__avatar-preview-wrap">
@@ -186,6 +206,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             value={name}
             placeholder="例如：智能助手"
             onChange={(event) => setName(event.target.value)}
+            onTouchStart={handleMobileInputTouchStart}
           />
         </div>
 
@@ -199,6 +220,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             value={description}
             placeholder="介绍助理的功能和应用场景"
             onChange={(event) => setDescription(event.target.value)}
+            onTouchStart={handleMobileInputTouchStart}
           />
         </div>
       </div>

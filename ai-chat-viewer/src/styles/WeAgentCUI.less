@@ -191,10 +191,18 @@
   padding: 20px 18px;
   background: rgba(255, 255, 255, 1);
   overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.we-agent-history-sidebar__panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .we-agent-history-sidebar__status {
