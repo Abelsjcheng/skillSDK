@@ -35,7 +35,7 @@ import {
   snapshotMessageToMessage,
 } from './utils/message';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
-import { showToast } from './utils/toast';
+import { showErrorToast } from './utils/toast';
 import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
@@ -194,7 +194,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       console.error('Failed to load more history messages:', err);
-      showToast('获取历史消息失败');
+      showErrorToast(err, '获取历史消息失败');
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
@@ -273,6 +273,7 @@ function App({ assistantAccount = '' }: AppProps) {
       } catch (err) {
         console.error('Failed to initialize weAgent session:', err);
         if (!disposed) {
+          showErrorToast(err, '初始化会话失败');
           setIsLoading(false);
         }
       }
@@ -313,7 +314,7 @@ function App({ assistantAccount = '' }: AppProps) {
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
-        showToast('获取历史消息失败');
+        showErrorToast(err, '获取历史消息失败');
       }
     };
 
@@ -454,6 +455,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const errorCode = err.code ?? (err.errorCode !== undefined ? String(err.errorCode) : 'unknown');
       const errorMessage = err.message ?? err.errorMessage ?? 'unknown error';
       console.error('Session listener error:', `${errorCode}: ${errorMessage}`);
+      showErrorToast(err, '会话监听异常');
     };
 
     onCloseRef.current = (reason) => {
@@ -506,6 +508,7 @@ function App({ assistantAccount = '' }: AppProps) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
+      showErrorToast(err, '发送消息失败');
       console.error('发送消息失败:', err);
     }
   }, [welinkSessionId, appendMessageFromOperation]);
@@ -523,6 +526,7 @@ function App({ assistantAccount = '' }: AppProps) {
     } catch (err) {
       suppressFooterAutoResetRef.current = false;
       console.error('Failed to stop skill:', err);
+      showErrorToast(err, '停止生成失败');
       setFooterMode('generating');
     }
   }, [welinkSessionId, finalizeStreamingMessage]);
@@ -546,6 +550,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setWelinkSessionId(newSession.welinkSessionId);
     } catch (err) {
       console.error('Failed to create new session:', err);
+      showErrorToast(err, '新建会话失败');
       setIsLoading(false);
     }
   }, [resolveAssistantDetail, createSessionForAssistant]);

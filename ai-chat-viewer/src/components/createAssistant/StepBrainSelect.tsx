@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canConfirm } from '../../utils/digitalTwinValidation';
+import { showErrorToast } from '../../utils/toast';
 import { INTERNAL_ASSISTANTS } from './constants';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 import { CreatorStepFooter } from './CreatorStepFooter';
@@ -58,7 +59,9 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
       if (Array.isArray(result)) {
         setInternalAssistants(result);
       }
-    } catch (_error) {
+    } catch (error) {
+      console.error('getAgentType failed in StepBrainSelect:', error);
+      showErrorToast(error, '获取内部助手列表失败');
       setInternalAssistants(INTERNAL_ASSISTANTS);
     }
   }, [loadAgentTypes]);

@@ -127,10 +127,7 @@ describe('StepBasicInfo', () => {
     const invalidFile = new File([new Uint8Array(10)], 'avatar.webp', { type: 'image/webp' });
     fireEvent.change(input, { target: { files: [invalidFile] } });
 
-    expect(mockedShowToast).toHaveBeenCalledWith('仅支持JPG/PNG格式', {
-      toastClassName: 'digital-twin-toast',
-      hideClassName: 'digital-twin-toast-hide',
-    });
+    expect(mockedShowToast).toHaveBeenCalledWith('仅支持JPG/PNG格式');
     expect(screen.queryByText('仅支持JPG/PNG格式')).not.toBeInTheDocument();
   });
 
@@ -152,10 +149,7 @@ describe('StepBasicInfo', () => {
     const oversizedFile = new File([new Uint8Array(2 * 1024 * 1024)], 'avatar.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [oversizedFile] } });
 
-    expect(mockedShowToast).toHaveBeenCalledWith('图片大小需小于2MB', {
-      toastClassName: 'digital-twin-toast',
-      hideClassName: 'digital-twin-toast-hide',
-    });
+    expect(mockedShowToast).toHaveBeenCalledWith('图片大小需小于2MB');
     expect(screen.queryByText('图片大小需小于2MB')).not.toBeInTheDocument();
     expect(defaultAvatarButton).toHaveClass('is-selected');
     expect(screen.getByLabelText('上传自定义头像')).not.toHaveClass('is-selected');

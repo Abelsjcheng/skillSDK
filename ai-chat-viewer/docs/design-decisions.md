@@ -221,26 +221,28 @@ interface CreateDigitalTwinParams {
    - 文件大小超限（`>= 2MB`）使用 toast 提示：`图片大小需小于2MB`
    - 文件格式不合法使用 toast 提示：`仅支持JPG/PNG格式`
    - 页面 1 不再维护 `avatarError` 组件内错误文本状态
-3. 点击头像项即切换选中态并更新预览区。
-4. 页面切换不清空已输入数据。
-5. 点击“上一步”时从页面 2 返回页面 1，且页面 1 的头像选择、名称和简介保持不变。
-6. 页面 1 的“名称”和“简介”输入仅允许汉字/字母/数字字符；检测到其他字符时，对应输入框应用红色高亮边框，且“下一步”保持禁用。
-7. 页面 1 移动端输入框（名称/简介）点击时，为降低 WebView 自动上抬概率，保留触摸聚焦兜底策略：在 `onTouchStart` 中优先执行 `focus({ preventScroll: true })`，并在下一帧恢复滚动位置；该策略禁止使用 `event.preventDefault()`，确保系统默认文本选择与复制能力不被拦截。
-8. 点击 `X` 与“取消”时直接调用 `window.Pedestal.remote.getCurrentWindow().close()`。
-9. 页面 2 初始化时调用 `window.getAgentType()`；返回项中：
+3. 页面 1 上传校验 toast 采用统一自定义结构：固定尺寸 `218x46`、白底圆角 `8px`、`padding: 12px 16px`、顶部 `10px` 水平居中；左侧 `14x14` 警告图标（来自 `src/imgs`），与右侧错误文案间距 `8px`；文案样式 `14px/400`、`rgba(25,25,25,1)`。
+4. 点击头像项即切换选中态并更新预览区。
+5. 页面切换不清空已输入数据。
+6. 点击“上一步”时从页面 2 返回页面 1，且页面 1 的头像选择、名称和简介保持不变。
+7. 页面 1 的“名称”和“简介”输入仅允许汉字/字母/数字字符；检测到其他字符时，对应输入框应用红色高亮边框，且“下一步”保持禁用。
+8. 页面 1 移动端输入框（名称/简介）点击时，为降低 WebView 自动上抬概率，保留触摸聚焦兜底策略：在 `onTouchStart` 中优先执行 `focus({ preventScroll: true })`，并在下一帧恢复滚动位置；该策略禁止使用 `event.preventDefault()`，确保系统默认文本选择与复制能力不被拦截。
+9. 点击 `X` 与“取消”时直接调用 `window.Pedestal.remote.getCurrentWindow().close()`。
+10. 页面 2 初始化时调用 `window.getAgentType()`；返回项中：
    - `internalAssistants` 初始默认值来自 `constants.ts` 中的 `INTERNAL_ASSISTANTS = [{ name: '助手', icon: '', bizRobotId: '1234' }]`
    - `name` 显示为内部助手按钮文本
    - `icon` 显示为内部助手按钮图标
    - `bizRobotId` 用作内部助手唯一标识与确认入参
    - `getAgentType` 返回值直接通过 `setInternalAssistants` 设置，不做 `normalizeInternalAssistants` 归一化
    - 不渲染“内部助手加载中...”与“暂无可用内部助手”提示文案
-10. 页面 2 选择“自定义助手”时，提示文案固定为“需在本地电脑自定义部署第三方助手，点击查看指导文档→”；其中“指导文档→”采用超链接渲染，点击打开 web 页面，链接地址当前留空；链接文本颜色固定为 `rgb(9,146,255)`。
-11. 点击“确定”时调用 `window.createDigitalTwin(params)`，`params` 字段映射：
+11. 页面 2 选择“自定义助手”时，提示文案固定为“需在本地电脑自定义部署第三方助手，点击查看指导文档→”；其中“指导文档→”采用超链接渲染，点击打开 web 页面，链接地址当前留空；链接文本颜色固定为 `rgb(9,146,255)`。
+12. 点击“确定”时调用 `window.createDigitalTwin(params)`，`params` 字段映射：
    - `name`：页面 1 名称输入值
    - `icon`：页面 1 当前选中头像地址
    - `description`：页面 1 简介输入值
    - `weCrewType`：页面 2 单选值映射（`internal => 1`，`custom => 0`）
    - `bizRobotId`：仅 `weCrewType = 1` 时传，值为选中内部助手项的 `bizRobotId`
+13. 所有 `HWH5EXT` / `HWH5` 能力调用在业务层进入 `catch` 分支时，统一通过 toast 告知用户；错误文案优先透传宿主返回的 `message/errorMessage`，否则回退到场景化兜底文案，避免仅保留控制台日志。
 
 ## 8. 样式与实现约束
 
@@ -302,7 +304,7 @@ interface CreateDigitalTwinParams {
 1. 页面结构拆分为两段：
    - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
    - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
-   - 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+   - 页面根容器背景统一使用纯色：`rgba(244,247,253,1)`。
 2. 内容区仅展示第一张本地图片资源 `src/imgs/activate-guide-1.svg`，不再保留轮播状态与指示器逻辑。
 3. “选择助理/立即启用”按钮按端区分样式：移动端使用 `250x38`、圆角 `99px`；PC 端使用 `140x32`、圆角 `4px`；背景统一为线性渐变 `linear-gradient(90deg, #1f78ff 0%, #42b0ff 100%)`，当前版本点击事件空实现（预留业务接入）。
 
@@ -314,7 +316,7 @@ interface CreateDigitalTwinParams {
 ## 14. 助理详情页面设计
 
 1. 页面采用“标题区 + 内容区”纵向结构，整体宽高自适应占满路由容器。
-2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+2. 标题区以外的页面区域背景统一改为线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
 3. 标题区通过 `isPcMiniApp` 区分端样式：
    - `isPcMiniApp === true`（PC）：`height: 54px; padding: 11px 16px;`，左侧 `32x32` 关闭按钮（内含 `20x20` 关闭图标），右侧 `32x32` 客服按钮（内含 `20x20` 客服图标），中间标题居中。
    - `isPcMiniApp === false`（移动）：沿用现有 `44px` 高度与左侧返回+客服按钮布局。
@@ -330,7 +332,7 @@ interface CreateDigitalTwinParams {
 ## 15. 切换助理页面设计
 
 1. 页面结构采用“标题区 + 列表内容区”，整体宽高占满路由容器。
-2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+2. 标题区以外的页面区域背景统一改为线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
 3. 标题区复用助理详情页的结构与样式规范（含 `isPcMiniApp` 的 PC/移动端分支），标题文案使用“切换助理”。
 4. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动，并隐藏可视滚动条。
 5. 助理列表项样式固定：
@@ -354,7 +356,7 @@ interface CreateDigitalTwinParams {
 ## 16. 启动助理页面设计
 
 1. 页面组件放在 `src/pages/selectAssistant.tsx`。
-2. 页面根容器背景统一改为线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+2. 标题区以外的页面区域背景统一改为线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
 3. 使用 `isPcMiniApp` 做双端分支：
    - `false`（移动）：继续复用 `AssistantSelectionPage` 的现有样式与交互，不做变更；
    - `true`（PC）：走独立 PC 布局渲染。
@@ -390,14 +392,16 @@ interface CreateDigitalTwinParams {
    - 顶部间距 `27px`；
    - 纵向 `12px` 间距、水平居中；
    - 头像容器 `72x72`，圆角 `124px`，白色 `2px` 边框；
-   - 标题文本：`早上好，峰哥`（`18px/500/26px`，`rgba(25,25,25,1)`）；
-   - 副标题文本：`CodeAgent | 你的专属编程智能体`（`14px/400/22px`，`rgba(89,89,89,1)`）。
+   - 标题文本使用运行时用户信息动态生成（如存在 `weAgentUserName` 则展示 `早上好，${weAgentUserName}`），样式 `18px/500/26px`、`rgba(25,25,25,1)`；
+   - 副标题文本使用运行时助理信息动态拼接（`weAgentAssistantName | weAgentAssistantDescription`），样式 `14px/400/22px`、`rgba(89,89,89,1)`；
+   - 不为欢迎标题和副标题提供默认兜底文案；当对应数据为空时直接不渲染文本节点。
 12. `WeAgentCUI` 消息区不保留“复制消息”“发送到IM”入口，`App -> Content -> MessageBubble` 组件链路中移除 `onCopy`、`onSendToIM` 参数透传。
 13. 历史消息中的 AI `Question` / `Permission` 卡片统一按只读展示处理：`App` 在历史消息映射阶段标记来源，`MessageBubble` 将该标记透传到 `QuestionCard` 与 `PermissionCard`，并在组件内部禁用选项点击、输入提交及授权按钮点击。
 14. 全页面取消“禁止复制”限制：不通过触摸事件 `preventDefault` 或样式策略阻断系统默认文本选择与复制行为。
 15. 历史会话侧栏的每个会话 item 标题按单行省略处理，超出宽度显示 `...`。
 16. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
 17. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
+18. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。
 
 
 

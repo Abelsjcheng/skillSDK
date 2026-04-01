@@ -43,7 +43,7 @@ export const Content: React.FC<ContentProps> = ({
     offsetTop: 0,
   });
 
-  const welcomeTitle = weAgentUserName ? `早上好，${weAgentUserName}` : '早上好';
+  const welcomeTitle = weAgentUserName ? `早上好，${weAgentUserName}` : '';
   const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
   const welcomeAvatar = weAgentAssistantAvatar || assistantAvatar;
 
@@ -119,8 +119,8 @@ export const Content: React.FC<ContentProps> = ({
           <div className="we-agent-cui-welcome__avatar-wrap" aria-hidden="true">
             <img src={welcomeAvatar} alt="" className="we-agent-cui-welcome__avatar" />
           </div>
-          <div className="we-agent-cui-welcome__title">{welcomeTitle}</div>
-          <div className="we-agent-cui-welcome__subtitle">{welcomeSubtitle}</div>
+          {welcomeTitle ? <div className="we-agent-cui-welcome__title">{welcomeTitle}</div> : null}
+          {welcomeSubtitle ? <div className="we-agent-cui-welcome__subtitle">{welcomeSubtitle}</div> : null}
         </div>
       </div>
     );

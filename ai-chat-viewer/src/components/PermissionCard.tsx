@@ -2,6 +2,7 @@
 import type { MessagePart } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
+import { showErrorToast } from '../utils/toast';
 
 interface PermissionCardProps {
   part: MessagePart;
@@ -43,6 +44,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
       onResolved?.();
     } catch (err) {
       console.error('Failed to reply permission:', err);
+      showErrorToast(err, '权限处理失败');
     } finally {
       setSubmitting(false);
     }

@@ -6,7 +6,7 @@ import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
-import { showToast } from '../utils/toast';
+import { showErrorToast, showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 
 interface DetailInfoRowProps {
@@ -52,6 +52,7 @@ const AssistantDetail: React.FC = () => {
         }
       } catch (error) {
         console.error('getWeAgentDetails failed in AssistantDetail:', error);
+        showErrorToast(error, '获取助理详情失败');
         if (!cancelled) {
           setDetail(null);
         }

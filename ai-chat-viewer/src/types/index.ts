@@ -31,6 +31,12 @@ export type PermissionResponse = 'once' | 'always' | 'reject';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type BackendMessageRole = 'user' | 'assistant' | 'system' | 'tool' | string;
 export type BackendContentType = 'plain' | 'markdown' | string | null;
+export interface QuestionOption {
+  label: string;
+  description?: string;
+}
+
+export type QuestionOptionInput = string | QuestionOption;
 
 interface ToolPartFields<TValue, TStatus> {
   toolName?: TValue;
@@ -67,7 +73,7 @@ interface FilePartFields<TValue> {
 /** StreamMessage delivered from SessionListener onMessage callback. */
 export interface StreamMessage
   extends ToolPartFields<string | null, PartStatus | string | null>,
-  QuestionPartFields<string | null, string[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   // transport-level fields
@@ -125,7 +131,7 @@ export interface SessionMessage {
 
 export interface SessionMessagePart
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, string[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   partId: string;
@@ -141,7 +147,7 @@ export interface SessionMessagePart
 /** A structured part within an assistant message */
 export interface MessagePart
   extends ToolPartFields<string, PartStatus>,
-  QuestionPartFields<string, string[]>,
+  QuestionPartFields<string, QuestionOption[]>,
   PermissionCoreFields<string>,
   FilePartFields<string> {
   partId: string;
@@ -188,7 +194,7 @@ export interface SessionMessageSnapshot {
 /** Part snapshot for streaming recovery */
 export interface MessagePartSnapshot
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, string[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
   PermissionPartFields<string | null, string | null>,
   FilePartFields<string | null> {
   partId: string;

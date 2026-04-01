@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { MessagePart } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { sendMessage } from '../utils/hwext';
+import { showErrorToast } from '../utils/toast';
 
 interface QuestionCardProps {
   part: MessagePart;
@@ -38,6 +39,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       onAnswered?.();
     } catch (err) {
       console.error('Failed to submit answer:', err);
+      showErrorToast(err, '提交回答失败');
     } finally {
       setSubmitting(false);
     }
@@ -65,16 +67,19 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         <div className="question-card__options">
           {part.options.map((opt, i) => (
             <button
-              key={i}
+              key={`${opt.label}-${i}`}
               className="question-card__option"
               onClick={(event) => {
                 runButtonClickWithDebounce(event, () => {
-                  handleSelect(opt);
+                  handleSelect(opt.label);
                 });
               }}
               disabled={isLocked}
             >
-              {opt}
+              <span className="question-card__option-label">{opt.label}</span>
+              {opt.description && (
+                <span className="question-card__option-desc">{opt.description}</span>
+              )}
             </button>
           ))}
         </div>

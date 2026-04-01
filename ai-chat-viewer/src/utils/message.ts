@@ -3,6 +3,7 @@ import type {
   MessagePart,
   MessagePartSnapshot,
   MessageRole,
+  QuestionOption,
   RegenerateAnswerResponse,
   SendMessageResponse,
   SessionMessage,
@@ -40,7 +41,85 @@ function normalizePartStatus(status: unknown): MessagePart['status'] | undefined
   return MESSAGE_PART_STATUS.has(status) ? (status as MessagePart['status']) : undefined;
 }
 
+export function normalizeQuestionOptions(options: unknown): QuestionOption[] | undefined {
+  if (!Array.isArray(options)) {
+    return undefined;
+  }
+
+  const normalized = options.reduce<QuestionOption[]>((result, option) => {
+    if (typeof option === 'string') {
+      const label = option.trim();
+      if (label) {
+        result.push({ label });
+      }
+      return result;
+    }
+
+    if (!option || typeof option !== 'object') {
+      return result;
+    }
+
+    const label = typeof (option as { label?: unknown }).label === 'string'
+      ? (option as { label: string }).label.trim()
+      : '';
+    if (!label) {
+      return result;
+    }
+
+    const description = typeof (option as { description?: unknown }).description === 'string'
+      ? (option as { description: string }).description.trim()
+      : '';
+
+    result.push({
+      label,
+      ...(description ? { description } : {}),
+    });
+    return result;
+  }, []);
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function extractQuestionFields(
+  input: unknown,
+): Pick<MessagePart, 'header' | 'question' | 'options'> {
+  if (!input || typeof input !== 'object') {
+    return {};
+  }
+
+  const inputRecord = input as {
+    header?: unknown;
+    question?: unknown;
+    options?: unknown;
+    questions?: unknown;
+  };
+
+  if (Array.isArray(inputRecord.questions) && inputRecord.questions.length > 0) {
+    const firstQuestion = inputRecord.questions[0];
+    if (firstQuestion && typeof firstQuestion === 'object') {
+      const questionRecord = firstQuestion as {
+        header?: unknown;
+        question?: unknown;
+        options?: unknown;
+      };
+      return {
+        header: typeof questionRecord.header === 'string' ? questionRecord.header : undefined,
+        question: typeof questionRecord.question === 'string' ? questionRecord.question : undefined,
+        options: normalizeQuestionOptions(questionRecord.options),
+      };
+    }
+  }
+
+  return {
+    header: typeof inputRecord.header === 'string' ? inputRecord.header : undefined,
+    question: typeof inputRecord.question === 'string' ? inputRecord.question : undefined,
+    options: normalizeQuestionOptions(inputRecord.options),
+  };
+}
+
 export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: boolean): MessagePart {
+  const questionFields = extractQuestionFields(rawPart.input);
+
   return {
     partId: rawPart.partId,
     type: rawPart.type,
@@ -52,9 +131,9 @@ export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: bo
     input: rawPart.input ?? undefined,
     output: rawPart.output ?? undefined,
     title: rawPart.title ?? undefined,
-    header: rawPart.header ?? undefined,
-    question: rawPart.question ?? undefined,
-    options: rawPart.options ?? undefined,
+    header: rawPart.header ?? questionFields.header ?? undefined,
+    question: rawPart.question ?? questionFields.question ?? undefined,
+    options: normalizeQuestionOptions(rawPart.options) ?? questionFields.options ?? undefined,
     permissionId: rawPart.permissionId ?? undefined,
     permType: rawPart.permType ?? undefined,
     fileName: rawPart.fileName ?? undefined,

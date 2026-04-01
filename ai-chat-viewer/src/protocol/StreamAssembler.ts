@@ -1,4 +1,5 @@
 import type { StreamMessage, MessagePart } from '../types';
+import { extractQuestionFields, normalizeQuestionOptions } from '../utils/message';
 
 export class StreamAssembler {
   private parts = new Map<string, MessagePart>();
@@ -101,6 +102,7 @@ export class StreamAssembler {
         const questionPart = msg.parts?.find((p) =>
           msg.partId ? p.partId === msg.partId : p.type === 'question',
         );
+        const questionFields = extractQuestionFields(msg.input ?? questionPart?.input);
         const id = msg.partId || questionPart?.partId || this.genPartId('question');
         const part = this.getOrCreatePart(id, 'question');
         part.toolName = msg.toolName ?? questionPart?.toolName ?? part.toolName;
@@ -111,9 +113,12 @@ export class StreamAssembler {
           part.status = status;
         }
 
-        part.header = msg.header ?? questionPart?.header ?? part.header;
-        part.question = msg.question ?? questionPart?.question ?? part.question;
-        part.options = msg.options ?? questionPart?.options ?? part.options;
+        part.header = msg.header ?? questionFields.header ?? questionPart?.header ?? part.header;
+        part.question = msg.question ?? questionFields.question ?? questionPart?.question ?? part.question;
+        part.options =
+          normalizeQuestionOptions(msg.options ?? questionPart?.options)
+          ?? questionFields.options
+          ?? part.options;
         part.content = msg.content ?? questionPart?.content ?? part.content;
         if (!part.content && part.question) {
           part.content = part.question;

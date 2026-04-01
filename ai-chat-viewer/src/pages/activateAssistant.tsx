@@ -4,6 +4,7 @@ import activateGuideMobile from '../imgs/activate-guide.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from '../utils/hwext';
+import { showErrorToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
 import { APP_ID } from '../constants';
 
@@ -28,6 +29,7 @@ const ActivateAssistant: React.FC = () => {
       return list;
     } catch (error) {
       console.error('getWeAgentList failed in ActivateAssistant:', error);
+      showErrorToast(error, '获取助理列表失败');
       setAssistantList([]);
       return [];
     }

@@ -2,7 +2,7 @@
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, GetFilePathResult, UploadTinyImageResult } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
-import { showToast } from '../../utils/toast';
+import { showErrorToast, showToast } from '../../utils/toast';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { chooseImage, uploadFile } from '../../utils/hwext';
@@ -86,10 +86,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const handleAvatarUpload = useCallback(async (file: GetFilePathResult) => {
     const result = validateAvatarFile(file);
     if (!result.valid) {
-      showToast(result.reason, {
-        toastClassName: 'digital-twin-toast',
-        hideClassName: 'digital-twin-toast-hide',
-      });
+      showToast(result.reason);
       return;
     }
     try {
@@ -105,10 +102,8 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       setAvatarType('custom');
       setCustomAvatarPreview(urlObj.pathname);
     } catch (error) {
-      showToast('上传头像失败', {
-        toastClassName: 'digital-twin-toast',
-        hideClassName: 'digital-twin-toast-hide',
-      });
+      console.error('uploadFile failed in StepBasicInfo:', error);
+      showErrorToast(error, '上传头像失败');
     }
   }, []);
 
