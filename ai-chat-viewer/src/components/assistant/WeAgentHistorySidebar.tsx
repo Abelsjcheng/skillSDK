@@ -121,8 +121,8 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       const result = await getHistorySessionsList(params);
       const sessions = Array.isArray(result.content) ? result.content : [];
       setHistorySessions(sessions);
-    } catch (err) {
-      console.error('Failed to load history sessions:', err);
+    } catch (error) {
+      console.error('Failed to load history sessions:', error);
       showToast('获取历史会话失败');
       setHistorySessions([]);
     } finally {
@@ -181,49 +181,51 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
             className="we-agent-history-sidebar__panel"
             onClick={(event) => event.stopPropagation()}
           >
-            {isLoading && (
-              <div className="we-agent-history-sidebar__status">加载中...</div>
-            )}
-            {!isLoading && groupedHistorySessions.length === 0 && (
-              <div className="we-agent-history-sidebar__empty">
-                <img
-                  className="we-agent-history-sidebar__empty-image"
-                  src={iconWeAgentHistory}
-                  alt="暂无历史会话"
-                />
-              </div>
-            )}
-            {!isLoading && groupedHistorySessions.map((group) => (
-              <section key={group.key} className="we-agent-history-sidebar__group">
-                <div className="we-agent-history-sidebar__group-title">{group.label}</div>
-                <div className="we-agent-history-sidebar__group-items">
-                  {group.sessions.map((session) => {
-                    const sessionId = session.welinkSessionId;
-                    const sessionTitle = session.title?.trim() || '未命名会话';
-                    const isSelected = currentWelinkSessionId === sessionId;
-
-                    return (
-                      <button
-                        key={sessionId}
-                        type="button"
-                        className={[
-                          'we-agent-history-sidebar__session-item',
-                          isSelected ? 'is-selected' : '',
-                        ].filter(Boolean).join(' ')}
-                        onClick={(event) => {
-                          runButtonClickWithDebounce(event, () => {
-                            handleSessionClick(sessionId);
-                          });
-                        }}
-                        title={sessionTitle}
-                      >
-                        <span className="we-agent-history-sidebar__session-item-text">{sessionTitle}</span>
-                      </button>
-                    );
-                  })}
+            <header className="we-agent-history-sidebar__header">
+              <h3 className="we-agent-history-sidebar__header-title">历史对话</h3>
+            </header>
+            <div className="we-agent-history-sidebar__body">
+              {!isLoading && groupedHistorySessions.length === 0 && (
+                <div className="we-agent-history-sidebar__empty">
+                  <img
+                    className="we-agent-history-sidebar__empty-image"
+                    src={iconWeAgentHistory}
+                    alt="暂无历史会话"
+                  />
                 </div>
-              </section>
-            ))}
+              )}
+              {!isLoading && groupedHistorySessions.map((group) => (
+                <section key={group.key} className="we-agent-history-sidebar__group">
+                  <div className="we-agent-history-sidebar__group-title">{group.label}</div>
+                  <div className="we-agent-history-sidebar__group-items">
+                    {group.sessions.map((session) => {
+                      const sessionId = session.welinkSessionId;
+                      const sessionTitle = session.title?.trim() || '未命名会话';
+                      const isSelected = currentWelinkSessionId === sessionId;
+
+                      return (
+                        <button
+                          key={sessionId}
+                          type="button"
+                          className={[
+                            'we-agent-history-sidebar__session-item',
+                            isSelected ? 'is-selected' : '',
+                          ].filter(Boolean).join(' ')}
+                          onClick={(event) => {
+                            runButtonClickWithDebounce(event, () => {
+                              handleSessionClick(sessionId);
+                            });
+                          }}
+                          title={sessionTitle}
+                        >
+                          <span className="we-agent-history-sidebar__session-item-text">{sessionTitle}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
           </aside>
           {isPc && (
             <button

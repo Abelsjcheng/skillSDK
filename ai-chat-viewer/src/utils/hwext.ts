@@ -292,7 +292,7 @@ const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
   if (typeof window === 'undefined') return false;
-  return true;
+  return false;
 }
 
 function tryGetPedestal(): Pedestal | null {

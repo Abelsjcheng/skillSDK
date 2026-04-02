@@ -154,6 +154,7 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .app-container--we-agent-cui.pc-mode {
@@ -167,14 +168,17 @@
   }
 
   .we-agent-cui-chat-panel {
-    max-width: 790px;
-    margin: 0 auto;
+    padding: 0 150px;
   }
 }
 
 .app-container--we-agent-cui.pc-mode.has-history-sidebar {
   .we-agent-cui-main {
-    padding-left: 284px;
+    padding-left: 260px;
+  }
+
+  .we-agent-cui-chat-panel {
+    padding: 0 50px;
   }
 }
 
@@ -209,6 +213,7 @@
   z-index: 20;
   display: flex;
   justify-content: flex-end;
+  animation: we-agent-history-sidebar-mask-fade-in 0.2s ease;
 }
 
 .we-agent-history-sidebar--mobile {
@@ -216,12 +221,12 @@
   inset: 0;
   width: 100vw;
   height: 100vh;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .we-agent-history-sidebar--pc {
   right: auto;
-  width: 284px;
+  width: 260px;
   justify-content: flex-start;
   overflow: visible;
 }
@@ -233,18 +238,23 @@
   cursor: pointer;
 }
 
+.we-agent-history-sidebar--mobile .we-agent-history-sidebar__mask {
+  order: 2;
+}
+
 .we-agent-history-sidebar__panel {
   width: 260px;
   height: 100%;
-  padding: 20px 18px;
   background: rgba(255, 255, 255, 1);
-  overflow-y: auto;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  padding: 20px 18px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  animation: we-agent-history-sidebar-panel-slide-in 0.22s ease;
+}
+
+.we-agent-history-sidebar--mobile .we-agent-history-sidebar__panel {
+  order: 1;
 }
 
 .we-agent-history-sidebar--pc .we-agent-history-sidebar__panel {
@@ -252,6 +262,34 @@
   box-shadow: none;
   background: #ffffff url('../imgs/assistant-bg.svg') center / cover no-repeat;
   border-right: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.we-agent-history-sidebar__header {
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.we-agent-history-sidebar__header-title {
+  margin: 0;
+  padding-left: 12px;
+  color: rgba(51, 51, 51, 1);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.we-agent-history-sidebar__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .we-agent-history-sidebar__close-button {
@@ -267,7 +305,7 @@
 .we-agent-history-sidebar--pc .we-agent-history-sidebar__close-button {
   position: absolute;
   top: 50%;
-  right: 0;
+  right: -24px;
   width: 24px;
   height: 22px;
   transform: translateY(-50%);
@@ -290,12 +328,10 @@
   display: none;
 }
 
-.we-agent-history-sidebar__status {
-  padding: 8px 14px;
-  color: rgba(153, 153, 153, 1);
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 21px;
+.we-agent-history-sidebar__body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .we-agent-history-sidebar__empty {
@@ -307,8 +343,8 @@
 }
 
 .we-agent-history-sidebar__empty-image {
-  width: 72px;
-  height: 72px;
+  width: 100px;
+  height: auto;
   display: block;
   object-fit: contain;
   opacity: 0.7;
@@ -371,4 +407,26 @@
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
+}
+
+@keyframes we-agent-history-sidebar-mask-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes we-agent-history-sidebar-panel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
