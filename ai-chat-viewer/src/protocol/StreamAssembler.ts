@@ -116,8 +116,8 @@ export class StreamAssembler {
         part.header = msg.header ?? questionFields.header ?? questionPart?.header ?? part.header;
         part.question = msg.question ?? questionFields.question ?? questionPart?.question ?? part.question;
         part.options =
-          normalizeQuestionOptions(msg.options ?? questionPart?.options)
-          ?? questionFields.options
+          questionFields.options
+          ?? normalizeQuestionOptions(msg.options ?? questionPart?.options)
           ?? part.options;
         part.content = msg.content ?? questionPart?.content ?? part.content;
         if (!part.content && part.question) {

@@ -668,8 +668,6 @@ export async function getWeAgentUri(): Promise<WeAgentUriResult> {
 }
 
 export async function openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<OpenWeAgentCUIResult> {
-  console.log('params', params);
-  
   return getJsApiOrThrow().openWeAgentCUI(params);
 }
 

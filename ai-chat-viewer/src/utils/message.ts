@@ -133,7 +133,7 @@ export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: bo
     title: rawPart.title ?? undefined,
     header: rawPart.header ?? questionFields.header ?? undefined,
     question: rawPart.question ?? questionFields.question ?? undefined,
-    options: normalizeQuestionOptions(rawPart.options) ?? questionFields.options ?? undefined,
+    options: questionFields.options ?? normalizeQuestionOptions(rawPart.options) ?? undefined,
     permissionId: rawPart.permissionId ?? undefined,
     permType: rawPart.permType ?? undefined,
     fileName: rawPart.fileName ?? undefined,

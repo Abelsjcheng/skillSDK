@@ -363,7 +363,7 @@
 2. 插画背景资源：1 张（页面 2，需提供具体图源）。
 3. 内部助手选项资源：通过 `window.getAgentType()` 动态获取（每项包含 `name/icon/bizRobotId`）。
 4. 激活助理轮播图资源：`src/imgs/activate-guide-1.svg`、`src/imgs/activate-guide-2.svg`。
-5. 激活助理页面背景图资源：`src/imgs/activate-bg.svg`（底色 `rgba(102,235,255,1)`）。
+5. 激活助理页面背景图资源：`src/imgs/assistant-bg.svg`（底色 `rgba(102,235,255,1)`）。
 6. 助理详情/切换助理页面图标资源：`src/imgs/icon-back.svg`、`src/imgs/icon-service.svg`。
 7. 助理详情/切换助理页面 PC 标题区关闭图标资源：`src/imgs/icon-close.svg`。
 8. 助理详情/切换助理页面头像资源：`src/imgs/assistant-avatar.svg`、`src/imgs/switch-assistant-avatar.svg`。
@@ -694,6 +694,7 @@
    - `options` 需支持对象结构 `{ label, description }`；
    - 选项按钮主文案显示 `label`；
    - 当 `description` 有值时，需在 `label` 下方追加展示说明文案，不可丢失；
+   - 当同一条 `question` 同时存在顶层 `options` 与 `input.questions[0].options` / `input.options` 时，需优先使用带对象结构的 `input` 内选项数据，避免被仅含字符串的顶层 `options` 覆盖，导致 `description` 丢失；
    - 为兼容历史数据或简化结构，若后端仅返回字符串数组，也需按 `label` 兜底渲染。
 21. `WeAgentCUI` 中收到 AI 流式错误事件时：
    - 适用事件类型包含 `session.error` 与 `error`；
@@ -858,12 +859,14 @@
    - 在无真实 SDK（`window.HWH5EXT` / `window.Pedestal`）时，`weAgentCUI` 页面可完成“会话初始化 -> 发消息 -> 渲染 AI 回复 -> 拉取历史会话”的完整链路。
 2. 启用策略：
    - 仅在本地调试环境启用（`localhost/127.0.0.1`）或 URL 明确携带 `mockJsApi=1` 时启用；
-   - 启用前仍需满足“非 PC 宿主 + 无真实 `window.HWH5EXT`”条件；
+   - mock 仅在“无真实 SDK”前提下补齐浏览器本地调试能力，不覆盖真实 `window.HWH5EXT`、`window.Pedestal` 与真实端判断结果；
+   - 本地 mock 的端类型判断仍统一复用 `isPcMiniApp` 真实逻辑，即仅当存在 `window.Pedestal.callMethod` 时视为 PC 端，否则按移动端分支处理；
    - 若已存在真实 SDK，mock 不覆盖真实实现。
    - mock 初始化失败时仅打印错误日志，不阻断页面渲染（避免首屏白屏）。
 3. mock 覆盖接口（最小闭环）：
    - V1 对话链路：`createNewSession`、`getHistorySessionsList`、`getSessionMessageHistory`、`registerSessionListener`、`unregisterSessionListener`、`sendMessage`、`regenerateAnswer`、`stopSkill`、`sendMessageToIM`；
    - V2 助理链路：`getWeAgentList`、`getWeAgentDetails`、`getAgentType`、`createDigitalTwin`、`getWeAgentUri`、`openWeAgentCUI`。
+   - 浏览器宿主桥 mock 需补齐最小可运行能力：`HWH5.openWebview`、`HWH5.showToast`、`HWH5.getDeviceInfo`、`HWH5.getUserInfo`、`HWH5.getAccountInfo`、`HWH5.navigateBack`、`HWH5.close`。
 4. 对话行为要求：
    - `sendMessage` 返回用户消息对象，并异步通过 `registerSessionListener` 回调 `text.delta` / `text.done` / `session.status`；
    - `getSessionMessageHistory` 返回当前会话历史消息列表，且顺序为“从旧到新”，确保页面刷新后可回显历史；
@@ -873,9 +876,17 @@
 5. 默认 mock 数据要求：
    - 至少包含 1 个助理（`partnerAccount`、`name`、`icon`、`appKey`、`weCodeUrl`）；
    - 助理详情字段需满足 `WeAgentCUI`、助理详情页、切换页渲染所需；
+   - 助理列表、助理详情、创建助理、切换助理、激活助理、WeAgentCUI 六类页面在本地浏览器下都需具备可直接访问的 mock 数据，不依赖手工修改源码；
    - 默认返回“可对话”会话状态（如 `ACTIVE` / `IDLE`）。
    - 默认历史消息可保留普通问答示例；错误场景通过发送特定提示词实时触发，无需依赖额外手工改 mock 数据。
 6. 验收标准：
+   - 本地运行后可直接访问以下页面并看到可用 mock 数据：
+      - `#/activateAssistant?mockJsApi=1`
+      - `#/selectAssistant?mockJsApi=1`
+      - `#/switchAssistant?partnerAccount=mock_assistant_001&mockJsApi=1`
+      - `#/assistantDetail?partnerAccount=mock_assistant_001&mockJsApi=1`
+      - `#/createAssistant?from=weAgent&mockJsApi=1`
+      - `#/weAgentCUI?assistantAccount=mock_assistant_001&mockJsApi=1`
    - 本地运行 `ai-chat-viewer` 后进入 `#/weAgentCUI?assistantAccount=<mock_account>`，可发送文本并看到 AI 回复内容渲染；
    - 点击“新建会话”后能创建并切换到新会话；
    - 打开“历史会话”侧边栏可看到 mock 会话列表；

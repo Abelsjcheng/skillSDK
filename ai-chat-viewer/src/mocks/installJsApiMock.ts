@@ -37,6 +37,7 @@ import { HOST } from '../constants';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
+  showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<{ statusBarHeight: number }>;
   getUserInfo?: () => Promise<{
     uid: string;
@@ -493,7 +494,7 @@ function seedMockData(): void {
   sessionStore.set(seedSession.welinkSessionId, seedRecord);
 }
 
-function ensureDefaultAssistantAccountInHash(): void {
+function ensureDefaultMockRouteQueryInHash(): void {
   const hashValue = window.location.hash.startsWith('#')
     ? window.location.hash.slice(1)
     : window.location.hash;
@@ -504,10 +505,30 @@ function ensureDefaultAssistantAccountInHash(): void {
 
   const hashUrl = parseUrl(hashValue);
   if (!hashUrl) return;
-  if (hashUrl.pathname !== '/weAgentCUI') return;
-  if (hashUrl.searchParams.get('assistantAccount')) return;
+  const nextQuery = Object.fromEntries(hashUrl.searchParams.entries());
 
-  window.location.hash = toRouteHash('/weAgentCUI', { assistantAccount: DEFAULT_ASSISTANT_ACCOUNT });
+  if (hashUrl.pathname === '/weAgentCUI' && !hashUrl.searchParams.get('assistantAccount')) {
+    nextQuery.assistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
+    window.location.hash = toRouteHash('/weAgentCUI', nextQuery);
+    return;
+  }
+
+  if (hashUrl.pathname === '/assistantDetail' && !hashUrl.searchParams.get('partnerAccount')) {
+    nextQuery.partnerAccount = DEFAULT_ASSISTANT_ACCOUNT;
+    window.location.hash = toRouteHash('/assistantDetail', nextQuery);
+    return;
+  }
+
+  if (hashUrl.pathname === '/switchAssistant' && !hashUrl.searchParams.get('partnerAccount')) {
+    nextQuery.partnerAccount = DEFAULT_ASSISTANT_ACCOUNT;
+    window.location.hash = toRouteHash('/switchAssistant', nextQuery);
+    return;
+  }
+
+  if (hashUrl.pathname === '/createAssistant' && !hashUrl.searchParams.get('from')) {
+    nextQuery.from = 'weAgent';
+    window.location.hash = toRouteHash('/createAssistant', nextQuery);
+  }
 }
 
 function ensureMockHWH5Bridge(): void {
@@ -521,6 +542,12 @@ function ensureMockHWH5Bridge(): void {
       if (!route) return;
       const path = route.startsWith('/') ? route : `/${route}`;
       window.location.hash = toRouteHash(path, Object.fromEntries(parsed.searchParams.entries()));
+    };
+  }
+
+  if (typeof hwh5.showToast !== 'function') {
+    hwh5.showToast = async ({ msg, type }) => {
+      console.info('[ai-chat-viewer] mock HWH5.showToast', { msg, type });
     };
   }
 
@@ -873,7 +900,7 @@ export function installJsApiMock(): void {
     }
 
     window.__AI_CHAT_VIEWER_JSAPI_MOCK__ = true;
-    ensureDefaultAssistantAccountInHash();
+    ensureDefaultMockRouteQueryInHash();
   } catch (error) {
     // mock 安装失败不应阻断页面渲染，避免首屏白屏
     // eslint-disable-next-line no-console
