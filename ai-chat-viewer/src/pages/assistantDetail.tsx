@@ -1,11 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
-import { getQueryParam, getWeAgentDetails, isPcMiniApp, type WeAgentDetails } from '../utils/hwext';
+import {
+  buildCustomerServiceWebviewUri,
+  getQueryParam,
+  getWeAgentDetails,
+  isPcMiniApp,
+  openH5Webview,
+  type WeAgentDetails,
+} from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 
@@ -105,6 +112,18 @@ const AssistantDetail: React.FC = () => {
     setIsSecretVisible(false);
   }, [isInternalAssistant, detail?.partnerAccount]);
 
+  const handleServiceClick = useCallback(() => {
+    const sourceUrl = detail?.weCodeUrl?.trim() ?? '';
+    if (!sourceUrl) {
+      showToast('客服链接不存在');
+      return;
+    }
+
+    openH5Webview({
+      uri: buildCustomerServiceWebviewUri(sourceUrl),
+    });
+  }, [detail?.weCodeUrl]);
+
   const handleBackgroundClick = (event: React.MouseEvent<HTMLDivElement>): void => {
     if (event.target !== event.currentTarget) {
       return;
@@ -115,7 +134,7 @@ const AssistantDetail: React.FC = () => {
 
   return (
     <div className="assistant-detail" onClick={handleBackgroundClick}>
-      <AssistantPageHeader title="助理详情" isPcMiniApp={isPc} />
+      <AssistantPageHeader title="助理详情" isPcMiniApp={isPc} onService={handleServiceClick} />
 
       <main className="assistant-detail__content">
         <section className="assistant-detail__card assistant-detail__card--profile">

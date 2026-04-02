@@ -117,25 +117,55 @@ export function extractQuestionFields(
   };
 }
 
+function normalizeResolvedStatus(status: unknown): string {
+  return typeof status === 'string' ? status.trim().toLowerCase() : '';
+}
+
 export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: boolean): MessagePart {
   const questionFields = extractQuestionFields(rawPart.input);
+  const rawStatus = normalizeResolvedStatus(rawPart.status);
+  const normalizedStatus = normalizePartStatus(rawPart.status);
+  const normalizedOutput = typeof rawPart.output === 'string' ? rawPart.output : undefined;
+  const normalizedResponse = typeof rawPart.response === 'string' ? rawPart.response : undefined;
+  const normalizedQuestion = rawPart.question ?? questionFields.question ?? undefined;
+  const questionAnswered = rawPart.type === 'question'
+    && (
+      (rawPart as { answered?: boolean | null }).answered === true
+      || rawStatus === 'completed'
+      || rawStatus === 'error'
+      || Boolean(normalizedOutput?.trim())
+    );
+  const permissionResolved = rawPart.type === 'permission'
+    && (
+      Boolean(normalizedResponse?.trim())
+      || rawStatus === 'completed'
+      || rawStatus === 'resolved'
+      || rawStatus === 'approved'
+      || rawStatus === 'rejected'
+    );
+  const normalizedContent = rawPart.type === 'permission'
+    ? (rawPart.content ?? rawPart.title ?? '')
+    : (rawPart.content ?? normalizedQuestion ?? '');
 
   return {
     partId: rawPart.partId,
     type: rawPart.type,
-    content: rawPart.content ?? '',
+    content: normalizedContent,
     isStreaming,
     toolName: rawPart.toolName ?? undefined,
     toolCallId: rawPart.toolCallId ?? undefined,
-    status: normalizePartStatus(rawPart.status),
+    status: normalizedStatus,
     input: rawPart.input ?? undefined,
-    output: rawPart.output ?? undefined,
+    output: normalizedOutput,
     title: rawPart.title ?? undefined,
     header: rawPart.header ?? questionFields.header ?? undefined,
-    question: rawPart.question ?? questionFields.question ?? undefined,
+    question: normalizedQuestion,
     options: questionFields.options ?? normalizeQuestionOptions(rawPart.options) ?? undefined,
+    answered: questionAnswered || undefined,
     permissionId: rawPart.permissionId ?? undefined,
     permType: rawPart.permType ?? undefined,
+    response: normalizedResponse,
+    permResolved: permissionResolved || undefined,
     fileName: rawPart.fileName ?? undefined,
     fileUrl: rawPart.fileUrl ?? undefined,
     fileMime: rawPart.fileMime ?? undefined,

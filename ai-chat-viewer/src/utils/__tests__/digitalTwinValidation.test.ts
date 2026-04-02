@@ -1,3 +1,4 @@
+import type { GetFilePathResult } from '../../types/digitalTwin';
 import {
   canConfirm,
   canProceedNext,
@@ -6,9 +7,8 @@ import {
   validateAvatarFile,
 } from '../digitalTwinValidation';
 
-function createFile(size: number, name: string, type: string): File {
-  const blob = new Blob([new Uint8Array(size)], { type });
-  return new File([blob], name, { type });
+function createFilePathResult(filePath: string): GetFilePathResult {
+  return { filePath };
 }
 
 describe('digitalTwinValidation', () => {
@@ -21,26 +21,26 @@ describe('digitalTwinValidation', () => {
       expect(canProceedNext('name', '  ')).toBe(false);
     });
 
-    it('returns true when both name and description are provided', () => {
-      expect(canProceedNext('助手', '介绍')).toBe(true);
+    it('returns true when both name and description are valid', () => {
+      expect(canProceedNext('helper01', 'valid description')).toBe(true);
     });
 
     it('returns false when name length is out of range', () => {
-      expect(canProceedNext('助', '介绍内容')).toBe(false);
-      expect(canProceedNext('A'.repeat(51), '介绍内容')).toBe(false);
+      expect(canProceedNext('a', 'valid description')).toBe(false);
+      expect(canProceedNext('A'.repeat(51), 'valid description')).toBe(false);
     });
 
     it('returns false when description length is out of range', () => {
-      expect(canProceedNext('助手', '介')).toBe(false);
-      expect(canProceedNext('助手', 'A'.repeat(257))).toBe(false);
+      expect(canProceedNext('helper01', 'a')).toBe(false);
+      expect(canProceedNext('helper01', 'A'.repeat(257))).toBe(false);
     });
 
     it('returns false when name includes unsupported character', () => {
-      expect(canProceedNext('助手@', '介绍内容')).toBe(false);
+      expect(canProceedNext('helper@', 'valid description')).toBe(false);
     });
 
-    it('returns true when description includes common punctuation', () => {
-      expect(canProceedNext('助手A1', '可处理中英文标点，支持!?.;:()【】《》')).toBe(true);
+    it('returns true when description includes allowed punctuation', () => {
+      expect(canProceedNext('helper01', 'supports punctuation, .!?;:()[]{}')).toBe(true);
     });
   });
 
@@ -59,22 +59,13 @@ describe('digitalTwinValidation', () => {
   });
 
   describe('validateAvatarFile', () => {
-    it('accepts valid png file under size limit', () => {
-      const file = createFile(1024, 'avatar.png', 'image/png');
+    it('accepts valid png file path', () => {
+      const file = createFilePathResult('avatar.png');
       expect(validateAvatarFile(file)).toEqual({ valid: true });
     });
 
-    it('rejects file greater than or equal to 2MB', () => {
-      const file = createFile(2 * 1024 * 1024, 'avatar.png', 'image/png');
-      expect(validateAvatarFile(file)).toEqual({
-        valid: false,
-        code: 'size',
-        reason: '图片大小需小于2MB',
-      });
-    });
-
     it('rejects unsupported extension', () => {
-      const file = createFile(1024, 'avatar.webp', 'image/webp');
+      const file = createFilePathResult('avatar.webp');
       expect(validateAvatarFile(file)).toEqual({
         valid: false,
         code: 'format',
@@ -86,15 +77,15 @@ describe('digitalTwinValidation', () => {
   describe('invalid-state helpers', () => {
     it('marks invalid name only when non-empty and invalid', () => {
       expect(hasInvalidName('')).toBe(false);
-      expect(hasInvalidName('助')).toBe(true);
-      expect(hasInvalidName('助手A1')).toBe(false);
+      expect(hasInvalidName('a')).toBe(true);
+      expect(hasInvalidName('helper01')).toBe(false);
     });
 
     it('marks invalid description only when non-empty and invalid', () => {
       expect(hasInvalidDescription('')).toBe(false);
-      expect(hasInvalidDescription('介')).toBe(true);
-      expect(hasInvalidDescription('说明🙂')).toBe(true);
-      expect(hasInvalidDescription('说明：支持，。!?')).toBe(false);
+      expect(hasInvalidDescription('a')).toBe(true);
+      expect(hasInvalidDescription('valid description')).toBe(false);
+      expect(hasInvalidDescription('emoji test 🙂')).toBe(true);
     });
   });
 });

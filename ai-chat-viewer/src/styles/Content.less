@@ -82,9 +82,7 @@
   }
   
   pre {
-    background-color: #282c34;
     color: #abb2bf;
-    padding: 12px;
     border-radius: 6px;
     overflow-x: auto;
     margin: 8px 0;
@@ -446,6 +444,32 @@
   margin-top: 8px;
   font-size: 12px;
   color: #52c41a;
+}
+
+.question-card__result,
+.permission-card__result {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(82, 196, 26, 0.08);
+}
+
+.question-card__result-label,
+.permission-card__result-label {
+  display: inline-block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #52c41a;
+}
+
+.question-card__result-content,
+.permission-card__result-content {
+  font-size: 13px;
+  line-height: 20px;
+  color: #333;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 // PermissionCard

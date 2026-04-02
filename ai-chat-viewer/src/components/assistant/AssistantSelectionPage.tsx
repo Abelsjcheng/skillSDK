@@ -23,6 +23,7 @@ interface AssistantSelectionPageProps {
   defaultSelectedAssistantId?: string;
   onLeftButtonClick?: () => void;
   onRightButtonClick?: () => void;
+  onService?: () => void;
   assistants?: AssistantItem[];
   selectedAssistantId?: string;
   onSelectAssistant?: (assistantId: string) => void;
@@ -40,6 +41,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   defaultSelectedAssistantId,
   onLeftButtonClick = noop,
   onRightButtonClick = noop,
+  onService = noop,
   assistants,
   selectedAssistantId,
   onSelectAssistant,
@@ -92,7 +94,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         }
       }}
     >
-      <AssistantPageHeader title={title} isPcMiniApp={isPcMiniApp} />
+      <AssistantPageHeader title={title} isPcMiniApp={isPcMiniApp} onService={onService} />
 
       <main className="switch-assistant__content">
         <div className="switch-assistant__list">

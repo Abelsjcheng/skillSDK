@@ -4,11 +4,14 @@ import { resolveAssistantIconUrl } from '../components/createAssistant/constants
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import { resolveAssistantTag } from '../utils/assistantTag';
 import {
+  buildCustomerServiceWebviewUri,
   buildOpenWeAgentCUIParams,
   getQueryParam,
   getWeAgentDetails,
   getWeAgentList,
   isPcMiniApp,
+  MOCK_CUSTOMER_SERVICE_SOURCE_URL,
+  openH5Webview,
   openWeAgentCUI,
   resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
@@ -122,6 +125,12 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     void handleConfirmSwitch();
   }, [handleConfirmSwitch, isPc, selectedPartnerAccount]);
 
+  const handleServiceClick = useCallback(() => {
+    openH5Webview({
+      uri: buildCustomerServiceWebviewUri(MOCK_CUSTOMER_SERVICE_SOURCE_URL),
+    });
+  }, []);
+
   return (
     <AssistantSelectionPage
       title="切换助理"
@@ -131,6 +140,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       defaultSelectedAssistantId={preferredDefaultPartnerAccount}
       onLeftButtonClick={handleLeftButtonClick}
       onRightButtonClick={handleRightButtonClick}
+      onService={handleServiceClick}
       assistants={assistantItems}
       selectedAssistantId={selectedPartnerAccount}
       onSelectAssistant={setSelectedPartnerAccount}

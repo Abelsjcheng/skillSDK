@@ -288,6 +288,8 @@ declare global {
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
+export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
+export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
@@ -541,6 +543,11 @@ export function openH5Webview(payload: { uri: string }): void {
   } else {
     window.location.href = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
   }
+}
+
+export function buildCustomerServiceWebviewUri(sourceUrl: string, timestamp = Date.now()): string {
+  const normalizedSourceUrl = normalizeString(sourceUrl);
+  return `${CUSTOMER_SERVICE_WEBVIEW_URI}?sourceURL=${encodeURIComponent(normalizedSourceUrl)}&rt=${timestamp}`;
 }
 
 function toPositiveNumber(value: unknown): number {

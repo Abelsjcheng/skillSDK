@@ -115,10 +115,16 @@ export class StreamAssembler {
 
         part.header = msg.header ?? questionFields.header ?? questionPart?.header ?? part.header;
         part.question = msg.question ?? questionFields.question ?? questionPart?.question ?? part.question;
+        if (msg.output != null) {
+          part.output = msg.output;
+        }
         part.options =
           questionFields.options
           ?? normalizeQuestionOptions(msg.options ?? questionPart?.options)
           ?? part.options;
+        if (status === 'completed' || status === 'error') {
+          part.answered = true;
+        }
         part.content = msg.content ?? questionPart?.content ?? part.content;
         if (!part.content && part.question) {
           part.content = part.question;
@@ -133,7 +139,19 @@ export class StreamAssembler {
         part.permissionId = msg.permissionId ?? undefined;
         part.permType = msg.permType ?? undefined;
         part.toolName = msg.toolName ?? undefined;
-        part.content = msg.content ?? '';
+        part.content = msg.title ?? msg.content ?? part.content;
+        part.permResolved = false;
+        part.response = undefined;
+        part.isStreaming = false;
+        break;
+      }
+
+      case 'permission.reply': {
+        const id = this.findPermissionPartId(msg.permissionId) || msg.partId || msg.permissionId || this.genPartId('perm');
+        const part = this.getOrCreatePart(id, 'permission');
+        part.permissionId = msg.permissionId ?? part.permissionId;
+        part.response = msg.response ?? part.response;
+        part.permResolved = true;
         part.isStreaming = false;
         break;
       }
@@ -161,6 +179,22 @@ export class StreamAssembler {
         return id;
       }
     }
+    return null;
+  }
+
+  private findPermissionPartId(permissionId?: string | null): string | null {
+    if (!permissionId) {
+      return null;
+    }
+
+    for (let i = this.partOrder.length - 1; i >= 0; i -= 1) {
+      const id = this.partOrder[i];
+      const part = this.parts.get(id);
+      if (part?.type === 'permission' && part.permissionId === permissionId) {
+        return id;
+      }
+    }
+
     return null;
   }
 

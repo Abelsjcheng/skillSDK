@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react';
-import type { MessagePart } from '../types';
+import React, { useEffect, useState } from 'react';
+import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
 import { showToast } from '../utils/toast';
@@ -20,17 +20,42 @@ const permTypeLabels: Record<string, string> = {
   unknown: '操作授权',
 };
 
+const permissionResponseLabels: Record<PermissionResponse, string> = {
+  once: '允许一次',
+  always: '始终允许',
+  reject: '拒绝',
+};
+
+function getPermissionResponse(part: MessagePart): PermissionResponse | string | undefined {
+  if (typeof part.response !== 'string') {
+    return undefined;
+  }
+
+  const normalized = part.response.trim();
+  return normalized || undefined;
+}
+
 export const PermissionCard: React.FC<PermissionCardProps> = ({
   part,
   welinkSessionId,
   onResolved,
   readonly = false,
 }) => {
-  const [resolved, setResolved] = useState(part.permResolved ?? false);
+  const [resolved, setResolved] = useState(Boolean(part.permResolved || getPermissionResponse(part)));
+  const [permissionResponse, setPermissionResponse] = useState<PermissionResponse | string | undefined>(
+    getPermissionResponse(part),
+  );
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const nextResponse = getPermissionResponse(part);
+    setPermissionResponse(nextResponse);
+    setResolved(Boolean(part.permResolved || nextResponse));
+  }, [part.partId, part.permResolved, part.response]);
+
   const isLocked = submitting || readonly;
 
-  const handleDecision = async (response: 'once' | 'always' | 'reject') => {
+  const handleDecision = async (response: PermissionResponse) => {
     if (resolved || isLocked || !part.permissionId) return;
 
     setSubmitting(true);
@@ -41,6 +66,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
         response,
       });
       setResolved(true);
+      setPermissionResponse(response);
       onResolved?.();
     } catch (err) {
       console.error('Failed to reply permission:', err);
@@ -51,6 +77,9 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
   };
 
   const typeLabel = permTypeLabels[part.permType ?? 'unknown'] ?? part.permType ?? '操作授权';
+  const permissionResponseText = permissionResponse && permissionResponse in permissionResponseLabels
+    ? permissionResponseLabels[permissionResponse as PermissionResponse]
+    : permissionResponse;
 
   return (
     <div className={`permission-card ${resolved ? 'permission-card--resolved' : ''}`}>
@@ -69,6 +98,13 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
           <div className="permission-card__desc">{part.content}</div>
         )}
       </div>
+
+      {resolved && permissionResponseText && (
+        <div className="permission-card__result">
+          <span className="permission-card__result-label">已确认</span>
+          <div className="permission-card__result-content">{permissionResponseText}</div>
+        </div>
+      )}
 
       {!resolved ? (
         <div className="permission-card__actions">
@@ -106,9 +142,11 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
             拒绝
           </button>
         </div>
-      ) : (
-        <div className="permission-card__status">已处理</div>
-      )}
+      ) : !permissionResponseText ? (
+        <div className="permission-card__status">
+          已处理
+        </div>
+      ) : null}
     </div>
   );
 };

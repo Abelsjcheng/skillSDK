@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
@@ -21,6 +21,7 @@ interface WeAgentHistorySidebarProps {
 }
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+const HISTORY_SIDEBAR_ANIMATION_DURATION = 320;
 const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
   { key: 'today', label: '今天' },
   { key: 'yesterday', label: '昨天' },
@@ -86,8 +87,10 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
 }) => {
   const isPc = isPcMiniApp();
   const [isVisible, setIsVisible] = useState(false);
+  const [shouldRenderSidebar, setShouldRenderSidebar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const groupedHistorySessions = useMemo(
     () => groupHistorySessionsByUpdatedAt(historySessions),
@@ -95,22 +98,60 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   );
 
   useEffect(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     setIsVisible(false);
+    setShouldRenderSidebar(false);
     setIsLoading(false);
     setHistorySessions([]);
   }, [assistantAccount]);
 
   useEffect(() => {
-    onVisibilityChange?.(isVisible);
-  }, [isVisible, onVisibilityChange]);
+    onVisibilityChange?.(shouldRenderSidebar);
+  }, [onVisibilityChange, shouldRenderSidebar]);
 
-  const handleOpen = useCallback(async () => {
-    if (isVisible) {
-      setIsVisible(false);
+  useEffect(() => () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+  }, []);
+
+  const openSidebar = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
+    setShouldRenderSidebar(true);
+    window.requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+  }, []);
+
+  const closeSidebar = useCallback(() => {
+    if (!shouldRenderSidebar) {
       return;
     }
 
-    setIsVisible(true);
+    setIsVisible(false);
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = setTimeout(() => {
+      setShouldRenderSidebar(false);
+      closeTimerRef.current = null;
+    }, HISTORY_SIDEBAR_ANIMATION_DURATION);
+  }, [shouldRenderSidebar]);
+
+  const handleOpen = useCallback(async () => {
+    if (shouldRenderSidebar && isVisible) {
+      closeSidebar();
+      return;
+    }
+
+    openSidebar();
     setIsLoading(true);
 
     try {
@@ -128,16 +169,16 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [assistantAccount, isVisible]);
+  }, [assistantAccount, closeSidebar, isVisible, openSidebar, shouldRenderSidebar]);
 
   const handleClose = useCallback(() => {
-    setIsVisible(false);
-  }, []);
+    closeSidebar();
+  }, [closeSidebar]);
 
   const handleSessionClick = useCallback((sessionId: string) => {
     onSessionSelect?.(sessionId);
-    setIsVisible(false);
-  }, [onSessionSelect]);
+    closeSidebar();
+  }, [closeSidebar, onSessionSelect]);
 
   return (
     <>
@@ -157,11 +198,12 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
           alt=""
         />
       </button>
-      {isVisible && (
+      {shouldRenderSidebar && (
         <div
           className={[
             'we-agent-history-sidebar',
             isPc ? 'we-agent-history-sidebar--pc' : 'we-agent-history-sidebar--mobile',
+            isVisible ? 'is-open' : 'is-closing',
           ].join(' ')}
           aria-label="历史会话侧边栏"
         >

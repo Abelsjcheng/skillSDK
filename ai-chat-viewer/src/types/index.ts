@@ -148,7 +148,7 @@ export interface SessionMessagePart
 export interface MessagePart
   extends ToolPartFields<string, PartStatus>,
   QuestionPartFields<string, QuestionOption[]>,
-  PermissionCoreFields<string>,
+  PermissionPartFields<string, PermissionResponse | string>,
   FilePartFields<string> {
   partId: string;
   type: MessagePartType;

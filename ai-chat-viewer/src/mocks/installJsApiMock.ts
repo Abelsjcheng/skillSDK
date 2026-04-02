@@ -73,6 +73,67 @@ type MockReplyScenario =
     type: 'session.error' | 'error';
     prelude: string;
     errorMessage: string;
+  }
+  | {
+    type: 'thinking';
+    thinkingContent: string;
+    assistantContent: string;
+  }
+  | {
+    type: 'tool';
+    toolName: string;
+    toolTitle: string;
+    toolInput: Record<string, unknown>;
+    toolOutput: string;
+    assistantContent: string;
+  }
+  | {
+    type: 'question';
+    toolCallId: string;
+    header: string;
+    question: string;
+    options: Array<{ label: string; description?: string }>;
+  }
+  | {
+    type: 'permission';
+    permissionId: string;
+    permType: string;
+    toolName: string;
+    title: string;
+    content: string;
+    assistantContent: string;
+  }
+  | {
+    type: 'file';
+    assistantContent: string;
+    fileName: string;
+    fileUrl: string;
+    fileMime: string;
+  }
+  | {
+    type: 'step';
+    assistantContent: string;
+    tokens: NonNullable<StreamMessage['tokens']>;
+    cost: number;
+  }
+  | {
+    type: 'snapshot';
+    assistantContent: string;
+  }
+  | {
+    type: 'streaming';
+    thinkingContent: string;
+    partialText: string;
+    finalText: string;
+  }
+  | {
+    type: 'session.title';
+    title: string;
+    assistantContent: string;
+  }
+  | {
+    type: 'agent.online' | 'agent.offline';
+    assistantContent: string;
   };
 
 declare global {
@@ -165,11 +226,137 @@ function buildTextPart(partId: string, content: string): SessionMessage['parts']
   }];
 }
 
+function buildThinkingPart(partId: string, content: string, partSeq = 1): NonNullable<SessionMessage['parts']>[number] {
+  return {
+    partId,
+    partSeq,
+    type: 'thinking',
+    content,
+    status: 'completed',
+  };
+}
+
+function buildToolPart(
+  partId: string,
+  toolName: string,
+  title: string,
+  input: Record<string, unknown>,
+  output: string,
+  toolCallId: string,
+  partSeq = 1,
+): NonNullable<SessionMessage['parts']>[number] {
+  return {
+    partId,
+    partSeq,
+    type: 'tool',
+    content: '',
+    status: 'completed',
+    toolName,
+    title,
+    toolCallId,
+    input,
+    output,
+  };
+}
+
+function buildQuestionPart(
+  partId: string,
+  toolCallId: string,
+  header: string,
+  question: string,
+  options: Array<{ label: string; description?: string }>,
+  partSeq = 1,
+): NonNullable<SessionMessage['parts']>[number] {
+  return {
+    partId,
+    partSeq,
+    type: 'question',
+    content: question,
+    status: 'running',
+    toolCallId,
+    header,
+    question,
+    options,
+  };
+}
+
+function buildPermissionPart(
+  partId: string,
+  permissionId: string,
+  permType: string,
+  toolName: string,
+  title: string,
+  content: string,
+  response?: ReplyPermissionParams['response'],
+  partSeq = 1,
+): NonNullable<SessionMessage['parts']>[number] {
+  return {
+    partId,
+    partSeq,
+    type: 'permission',
+    content,
+    status: response ? 'completed' : 'running',
+    permissionId,
+    permType,
+    toolName,
+    title,
+    response,
+  };
+}
+
+function buildFilePart(
+  partId: string,
+  fileName: string,
+  fileUrl: string,
+  fileMime: string,
+  partSeq = 1,
+): NonNullable<SessionMessage['parts']>[number] {
+  return {
+    partId,
+    partSeq,
+    type: 'file',
+    content: fileName,
+    status: 'completed',
+    fileName,
+    fileUrl,
+    fileMime,
+  };
+}
+
+function createAssistantMessage(
+  sessionId: string,
+  content: string,
+  messageSeq: number,
+  parts: SessionMessage['parts'],
+  meta: object | null = null,
+): SessionMessage {
+  const createdAt = nowIso();
+  return {
+    id: nextId('msg_assistant'),
+    seq: messageSeq,
+    welinkSessionId: sessionId,
+    role: 'assistant',
+    content,
+    contentType: 'plain',
+    meta,
+    messageSeq,
+    parts,
+    createdAt,
+  };
+}
+
 function cloneSessionMessage(message: SessionMessage): SessionMessage {
   return {
     ...message,
     meta: message.meta ? { ...message.meta } : null,
     parts: message.parts ? message.parts.map((part) => ({ ...part })) : null,
+  };
+}
+
+function toSnapshotMessage(message: SessionMessage): NonNullable<StreamMessage['messages']>[number] {
+  return {
+    ...cloneSessionMessage(message),
+    parts: message.parts ? message.parts.map((part) => ({ ...part })) : undefined,
   };
 }
 
@@ -211,6 +398,14 @@ function buildAssistantReply(content: string): string {
   ].join('\n');
 }
 
+function buildMockFileUrl(fileName: string): string {
+  return `${URL_BASE}/downloads/${encodeURIComponent(fileName)}`;
+}
+
+function matchesMockKeyword(normalized: string, keywords: string[]): boolean {
+  return keywords.some((keyword) => normalized.includes(keyword));
+}
+
 function resolveMockReplyScenario(content: string): MockReplyScenario {
   const normalized = content.trim().toLowerCase();
 
@@ -236,6 +431,176 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
       type: 'error',
       prelude: 'Mock AI is preparing an answer before generic stream failure...',
       errorMessage: 'Mock stream error: internal server error from local JSAPI mock.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-thinking', 'trigger-thinking', '触发thinking'])) {
+    return {
+      type: 'thinking',
+      thinkingContent: [
+        '1. Read the route entry and assistantAccount query.',
+        '2. Initialize or reuse the latest available session.',
+        '3. Register the listener and assemble mixed message parts.',
+      ].join('\n'),
+      assistantContent: [
+        'Thinking flow verified.',
+        '',
+        '- The page reads `assistantAccount` from the route.',
+        '- Session init and listener registration happen in `App.tsx`.',
+        '- Thinking and text parts are rendered in the same assistant message.',
+      ].join('\n'),
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-codeblock', 'trigger-codeblock', '触发代码块样式'])) {
+    return {
+      type: 'normal',
+      assistantContent: [
+        '使用 Python 的 PIL/Pillow 库去去除背景。代码逻辑分以下四步：',
+        '',
+        '1. 把图片转成 RGBA 模式（带透明通道）',
+        '2. 识别背景颜色（灰色区域）',
+        '3. 把那些像素点的 alpha 通道设为 0（变透明）',
+        '4. 导出处理后的 PNG 图片',
+        '',
+        '具体代码：',
+        '',
+        '```cpp',
+        'class Solution {',
+        'public:',
+        '    int countTestedDevices(vector<int>& batteryPercentages) {',
+        '        int tested = 0;',
+        '        for (int battery : batteryPercentages) {',
+        '            if (battery - tested > 0) {',
+        '                tested++;',
+        '            }',
+        '        }',
+        '        return tested;',
+        '    }',
+        '};',
+        '',
+        'class Solution {',
+        'public:',
+        '    int countTestedDevices(vector<int>& batteryPercentages) {',
+        '        int tested = 0;',
+        '        for (int i = 0; i < static_cast<int>(batteryPercentages.size()); ++i) {',
+        '            if (batteryPercentages[i] > tested) {',
+        '                tested += 1;',
+        '            }',
+        '        }',
+        '        return tested;',
+        '    }',
+        '};',
+        '```',
+      ].join('\n'),
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-tool', 'trigger-tool', '触发tool'])) {
+    return {
+      type: 'tool',
+      toolName: 'code_search',
+      toolTitle: 'Locate weAgentCUI entry and renderer',
+      toolInput: {
+        query: 'weAgentCUI App.tsx StreamAssembler MessageBubble',
+      },
+      toolOutput: 'Matched src/pages/weAgentCUI.tsx, src/App.tsx, src/protocol/StreamAssembler.ts, src/components/MessageBubble.tsx',
+      assistantContent: 'Tool execution finished. The core flow has been located and summarized.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-question', 'trigger-question', '触发question'])) {
+    return {
+      type: 'question',
+      toolCallId: nextId('tool_call_question'),
+      header: 'Need your confirmation',
+      question: 'Which platform should this requirement prioritize first?',
+      options: [
+        { label: 'Android', description: 'Focus on Java/Kotlin SDK changes' },
+        { label: 'iOS', description: 'Focus on Objective-C/Swift SDK changes' },
+        { label: 'HarmonyOS', description: 'Focus on ArkTS SDK changes' },
+      ],
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-permission', 'trigger-permission', '触发permission'])) {
+    return {
+      type: 'permission',
+      permissionId: nextId('perm_write'),
+      permType: 'file_write',
+      toolName: 'write_markdown',
+      title: 'Need permission to write a markdown file',
+      content: 'The assistant wants to create a case document under docs/.',
+      assistantContent: 'Permission request emitted. Please approve or reject it from the card.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-file', 'trigger-file', '触发file'])) {
+    return {
+      type: 'file',
+      assistantContent: 'The file result is attached below for verification.',
+      fileName: 'mock-release-notes.md',
+      fileUrl: buildMockFileUrl('mock-release-notes.md'),
+      fileMime: 'text/markdown',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-step', 'trigger-step', '触发step'])) {
+    return {
+      type: 'step',
+      assistantContent: 'Step metrics have been produced and attached to the current message meta.',
+      tokens: {
+        input: 128,
+        output: 256,
+        reasoning: 96,
+        cache: {
+          read: 64,
+          write: 0,
+        },
+      },
+      cost: 0.0025,
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-snapshot', 'trigger-snapshot', '触发snapshot'])) {
+    return {
+      type: 'snapshot',
+      assistantContent: 'Snapshot recovery replaced the current message list with recovered conversation data.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-streaming', 'trigger-streaming', '触发streaming'])) {
+    return {
+      type: 'streaming',
+      thinkingContent: 'Recovering the in-flight message from cached stream parts.',
+      partialText: 'Recovered partial assistant output from streaming event.',
+      finalText: [
+        'Recovered partial assistant output from streaming event.',
+        '',
+        'The listener continued the same message with follow-up stream chunks and then completed it.',
+      ].join('\n'),
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-session-title', 'trigger-session-title', '触发session.title'])) {
+    return {
+      type: 'session.title',
+      title: 'Mock Session Title Updated',
+      assistantContent: 'A session.title event has been emitted. The current page does not render this event yet.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-agent-online', 'trigger-agent-online', '触发agent.online'])) {
+    return {
+      type: 'agent.online',
+      assistantContent: 'An agent.online event has been emitted. The current page does not render this event yet.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-agent-offline', 'trigger-agent-offline', '触发agent.offline'])) {
+    return {
+      type: 'agent.offline',
+      assistantContent: 'An agent.offline event has been emitted. The current page does not render this event yet.',
     };
   }
 
@@ -318,71 +683,526 @@ function getSessionRecordOrThrow(sessionId: string): SessionRecord {
   return record;
 }
 
+function scheduleRecordTimer(record: SessionRecord, delay: number, callback: () => void): void {
+  const timerId = window.setTimeout(callback, delay);
+  record.timerIds.push(timerId);
+}
+
+function finalizeAssistantMessage(
+  record: SessionRecord,
+  content: string,
+  parts: SessionMessage['parts'],
+  meta: object | null = null,
+): void {
+  const assistantMessage = createAssistantMessage(
+    record.session.welinkSessionId,
+    content,
+    record.nextMessageSeq,
+    parts,
+    meta,
+  );
+  record.nextMessageSeq += 1;
+  upsertSessionRecord(record, assistantMessage);
+}
+
+function updateStoredPermissionResponse(
+  record: SessionRecord,
+  permissionId: string,
+  response: ReplyPermissionParams['response'],
+): void {
+  for (let i = record.messages.length - 1; i >= 0; i -= 1) {
+    const message = record.messages[i];
+    if (!message.parts) {
+      continue;
+    }
+
+    const targetPart = message.parts.find(
+      (part) => part.type === 'permission' && part.permissionId === permissionId,
+    );
+    if (!targetPart) {
+      continue;
+    }
+
+    targetPart.response = response;
+    targetPart.status = 'completed';
+    record.session.updatedAt = nowIso();
+    return;
+  }
+}
+
 function scheduleAssistantReply(record: SessionRecord, userContent: string): void {
   clearSessionTimers(record);
 
   record.session.status = 'ACTIVE';
   const sessionId = record.session.welinkSessionId;
   const scenario = resolveMockReplyScenario(userContent);
-  const assistantContent = scenario.type === 'normal' ? scenario.assistantContent : scenario.prelude;
-  const partId = nextId('part_assistant');
-  const chunks = splitReplyContent(assistantContent);
-
-  const busyTimer = window.setTimeout(() => {
+  scheduleRecordTimer(record, 40, () => {
     emit(sessionId, {
       type: 'session.status',
       sessionStatus: 'busy',
     });
-  }, 40);
-  record.timerIds.push(busyTimer);
-
-  chunks.forEach((chunk, index) => {
-    const timerId = window.setTimeout(() => {
-      emit(sessionId, {
-        type: 'text.delta',
-        role: 'assistant',
-        partId,
-        content: chunk,
-      });
-    }, 120 + index * 80);
-    record.timerIds.push(timerId);
   });
 
-  const doneTimer = window.setTimeout(() => {
-    emit(sessionId, {
-      type: 'text.done',
-      role: 'assistant',
-      partId,
-      content: assistantContent,
+  if (scenario.type === 'normal' || scenario.type === 'session.error' || scenario.type === 'error') {
+    const assistantContent = scenario.type === 'normal' ? scenario.assistantContent : scenario.prelude;
+    const partId = nextId('part_assistant');
+    const chunks = splitReplyContent(assistantContent);
+
+    chunks.forEach((chunk, index) => {
+      scheduleRecordTimer(record, 120 + index * 80, () => {
+        emit(sessionId, {
+          type: 'text.delta',
+          role: 'assistant',
+          partId,
+          content: chunk,
+        });
+      });
     });
 
-    if (scenario.type === 'normal') {
-      const assistantMessage = createMessage(
-        sessionId,
-        'assistant',
-        assistantContent,
-        record.nextMessageSeq,
+    scheduleRecordTimer(record, 180 + chunks.length * 80, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
         partId,
-      );
-      record.nextMessageSeq += 1;
-      upsertSessionRecord(record, assistantMessage);
+        content: assistantContent,
+      });
 
+      if (scenario.type === 'normal') {
+        finalizeAssistantMessage(record, assistantContent, buildTextPart(partId, assistantContent));
+        emit(sessionId, {
+          type: 'session.status',
+          sessionStatus: 'idle',
+        });
+      } else {
+        emit(sessionId, {
+          type: scenario.type,
+          role: 'assistant',
+          messageId: nextId('mock_error_message'),
+          error: scenario.errorMessage,
+        });
+      }
+
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'thinking') {
+    const thinkingPartId = nextId('part_thinking');
+    const textPartId = nextId('part_assistant');
+    const thinkingChunks = splitReplyContent(scenario.thinkingContent);
+    const textChunks = splitReplyContent(scenario.assistantContent);
+
+    thinkingChunks.forEach((chunk, index) => {
+      scheduleRecordTimer(record, 120 + index * 80, () => {
+        emit(sessionId, {
+          type: 'thinking.delta',
+          role: 'assistant',
+          partId: thinkingPartId,
+          content: chunk,
+        });
+      });
+    });
+
+    scheduleRecordTimer(record, 140 + thinkingChunks.length * 80, () => {
+      emit(sessionId, {
+        type: 'thinking.done',
+        role: 'assistant',
+        partId: thinkingPartId,
+        content: scenario.thinkingContent,
+      });
+    });
+
+    textChunks.forEach((chunk, index) => {
+      scheduleRecordTimer(record, 220 + thinkingChunks.length * 80 + index * 80, () => {
+        emit(sessionId, {
+          type: 'text.delta',
+          role: 'assistant',
+          partId: textPartId,
+          content: chunk,
+        });
+      });
+    });
+
+    scheduleRecordTimer(record, 280 + thinkingChunks.length * 80 + textChunks.length * 80, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId: textPartId,
+        content: scenario.assistantContent,
+      });
+      finalizeAssistantMessage(record, scenario.assistantContent, [
+        buildThinkingPart(thinkingPartId, scenario.thinkingContent, 1),
+        {
+          ...buildTextPart(textPartId, scenario.assistantContent)![0],
+          partSeq: 2,
+        },
+      ]);
       emit(sessionId, {
         type: 'session.status',
         sessionStatus: 'idle',
       });
-    } else {
-      emit(sessionId, {
-        type: scenario.type,
-        role: 'assistant',
-        messageId: nextId('mock_error_message'),
-        error: scenario.errorMessage,
-      });
-    }
+      clearSessionTimers(record);
+    });
+    return;
+  }
 
-    clearSessionTimers(record);
-  }, 180 + chunks.length * 80);
-  record.timerIds.push(doneTimer);
+  if (scenario.type === 'tool') {
+    const toolPartId = nextId('part_tool');
+    const toolCallId = nextId('tool_call');
+    const textPartId = nextId('part_tool_text');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'tool.update',
+        role: 'assistant',
+        partId: toolPartId,
+        toolName: scenario.toolName,
+        toolCallId,
+        status: 'pending',
+        title: scenario.toolTitle,
+        input: scenario.toolInput,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'tool.update',
+        role: 'assistant',
+        partId: toolPartId,
+        toolName: scenario.toolName,
+        toolCallId,
+        status: 'running',
+        title: scenario.toolTitle,
+        input: scenario.toolInput,
+      });
+    });
+
+    scheduleRecordTimer(record, 320, () => {
+      emit(sessionId, {
+        type: 'tool.update',
+        role: 'assistant',
+        partId: toolPartId,
+        toolName: scenario.toolName,
+        toolCallId,
+        status: 'completed',
+        title: scenario.toolTitle,
+        input: scenario.toolInput,
+        output: scenario.toolOutput,
+      });
+    });
+
+    scheduleRecordTimer(record, 420, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId: textPartId,
+        content: scenario.assistantContent,
+      });
+      finalizeAssistantMessage(record, scenario.assistantContent, [
+        buildToolPart(toolPartId, scenario.toolName, scenario.toolTitle, scenario.toolInput, scenario.toolOutput, toolCallId, 1),
+        {
+          ...buildTextPart(textPartId, scenario.assistantContent)![0],
+          partSeq: 2,
+        },
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'question') {
+    const questionPartId = nextId('part_question');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'question',
+        role: 'assistant',
+        partId: questionPartId,
+        toolCallId: scenario.toolCallId,
+        header: scenario.header,
+        question: scenario.question,
+        options: scenario.options,
+        status: 'running',
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      finalizeAssistantMessage(record, scenario.question, [
+        buildQuestionPart(questionPartId, scenario.toolCallId, scenario.header, scenario.question, scenario.options, 1),
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'permission') {
+    const permissionPartId = nextId('part_permission');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'permission.ask',
+        role: 'assistant',
+        partId: permissionPartId,
+        permissionId: scenario.permissionId,
+        permType: scenario.permType,
+        toolName: scenario.toolName,
+        title: scenario.title,
+        content: scenario.content,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId: nextId('part_permission_text'),
+        content: scenario.assistantContent,
+      });
+      finalizeAssistantMessage(record, scenario.assistantContent, [
+        buildPermissionPart(
+          permissionPartId,
+          scenario.permissionId,
+          scenario.permType,
+          scenario.toolName,
+          scenario.title,
+          scenario.content,
+          undefined,
+          1,
+        ),
+        {
+          ...buildTextPart(nextId('part_permission_summary'), scenario.assistantContent)![0],
+          partSeq: 2,
+        },
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'file') {
+    const filePartId = nextId('part_file');
+    const textPartId = nextId('part_file_text');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'file',
+        role: 'assistant',
+        partId: filePartId,
+        fileName: scenario.fileName,
+        fileUrl: scenario.fileUrl,
+        fileMime: scenario.fileMime,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId: textPartId,
+        content: scenario.assistantContent,
+      });
+      finalizeAssistantMessage(record, scenario.assistantContent, [
+        buildFilePart(filePartId, scenario.fileName, scenario.fileUrl, scenario.fileMime, 1),
+        {
+          ...buildTextPart(textPartId, scenario.assistantContent)![0],
+          partSeq: 2,
+        },
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'step') {
+    const partId = nextId('part_step_text');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'step.start',
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId,
+        content: scenario.assistantContent,
+      });
+    });
+
+    scheduleRecordTimer(record, 320, () => {
+      emit(sessionId, {
+        type: 'step.done',
+        tokens: scenario.tokens,
+        cost: scenario.cost,
+      });
+      finalizeAssistantMessage(
+        record,
+        scenario.assistantContent,
+        buildTextPart(partId, scenario.assistantContent),
+        {
+          tokens: scenario.tokens,
+          cost: scenario.cost,
+        },
+      );
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'snapshot') {
+    scheduleRecordTimer(record, 160, () => {
+      const assistantPartId = nextId('part_snapshot_text');
+      const recoveredUserMessage = createMessage(
+        sessionId,
+        'user',
+        userContent,
+        record.nextMessageSeq,
+      );
+      const recoveredAssistantMessage = createAssistantMessage(
+        sessionId,
+        scenario.assistantContent,
+        record.nextMessageSeq + 1,
+        buildTextPart(assistantPartId, scenario.assistantContent),
+      );
+      record.nextMessageSeq += 2;
+      record.messages = [recoveredUserMessage, recoveredAssistantMessage];
+      record.session.updatedAt = recoveredAssistantMessage.createdAt;
+
+      emit(sessionId, {
+        type: 'snapshot',
+        messages: [
+          toSnapshotMessage(recoveredUserMessage),
+          toSnapshotMessage(recoveredAssistantMessage),
+        ],
+      });
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'streaming') {
+    const thinkingPartId = nextId('part_stream_thinking');
+    const textPartId = nextId('part_stream_text');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'streaming',
+        role: 'assistant',
+        sessionStatus: 'busy',
+        parts: [
+          {
+            partId: thinkingPartId,
+            type: 'thinking',
+            content: scenario.thinkingContent,
+            status: 'running',
+          },
+          {
+            partId: textPartId,
+            type: 'text',
+            content: scenario.partialText,
+            status: 'running',
+          },
+        ],
+      });
+    });
+
+    scheduleRecordTimer(record, 240, () => {
+      emit(sessionId, {
+        type: 'thinking.done',
+        role: 'assistant',
+        partId: thinkingPartId,
+        content: scenario.thinkingContent,
+      });
+      emit(sessionId, {
+        type: 'text.delta',
+        role: 'assistant',
+        partId: textPartId,
+        content: '\nContinuing after recovered partial output...',
+      });
+    });
+
+    scheduleRecordTimer(record, 360, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId: textPartId,
+        content: scenario.finalText,
+      });
+      finalizeAssistantMessage(record, scenario.finalText, [
+        buildThinkingPart(thinkingPartId, scenario.thinkingContent, 1),
+        {
+          ...buildTextPart(textPartId, scenario.finalText)![0],
+          partSeq: 2,
+        },
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'session.title' || scenario.type === 'agent.online' || scenario.type === 'agent.offline') {
+    const partId = nextId('part_misc_text');
+
+    scheduleRecordTimer(record, 120, () => {
+      if (scenario.type === 'session.title') {
+        record.session.title = scenario.title;
+        emit(sessionId, {
+          type: 'session.title',
+          title: scenario.title,
+        });
+      } else {
+        emit(sessionId, {
+          type: scenario.type,
+        });
+      }
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        role: 'assistant',
+        partId,
+        content: scenario.assistantContent,
+      });
+      finalizeAssistantMessage(record, scenario.assistantContent, buildTextPart(partId, scenario.assistantContent));
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+  }
 }
 
 function createSession(params: CreateNewSessionParams): SkillSession {
@@ -710,11 +1530,20 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
-    replyPermission: async (params: ReplyPermissionParams) => ({
-      welinkSessionId: params.welinkSessionId,
-      permissionId: params.permId,
-      response: params.response,
-    }),
+    replyPermission: async (params: ReplyPermissionParams) => {
+      const record = getSessionRecordOrThrow(params.welinkSessionId);
+      updateStoredPermissionResponse(record, params.permId, params.response);
+      emit(record.session.welinkSessionId, {
+        type: 'permission.reply',
+        permissionId: params.permId,
+        response: params.response,
+      });
+      return {
+        welinkSessionId: params.welinkSessionId,
+        permissionId: params.permId,
+        response: params.response,
+      };
+    },
 
     controlSkillWeCode: async () => ({ status: 'success' }),
 

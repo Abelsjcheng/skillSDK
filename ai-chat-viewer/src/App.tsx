@@ -413,6 +413,48 @@ function App({ assistantAccount = '' }: AppProps) {
           break;
         }
 
+        case 'permission.reply': {
+          const hasStreamingPermission = Boolean(
+            msg.permissionId && assemblerRef.current.getParts().some(
+              (part) => part.type === 'permission' && part.permissionId === msg.permissionId,
+            ),
+          );
+          if (hasStreamingPermission) {
+            assemblerRef.current.handleMessage(msg);
+          }
+          const currentParts = hasStreamingPermission ? assemblerRef.current.getParts() : null;
+          const currentStreamingMessageId = streamingMsgIdRef.current;
+
+          setMessages((prev) => prev.map((messageItem) => {
+            if (currentStreamingMessageId && currentParts && messageItem.id === currentStreamingMessageId) {
+              return {
+                ...messageItem,
+                parts: [...currentParts],
+              };
+            }
+
+            if (!msg.permissionId || !messageItem.parts?.some(
+              (part) => part.type === 'permission' && part.permissionId === msg.permissionId,
+            )) {
+              return messageItem;
+            }
+
+            return {
+              ...messageItem,
+              parts: messageItem.parts.map((part) => (
+                part.type === 'permission' && part.permissionId === msg.permissionId
+                  ? {
+                    ...part,
+                    permResolved: true,
+                    response: msg.response ?? part.response,
+                  }
+                  : part
+              )),
+            };
+          }));
+          break;
+        }
+
         case 'step.start':
           setSessionStatus('busy');
           break;

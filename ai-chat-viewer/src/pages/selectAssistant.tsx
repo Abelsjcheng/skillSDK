@@ -7,10 +7,13 @@ import '../styles/SwitchAssistant.less';
 import { resolveAssistantTag } from '../utils/assistantTag';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import {
+  buildCustomerServiceWebviewUri,
   buildOpenWeAgentCUIParams,
   getWeAgentDetails,
   getWeAgentList,
   isPcMiniApp,
+  MOCK_CUSTOMER_SERVICE_SOURCE_URL,
+  openH5Webview,
   openWeAgentCUI,
   resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
@@ -125,6 +128,12 @@ const SelectAssistant: React.FC = () => {
     setSelectedAssistantId(assistantId);
   };
 
+  const handleServiceClick = useCallback(() => {
+    openH5Webview({
+      uri: buildCustomerServiceWebviewUri(MOCK_CUSTOMER_SERVICE_SOURCE_URL),
+    });
+  }, []);
+
   if (!isPc) {
     return (
       <AssistantSelectionPage
@@ -134,6 +143,7 @@ const SelectAssistant: React.FC = () => {
         rightButtonText="开始使用"
         onLeftButtonClick={handleCreateAssistant}
         onRightButtonClick={handleEnableNow}
+        onService={handleServiceClick}
         assistants={assistantItems}
         selectedAssistantId={selectedAssistantId}
         onSelectAssistant={setSelectedAssistantId}
