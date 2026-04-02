@@ -23,7 +23,7 @@ import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
 
 function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
-  const value = result.partnerAccount;
+  const value = result?.partnerAccount;
   return typeof value === 'string' ? value.trim() : '';
 }
 
@@ -55,10 +55,6 @@ const PersonalAssistantCreator: React.FC = () => {
     setStep(1);
   }, []);
 
-  const handleCreateForOtherScene = useCallback(async (_result: CreateDigitalTwinResult) => {
-    // 非 weAgent 入口的后续链路预留，待后续接口补齐后接入。
-    console.info('createDigitalTwin success in non-weAgent flow, pending follow-up integration.');
-  }, []);
 
   const handleConfirm = useCallback(async (payload: DigitalTwinBrainPayload) => {
     const basicInfo = basicInfoRef.current;
@@ -78,8 +74,13 @@ const PersonalAssistantCreator: React.FC = () => {
     try {
       const createResult = await createDigitalTwin(params);
 
+      if (!resolvePartnerAccount(createResult)) {
+        console.error('创建助理失败', createResult);
+        showToast('创建助理失败');
+        return;
+      }
+
       if (from !== 'weAgent') {
-        await handleCreateForOtherScene(createResult);
         if (!isPc) {
           window.HWH5.close();
         }
@@ -115,7 +116,7 @@ const PersonalAssistantCreator: React.FC = () => {
       console.error('confirm create assistant failed:', error);
       showToast('创建助理失败');
     }
-  }, [from, handleCreateForOtherScene, isPc]);
+  }, [from, isPc]);
 
   return (
     <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>
