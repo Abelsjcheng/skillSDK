@@ -1,5 +1,7 @@
 package com.opencode.skill;
 
+import android.net.Uri;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -74,6 +76,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class SkillSDK {
     private static volatile SkillSDK instance;
     private static final String ASSISTANT_H5_URI = "h5://S008623/index.html";
+    private static final String WE_AGENT_CUI_APPID = "S008623";
 
     @NonNull
     private final ApiClient apiClient = new ApiClient();
@@ -976,18 +979,15 @@ public final class SkillSDK {
 
         String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
         String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
-        String bizRobotId = normalizeOptionalString(details.getBizRobotId());
         String detailId = normalizeOptionalString(details.getId());
+        String weCodeUrlHost = extractUriHost(weCodeUrl);
 
         String weAgentUri;
-        if (!isBlank(bizRobotId)) {
-            String internalWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
-            weAgentUri = appendQueryParameter(internalWeAgentUri, "robotId", detailId);
+        String baseWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+        if (WE_AGENT_CUI_APPID.equalsIgnoreCase(weCodeUrlHost == null ? "" : weCodeUrlHost)) {
+            weAgentUri = appendQueryParameter(baseWeAgentUri, "assistantAccount", partnerAccount);
         } else {
-            String externalBase = !isBlank(weCodeUrl) ? weCodeUrl : (ASSISTANT_H5_URI + "#weAgentCUI");
-            String externalWeAgentUri = appendQueryParameter(externalBase, "wecodePlace", "weAgent");
-            externalWeAgentUri = appendQueryParameter(externalWeAgentUri, "assistantAccount", partnerAccount);
-            weAgentUri = appendHashFragment(externalWeAgentUri, "weAgentCUI");
+            weAgentUri = appendQueryParameter(baseWeAgentUri, "robotId", detailId);
         }
 
         String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
@@ -1265,6 +1265,18 @@ public final class SkillSDK {
         int hashIndex = trimmedBase.indexOf('#');
         String baseWithoutHash = hashIndex >= 0 ? trimmedBase.substring(0, hashIndex) : trimmedBase;
         return baseWithoutHash + "#" + hash;
+    }
+
+    @Nullable
+    private static String extractUriHost(@Nullable String uri) {
+        if (isBlank(uri)) {
+            return null;
+        }
+        String host = Uri.parse(uri.trim()).getHost();
+        if (isBlank(host)) {
+            return null;
+        }
+        return host.trim();
     }
 
     private static boolean isBlank(@Nullable String value) {
