@@ -13,6 +13,7 @@
 
 static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html";
+static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
 
 @interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
 
@@ -955,23 +956,14 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
     WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary];
     NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
-    NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.bizRobotId];
     NSString *detailId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.id];
+    NSString *weCodeUrlHost = [self hostFromUri:weCodeUrl];
 
-    if (bizRobotId != nil && bizRobotId.length > 0) {
-        NSString *internalWeAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"];
-        result.weAgentUri = [self appendQueryItemToUri:internalWeAgentUri key:@"robotId" value:detailId] ?: @"";
+    NSString *baseWeAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"];
+    if (weCodeUrlHost != nil && [weCodeUrlHost caseInsensitiveCompare:WLAgentSkillsWeAgentCUIAppId] == NSOrderedSame) {
+        result.weAgentUri = [self appendQueryItemToUri:baseWeAgentUri key:@"assistantAccount" value:partnerAccount] ?: @"";
     } else {
-        NSString *externalBase = (weCodeUrl != nil && weCodeUrl.length > 0)
-            ? weCodeUrl
-            : [NSString stringWithFormat:@"%@#weAgentCUI", WLAgentSkillsAssistantH5URI];
-        NSString *externalWeAgentUri = [self appendQueryItemToUri:externalBase
-                                                              key:@"wecodePlace"
-                                                            value:@"weAgent"];
-        externalWeAgentUri = [self appendQueryItemToUri:externalWeAgentUri
-                                                    key:@"assistantAccount"
-                                                  value:partnerAccount];
-        result.weAgentUri = [self appendHashToUri:externalWeAgentUri hash:@"weAgentCUI"] ?: @"";
+        result.weAgentUri = [self appendQueryItemToUri:baseWeAgentUri key:@"robotId" value:detailId] ?: @"";
     }
 
     NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
@@ -1300,6 +1292,17 @@ static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html"
     NSRange hashRange = [base rangeOfString:@"#"];
     NSString *baseWithoutHash = hashRange.location == NSNotFound ? base : [base substringToIndex:hashRange.location];
     return [NSString stringWithFormat:@"%@#%@", baseWithoutHash, safeHash];
+}
+
+- (nullable NSString *)hostFromUri:(nullable NSString *)uri {
+    NSString *base = [WLAgentSkillsTypeConverter optionalStringFromValue:uri];
+    if (base == nil || base.length == 0) {
+        return nil;
+    }
+
+    NSURLComponents *components = [NSURLComponents componentsWithString:base];
+    NSString *host = components.host;
+    return host.length > 0 ? host : nil;
 }
 
 - (BOOL)isSameSessionMessage:(WLAgentSkillsSessionMessage *)left
