@@ -268,7 +268,7 @@
   height: 22px;
   transform: translateY(-50%);
   background: linear-gradient(180deg, #f3f8ff, #ffffff 100%);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: none;
   border-radius: 0 8px 8px 0;
   box-sizing: border-box;
   z-index: 1;
@@ -292,6 +292,22 @@
   font-size: 16px;
   font-weight: 400;
   line-height: 21px;
+}
+
+.we-agent-history-sidebar__empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.we-agent-history-sidebar__empty-image {
+  width: 72px;
+  height: 72px;
+  display: block;
+  object-fit: contain;
+  opacity: 0.7;
 }
 
 .we-agent-history-sidebar__group {

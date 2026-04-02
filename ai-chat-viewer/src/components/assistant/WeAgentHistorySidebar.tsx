@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import closeIcon from '../../imgs/close_icon.svg';
+import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { getHistorySessionsList, isPcMiniApp, type SkillSession } from '../../utils/hwext';
 import { showToast } from '../../utils/toast';
@@ -185,7 +185,13 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
               <div className="we-agent-history-sidebar__status">加载中...</div>
             )}
             {!isLoading && groupedHistorySessions.length === 0 && (
-              <div className="we-agent-history-sidebar__status">暂无历史会话</div>
+              <div className="we-agent-history-sidebar__empty">
+                <img
+                  className="we-agent-history-sidebar__empty-image"
+                  src={iconWeAgentHistory}
+                  alt="暂无历史会话"
+                />
+              </div>
             )}
             {!isLoading && groupedHistorySessions.map((group) => (
               <section key={group.key} className="we-agent-history-sidebar__group">
@@ -223,7 +229,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
             <button
               type="button"
               className="we-agent-history-sidebar__close-button"
-              aria-label="Close history sessions"
+              aria-label="关闭历史会话"
               onClick={(event) => {
                 runButtonClickWithDebounce(event, () => {
                   handleClose();
