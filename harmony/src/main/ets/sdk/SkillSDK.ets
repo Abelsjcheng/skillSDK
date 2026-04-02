@@ -1,3 +1,4 @@
+import { uri } from '@kit.ArkTS';
 import { HttpClient } from './core/HttpClient';
 import { WebSocketManager } from './core/WebSocketManager';
 import { MessageCacheManager } from './managers/MessageCacheManager';
@@ -61,6 +62,7 @@ import {
 export class SkillSDK {
   private static instance: SkillSDK | null = null;
   private static readonly ASSISTANT_H5_URI = 'h5://S008623/index.html';
+  private static readonly WE_AGENT_CUI_APPID = 'S008623';
 
   private config: SkillSDKConfig;
   private readonly logger: Logger;
@@ -700,21 +702,15 @@ export class SkillSDK {
 
       const partnerAccount = details.partnerAccount ?? '';
       const weCodeUrl = details.weCodeUrl ?? '';
-      const bizRobotId = details.bizRobotId ?? '';
       const detailId = details.id ?? '';
+      const weCodeUrlHost = this.extractUriHost(weCodeUrl);
 
+      const baseWeAgentUri = this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent');
       let weAgentUri = '';
-      if (bizRobotId.trim() !== '') {
-        const internalWeAgentUri = this.appendQueryParam(weCodeUrl, 'wecodePlace', 'weAgent');
-        weAgentUri = this.appendQueryParam(internalWeAgentUri, 'robotId', detailId);
+      if (weCodeUrlHost.toUpperCase() === SkillSDK.WE_AGENT_CUI_APPID) {
+        weAgentUri = this.appendQueryParam(baseWeAgentUri, 'assistantAccount', partnerAccount);
       } else {
-        const externalBase = weCodeUrl.trim() !== '' ? weCodeUrl : `${SkillSDK.ASSISTANT_H5_URI}#weAgentCUI`;
-        const externalWeAgentUri = this.appendQueryParam(
-          this.appendQueryParam(externalBase, 'wecodePlace', 'weAgent'),
-          'assistantAccount',
-          partnerAccount
-        );
-        weAgentUri = this.appendHashFragment(externalWeAgentUri, 'weAgentCUI');
+        weAgentUri = this.appendQueryParam(baseWeAgentUri, 'robotId', detailId);
       }
 
       const assistantDetailUri = this.appendHashFragment(
@@ -983,6 +979,19 @@ export class SkillSDK {
     const hashIndex = normalizedBase.indexOf('#');
     const baseWithoutHash = hashIndex >= 0 ? normalizedBase.slice(0, hashIndex) : normalizedBase;
     return `${baseWithoutHash}#${normalizedHash}`;
+  }
+
+  private extractUriHost(uri: string): string {
+    const normalizedUri = TypeConverter.toOptionalString(uri, 'uri') ?? '';
+    if (normalizedUri === '') {
+      return '';
+    }
+    try {
+      const parsed: uri.URI = new uri.URI(normalizedUri).normalize();
+      return parsed.host ?? '';
+    } catch {
+      return '';
+    }
   }
 
   private isSameMessage(left: SessionMessage, right: SessionMessage): boolean {
