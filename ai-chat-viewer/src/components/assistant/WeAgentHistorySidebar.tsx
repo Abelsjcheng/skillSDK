@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
+import closeIcon from '../../imgs/close_icon.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
+import { getHistorySessionsList, isPcMiniApp, type SkillSession } from '../../utils/hwext';
 import { showToast } from '../../utils/toast';
 
 type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
@@ -16,6 +17,7 @@ interface WeAgentHistorySidebarProps {
   assistantAccount?: string;
   currentWelinkSessionId?: string;
   onSessionSelect?: (welinkSessionId: string) => void;
+  onVisibilityChange?: (visible: boolean) => void;
 }
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
@@ -80,7 +82,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   assistantAccount = '',
   currentWelinkSessionId = '',
   onSessionSelect,
+  onVisibilityChange,
 }) => {
+  const isPc = isPcMiniApp();
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
@@ -96,7 +100,16 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     setHistorySessions([]);
   }, [assistantAccount]);
 
+  useEffect(() => {
+    onVisibilityChange?.(isVisible);
+  }, [isVisible, onVisibilityChange]);
+
   const handleOpen = useCallback(async () => {
+    if (isVisible) {
+      setIsVisible(false);
+      return;
+    }
+
     setIsVisible(true);
     setIsLoading(true);
 
@@ -115,7 +128,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [assistantAccount]);
+  }, [assistantAccount, isVisible]);
 
   const handleClose = useCallback(() => {
     setIsVisible(false);
@@ -145,17 +158,25 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
         />
       </button>
       {isVisible && (
-        <div className="we-agent-history-sidebar" aria-label="历史会话侧边栏">
-          <button
-            type="button"
-            className="we-agent-history-sidebar__mask"
-            aria-label="关闭历史会话侧边栏"
-            onClick={(event) => {
-              runButtonClickWithDebounce(event, () => {
-                handleClose();
-              });
-            }}
-          />
+        <div
+          className={[
+            'we-agent-history-sidebar',
+            isPc ? 'we-agent-history-sidebar--pc' : 'we-agent-history-sidebar--mobile',
+          ].join(' ')}
+          aria-label="历史会话侧边栏"
+        >
+          {!isPc && (
+            <button
+              type="button"
+              className="we-agent-history-sidebar__mask"
+              aria-label="关闭历史会话侧边栏"
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  handleClose();
+                });
+              }}
+            />
+          )}
           <aside
             className="we-agent-history-sidebar__panel"
             onClick={(event) => event.stopPropagation()}
@@ -198,6 +219,25 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
               </section>
             ))}
           </aside>
+          {isPc && (
+            <button
+              type="button"
+              className="we-agent-history-sidebar__close-button"
+              aria-label="Close history sessions"
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  handleClose();
+                });
+              }}
+            >
+              <img
+                className="we-agent-history-sidebar__close-icon"
+                src={closeIcon}
+                alt=""
+                aria-hidden="true"
+              />
+            </button>
+          )}
         </div>
       )}
     </>

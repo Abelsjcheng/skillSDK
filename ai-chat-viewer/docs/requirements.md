@@ -129,14 +129,20 @@
    - 文件大小超限（`>=2MB`）提示：`图片大小需小于2MB`；
    - 格式不合法提示：`仅支持JPG/PNG格式`。
 6. 头像上传相关 toast 视觉样式：
-   - 弹窗尺寸：`218px x 46px`；
-   - 圆角：`8px`；
-   - 内边距：`padding: 12px 16px`；
-   - 背景色：白色；
-   - 定位：距离页面顶部 `10px`，水平居中；
-   - 左侧为警告图标（从 `src/imgs` 导入），尺寸 `14px x 14px`；
-   - 图标与文案间距：`8px`；
-   - 右侧错误文案样式：`14px / 400`，颜色 `rgba(25,25,25,1)`。
+   - PC 端使用页面内统一自定义 toast：
+     - 弹窗高度：`46px`，宽度按内容自适应；
+     - 圆角：`8px`；
+     - 内边距：`padding: 12px 16px`；
+     - 背景色：白色；
+     - 定位：距离页面顶部或标题区顶部 `50px`，水平居中；
+     - 左侧为警告图标（从 `src/imgs` 导入），尺寸 `14px x 14px`；
+     - 图标与文案间距：`8px`；
+     - 右侧错误文案样式：`14px / 400`，颜色 `rgba(25,25,25,1)`。
+     - 弹窗右侧新增固定宽度 `40px` 的关闭操作区；
+     - 关闭操作区内为关闭按钮，按钮图标从 `src/imgs` 导入，尺寸 `8px x 8px`；
+     - 点击关闭按钮后需立即关闭当前 toast。
+   - 移动端统一调用宿主已有 `HWH5.showToast()` 能力展示，不再渲染页面内自定义 toast；
+   - `HWH5.showToast()` 入参仅传 `{ msg, type: 'w' }`，其中 `msg` 为提示文本。
 
 #### 容器 3：名称输入
 
@@ -209,7 +215,8 @@
    - 所有通过 `HWH5EXT` 或 `HWH5` 发起的能力调用，只要业务代码进入 `catch` 分支，必须通过 toast 弹窗向用户展示错误；
    - toast 统一直接调用 `showToast(message)` 展示，不再直接调用传入 `error` 对象的 toast 包装方法；
    - toast 文案统一使用业务代码中已定义的固定错误文案，不再从 `error` 对象中解析宿主返回信息；
-   - toast 定位规则：当前页面存在标题区时，toast 距离该标题区顶部 `10px`；当前页面无标题区时，toast 距离页面顶部 `10px`；始终水平居中。
+   - PC 端 toast 定位规则：当前页面存在标题区时，toast 距离该标题区顶部 `50px`；当前页面无标题区时，toast 距离页面顶部 `50px`；始终水平居中；
+   - 移动端 toast 统一通过 `HWH5.showToast({ msg, type: 'w' })` 调用宿主原生提示能力，业务侧不再自行控制页面内定位样式。
 
 ## 5. 页面 2（大脑选择页）需求
 
@@ -630,10 +637,15 @@
    - 进入 `#/weAgentCUI` 页面时，需从 URL query（含 HashRouter query）中解析 `assistantAccount`；
    - 解析结果需在页面内保留（用于后续业务逻辑处理），不影响当前对话 UI 展示逻辑。
 10. 历史会话侧边栏：
-   - 点击“历史会话”图标后，在当前页面右侧弹出历史会话侧边栏；
-   - 侧边栏覆盖在当前页面上方，容器宽度 `260px`，高度占满页面可用高度；
-   - 侧边栏左侧显示蒙层，点击蒙层关闭侧边栏；
-   - 侧边栏内容区内边距：`padding: 20px 18px`。
+   - 移动端：点击“历史会话”图标后，在当前页面右侧弹出历史会话侧边栏；
+   - 移动端：侧边栏覆盖在当前页面上方，容器宽度 `260px`，高度占满页面可用高度；
+   - 移动端：侧边栏左侧显示蒙层，点击蒙层关闭侧边栏；
+   - PC 端：点击“历史会话”图标后，历史会话列表在页面左侧弹出，并与右侧对话页面分栏显示，不再使用覆盖式右侧抽屉；
+   - PC 端：历史会话列表宽度保持 `260px`，高度占满当前页面可用高度；
+   - PC 端：`weAgentCUI` 页面外层去除 `padding`，页面按左右分栏布局；
+   - PC 端：右侧 AI 对话容器包含内容区、按钮区、输入区，容器仅保留 `padding-top: 16px` 与 `padding-bottom: 30px`；
+   - PC 端：右侧 AI 对话容器宽度限制为 `max-width: 690px`，并在可用区域内水平居中；
+   - 历史会话侧边栏内容区内边距：`padding: 20px 18px`；
    - 侧边栏保持可滚动，但需隐藏可视滚动条。
 11. 历史会话数据获取：
    - 打开侧边栏时调用 `getHistorySessionsList`；
@@ -717,8 +729,10 @@
    - 选中某个助理后点击“立即启用”：
       - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
-         - 若助理详情 `bizRobotId` 有值：取助理详情 `weCodeUrl`；
-         - 若助理详情 `bizRobotId` 为空：使用 `h5://123456/index.html`，并追加 query `assistantAccount=<partnerAccount>` 与 hash `weAgentCUI`；
+         - 若助理详情 `weCodeUrl` 不为空，则先解析其 host；
+         - 当 `weCodeUrl.host !== APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `robotId=<detail.robotId>`；
+         - 当 `weCodeUrl.host === APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
+         - 若 `weCodeUrl` 为空：使用 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
       - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 4. 创建助理页面（`/createAssistant`）：
    - 页面初始化读取 query 参数 `from`；
@@ -727,8 +741,10 @@
    - 若 `from=weAgent`：
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
-         - 若助理详情 `bizRobotId` 有值：取助理详情 `weCodeUrl`；
-         - 若助理详情 `bizRobotId` 为空：使用 `h5://123456/index.html`，并追加 query `assistantAccount=<partnerAccount>` 与 hash `weAgentCUI`；
+         - 若助理详情 `weCodeUrl` 不为空，则先解析其 host；
+         - 当 `weCodeUrl.host !== APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `robotId=<detail.robotId>`；
+         - 当 `weCodeUrl.host === APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
+         - 若 `weCodeUrl` 为空：使用 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
       - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
    - 若 `from` 非 `weAgent`：
       - 业务侧统一调用 `hwext` 封装方法（参考 `getJsApiOrThrow` 风格）；
@@ -750,13 +766,17 @@
          - 移动端：执行 `handleConfirmSwitch` 逻辑：
             - 根据当前选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
             - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
-               - 若助理详情 `bizRobotId` 有值：取助理详情 `weCodeUrl`；
-               - 若助理详情 `bizRobotId` 为空：使用 `h5://123456/index.html`，并追加 query `assistantAccount=<partnerAccount>` 与 hash `weAgentCUI`；
+               - 若助理详情 `weCodeUrl` 不为空，则先解析其 host；
+               - 当 `weCodeUrl.host !== APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `robotId=<detail.robotId>`；
+               - 当 `weCodeUrl.host === APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
+               - 若 `weCodeUrl` 为空：使用 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
             - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`；
             - 处理完成后同步调用 `window.HWH5.close()`。
 7. `openWeAgentCUI` 参数组装规则：
-   - `weAgentUri`：`weCodeUrl` 追加 query `wecodePlace=weAgent`；
-   - 当助理详情 `bizRobotId` 为空时，`weAgentUri` 需额外追加 query `assistantAccount=<partnerAccount>`；
+   - 若助理详情 `weCodeUrl` 不为空，则先解析其 host；
+   - 当 `weCodeUrl.host !== APP_ID` 时，`weAgentUri` 取 `weCodeUrl` 并追加 query `wecodePlace=weAgent` 与 `robotId=<detail.robotId>`；
+   - 当 `weCodeUrl.host === APP_ID` 时，`weAgentUri` 取 `weCodeUrl` 并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
+   - 若 `weCodeUrl` 为空，则 `weAgentUri` 取 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），随后追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
    - `assistantDetailUri`：`h5://123456/index.html` 追加 query `partnerAccount`，并追加 hash `assistantDetail`；
    - `switchAssistantUri`：`h5://123456/index.html` 追加 query `partnerAccount`，并追加 hash `switchAssistant`。
 8. 移动端标题栏状态栏适配（创建助理/启动助理/切换助理/助理详情）：

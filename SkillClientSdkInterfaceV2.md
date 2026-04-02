@@ -332,7 +332,7 @@ getWeAgentUri(): WeAgentUriResult
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `weAgentUri` | `string` | 当前助理 CUI 地址：若可读取到持久化助理详情且 `bizRobotId` 有值，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `robotId={id}`（`id` 来自助理详情）；若可读取到持久化助理详情且 `bizRobotId` 为空，则按 `weCodeUrl` 或默认值组装并追加 query `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；若读取不到持久化助理详情，则返回 `h5://S008623/index.html` 并追加 query `wecodePlace=weAgent` 与 hash `activateAssistant` |
+| `weAgentUri` | `string` | 当前助理 CUI 地址：若可读取到持久化助理详情，且解析 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `robotId={id}`（`id` 来自助理详情）；若可读取到持久化助理详情，且解析 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；若读取不到持久化助理详情，则返回 `h5://S008623/index.html` 并追加 query `wecodePlace=weAgent` 与 hash `activateAssistant` |
 | `assistantDetailUri` | `string` | 助理详情地址：`h5://S008623/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`；若读取不到持久化助理详情则返回空字符串 |
 | `switchAssistantUri` | `string` | 切换助理地址：`h5://S008623/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`；若读取不到持久化助理详情则返回空字符串 |
 
@@ -350,9 +350,9 @@ getWeAgentUri(): WeAgentUriResult
 
 1. 从 SP 持久化存储中读取当前助理详情（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`）。
 2. 若读取不到持久化助理详情，`weAgentUri` 固定返回：`h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`，`assistantDetailUri` 与 `switchAssistantUri` 返回空字符串。
-3. 若读取到持久化助理详情，读取其中的 `weCodeUrl`、`partnerAccount`、`bizRobotId`、`id`，并按原规则组装 `weAgentUri`：
-   - 若 `bizRobotId` 有值：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
-   - 若 `bizRobotId` 为空：如果 `weCodeUrl` 有值则使用该值，如果为空则使用默认值 `h5://S008623/index.html#weAgentCUI`，再追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`，并保证最终 URL 格式为 `h5://S008623/index.html?wecodePlace=weAgent&assistantAccount={partnerAccount}#weAgentCUI`。
+3. 若读取到持久化助理详情，读取其中的 `weCodeUrl`、`partnerAccount`、`id`，解析 `weCodeUrl` 的 host，并按以下规则组装 `weAgentUri`：
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。
 4. 组装 `assistantDetailUri`：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`。
 5. 组装 `switchAssistantUri`：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
 6. 返回 `WeAgentUriResult`。

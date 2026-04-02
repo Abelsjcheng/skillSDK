@@ -1,4 +1,6 @@
 import warningIcon from '../imgs/warn_icon.svg';
+import closeIcon from '../imgs/close_icon.svg';
+import { isPcMiniApp } from './hwext';
 import '../styles/Toast.less';
 
 interface ToastOptions {
@@ -10,38 +12,38 @@ interface ToastOptions {
 const DEFAULT_DURATION = 2000;
 const DEFAULT_TOAST_CLASS_NAME = 'toast';
 const DEFAULT_HIDE_CLASS_NAME = 'toast-hide';
-const ICON_TOAST_CLASS_NAMES: Record<string, { icon: string; text: string }> = {
+const ICON_TOAST_CLASS_NAMES: Record<string, { icon: string; text: string; closeArea: string; closeButton: string; closeIcon: string }> = {
   toast: {
     icon: 'toast__icon',
     text: 'toast__text',
+    closeArea: 'toast__close-area',
+    closeButton: 'toast__close-button',
+    closeIcon: 'toast__close-icon',
   },
 };
 
-const PAGE_HEADER_SELECTORS = [
-  '.digital-twin__header',
-  '.assistant-page-header',
-  '.start-assistant__header',
-];
-
-function resolveToastTop(): number {
-  if (typeof document === 'undefined') {
-    return 10;
+function showMobileNativeToast(message: string): boolean {
+  if (typeof window === 'undefined' || isPcMiniApp()) {
+    return false;
   }
 
-  for (const selector of PAGE_HEADER_SELECTORS) {
-    const header = document.querySelector<HTMLElement>(selector);
-    if (!header) {
-      continue;
-    }
-
-    const rect = header.getBoundingClientRect();
-    return Math.max(10, Math.round(rect.top + 10));
+  if (typeof window.HWH5?.showToast !== 'function') {
+    return false;
   }
 
-  return 10;
+  window.HWH5.showToast({
+    msg: message,
+    type: 'w',
+  });
+
+  return true;
 }
 
 export function showToast(message: string, options?: ToastOptions): void {
+  if (showMobileNativeToast(message)) {
+    return;
+  }
+
   if (typeof document === 'undefined') {
     return;
   }
@@ -52,8 +54,16 @@ export function showToast(message: string, options?: ToastOptions): void {
 
   const toast = document.createElement('div');
   toast.className = toastClassName;
-  toast.style.top = `${resolveToastTop()}px`;
   const iconToastClassNames = ICON_TOAST_CLASS_NAMES[toastClassName];
+  let removeTimeoutId = 0;
+  let hideTimeoutId = 0;
+
+  const removeToast = () => {
+    window.clearTimeout(hideTimeoutId);
+    window.clearTimeout(removeTimeoutId);
+    toast.classList.add(hideClassName);
+    removeTimeoutId = window.setTimeout(() => toast.remove(), 300);
+  };
 
   if (iconToastClassNames) {
     const icon = document.createElement('img');
@@ -66,16 +76,31 @@ export function showToast(message: string, options?: ToastOptions): void {
     text.className = iconToastClassNames.text;
     text.textContent = message;
 
+    const closeArea = document.createElement('div');
+    closeArea.className = iconToastClassNames.closeArea;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = iconToastClassNames.closeButton;
+    closeButton.setAttribute('aria-label', '关闭提示');
+    closeButton.addEventListener('click', removeToast);
+
+    const closeButtonIcon = document.createElement('img');
+    closeButtonIcon.className = iconToastClassNames.closeIcon;
+    closeButtonIcon.src = closeIcon;
+    closeButtonIcon.alt = '';
+    closeButtonIcon.setAttribute('aria-hidden', 'true');
+
+    closeButton.appendChild(closeButtonIcon);
+    closeArea.appendChild(closeButton);
     toast.appendChild(icon);
     toast.appendChild(text);
+    toast.appendChild(closeArea);
   } else {
     toast.textContent = message;
   }
 
   document.body.appendChild(toast);
 
-  window.setTimeout(() => {
-    toast.classList.add(hideClassName);
-    window.setTimeout(() => toast.remove(), 300);
-  }, duration);
+  hideTimeoutId = window.setTimeout(removeToast, duration);
 }

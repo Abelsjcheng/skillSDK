@@ -221,7 +221,7 @@ interface CreateDigitalTwinParams {
    - 文件大小超限（`>= 2MB`）使用 toast 提示：`图片大小需小于2MB`
    - 文件格式不合法使用 toast 提示：`仅支持JPG/PNG格式`
    - 页面 1 不再维护 `avatarError` 组件内错误文本状态
-3. 页面 1 上传校验 toast 采用统一自定义结构：固定尺寸 `218x46`、白底圆角 `8px`、`padding: 12px 16px`、顶部 `10px` 水平居中；左侧 `14x14` 警告图标（来自 `src/imgs`），与右侧错误文案间距 `8px`；文案样式 `14px/400`、`rgba(25,25,25,1)`。
+3. 页面 1 上传校验 toast 按端分流：PC 端采用统一自定义结构（高度固定 `46px`、宽度按内容自适应、白底圆角 `8px`、`padding: 12px 16px`、顶部 `50px` 水平居中；左侧 `14x14` 警告图标来自 `src/imgs`，与右侧错误文案间距 `8px`；文案样式 `14px/400`、`rgba(25,25,25,1)`；右侧增加固定宽度 `40px` 的关闭操作区，内部放置 `8x8` 关闭图标按钮，点击后立即关闭 toast）；移动端统一调用宿主 `HWH5.showToast({ msg, type: 'w' })`，不再渲染页面内自定义 toast。
 4. 点击头像项即切换选中态并更新预览区。
 5. 页面切换不清空已输入数据。
 6. 点击“上一步”时从页面 2 返回页面 1，且页面 1 的头像选择、名称和简介保持不变。
@@ -242,7 +242,7 @@ interface CreateDigitalTwinParams {
    - `description`：页面 1 简介输入值
    - `weCrewType`：页面 2 单选值映射（`internal => 1`，`custom => 0`）
    - `bizRobotId`：仅 `weCrewType = 1` 时传，值为选中内部助手项的 `bizRobotId`
-13. 所有 `HWH5EXT` / `HWH5` 能力调用在业务层进入 `catch` 分支时，统一直接通过 `showToast(固定错误文案)` 告知用户，不再解析 `error.message/errorMessage`；toast 自身负责根据当前页面是否存在标题区动态定位，有标题区时显示在标题区顶部 `10px`，无标题区时显示在页面顶部 `10px`，并保持水平居中。
+13. 所有 `HWH5EXT` / `HWH5` 能力调用在业务层进入 `catch` 分支时，统一直接通过 `showToast(固定错误文案)` 告知用户，不再解析 `error.message/errorMessage`；其中 PC 端由 toast 自身根据当前页面是否存在标题区动态定位，有标题区时显示在标题区顶部 `50px`，无标题区时显示在页面顶部 `50px`，并保持水平居中；移动端则统一透传到宿主 `HWH5.showToast({ msg, type: 'w' })`，不再维护页面内定位。toast 内部的端类型判断统一复用 `src/utils/hwext.ts` 导出的 `isPcMiniApp`，避免重复维护判端逻辑。
 
 ## 8. 样式与实现约束
 
@@ -400,10 +400,11 @@ interface CreateDigitalTwinParams {
 14. 全页面取消“禁止复制”限制：不通过触摸事件 `preventDefault` 或样式策略阻断系统默认文本选择与复制行为。
 15. 历史会话侧栏的每个会话 item 标题按单行省略处理，超出宽度显示 `...`。
 16. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
-17. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
-18. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。
-19. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
-20. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
+17. 历史会话面板按端分流：移动端保留“遮罩 + 右侧抽屉”方案；PC 端改为左侧固定宽度 `260px` 的历史会话栏，并通过页面布局为右侧对话区预留空间，形成左右分栏显示，不再使用遮罩覆盖对话区。PC 端 `weAgentCUI` 根容器去除外层 `padding`，右侧 AI 对话容器单独承担上下内边距，仅保留 `padding-top: 16px` 与 `padding-bottom: 30px`，左右不额外加内边距；右侧 AI 对话容器自身再增加一个居中内容层，限制 `max-width: 690px`，在右侧可用区域内水平居中显示。
+18. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
+19. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。
+20. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
+21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 
 
 

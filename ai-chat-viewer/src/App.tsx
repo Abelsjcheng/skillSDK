@@ -80,6 +80,7 @@ function getLatestAvailableSessionByUpdatedAt(sessions: SkillSession[]): SkillSe
 
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
+  const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
@@ -628,54 +629,66 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [finalizeStreamingMessage, welinkSessionId]);
 
   return (
-    <div className={['app-container', isPc ? 'pc-mode' : '', 'app-container--we-agent-cui'].filter(Boolean).join(' ')}>
-      <div className="content-wrapper">
-        <Content
-          messages={messages}
-          welinkSessionId={welinkSessionId ?? ''}
-          isLoading={isLoading}
-          isLoadingHistory={isLoadingHistory}
-          hasMoreHistory={hasMoreHistory}
-          onLoadMoreHistory={loadMoreHistory}
-          weAgentUserName={weAgentUserName}
-          weAgentUserAvatar={weAgentUserAvatar}
-          weAgentAssistantName={weAgentAssistantName}
-          weAgentAssistantDescription={weAgentAssistantDescription}
-          weAgentAssistantAvatar={weAgentAssistantAvatar}
-        />
-      </div>
+    <div
+      className={[
+        'app-container',
+        isPc ? 'pc-mode' : '',
+        'app-container--we-agent-cui',
+        isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <div className="we-agent-cui-main">
+        <div className="we-agent-cui-chat-panel">
+          <div className="content-wrapper">
+            <Content
+              messages={messages}
+              welinkSessionId={welinkSessionId ?? ''}
+              isLoading={isLoading}
+              isLoadingHistory={isLoadingHistory}
+              hasMoreHistory={hasMoreHistory}
+              onLoadMoreHistory={loadMoreHistory}
+              weAgentUserName={weAgentUserName}
+              weAgentUserAvatar={weAgentUserAvatar}
+              weAgentAssistantName={weAgentAssistantName}
+              weAgentAssistantDescription={weAgentAssistantDescription}
+              weAgentAssistantAvatar={weAgentAssistantAvatar}
+            />
+          </div>
 
-      <div className="we-agent-cui-actions" aria-label="多功能按钮区">
-        <button
-          type="button"
-          className="we-agent-cui-actions__button"
-          onClick={(event) => {
-            runButtonClickWithDebounce(event, () => {
-              void handleCreateSession();
-            });
-          }}
-          aria-label="新建会话"
-        >
-          <img
-            className="we-agent-cui-actions__icon"
-            src={iconWeAgentNewSession}
-            alt=""
-          />
-        </button>
-        <WeAgentHistorySidebar
-          assistantAccount={assistantAccount}
-          currentWelinkSessionId={welinkSessionId ?? ''}
-          onSessionSelect={handleSwitchWeAgentSession}
-        />
-      </div>
+          <div className="we-agent-cui-actions" aria-label="多功能按钮区">
+            <button
+              type="button"
+              className="we-agent-cui-actions__button"
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  void handleCreateSession();
+                });
+              }}
+              aria-label="新建会话"
+            >
+              <img
+                className="we-agent-cui-actions__icon"
+                src={iconWeAgentNewSession}
+                alt=""
+              />
+            </button>
+            <WeAgentHistorySidebar
+              assistantAccount={assistantAccount}
+              currentWelinkSessionId={welinkSessionId ?? ''}
+              onSessionSelect={handleSwitchWeAgentSession}
+              onVisibilityChange={setIsHistorySidebarVisible}
+            />
+          </div>
 
-      <div className="footer-wrapper">
-        <WeAgentCUIFooter
-          isPcMiniApp={isPc}
-          mode={footerMode}
-          onSend={handleGenerate}
-          onStop={handleStop}
-        />
+          <div className="footer-wrapper">
+            <WeAgentCUIFooter
+              isPcMiniApp={isPc}
+              mode={footerMode}
+              onSend={handleGenerate}
+              onStop={handleStop}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

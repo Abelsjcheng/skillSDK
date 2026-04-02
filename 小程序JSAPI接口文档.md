@@ -1080,7 +1080,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | ownerDeptName | string | 责任部门中文名 |
 | ownerDeptNameEn | string | 责任部门英文名 |
 | bizRobotId | string | 助理对应业务机器人 ID |
-| robotId | string | 助理对应机器人 ID（当 `bizRobotId` 不为空时用于拼接 `weAgentUri` 的 `robotId` query） |
+| robotId | string | 助理对应机器人 ID（当助理详情解析 `weCodeUrl` 的 host 与常量 `APP_ID` 不一致时，用于拼接 `weAgentUri` 的 `robotId` query） |
 | weCodeUrl | string | 助理 We 码地址 |
 
 ### 行为说明
@@ -1317,7 +1317,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| weAgentUri | string | 当前助理 CUI 地址（由 `weCodeUrl` 添加 `wecodePlace=weAgent` query 生成；当助理详情 `bizRobotId` 不为空且存在 `robotId` 时，追加 `robotId` query） |
+| weAgentUri | string | 当前助理 CUI 地址：若助理详情 `weCodeUrl` 不为空，先解析其 host；当 host 与常量 `APP_ID` 不一致时，按 `weCodeUrl` 追加 `wecodePlace=weAgent` 与 `robotId={id}`（`id` 来自助理详情）；当 host 与常量 `APP_ID` 一致时，按 `weCodeUrl` 追加 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。若 `weCodeUrl` 为空，则取 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），随后追加 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。 |
 | assistantDetailUri | string | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
 | switchAssistantUri | string | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 
@@ -1357,7 +1357,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| weAgentUri | string | 是 | 当前助理 CUI 地址：当助理详情 `bizRobotId` 为空时，若 `weCodeUrl` 不为空则取 `weCodeUrl`（服务端下发格式：`h5://123456/index.html#weAgentCUI`）；若 `weCodeUrl` 为空则取 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`）；随后追加 `wecodePlace=weAgent` query，最终 URL 形态为 `h5://123456/index.html?wecodePlace=weAgent#weAgentCUI`。当助理详情 `bizRobotId` 不为空且存在 `robotId` 时，继续追加 `robotId` query。 |
+| weAgentUri | string | 是 | 当前助理 CUI 地址：若助理详情 `weCodeUrl` 不为空，则先解析 `weCodeUrl` 的 host。若 host 与常量 `APP_ID` 不一致，则取 `weCodeUrl` 并追加 query `wecodePlace=weAgent` 与 `robotId={id}`（`id` 来自助理详情）；若 host 与常量 `APP_ID` 一致，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。若 `weCodeUrl` 为空，则取 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`）；随后追加 query `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。 |
 | assistantDetailUri | string | 是 | 助理详情地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`） |
 | switchAssistantUri | string | 是 | 切换助理地址（`h5://123456/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`） |
 
@@ -1380,7 +1380,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'openWeAgen
 
 ```javascript
 window.HWH5EXT.openWeAgentCUI({
-  weAgentUri: 'h5://123456/index.html?wecodePlace=weAgent#weAgentCUI',
+  weAgentUri: 'h5://123456/index.html?wecodePlace=weAgent&assistantAccount=x00_1#weAgentCUI',
   assistantDetailUri: 'h5://123456/index.html?partnerAccount=x00_1#assistantDetail',
   switchAssistantUri: 'h5://123456/index.html?partnerAccount=x00_1#switchAssistant'
 }).then((result) => {

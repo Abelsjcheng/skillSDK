@@ -254,6 +254,7 @@ interface Pedestal {
 
 interface HWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
+  showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
@@ -291,7 +292,7 @@ const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
   if (typeof window === 'undefined') return false;
-  return typeof window.Pedestal?.callMethod === 'function';
+  return true;
 }
 
 function tryGetPedestal(): Pedestal | null {
@@ -451,6 +452,11 @@ function normalizeString(value?: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function getUrlHost(value: string): string {
+  const parsed = parseUrl(value);
+  return parsed?.host ?? '';
+}
+
 function buildAssistantPageUri(partnerAccount: string, hash: 'assistantDetail' | 'switchAssistant'): string {
   const parsed = parseUrl(ASSISTANT_PAGE_BASE_URI);
   if (!parsed) return ASSISTANT_PAGE_BASE_URI;
@@ -484,15 +490,17 @@ export function buildOpenWeAgentCUIParams(
   options?: BuildOpenWeAgentCUIOptions,
 ): OpenWeAgentCUIParams {
   const normalizedPartnerAccount = partnerAccount?.trim() ?? '';
-  const normalizedBizRobotId = normalizeString(options?.bizRobotId);
+  const normalizedWeCodeUrl = normalizeString(weCodeUrl) || WE_AGENT_BASE_URI;
+  const weCodeUrlHost = getUrlHost(normalizedWeCodeUrl);
+  const isSameAppIdHost = weCodeUrlHost === APP_ID;
   const normalizedRobotId = normalizeString(options?.robotId);
-  let weAgentUri = appendQueryParam(weCodeUrl || WE_AGENT_BASE_URI, 'wecodePlace', 'weAgent');
+  let weAgentUri = appendQueryParam(normalizedWeCodeUrl, 'wecodePlace', 'weAgent');
 
-  if (!normalizedBizRobotId && normalizedPartnerAccount) {
+  if (!weCodeUrlHost || isSameAppIdHost) {
     weAgentUri = appendQueryParam(weAgentUri, 'assistantAccount', normalizedPartnerAccount);
   }
 
-  if (normalizedBizRobotId && normalizedRobotId) {
+  if (weCodeUrlHost && !isSameAppIdHost && normalizedRobotId) {
     weAgentUri = appendQueryParam(weAgentUri, 'robotId', normalizedRobotId);
   }
 
