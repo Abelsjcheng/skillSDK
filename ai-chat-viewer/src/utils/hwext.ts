@@ -455,8 +455,13 @@ function normalizeString(value?: string): string {
 }
 
 function getUrlHost(value: string): string {
-  const parsed = parseUrl(value);
-  return parsed?.host ?? '';
+  const normalizedValue = normalizeString(value);
+  if (!normalizedValue) {
+    return '';
+  }
+
+  const matched = normalizedValue.match(/^[a-zA-Z][a-zA-Z\d+.-]*:\/\/([^/?#]+)/);
+  return matched?.[1]?.trim() ?? '';
 }
 
 function buildAssistantPageUri(partnerAccount: string, hash: 'assistantDetail' | 'switchAssistant'): string {
