@@ -12,7 +12,7 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
-import type { Message, MessagePart, SendMessageResponse } from '../types';
+import type { Message, MessagePart, QuestionAnswerSubmission } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
 import userAvatar from '../imgs/switch-assistant-avatar.svg';
@@ -21,7 +21,7 @@ import 'katex/dist/katex.min.css';
 interface MessageBubbleProps {
   message: Message;
   welinkSessionId: string;
-  onQuestionAnswered?: (messageOperation: SendMessageResponse) => void;
+  onQuestionAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
@@ -97,7 +97,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <QuestionCard
             key={part.partId}
             part={part}
-            welinkSessionId={welinkSessionId}
             onAnswered={onQuestionAnswered}
             readonly={isHistoryAssistantReadonly}
           />

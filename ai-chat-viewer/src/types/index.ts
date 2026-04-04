@@ -37,6 +37,12 @@ export interface QuestionOption {
   description?: string;
 }
 
+export interface QuestionAnswerSubmission {
+  partId: string;
+  answer: string;
+  toolCallId?: string;
+}
+
 export type QuestionOptionInput = string | QuestionOption;
 
 interface ToolPartFields<TValue, TStatus> {

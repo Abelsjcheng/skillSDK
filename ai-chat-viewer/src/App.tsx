@@ -8,6 +8,7 @@ import type {
   GetSessionMessageHistoryResponse,
   Message,
   MessagePart,
+  QuestionAnswerSubmission,
   SendMessageResponse,
   SessionStatus,
   StreamMessage,
@@ -68,6 +69,37 @@ function contentTypeForRole(role: Message['role']): NonNullable<Message['content
   }
 }
 
+type MessageInsertStrategy = 'append' | 'before-streaming';
+
+function markQuestionPartAnswered(messages: Message[], partId: string, answer: string): Message[] {
+  let changed = false;
+
+  const next = messages.map((message) => {
+    if (!message.parts?.some((part) => part.type === 'question' && part.partId === partId)) {
+      return message;
+    }
+
+    changed = true;
+    return {
+      ...message,
+      isStreaming: false,
+      parts: message.parts.map((part) => (
+        part.type === 'question' && part.partId === partId
+          ? {
+            ...part,
+            answered: true,
+            output: answer,
+            status: 'completed',
+            isStreaming: false,
+          }
+          : part
+      )),
+    };
+  });
+
+  return changed ? next : messages;
+}
+
 function buildCorpUserAvatar(corpUserId: string): string {
   const normalizedCorpUserId = corpUserId.trim();
   return normalizedCorpUserId ? `https://${normalizedCorpUserId}` : '';
@@ -126,6 +158,8 @@ function App({ assistantAccount = '' }: AppProps) {
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
+  const pendingQuestionAnswerRef = useRef(false);
+  const bufferedQuestionEventsRef = useRef<StreamMessage[]>([]);
 
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
   const onErrorRef = useRef<((err: {
@@ -209,7 +243,10 @@ function App({ assistantAccount = '' }: AppProps) {
   }, []);
 
   const appendMessageFromOperation = useCallback(
-    (messageOperation: SendMessageResponse) => {
+    (
+      messageOperation: SendMessageResponse,
+      insertStrategy: MessageInsertStrategy = 'before-streaming',
+    ) => {
       const mappedMessage = messageOperationToMessage(messageOperation);
       if (mappedMessage.role === 'user' && mappedMessage.content.trim()) {
         latestUserContentRef.current = mappedMessage.content.trim();
@@ -227,7 +264,7 @@ function App({ assistantAccount = '' }: AppProps) {
           return next;
         }
 
-        if (mappedMessage.role === 'user' && streamingMsgIdRef.current) {
+        if (insertStrategy === 'before-streaming' && mappedMessage.role === 'user' && streamingMsgIdRef.current) {
           const streamingIndex = prev.findIndex((msg) => msg.id === streamingMsgIdRef.current);
           if (streamingIndex >= 0) {
             const next = [
@@ -248,9 +285,47 @@ function App({ assistantAccount = '' }: AppProps) {
     [],
   );
 
-  const handleQuestionAnswered = useCallback((messageOperation: SendMessageResponse) => {
-    appendMessageFromOperation(messageOperation);
-  }, [appendMessageFromOperation]);
+  const handleQuestionAnswered = useCallback(async ({
+    partId,
+    answer,
+    toolCallId,
+  }: QuestionAnswerSubmission) => {
+    if (!welinkSessionId) {
+      return;
+    }
+
+    pendingQuestionAnswerRef.current = true;
+    bufferedQuestionEventsRef.current = [];
+    setSessionStatus('busy');
+    finalizeStreamingMessage();
+
+    try {
+      const result = await sendMessageApi({
+        welinkSessionId,
+        content: answer,
+        toolCallId,
+      });
+      setMessages((prev) => markQuestionPartAnswered(prev, partId, answer));
+      appendMessageFromOperation(result, 'append');
+      pendingQuestionAnswerRef.current = false;
+      const bufferedMessages = [...bufferedQuestionEventsRef.current];
+      bufferedQuestionEventsRef.current = [];
+      bufferedMessages.forEach((message) => {
+        onMessageRef.current?.(message);
+      });
+    } catch (err) {
+      pendingQuestionAnswerRef.current = false;
+      const bufferedMessages = [...bufferedQuestionEventsRef.current];
+      bufferedQuestionEventsRef.current = [];
+      bufferedMessages.forEach((message) => {
+        onMessageRef.current?.(message);
+      });
+      console.error('Failed to submit question answer:', err);
+      setSessionStatus('idle');
+      showToast('提交回答失败');
+      throw err;
+    }
+  }, [appendMessageFromOperation, finalizeStreamingMessage, welinkSessionId]);
 
   const loadMoreHistory = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -321,6 +396,8 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccountRef.current = assistantAccount.trim();
     assistantDetailRef.current = null;
     knownUserMessageIdsRef.current.clear();
+    pendingQuestionAnswerRef.current = false;
+    bufferedQuestionEventsRef.current = [];
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
@@ -413,6 +490,11 @@ function App({ assistantAccount = '' }: AppProps) {
     };
 
     onMessageRef.current = (msg: StreamMessage) => {
+      if (pendingQuestionAnswerRef.current) {
+        bufferedQuestionEventsRef.current.push(msg);
+        return;
+      }
+
       switch (msg.type) {
         case 'text.delta':
         case 'text.done':
@@ -718,6 +800,8 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       const newSession = await createSessionForAssistant(currentAssistantAccount, detail.appKey);
+      pendingQuestionAnswerRef.current = false;
+      bufferedQuestionEventsRef.current = [];
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
     } catch (err) {
@@ -738,6 +822,8 @@ function App({ assistantAccount = '' }: AppProps) {
     suppressFooterAutoResetRef.current = false;
     latestUserContentRef.current = '';
     knownUserMessageIdsRef.current.clear();
+    pendingQuestionAnswerRef.current = false;
+    bufferedQuestionEventsRef.current = [];
 
     setFooterMode('generate');
     setSessionStatus('idle');

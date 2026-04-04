@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import type { MessagePart, SendMessageResponse } from '../types';
+import type { MessagePart, QuestionAnswerSubmission } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { sendMessage } from '../utils/hwext';
-import { showToast } from '../utils/toast';
 
 interface QuestionCardProps {
   part: MessagePart;
-  welinkSessionId: string;
-  onAnswered?: (messageOperation: SendMessageResponse) => void;
+  onAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
   readonly?: boolean;
 }
 
@@ -17,7 +14,6 @@ function getAnswerText(part: MessagePart): string {
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   part,
-  welinkSessionId,
   onAnswered,
   readonly = false,
 }) => {
@@ -43,22 +39,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
   const submitAnswer = async (value: string) => {
     const content = value.trim();
-    if (!content || isLocked) return;
+    if (!content || isLocked || !onAnswered) return;
 
     setSubmitting(true);
     try {
-      const result = await sendMessage({
-        welinkSessionId,
-        content,
+      await onAnswered?.({
+        partId: part.partId,
+        answer: content,
         toolCallId: part.toolCallId,
       });
       setAnswered(true);
       setSelectedAnswer(content);
       setCustomInput(content);
-      onAnswered?.(result);
     } catch (err) {
       console.error('Failed to submit answer:', err);
-      showToast('提交回答失败');
     } finally {
       setSubmitting(false);
     }
@@ -78,7 +72,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         <div className="question-card__header">{part.header}</div>
       )}
       <div className="question-card__question">
-        <span className="question-card__icon">❓</span>
+        <span className="question-card__icon">?</span>
         {part.question ?? part.content}
       </div>
 
@@ -109,7 +103,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           <input
             type="text"
             className="question-card__input"
-            placeholder="输入自定义回答..."
+            placeholder="请输入自定义回答..."
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
