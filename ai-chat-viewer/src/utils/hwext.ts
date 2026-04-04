@@ -249,11 +249,11 @@ export interface HWH5EXT {
 }
 
 interface Pedestal {
-  callMethod: (method: string, payload: { funName: string; params: unknown }) => Promise<unknown> | unknown;
+  callMethod: (method: string, payload: unknown) => Promise<unknown> | unknown;
 }
 
 interface HWH5Bridge {
-  openWebview?: (payload: { uri: string }) => void;
+  openWebview: (payload: { uri: string }) => void;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
@@ -517,34 +517,10 @@ export function buildOpenWeAgentCUIParams(
 }
 
 export function openH5Webview(payload: { uri: string }): void {
-  if (typeof window === 'undefined') return;
-
-  if (typeof window.HWH5?.openWebview === 'function') {
-    window.HWH5.openWebview(payload);
-    return;
-  }
-
-  const { uri } = payload;
-  const targetUrl = parseUrl(uri, window.location.href);
-  if (!targetUrl) {
-    window.location.href = uri;
-    return;
-  }
-
-  if (targetUrl.hash) {
-    const hashUrl = parseUrl(targetUrl.hash.slice(1));
-    if (hashUrl) {
-      const hashPath = hashUrl.pathname.startsWith('/') ? hashUrl.pathname : `/${hashUrl.pathname}`;
-      const hashSearch = hashUrl.search || targetUrl.search;
-      window.location.hash = `${hashPath}${hashSearch}`;
-      return;
-    }
-  }
-
-  if (isAbsoluteUrl(uri)) {
-    window.location.href = targetUrl.toString();
+  if (isPcMiniApp()) {
+    getPedestalOrThrow().callMethod('method://pedestal/openUrl', payload.uri);
   } else {
-    window.location.href = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
+    window.HWH5?.openWebview(payload);
   }
 }
 

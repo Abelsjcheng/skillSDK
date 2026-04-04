@@ -5,24 +5,30 @@ import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
+import type { Components } from 'react-markdown';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { MessagePart } from '../types';
+import { createMarkdownComponents } from './markdownComponents';
+
+const STREAMING_CURSOR_HTML = '<span class="streaming-cursor"></span>';
+
+function withStreamingCursor(content: string, isStreaming: boolean): string {
+  return isStreaming ? `${content}${STREAMING_CURSOR_HTML}` : content;
+}
 
 interface ThinkingBlockProps {
   part: MessagePart;
 }
 
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
-  const [expanded, setExpanded] = useState(part.isStreaming);
+  const [expanded, setExpanded] = useState(true);
   const prevStreamingRef = useRef(part.isStreaming);
+  const markdownComponents = useRef<Components>(createMarkdownComponents());
 
   useEffect(() => {
     if (part.isStreaming && !prevStreamingRef.current) {
-      // thinking started: default expand
+      // thinking resumed: reopen the panel so new content is visible.
       setExpanded(true);
-    } else if (!part.isStreaming && prevStreamingRef.current) {
-      // thinking finished: auto collapse
-      setExpanded(false);
     }
     prevStreamingRef.current = part.isStreaming;
   }, [part.isStreaming]);
@@ -56,10 +62,10 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
             rehypePlugins={[rehypeRaw, rehypeKatex]}
+            components={markdownComponents.current}
           >
-            {part.content}
+            {withStreamingCursor(part.content, part.isStreaming)}
           </ReactMarkdown>
-          {part.isStreaming && <span className="streaming-cursor" />}
         </div>
       )}
     </div>

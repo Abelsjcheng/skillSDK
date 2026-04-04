@@ -48,6 +48,7 @@ export interface AppProps {
 export type AppVariant = 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
+const PENDING_ASSISTANT_MESSAGE = '正在生成中，请稍等...';
 
 function collectUserMessageIds(messages: Message[]): Set<string> {
   return new Set(
@@ -66,6 +67,26 @@ function contentTypeForRole(role: Message['role']): NonNullable<Message['content
     default:
       return 'plain';
   }
+}
+
+function shouldCreatePendingAssistantMessage(msg: StreamMessage): boolean {
+  return msg.type === 'step.start'
+    || (msg.type === 'session.status' && msg.sessionStatus === 'busy');
+}
+
+function createPendingAssistantMessage(): Message {
+  return {
+    id: genMessageId('assistant_pending'),
+    role: 'assistant',
+    content: PENDING_ASSISTANT_MESSAGE,
+    contentType: 'plain',
+    timestamp: Date.now(),
+    isStreaming: true,
+    parts: [],
+    meta: {
+      pending: true,
+    },
+  };
 }
 
 function replaceOptimisticMessage(messages: Message[], tempId: string, resolvedMessage: Message): Message[] {
@@ -195,19 +216,50 @@ function App({ assistantAccount = '' }: AppProps) {
   }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
 
+  const ensurePendingAssistantMessage = useCallback(() => {
+    if (streamingMsgIdRef.current) {
+      return;
+    }
+
+    const pendingMessage = createPendingAssistantMessage();
+    streamingMsgIdRef.current = pendingMessage.id;
+    setMessages((prev) => [...prev, pendingMessage]);
+  }, []);
+
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
 
     if (streamingMsgIdRef.current) {
       const finalId = streamingMsgIdRef.current;
+      const finalText = assemblerRef.current.getText();
       const finalParts = assemblerRef.current.getParts();
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === finalId
-            ? { ...m, isStreaming: false, parts: [...finalParts] }
-            : m,
-        ),
-      );
+      setMessages((prev) => {
+        const currentMessage = prev.find((message) => message.id === finalId);
+        if (!currentMessage) {
+          return prev;
+        }
+
+        if (currentMessage.meta?.pending && finalParts.length === 0 && !finalText.trim()) {
+          return prev.filter((message) => message.id !== finalId);
+        }
+
+        return prev.map((message) =>
+          message.id === finalId
+            ? {
+              ...message,
+              content: currentMessage.meta?.pending ? finalText : message.content,
+              isStreaming: false,
+              parts: [...finalParts],
+              meta: currentMessage.meta?.pending
+                ? {
+                  ...message.meta,
+                  pending: false,
+                }
+                : message.meta,
+            }
+            : message,
+        );
+      });
     }
 
     assemblerRef.current.reset();
@@ -237,12 +289,21 @@ function App({ assistantAccount = '' }: AppProps) {
           const baseParts = currentMessage.parts && currentMessage.parts.length > 0
             ? currentMessage.parts.map((part) => ({ ...part, isStreaming: false }))
             : assemblerParts;
+          const nextContent = currentMessage.meta?.pending
+            ? assemblerText || normalizedMessage
+            : currentMessage.content || assemblerText || normalizedMessage;
 
           nextMessages[streamingMessageIndex] = {
             ...currentMessage,
-            content: currentMessage.content || assemblerText || normalizedMessage,
+            content: nextContent,
             isStreaming: false,
             parts: [...baseParts, errorPart],
+            meta: currentMessage.meta?.pending
+              ? {
+                ...currentMessage.meta,
+                pending: false,
+              }
+              : currentMessage.meta,
           };
           return nextMessages;
         }
@@ -487,6 +548,10 @@ function App({ assistantAccount = '' }: AppProps) {
     };
 
     onMessageRef.current = (msg: StreamMessage) => {
+      if (shouldCreatePendingAssistantMessage(msg)) {
+        ensurePendingAssistantMessage();
+      }
+
       if (
         msg.type === 'question'
         && (msg.status === 'completed' || msg.status === 'error')
@@ -539,7 +604,18 @@ function App({ assistantAccount = '' }: AppProps) {
             if (streamingMsgIdRef.current) {
               return prev.map((m) =>
                 m.id === streamingMsgIdRef.current
-                  ? { ...m, content: currentText, parts: [...currentParts], isStreaming: true }
+                  ? {
+                    ...m,
+                    content: currentText,
+                    parts: [...currentParts],
+                    isStreaming: true,
+                    meta: m.meta?.pending
+                      ? {
+                        ...m.meta,
+                        pending: false,
+                      }
+                      : m.meta,
+                  }
                   : m,
               );
             }
@@ -705,18 +781,43 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'streaming':
           if (msg.parts && msg.parts.length > 0) {
             setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
-            const id = genMessageId();
-            streamingMsgIdRef.current = id;
-            const streamingMsg: Message = {
-              id,
-              role: normalizeRole(msg.role),
-              content: '',
-              contentType: contentTypeForRole(normalizeRole(msg.role)),
-              timestamp: Date.now(),
-              isStreaming: true,
-              parts: mapRawParts(msg.parts, true),
-            };
-            setMessages((prev) => [...prev, streamingMsg]);
+            const nextRole = normalizeRole(msg.role);
+            const nextParts = mapRawParts(msg.parts, true);
+            setMessages((prev) => {
+              if (streamingMsgIdRef.current) {
+                return prev.map((message) =>
+                  message.id === streamingMsgIdRef.current
+                    ? {
+                      ...message,
+                      role: nextRole,
+                      content: '',
+                      contentType: contentTypeForRole(nextRole),
+                      isStreaming: true,
+                      parts: nextParts,
+                      meta: message.meta?.pending
+                        ? {
+                          ...message.meta,
+                          pending: false,
+                        }
+                        : message.meta,
+                    }
+                    : message,
+                );
+              }
+
+              const id = genMessageId();
+              streamingMsgIdRef.current = id;
+              const streamingMsg: Message = {
+                id,
+                role: nextRole,
+                content: '',
+                contentType: contentTypeForRole(nextRole),
+                timestamp: Date.now(),
+                isStreaming: true,
+                parts: nextParts,
+              };
+              return [...prev, streamingMsg];
+            });
           }
           break;
 
@@ -760,7 +861,7 @@ function App({ assistantAccount = '' }: AppProps) {
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage]);
+  }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage, ensurePendingAssistantMessage]);
 
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
@@ -821,6 +922,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const newSession = await createSessionForAssistant(currentAssistantAccount, detail.appKey);
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
+      showToast('成功创建新会话');
     } catch (err) {
       console.error('Failed to create new session:', err);
       showToast('新建会话失败');

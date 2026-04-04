@@ -82,12 +82,14 @@
     }
 
     &.is-assistant {
-      border-radius: 0 24px 24px 24px;
-      padding: 8px;
-      background: #fff;
-      border: 1px solid #1890ff;
-      border-radius: 8px;
+      padding: 0;
+      background: transparent;
+      border: none;
       box-sizing: border-box;
+
+      &.is-pending {
+        padding: 12px 2px;
+      }
 
       &.has-code-block {
         width: 100%;
@@ -111,6 +113,26 @@
 
   .we-agent-message__bubble p {
     margin: 0;
+  }
+
+  .we-agent-message__pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .we-agent-message__pending-icon {
+    width: 16px;
+    height: 16px;
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .we-agent-message__pending-text {
+    color: rgba(51, 51, 51, 1);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
   }
 
   .we-agent-cui-welcome {

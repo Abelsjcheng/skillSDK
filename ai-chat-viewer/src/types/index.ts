@@ -177,6 +177,7 @@ export interface Message {
   meta?: {
     tokens?: StreamMessage['tokens'];
     cost?: number;
+    pending?: boolean;
   };
 }
 

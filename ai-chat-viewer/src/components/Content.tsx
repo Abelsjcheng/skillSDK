@@ -5,6 +5,7 @@ import type { Message, QuestionAnswerSubmission } from '../types';
 import '../styles/Content.less';
 
 const TOP_LOAD_THRESHOLD = 24;
+const BOTTOM_AUTO_SCROLL_THRESHOLD = 24;
 
 interface ContentProps {
   messages: Message[];
@@ -44,6 +45,7 @@ export const Content: React.FC<ContentProps> = ({
     messageId: null,
     offsetTop: 0,
   });
+  const shouldAutoScrollRef = useRef(true);
 
   const welcomeTitle = weAgentUserName ? `早上好，${weAgentUserName}` : '';
   const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
@@ -66,6 +68,8 @@ export const Content: React.FC<ContentProps> = ({
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
+    const distanceToBottom = container.scrollHeight - container.clientHeight - container.scrollTop;
+    shouldAutoScrollRef.current = distanceToBottom <= BOTTOM_AUTO_SCROLL_THRESHOLD;
     if (preservingAnchorRef.current.active) return;
     if (isLoadingHistory || !hasMoreHistory) return;
     if (container.scrollTop > TOP_LOAD_THRESHOLD) return;
@@ -96,6 +100,10 @@ export const Content: React.FC<ContentProps> = ({
       return undefined;
     }
 
+    if (!shouldAutoScrollRef.current) {
+      return undefined;
+    }
+
     scrollToBottom();
 
     const rafId = window.requestAnimationFrame(scrollToBottom);
@@ -113,6 +121,10 @@ export const Content: React.FC<ContentProps> = ({
       preservingAnchorRef.current.messageId = null;
     }
   }, [isLoadingHistory]);
+
+  useEffect(() => {
+    shouldAutoScrollRef.current = true;
+  }, [welinkSessionId]);
 
   if (messages.length === 0) {
     return (

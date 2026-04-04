@@ -21,7 +21,7 @@ const statusIcons: Record<string, string> = {
 };
 
 export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const status = part.status ?? 'pending';
   const statusLabel = statusLabels[status] ?? status;
   const statusIcon = statusIcons[status] ?? 'i';

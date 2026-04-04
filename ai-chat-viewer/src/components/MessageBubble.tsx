@@ -6,15 +6,16 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
-import { CodeBlock } from './CodeBlock';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
+import { createMarkdownComponents } from './markdownComponents';
 import type { Message, MessagePart, QuestionAnswerSubmission } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
+import generatingIcon from '../imgs/generating_icon.png';
 import userAvatar from '../imgs/switch-assistant-avatar.svg';
 import 'katex/dist/katex.min.css';
 
@@ -51,6 +52,13 @@ function messageContainsCodeBlock(message: Message): boolean {
   }
   return hasMarkdownCodeBlock(message.content);
 }
+const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
+const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
+const STREAMING_CURSOR_HTML = '<span class="streaming-cursor"></span>';
+
+function withStreamingCursor(content: string, isStreaming?: boolean): string {
+  return isStreaming ? `${content}${STREAMING_CURSOR_HTML}` : content;
+}
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -63,25 +71,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
+  const isPendingAssistant = normalizedRole === 'assistant' && Boolean(message.meta?.pending);
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
 
   const markdownComponents: Components = useMemo(
-    () => ({
-      code({ className, children, ...rest }) {
-        const match = /language-(\w+)/.exec(className ?? '');
-        const codeString = String(children).replace(/\n$/, '');
-        if (match) {
-          return <CodeBlock code={codeString} language={match[1]} />;
-        }
-        return (
-          <code className={className} {...rest}>
-            {children}
-          </code>
-        );
-      },
-    }),
+    () => createMarkdownComponents(true),
     [],
+  );
+
+  const renderMarkdown = (content: string, isStreaming?: boolean) => (
+    <ReactMarkdown
+      remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+      rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
+      components={markdownComponents}
+    >
+      {withStreamingCursor(content, isStreaming)}
+    </ReactMarkdown>
   );
 
   const renderPart = (part: MessagePart) => {
@@ -133,20 +139,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       default:
         return (
           <div key={part.partId} className="text-part">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
-              rehypePlugins={[rehypeRaw, rehypeKatex]}
-              components={markdownComponents}
-            >
-              {part.content}
-            </ReactMarkdown>
-            {part.isStreaming && <span className="streaming-cursor" />}
+            {renderMarkdown(part.content, part.isStreaming)}
           </div>
         );
     }
   };
 
   const renderContent = () => {
+    if (isPendingAssistant) {
+      return (
+        <div className="we-agent-message__pending">
+          <img className="we-agent-message__pending-icon" src={generatingIcon} alt="" />
+          <span className="we-agent-message__pending-text">{message.content}</span>
+        </div>
+      );
+    }
+
     const normalizedParts = message.parts ? syncToolCallIdForQuestionParts(message.parts) : undefined;
     if (normalizedParts && normalizedParts.length > 0) {
       return (
@@ -161,18 +169,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return (
-        <>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
-            rehypePlugins={[rehypeRaw, rehypeKatex]}
-            components={markdownComponents}
-          >
-            {message.content}
-          </ReactMarkdown>
-          {message.isStreaming && <span className="streaming-cursor" />}
-        </>
-      );
+      return renderMarkdown(message.content, message.isStreaming);
     }
     return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
   };
@@ -208,6 +205,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           className={[
             'we-agent-message__bubble',
             isUser ? 'is-user' : 'is-assistant',
+            isPendingAssistant ? 'is-pending' : '',
             hasCodeBlock ? 'has-code-block' : '',
           ].filter(Boolean).join(' ')}
         >
