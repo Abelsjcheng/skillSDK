@@ -662,17 +662,21 @@ function toRegenerateResponse(message: SessionMessage): RegenerateAnswerResponse
   return toSendMessageResponse(message);
 }
 
-function emit(sessionId: string, payload: Omit<StreamMessage, 'welinkSessionId' | 'seq' | 'emittedAt'>): void {
+type MockEmitPayload = Omit<StreamMessage, 'welinkSessionId' | 'seq' | 'emittedAt'> & {
+  emittedAt?: StreamMessage['emittedAt'];
+};
+
+function emit(sessionId: string, payload: MockEmitPayload): void {
   const record = sessionStore.get(sessionId);
   const listener = listeners.get(sessionId);
   if (!record || !listener) return;
 
   record.nextStreamSeq += 1;
   listener.onMessage({
+    ...payload,
     welinkSessionId: sessionId,
     seq: record.nextStreamSeq,
-    emittedAt: nowIso(),
-    ...payload,
+    emittedAt: payload.emittedAt ?? nowIso(),
   });
 }
 

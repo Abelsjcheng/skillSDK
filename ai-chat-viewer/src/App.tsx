@@ -9,7 +9,6 @@ import type {
   Message,
   MessagePart,
   QuestionAnswerSubmission,
-  SendMessageResponse,
   SessionStatus,
   StreamMessage,
 } from './types';
@@ -69,35 +68,61 @@ function contentTypeForRole(role: Message['role']): NonNullable<Message['content
   }
 }
 
-type MessageInsertStrategy = 'append' | 'before-streaming';
+function replaceOptimisticMessage(messages: Message[], tempId: string, resolvedMessage: Message): Message[] {
+  const tempIndex = messages.findIndex((message) => message.id === tempId);
+  const resolvedIndex = messages.findIndex((message) => message.id === resolvedMessage.id);
 
-function markQuestionPartAnswered(messages: Message[], partId: string, answer: string): Message[] {
-  let changed = false;
+  if (resolvedIndex >= 0) {
+    const next = [...messages];
+    next[resolvedIndex] = {
+      ...next[resolvedIndex],
+      ...resolvedMessage,
+    };
+    if (tempIndex >= 0 && tempIndex !== resolvedIndex) {
+      next.splice(tempIndex, 1);
+    }
+    return next;
+  }
 
-  const next = messages.map((message) => {
-    if (!message.parts?.some((part) => part.type === 'question' && part.partId === partId)) {
-      return message;
+  if (tempIndex >= 0) {
+    const next = [...messages];
+    next[tempIndex] = resolvedMessage;
+    return next;
+  }
+
+  return [...messages, resolvedMessage];
+}
+
+function updateLatestQuestionPart(
+  messages: Message[],
+  matcher: (part: MessagePart) => boolean,
+  updater: (part: MessagePart) => MessagePart,
+): Message[] {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex];
+    if (!message.parts || message.parts.length === 0) {
+      continue;
     }
 
-    changed = true;
-    return {
-      ...message,
-      isStreaming: false,
-      parts: message.parts.map((part) => (
-        part.type === 'question' && part.partId === partId
-          ? {
-            ...part,
-            answered: true,
-            output: answer,
-            status: 'completed',
-            isStreaming: false,
-          }
-          : part
-      )),
-    };
-  });
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+      if (part.type !== 'question' || !matcher(part)) {
+        continue;
+      }
 
-  return changed ? next : messages;
+      const nextMessages = [...messages];
+      const nextParts = [...message.parts];
+      nextParts[partIndex] = updater(part);
+      nextMessages[messageIndex] = {
+        ...message,
+        isStreaming: false,
+        parts: nextParts,
+      };
+      return nextMessages;
+    }
+  }
+
+  return messages;
 }
 
 function buildCorpUserAvatar(corpUserId: string): string {
@@ -155,11 +180,10 @@ function App({ assistantAccount = '' }: AppProps) {
   const suppressFooterAutoResetRef = useRef(false);
   const latestUserContentRef = useRef('');
   const knownUserMessageIdsRef = useRef(new Set<string>());
+  const messagesRef = useRef<Message[]>([]);
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
-  const pendingQuestionAnswerRef = useRef(false);
-  const bufferedQuestionEventsRef = useRef<StreamMessage[]>([]);
 
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
   const onErrorRef = useRef<((err: {
@@ -242,90 +266,64 @@ function App({ assistantAccount = '' }: AppProps) {
     streamingMsgIdRef.current = null;
   }, []);
 
-  const appendMessageFromOperation = useCallback(
-    (
-      messageOperation: SendMessageResponse,
-      insertStrategy: MessageInsertStrategy = 'before-streaming',
-    ) => {
-      const mappedMessage = messageOperationToMessage(messageOperation);
-      if (mappedMessage.role === 'user' && mappedMessage.content.trim()) {
-        latestUserContentRef.current = mappedMessage.content.trim();
-      }
+  const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
+    if (!welinkSessionId || !content.trim()) {
+      return null;
+    }
 
-      setMessages((prev) => {
-        const existingIndex = prev.findIndex((msg) => msg.id === mappedMessage.id);
-        if (existingIndex >= 0) {
-          const next = [...prev];
-          next[existingIndex] = {
-            ...next[existingIndex],
-            ...mappedMessage,
-          };
-          knownUserMessageIdsRef.current = collectUserMessageIds(next);
-          return next;
-        }
+    const trimmedContent = content.trim();
+    latestUserContentRef.current = trimmedContent;
+    const tempId = genMessageId('user');
+    const optimisticMessage: Message = {
+      id: tempId,
+      role: 'user',
+      content: trimmedContent,
+      contentType: 'plain',
+      timestamp: Date.now(),
+      isStreaming: false,
+    };
 
-        if (insertStrategy === 'before-streaming' && mappedMessage.role === 'user' && streamingMsgIdRef.current) {
-          const streamingIndex = prev.findIndex((msg) => msg.id === streamingMsgIdRef.current);
-          if (streamingIndex >= 0) {
-            const next = [
-              ...prev.slice(0, streamingIndex),
-              mappedMessage,
-              ...prev.slice(streamingIndex),
-            ];
-            knownUserMessageIdsRef.current = collectUserMessageIds(next);
-            return next;
-          }
-        }
+    setMessages((prev) => {
+      const next = [
+        ...prev,
+        optimisticMessage,
+      ];
+      knownUserMessageIdsRef.current = collectUserMessageIds(next);
+      return next;
+    });
 
-        const next = [...prev, mappedMessage];
-        knownUserMessageIdsRef.current = collectUserMessageIds(next);
-        return next;
-      });
-    },
-    [],
-  );
+    const result = await sendMessageApi({
+      welinkSessionId,
+      content: trimmedContent,
+      ...(toolCallId ? { toolCallId } : {}),
+    });
+    const mappedMessage = messageOperationToMessage(result);
+
+    setMessages((prev) => {
+      const next = replaceOptimisticMessage(prev, tempId, mappedMessage);
+      knownUserMessageIdsRef.current = collectUserMessageIds(next);
+      return next;
+    });
+
+    return result;
+  }, [welinkSessionId]);
 
   const handleQuestionAnswered = useCallback(async ({
-    partId,
     answer,
     toolCallId,
   }: QuestionAnswerSubmission) => {
-    if (!welinkSessionId) {
-      return;
-    }
-
-    pendingQuestionAnswerRef.current = true;
-    bufferedQuestionEventsRef.current = [];
-    setSessionStatus('busy');
     finalizeStreamingMessage();
+    setSessionStatus('busy');
 
     try {
-      const result = await sendMessageApi({
-        welinkSessionId,
-        content: answer,
-        toolCallId,
-      });
-      setMessages((prev) => markQuestionPartAnswered(prev, partId, answer));
-      appendMessageFromOperation(result, 'append');
-      pendingQuestionAnswerRef.current = false;
-      const bufferedMessages = [...bufferedQuestionEventsRef.current];
-      bufferedQuestionEventsRef.current = [];
-      bufferedMessages.forEach((message) => {
-        onMessageRef.current?.(message);
-      });
+      await sendUserMessage(answer, toolCallId);
     } catch (err) {
-      pendingQuestionAnswerRef.current = false;
-      const bufferedMessages = [...bufferedQuestionEventsRef.current];
-      bufferedQuestionEventsRef.current = [];
-      bufferedMessages.forEach((message) => {
-        onMessageRef.current?.(message);
-      });
       console.error('Failed to submit question answer:', err);
       setSessionStatus('idle');
       showToast('提交回答失败');
       throw err;
     }
-  }, [appendMessageFromOperation, finalizeStreamingMessage, welinkSessionId]);
+  }, [finalizeStreamingMessage, sendUserMessage]);
 
   const loadMoreHistory = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -396,8 +394,6 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccountRef.current = assistantAccount.trim();
     assistantDetailRef.current = null;
     knownUserMessageIdsRef.current.clear();
-    pendingQuestionAnswerRef.current = false;
-    bufferedQuestionEventsRef.current = [];
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
@@ -453,6 +449,7 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
 
   useEffect(() => {
+    messagesRef.current = messages;
     knownUserMessageIdsRef.current = collectUserMessageIds(messages);
   }, [messages]);
 
@@ -490,9 +487,36 @@ function App({ assistantAccount = '' }: AppProps) {
     };
 
     onMessageRef.current = (msg: StreamMessage) => {
-      if (pendingQuestionAnswerRef.current) {
-        bufferedQuestionEventsRef.current.push(msg);
-        return;
+      if (
+        msg.type === 'question'
+        && (msg.status === 'completed' || msg.status === 'error')
+        && !streamingMsgIdRef.current
+      ) {
+        const hasMatchingQuestion = messagesRef.current.some((message) =>
+          message.parts?.some((part) => (
+            part.type === 'question'
+            && (!msg.partId || part.partId === msg.partId)
+            && (!msg.toolCallId || part.toolCallId === msg.toolCallId)
+          )),
+        );
+
+        if (hasMatchingQuestion) {
+          setMessages((prev) => updateLatestQuestionPart(
+            prev,
+            (part) => (
+              (!msg.partId || part.partId === msg.partId)
+              && (!msg.toolCallId || part.toolCallId === msg.toolCallId)
+            ),
+            (part) => ({
+              ...part,
+              answered: true,
+              output: msg.output ?? part.output,
+              status: msg.status === 'completed' || msg.status === 'error' ? msg.status : part.status,
+              isStreaming: false,
+            }),
+          ));
+          return;
+        }
       }
 
       switch (msg.type) {
@@ -741,18 +765,13 @@ function App({ assistantAccount = '' }: AppProps) {
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
 
-    const trimmedContent = content.trim();
     setSessionStatus('busy');
     setFooterMode('generating');
     shouldResetFooterOnCompletionRef.current = true;
     suppressFooterAutoResetRef.current = false;
 
     try {
-      const result = await sendMessageApi({
-        welinkSessionId,
-        content: trimmedContent,
-      });
-      appendMessageFromOperation(result);
+      await sendUserMessage(content);
     } catch (err) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
@@ -760,7 +779,7 @@ function App({ assistantAccount = '' }: AppProps) {
       showToast('发送消息失败');
       console.error('发送消息失败:', err);
     }
-  }, [welinkSessionId, appendMessageFromOperation]);
+  }, [welinkSessionId, sendUserMessage]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -800,8 +819,6 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       const newSession = await createSessionForAssistant(currentAssistantAccount, detail.appKey);
-      pendingQuestionAnswerRef.current = false;
-      bufferedQuestionEventsRef.current = [];
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
     } catch (err) {
@@ -822,8 +839,6 @@ function App({ assistantAccount = '' }: AppProps) {
     suppressFooterAutoResetRef.current = false;
     latestUserContentRef.current = '';
     knownUserMessageIdsRef.current.clear();
-    pendingQuestionAnswerRef.current = false;
-    bufferedQuestionEventsRef.current = [];
 
     setFooterMode('generate');
     setSessionStatus('idle');

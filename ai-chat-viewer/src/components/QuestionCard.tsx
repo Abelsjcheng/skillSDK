@@ -38,19 +38,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const shouldShowInteractiveControls = !readonly || !answered;
 
   const submitAnswer = async (value: string) => {
-    const content = value.trim();
-    if (!content || isLocked || !onAnswered) return;
+    const answer = value.trim();
+    if (!answer || isLocked || !onAnswered) {
+      return;
+    }
 
     setSubmitting(true);
     try {
-      await onAnswered?.({
-        partId: part.partId,
-        answer: content,
+      await onAnswered({
+        answer,
         toolCallId: part.toolCallId,
       });
       setAnswered(true);
-      setSelectedAnswer(content);
-      setCustomInput(content);
+      setSelectedAnswer(answer);
+      setCustomInput(answer);
     } catch (err) {
       console.error('Failed to submit answer:', err);
     } finally {

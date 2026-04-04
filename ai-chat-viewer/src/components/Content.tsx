@@ -142,6 +142,7 @@ export const Content: React.FC<ContentProps> = ({
           <div key={message.id} data-message-id={message.id}>
             <MessageBubble
               message={message}
+              welinkSessionId={welinkSessionId}
               onQuestionAnswered={onQuestionAnswered}
               weAgentUserName={weAgentUserName}
               weAgentUserAvatar={weAgentUserAvatar}

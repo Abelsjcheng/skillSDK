@@ -38,7 +38,6 @@ export interface QuestionOption {
 }
 
 export interface QuestionAnswerSubmission {
-  partId: string;
   answer: string;
   toolCallId?: string;
 }
