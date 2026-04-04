@@ -258,11 +258,12 @@
 .tool-card__title { color: #666; font-size: 12px; }
 .tool-card__status { font-size: 12px; color: #999; }
 .tool-card__chevron {
-  font-size: 10px;
-  color: #999;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
   transition: transform 0.2s;
-  
-  &.expanded { transform: rotate(90deg); }
+
+  &.is-collapsed { transform: rotate(180deg); }
 }
 
 .tool-card__body {
@@ -322,11 +323,12 @@
 .thinking-block__label { font-weight: 500; color: #333; flex: 1; }
 .thinking-block__streaming { font-size: 12px; color: #1890ff; }
 .thinking-block__chevron {
-  font-size: 10px;
-  color: #999;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
   transition: transform 0.2s;
-  
-  &.expanded { transform: rotate(90deg); }
+
+  &.is-collapsed { transform: rotate(180deg); }
 }
 
 .thinking-block__content {
@@ -340,7 +342,6 @@
 // QuestionCard
 .question-card {
   border-radius: 8px;
-  border: 1px solid #1890ff;
   background-color: #e6f7ff;
   padding: 12px;
   margin: 4px 0;
@@ -368,7 +369,7 @@
 
 .question-card__options {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -377,6 +378,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  width: 100%;
   gap: 2px;
   padding: 6px 12px;
   border: 1px solid #1890ff;
@@ -386,14 +388,10 @@
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
+  box-sizing: border-box;
   
   &:hover:not(:disabled) {
-    background-color: #1890ff;
-    color: #fff;
-
-    .question-card__option-desc {
-      color: rgba(255, 255, 255, 0.85);
-    }
+    background-color: rgba(0, 0, 0, 0.05);
   }
 
   &:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -474,8 +472,8 @@
 
 // PermissionCard
 .permission-card {
-  display: inline-block;
-  width: fit-content;
+  display: block;
+  width: 100%;
   max-width: 100%;
   border-radius: 8px;
   border: 1px solid #faad14;
@@ -485,10 +483,6 @@
   box-sizing: border-box;
   
   &--resolved { border-color: #52c41a; background-color: #f6ffed; }
-
-  &--pc {
-    min-width: 414px;
-  }
 }
 
 .permission-card__header {

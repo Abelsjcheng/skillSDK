@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { MessageBubble } from './MessageBubble';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
-import type { Message } from '../types';
+import type { Message, SendMessageResponse } from '../types';
 import '../styles/Content.less';
 
 const TOP_LOAD_THRESHOLD = 24;
@@ -13,6 +13,7 @@ interface ContentProps {
   isLoadingHistory: boolean;
   hasMoreHistory: boolean;
   onLoadMoreHistory: () => void;
+  onQuestionAnswered?: (messageOperation: SendMessageResponse) => void;
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
@@ -26,6 +27,7 @@ export const Content: React.FC<ContentProps> = ({
   isLoadingHistory,
   hasMoreHistory,
   onLoadMoreHistory,
+  onQuestionAnswered,
   weAgentUserName = '',
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
@@ -141,6 +143,7 @@ export const Content: React.FC<ContentProps> = ({
             <MessageBubble
               message={message}
               welinkSessionId={welinkSessionId}
+              onQuestionAnswered={onQuestionAnswered}
               weAgentUserName={weAgentUserName}
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}

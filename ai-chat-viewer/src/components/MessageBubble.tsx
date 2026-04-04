@@ -12,7 +12,7 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
-import type { Message, MessagePart } from '../types';
+import type { Message, MessagePart, SendMessageResponse } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
 import userAvatar from '../imgs/switch-assistant-avatar.svg';
@@ -21,6 +21,7 @@ import 'katex/dist/katex.min.css';
 interface MessageBubbleProps {
   message: Message;
   welinkSessionId: string;
+  onQuestionAnswered?: (messageOperation: SendMessageResponse) => void;
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
@@ -37,9 +38,24 @@ function formatMessageTime(timestamp: number): string {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
+function hasMarkdownCodeBlock(content?: string): boolean {
+  if (typeof content !== 'string' || content.length === 0) {
+    return false;
+  }
+  return /(^|\n)```/.test(content);
+}
+
+function messageContainsCodeBlock(message: Message): boolean {
+  if (message.parts?.some((part) => part.type === 'text' && hasMarkdownCodeBlock(part.content))) {
+    return true;
+  }
+  return hasMarkdownCodeBlock(message.content);
+}
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   welinkSessionId,
+  onQuestionAnswered,
   weAgentUserName = '',
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
@@ -48,6 +64,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
+  const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
 
   const markdownComponents: Components = useMemo(
     () => ({
@@ -81,6 +98,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
+            onAnswered={onQuestionAnswered}
             readonly={isHistoryAssistantReadonly}
           />
         );
@@ -139,6 +157,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
+    if (message.content === '') {
+      return null;
+    }
+
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
       return (
         <>
@@ -157,6 +179,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const messageContent = renderContent();
+  if (messageContent === null) {
+    return null;
+  }
   const messageTimeText = formatMessageTime(message.timestamp || new Date().getTime());
   const userName = weAgentUserName.trim();
   const assistantName = weAgentAssistantName.trim();
@@ -180,7 +205,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </>
           )}
         </div>
-        <div className={`we-agent-message__bubble ${isUser ? 'is-user' : 'is-assistant'}`}>
+        <div
+          className={[
+            'we-agent-message__bubble',
+            isUser ? 'is-user' : 'is-assistant',
+            hasCodeBlock ? 'has-code-block' : '',
+          ].filter(Boolean).join(' ')}
+        >
           <div className="message-content">{messageContent}</div>
         </div>
       </div>

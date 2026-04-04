@@ -5,6 +5,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
+import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { MessagePart } from '../types';
 
 interface ThinkingBlockProps {
@@ -39,9 +40,15 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
         {part.isStreaming && (
           <span className="thinking-block__streaming">思考中...</span>
         )}
-        <span className={`thinking-block__chevron ${expanded ? 'expanded' : ''}`}>
-          ▶
-        </span>
+        <img
+          className={[
+            'thinking-block__chevron',
+            !expanded ? 'is-collapsed' : '',
+          ].filter(Boolean).join(' ')}
+          src={arrowUpIcon}
+          alt=""
+          aria-hidden="true"
+        />
       </div>
 
       {expanded && (

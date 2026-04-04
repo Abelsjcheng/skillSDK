@@ -1,5 +1,8 @@
 .code-block {
   position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   margin-block: 8px;
   overflow: hidden;
   border: 1px solid #eaeaea;
@@ -87,7 +90,17 @@
   margin: 0 !important;
   background: #ffffff !important;
   overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   tab-size: 2;
+
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
 
   pre,
   code,
@@ -99,6 +112,9 @@
   code[class*='language-'] {
     background: #ffffff !important;
     text-shadow: none !important;
+    white-space: pre !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
   }
 }
 

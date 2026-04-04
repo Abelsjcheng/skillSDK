@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { MessagePart } from '../types';
 
 interface ToolCardProps {
@@ -39,9 +40,15 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
           <span className="tool-card__title">{part.title}</span>
         )}
         <span className="tool-card__status">{statusLabel}</span>
-        <span className={`tool-card__chevron ${expanded ? 'expanded' : ''}`}>
-          {'>'}
-        </span>
+        <img
+          className={[
+            'tool-card__chevron',
+            !expanded ? 'is-collapsed' : '',
+          ].filter(Boolean).join(' ')}
+          src={arrowUpIcon}
+          alt=""
+          aria-hidden="true"
+        />
       </div>
 
       {expanded && (

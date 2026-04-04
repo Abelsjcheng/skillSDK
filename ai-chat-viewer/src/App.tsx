@@ -104,6 +104,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
   const [footerMode, setFooterMode] = useState<'generate' | 'generating' | 'regenerate'>('generate');
+  const isOutputting = footerMode === 'generating' || sessionStatus === 'busy';
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
@@ -246,6 +247,10 @@ function App({ assistantAccount = '' }: AppProps) {
     },
     [],
   );
+
+  const handleQuestionAnswered = useCallback((messageOperation: SendMessageResponse) => {
+    appendMessageFromOperation(messageOperation);
+  }, [appendMessageFromOperation]);
 
   const loadMoreHistory = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -699,6 +704,11 @@ function App({ assistantAccount = '' }: AppProps) {
       return;
     }
 
+    if (messages.length === 0) {
+      showToast('当前是最新会话');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -715,7 +725,7 @@ function App({ assistantAccount = '' }: AppProps) {
       showToast('新建会话失败');
       setIsLoading(false);
     }
-  }, [resolveAssistantDetail, createSessionForAssistant]);
+  }, [messages.length, resolveAssistantDetail, createSessionForAssistant]);
 
   const handleSwitchWeAgentSession = useCallback((nextWelinkSessionId: string) => {
     const normalizedSessionId = nextWelinkSessionId.trim();
@@ -755,6 +765,7 @@ function App({ assistantAccount = '' }: AppProps) {
               isLoadingHistory={isLoadingHistory}
               hasMoreHistory={hasMoreHistory}
               onLoadMoreHistory={loadMoreHistory}
+              onQuestionAnswered={handleQuestionAnswered}
               weAgentUserName={weAgentUserName}
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}
@@ -780,6 +791,11 @@ function App({ assistantAccount = '' }: AppProps) {
                 alt=""
               />
             </button>
+            {isOutputting ? (
+              <div className="we-agent-cui-actions__status" aria-live="polite">
+                输出中...
+              </div>
+            ) : null}
             <WeAgentHistorySidebar
               assistantAccount={assistantAccount}
               currentWelinkSessionId={welinkSessionId ?? ''}

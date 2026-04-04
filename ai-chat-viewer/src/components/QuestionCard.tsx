@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { MessagePart } from '../types';
+import type { MessagePart, SendMessageResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { sendMessage } from '../utils/hwext';
 import { showToast } from '../utils/toast';
@@ -7,7 +7,7 @@ import { showToast } from '../utils/toast';
 interface QuestionCardProps {
   part: MessagePart;
   welinkSessionId: string;
-  onAnswered?: () => void;
+  onAnswered?: (messageOperation: SendMessageResponse) => void;
   readonly?: boolean;
 }
 
@@ -47,7 +47,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
     setSubmitting(true);
     try {
-      await sendMessage({
+      const result = await sendMessage({
         welinkSessionId,
         content,
         toolCallId: part.toolCallId,
@@ -55,7 +55,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       setAnswered(true);
       setSelectedAnswer(content);
       setCustomInput(content);
-      onAnswered?.();
+      onAnswered?.(result);
     } catch (err) {
       console.error('Failed to submit answer:', err);
       showToast('提交回答失败');
@@ -81,13 +81,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         <span className="question-card__icon">❓</span>
         {part.question ?? part.content}
       </div>
-
-      {answered && selectedAnswer && (
-        <div className="question-card__result">
-          <span className="question-card__result-label">已回答</span>
-          <div className="question-card__result-content">{selectedAnswer}</div>
-        </div>
-      )}
 
       {part.options && part.options.length > 0 && (
         <div className="question-card__options">
@@ -136,8 +129,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         </div>
       )}
 
-      {answered && !selectedAnswer && (
-        <div className="question-card__status">已回答</div>
+      {answered && selectedAnswer && (
+        <div className="question-card__result">
+          <span className="question-card__result-label">已回答</span>
+          <div className="question-card__result-content">{selectedAnswer}</div>
+        </div>
       )}
     </div>
   );

@@ -143,7 +143,6 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
             fontVariantNumeric: 'tabular-nums',
           }}
           showLineNumbers
-          wrapLongLines
         >
           {code}
         </SyntaxHighlighter>
