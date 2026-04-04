@@ -18,6 +18,7 @@ interface ContentProps {
   weAgentAssistantName?: string;
   weAgentAssistantDescription?: string;
   weAgentAssistantAvatar?: string;
+  enableMarkdownLinkIntercept?: boolean;
 }
 
 export const Content: React.FC<ContentProps> = ({
@@ -31,6 +32,7 @@ export const Content: React.FC<ContentProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantDescription = '',
   weAgentAssistantAvatar = '',
+  enableMarkdownLinkIntercept = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const preservingAnchorRef = useRef<{
@@ -145,6 +147,7 @@ export const Content: React.FC<ContentProps> = ({
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
+              enableMarkdownLinkIntercept={enableMarkdownLinkIntercept}
             />
           </div>
         ))}

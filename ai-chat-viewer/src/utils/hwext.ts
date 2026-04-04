@@ -297,6 +297,10 @@ export function isPcMiniApp(): boolean {
   return false;
 }
 
+export function openUrlViaPedestal(url: string): void {
+  getPedestalOrThrow().callMethod('method://pedestal/openUrl', url);
+}
+
 function tryGetPedestal(): Pedestal | null {
   if (typeof window === 'undefined') return null;
   if (window.Pedestal && typeof window.Pedestal.callMethod === 'function') {

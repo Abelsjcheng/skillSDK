@@ -19,6 +19,7 @@ import {
   getUserInfo,
   getWeAgentDetails,
   isPcMiniApp,
+  openUrlViaPedestal,
   registerSessionListener,
   sendMessage as sendMessageApi,
   stopSkill,
@@ -37,6 +38,7 @@ import {
 } from './utils/message';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import { showToast } from './utils/toast';
+import { isWebUrl } from './utils/markdownLink';
 import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
@@ -115,6 +117,36 @@ function App({ assistantAccount = '' }: AppProps) {
     errorMessage?: string;
   }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
+
+  useEffect(() => {
+    if (!isPc) return;
+
+    const handleMarkdownLinkClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        url: string;
+        text: string;
+        messageId?: string;
+        source?: string;
+      }>;
+
+      customEvent.preventDefault();
+
+      const { url } = customEvent.detail;
+      if (!url) return;
+
+      if (!isWebUrl(url)) {
+        console.log('ignored non-web markdown url:', customEvent.detail);
+        return;
+      }
+
+      openUrlViaPedestal(url);
+    };
+
+    window.addEventListener('ai-chat-viewer:markdown-link-click', handleMarkdownLinkClick);
+    return () => {
+      window.removeEventListener('ai-chat-viewer:markdown-link-click', handleMarkdownLinkClick);
+    };
+  }, [isPc]);
 
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
@@ -694,6 +726,7 @@ function App({ assistantAccount = '' }: AppProps) {
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantDescription={weAgentAssistantDescription}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
+              enableMarkdownLinkIntercept={isPc}
             />
           </div>
 

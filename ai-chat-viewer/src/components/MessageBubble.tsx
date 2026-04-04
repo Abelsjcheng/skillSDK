@@ -14,6 +14,7 @@ import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
 import type { Message, MessagePart } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
+import { handleMarkdownLinkClick } from '../utils/markdownLink';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
 import userAvatar from '../imgs/switch-assistant-avatar.svg';
 import 'katex/dist/katex.min.css';
@@ -25,6 +26,7 @@ interface MessageBubbleProps {
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
+  enableMarkdownLinkIntercept?: boolean;
 }
 
 function formatMessageTime(timestamp: number): string {
@@ -44,6 +46,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
+  enableMarkdownLinkIntercept = false,
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
@@ -51,6 +54,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const markdownComponents: Components = useMemo(
     () => ({
+      ...(enableMarkdownLinkIntercept
+        ? {
+            a({ href, children, ...rest }) {
+              const resolvedHref = typeof href === 'string' ? href : '';
+              const linkText = Array.isArray(children) ? children.join('') : String(children ?? '');
+              return (
+                <a
+                  {...rest}
+                  href={resolvedHref}
+                  data-url={resolvedHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => {
+                    handleMarkdownLinkClick(event, resolvedHref, {
+                      url: resolvedHref,
+                      text: linkText,
+                      messageId: message.id,
+                      source: 'message',
+                    });
+                  }}
+                >
+                  {children}
+                </a>
+              );
+            },
+          }
+        : {}),
       code({ className, children, ...rest }) {
         const match = /language-(\w+)/.exec(className ?? '');
         const codeString = String(children).replace(/\n$/, '');
@@ -64,7 +94,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         );
       },
     }),
-    [],
+    [enableMarkdownLinkIntercept, message.id],
   );
 
   const renderPart = (part: MessagePart) => {
