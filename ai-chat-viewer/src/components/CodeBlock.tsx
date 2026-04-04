@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import chevronIcon from '../imgs/icon-codeblock-chevron.svg';
+import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import copyIcon from '../imgs/icon-copy.svg';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { showToast } from '../utils/toast';
@@ -93,7 +93,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
               'code-block__chevron-icon',
               collapsed ? 'is-collapsed' : '',
             ].filter(Boolean).join(' ')}
-            src={chevronIcon}
+            src={arrowUpIcon}
             alt=""
             aria-hidden="true"
           />

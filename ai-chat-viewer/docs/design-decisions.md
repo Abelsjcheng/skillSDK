@@ -299,6 +299,12 @@ interface CreateDigitalTwinParams {
 3. 页面路由切换不改变原有业务逻辑，只做视图层分发。
 4. `create-assistant-page` 独立打包入口维持现状，用于单页发布场景；与主入口路由方案并存。
 
+## 11.1 WeCodeUrl Host 解析
+
+1. `weCodeUrl` 的 host 提取统一收敛到 `src/utils/hwext.ts`。
+2. 由于业务 URI 存在 `h5://123456/html/index.html` 这类自定义协议地址，host 解析不依赖 `URL.host`，改为通过正则表达式从 `://` 后到下一个 `/` 之前的片段提取。
+3. 解析失败时返回空字符串，后续 `openWeAgentCUI` 参数组装继续走现有兜底逻辑。
+
 ## 12. 激活助理页面设计
 
 1. 页面结构拆分为两段：
@@ -377,7 +383,7 @@ interface CreateDigitalTwinParams {
 6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
    - 用户消息右对齐，头部文案为“测试 + 时间”，右侧头像 `24x24`；
    - 助手消息左对齐，头部文案为“小米 + 时间”，左侧头像 `24x24`；
-   - 用户气泡使用蓝色线性渐变，助手气泡使用白底圆角样式。
+   - 用户气泡使用蓝色线性渐变，助手气泡去除背景、边框与内边距，改为透明承载正文内容，且宽度占满当前消息容器。
 7. 输入区在 `Footer` 增加变体样式支持：
    - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px; background: #fff`；
    - placeholder 固定为“有问题尽管问我~”；
@@ -408,6 +414,9 @@ interface CreateDigitalTwinParams {
 22. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
 23. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。
 24. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
+25. `PermissionCard` 宽度改为按内容自适应收缩，默认不再强制占满消息区域；仅在 PC 端追加最小宽度约束 `min-width: 414px`，移动端保持内容宽度自适应且不引入固定最小宽度。
+26. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。
+27. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
 21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 22. 本地 JSAPI mock 的目标扩展到全部业务页面：`activateAssistant`、`selectAssistant`、`switchAssistant`、`assistantDetail`、`createAssistant`、`weAgentCUI` 都应能在浏览器本地通过 mock 数据直接访问与联动。
 23. mock 环境不单独维护一套伪判端逻辑，端类型判断统一复用 `src/utils/hwext.ts` 中的 `isPcMiniApp`：仅当存在真实或 mock 的 `window.Pedestal.callMethod` 时视为 PC，否则按移动端处理，避免样式和 toast 分流与生产逻辑偏离。

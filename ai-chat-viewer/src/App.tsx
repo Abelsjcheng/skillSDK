@@ -37,7 +37,7 @@ import {
 } from './utils/message';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import { showToast } from './utils/toast';
-import iconWeAgentNewSession from './imgs/icon-we-agent-new-session.svg';
+import createSession from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
 
@@ -48,6 +48,25 @@ export interface AppProps {
 export type AppVariant = 'weAgentCUI';
 
 const HISTORY_PAGE_SIZE = 20;
+
+function collectUserMessageIds(messages: Message[]): Set<string> {
+  return new Set(
+    messages
+      .filter((message) => normalizeRole(message.role) === 'user')
+      .map((message) => message.id),
+  );
+}
+
+function contentTypeForRole(role: Message['role']): NonNullable<Message['contentType']> {
+  switch (role) {
+    case 'assistant':
+      return 'markdown';
+    case 'tool':
+      return 'code';
+    default:
+      return 'plain';
+  }
+}
 
 function buildCorpUserAvatar(corpUserId: string): string {
   const normalizedCorpUserId = corpUserId.trim();
@@ -102,6 +121,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
   const latestUserContentRef = useRef('');
+  const knownUserMessageIdsRef = useRef(new Set<string>());
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
@@ -175,6 +195,7 @@ function App({ assistantAccount = '' }: AppProps) {
           id: genMessageId('assistant_error'),
           role: 'assistant',
           content: normalizedMessage,
+          contentType: 'plain',
           timestamp: Date.now(),
           isStreaming: false,
           parts: [errorPart],
@@ -201,21 +222,26 @@ function App({ assistantAccount = '' }: AppProps) {
             ...next[existingIndex],
             ...mappedMessage,
           };
+          knownUserMessageIdsRef.current = collectUserMessageIds(next);
           return next;
         }
 
         if (mappedMessage.role === 'user' && streamingMsgIdRef.current) {
           const streamingIndex = prev.findIndex((msg) => msg.id === streamingMsgIdRef.current);
           if (streamingIndex >= 0) {
-            return [
+            const next = [
               ...prev.slice(0, streamingIndex),
               mappedMessage,
               ...prev.slice(streamingIndex),
             ];
+            knownUserMessageIdsRef.current = collectUserMessageIds(next);
+            return next;
           }
         }
 
-        return [...prev, mappedMessage];
+        const next = [...prev, mappedMessage];
+        knownUserMessageIdsRef.current = collectUserMessageIds(next);
+        return next;
       });
     },
     [],
@@ -238,7 +264,11 @@ function App({ assistantAccount = '' }: AppProps) {
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
 
       if (olderMessages.length > 0) {
-        setMessages((prev) => [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev]);
+        setMessages((prev) => {
+          const next = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
+          knownUserMessageIdsRef.current = collectUserMessageIds(next);
+          return next;
+        });
       }
 
       nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
@@ -285,6 +315,7 @@ function App({ assistantAccount = '' }: AppProps) {
   useEffect(() => {
     assistantAccountRef.current = assistantAccount.trim();
     assistantDetailRef.current = null;
+    knownUserMessageIdsRef.current.clear();
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
@@ -340,6 +371,10 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
 
   useEffect(() => {
+    knownUserMessageIdsRef.current = collectUserMessageIds(messages);
+  }, [messages]);
+
+  useEffect(() => {
     if (!welinkSessionId) return;
 
     nextBeforeSeqRef.current = null;
@@ -359,6 +394,7 @@ function App({ assistantAccount = '' }: AppProps) {
           isHistory: true,
         }));
         setMessages(mapped);
+        knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
         latestUserContentRef.current = getLatestUserContent(mapped);
 
         nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
@@ -409,6 +445,34 @@ function App({ assistantAccount = '' }: AppProps) {
                 parts: [...currentParts],
               },
             ];
+          });
+          break;
+        }
+
+        case 'message.user': {
+          const messageId = msg.messageId?.trim();
+          if (!messageId || knownUserMessageIdsRef.current.has(messageId)) {
+            break;
+          }
+
+          const content = msg.content ?? '';
+          if (content.trim()) {
+            latestUserContentRef.current = content.trim();
+          }
+
+          setMessages((prev) => {
+            const nextMessage: Message = {
+              id: messageId,
+              role: 'user',
+              content,
+              contentType: 'plain',
+              timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
+              isStreaming: false,
+            };
+
+            const next = [...prev, nextMessage];
+            knownUserMessageIdsRef.current.add(messageId);
+            return next;
           });
           break;
         }
@@ -522,6 +586,7 @@ function App({ assistantAccount = '' }: AppProps) {
               .map((sm) => snapshotMessageToMessage(sm))
               .reverse();
             setMessages(snapshotMessages);
+            knownUserMessageIdsRef.current = collectUserMessageIds(snapshotMessages);
             latestUserContentRef.current = getLatestUserContent(snapshotMessages);
           }
           break;
@@ -535,6 +600,7 @@ function App({ assistantAccount = '' }: AppProps) {
               id,
               role: normalizeRole(msg.role),
               content: '',
+              contentType: contentTypeForRole(normalizeRole(msg.role)),
               timestamp: Date.now(),
               isStreaming: true,
               parts: mapRawParts(msg.parts, true),
@@ -552,7 +618,6 @@ function App({ assistantAccount = '' }: AppProps) {
       const errorCode = err.code ?? (err.errorCode !== undefined ? String(err.errorCode) : 'unknown');
       const errorMessage = err.message ?? err.errorMessage ?? 'unknown error';
       console.error('Session listener error:', `${errorCode}: ${errorMessage}`);
-      showToast('会话监听异常');
     };
 
     onCloseRef.current = (reason) => {
@@ -662,6 +727,7 @@ function App({ assistantAccount = '' }: AppProps) {
     shouldResetFooterOnCompletionRef.current = false;
     suppressFooterAutoResetRef.current = false;
     latestUserContentRef.current = '';
+    knownUserMessageIdsRef.current.clear();
 
     setFooterMode('generate');
     setSessionStatus('idle');
@@ -710,7 +776,7 @@ function App({ assistantAccount = '' }: AppProps) {
             >
               <img
                 className="we-agent-cui-actions__icon"
-                src={iconWeAgentNewSession}
+                src={createSession}
                 alt=""
               />
             </button>

@@ -474,13 +474,21 @@
 
 // PermissionCard
 .permission-card {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
   border-radius: 8px;
   border: 1px solid #faad14;
   background-color: #fffbe6;
   padding: 12px;
   margin: 4px 0;
+  box-sizing: border-box;
   
   &--resolved { border-color: #52c41a; background-color: #f6ffed; }
+
+  &--pc {
+    min-width: 414px;
+  }
 }
 
 .permission-card__header {

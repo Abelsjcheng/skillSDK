@@ -28,9 +28,12 @@
 - `step.done`
 - `session.status`
 - `session.error`
+- `message.user`
 - `error`
 - `snapshot`
 - `streaming`
+
+补充说明：上述消息在进入 `WeAgentCUI` UI 状态时，需一并保留或补齐 `contentType`，避免历史消息、消息漫游消息与实时流式消息在内容类型上不一致。
 
 ### 2.2 类型里定义但当前页面未消费的返回类型
 
@@ -127,6 +130,7 @@
 
 - 标题、列表、表格正常渲染
 - 代码块走 `CodeBlock`
+- 代码块头部折叠箭头资源统一使用 `arrow_up_icon.svg`：展开状态箭头朝上，收缩状态箭头朝下
 - 公式走 `rehype-katex`
 
 ### 校验点
@@ -366,6 +370,7 @@
 - 出现 `PermissionCard`
 - 用户可选“允许 / 始终允许 / 拒绝”
 - 收到 `permission.reply` 后卡片进入已处理态
+- `PermissionCard` 宽度按内容自适应；PC 端最小宽度 `414px`，移动端不设最小宽度
 
 ### 校验点
 

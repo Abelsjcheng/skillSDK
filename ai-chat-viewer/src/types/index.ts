@@ -21,6 +21,7 @@ export type StreamMessageType =
   | 'permission.reply'
   | 'agent.online'
   | 'agent.offline'
+  | 'message.user'
   | 'error'
   | 'snapshot'
   | 'streaming';
@@ -163,6 +164,7 @@ export interface Message {
   id: string;
   role: MessageRole;
   content: string;
+  contentType?: BackendContentType | 'code';
   timestamp: number;
   isStreaming?: boolean;
   isHistory?: boolean;

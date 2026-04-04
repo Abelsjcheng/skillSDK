@@ -71,7 +71,6 @@
 
   .we-agent-message__bubble {
     margin-top: 4px;
-    max-width: calc(100% - 28px);
     word-break: break-word;
     overflow-wrap: break-word;
 
@@ -83,9 +82,13 @@
     }
 
     &.is-assistant {
-      border-radius: 0 24px 24px 24px;
-      padding: 8px;
-      background: #fff;
+      width: 100%;
+      max-width: 100%;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+      box-sizing: border-box;
     }
   }
 

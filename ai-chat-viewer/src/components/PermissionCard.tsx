@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { replyPermission } from '../utils/hwext';
+import { isPcMiniApp, replyPermission } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 
 interface PermissionCardProps {
@@ -41,6 +41,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
   onResolved,
   readonly = false,
 }) => {
+  const isPc = isPcMiniApp();
   const [resolved, setResolved] = useState(Boolean(part.permResolved || getPermissionResponse(part)));
   const [permissionResponse, setPermissionResponse] = useState<PermissionResponse | string | undefined>(
     getPermissionResponse(part),
@@ -82,7 +83,13 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
     : permissionResponse;
 
   return (
-    <div className={`permission-card ${resolved ? 'permission-card--resolved' : ''}`}>
+    <div
+      className={[
+        'permission-card',
+        resolved ? 'permission-card--resolved' : '',
+        isPc ? 'permission-card--pc' : '',
+      ].filter(Boolean).join(' ')}
+    >
       <div className="permission-card__header">
         <span className="permission-card__icon">🔐</span>
         <span className="permission-card__type">{typeLabel}</span>

@@ -78,7 +78,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         <div className="question-card__header">{part.header}</div>
       )}
       <div className="question-card__question">
-        <span className="question-card__icon">?</span>
+        <span className="question-card__icon">❓</span>
         {part.question ?? part.content}
       </div>
 

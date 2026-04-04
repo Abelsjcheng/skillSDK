@@ -613,7 +613,7 @@
    - AI 头像来源：助理详情 `icon` 字段，渲染前按 `host` 规则补全地址。
    - AI 助理名来源：助理详情 `name` 字段。
    - AI 消息时间来源：消息生成时间（当前消息对象的时间戳）。
-   - 消息内容块距第一行 `4px`，圆角 `0 24px 24px 24px`，`padding: 16px`，背景白色。
+   - 消息内容块距第一行 `4px`，宽度占满当前消息容器可用宽度；不再渲染背景色、边框与内边距；容器保持透明，仅承载消息正文内容布局。
 6. 多功能按钮区：
    - 按钮间距 `8px`，按钮背景白色。
    - 按钮 1：新建会话，尺寸 `32px x 32px`，圆角 `20px`，图标 `16px x 16px`，点击事件空实现。
@@ -750,6 +750,7 @@
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
          - 若助理详情 `weCodeUrl` 不为空，则先解析其 host；
+         - `weCodeUrl` 的 host 提取统一通过共享工具层使用正则表达式解析，例如 `h5://123456/html/index.html` 需解析出 host=`123456`；
          - 当 `weCodeUrl.host !== APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `robotId=<detail.robotId>`；
          - 当 `weCodeUrl.host === APP_ID` 时：取助理详情 `weCodeUrl`，并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
          - 若 `weCodeUrl` 为空：使用 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
@@ -782,6 +783,7 @@
             - 处理完成后同步调用 `window.HWH5.close()`。
 7. `openWeAgentCUI` 参数组装规则：
    - 若助理详情 `weCodeUrl` 不为空，则先解析其 host；
+   - `weCodeUrl` 的 host 提取统一通过共享工具层使用正则表达式解析，例如 `h5://123456/html/index.html` 需解析出 host=`123456`；
    - 当 `weCodeUrl.host !== APP_ID` 时，`weAgentUri` 取 `weCodeUrl` 并追加 query `wecodePlace=weAgent` 与 `robotId=<detail.robotId>`；
    - 当 `weCodeUrl.host === APP_ID` 时，`weAgentUri` 取 `weCodeUrl` 并追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；
    - 若 `weCodeUrl` 为空，则 `weAgentUri` 取 `WE_AGENT_BASE_URI` 默认值（`h5://123456/index.html#weAgentCUI`），随后追加 query `wecodePlace=weAgent` 与 `assistantAccount=<partnerAccount>`；

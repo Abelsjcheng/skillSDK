@@ -132,6 +132,10 @@ type MockReplyScenario =
     assistantContent: string;
   }
   | {
+    type: 'message.user';
+    userContent: string;
+  }
+  | {
     type: 'agent.online' | 'agent.offline';
     assistantContent: string;
   };
@@ -601,6 +605,13 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
     return {
       type: 'agent.offline',
       assistantContent: 'An agent.offline event has been emitted. The current page does not render this event yet.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-message-user', 'trigger-message-user', '瑙﹀彂message.user'])) {
+    return {
+      type: 'message.user',
+      userContent: 'This user message was sent from the PC side and synchronized to the current mobile conversation.',
     };
   }
 
@@ -1162,6 +1173,37 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
           partSeq: 2,
         },
       ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'message.user') {
+    scheduleRecordTimer(record, 120, () => {
+      const userMessage = createMessage(
+        sessionId,
+        'user',
+        scenario.userContent,
+        record.nextMessageSeq,
+      );
+      record.nextMessageSeq += 1;
+      upsertSessionRecord(record, userMessage);
+
+      emit(sessionId, {
+        type: 'message.user',
+        role: 'user',
+        messageId: userMessage.id,
+        messageSeq: userMessage.messageSeq,
+        content: userMessage.content,
+        emittedAt: userMessage.createdAt,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
       emit(sessionId, {
         type: 'session.status',
         sessionStatus: 'idle',
