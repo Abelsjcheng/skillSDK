@@ -1,6 +1,22 @@
 import type { GetSessionMessageHistoryResponse } from '../types';
 import type { SkillSession } from './hwext';
 
+export function ensureSessionTimestamps(session: SkillSession): SkillSession {
+  const now = new Date().toISOString();
+  const createdAt = session.createdAt.trim() ? session.createdAt : now;
+  const updatedAt = session.updatedAt.trim() ? session.updatedAt : createdAt;
+
+  if (createdAt === session.createdAt && updatedAt === session.updatedAt) {
+    return session;
+  }
+
+  return {
+    ...session,
+    createdAt,
+    updatedAt,
+  };
+}
+
 export function hasMoreHistoryByCursor(result: GetSessionMessageHistoryResponse): boolean {
   return result.hasMore;
 }

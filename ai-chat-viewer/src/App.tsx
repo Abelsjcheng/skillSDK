@@ -41,6 +41,7 @@ import {
   updateLatestQuestionPart,
 } from './utils/message';
 import {
+  ensureSessionTimestamps,
   getLatestAvailableSessionByUpdatedAt,
   hasMoreHistoryByCursor,
 } from './utils/session';
@@ -823,7 +824,9 @@ function App({ assistantAccount = '' }: AppProps) {
         detail = await resolveAssistantDetail(currentAssistantAccount);
       }
 
-      const newSession = await createSessionForAssistant(currentAssistantAccount, detail.appKey);
+      const newSession = ensureSessionTimestamps(
+        await createSessionForAssistant(currentAssistantAccount, detail.appKey),
+      );
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
       setHistorySessionsCache((prev) => {
