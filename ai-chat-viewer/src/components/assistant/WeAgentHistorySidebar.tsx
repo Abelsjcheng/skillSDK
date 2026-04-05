@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
@@ -16,12 +16,15 @@ interface HistorySessionGroup {
 interface WeAgentHistorySidebarProps {
   assistantAccount?: string;
   currentWelinkSessionId?: string;
+  cachedSessions?: SkillSession[];
+  historyLoaded?: boolean;
+  onHistoryLoaded?: (sessions: SkillSession[]) => void;
   onSessionSelect?: (welinkSessionId: string) => void;
   onVisibilityChange?: (visible: boolean) => void;
 }
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
-const HISTORY_SIDEBAR_ANIMATION_DURATION = 320;
+const HISTORY_SIDEBAR_ANIMATION_DURATION = 500;
 const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
   { key: 'today', label: '今天' },
   { key: 'yesterday', label: '昨天' },
@@ -82,6 +85,9 @@ function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessi
 const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   assistantAccount = '',
   currentWelinkSessionId = '',
+  cachedSessions = [],
+  historyLoaded = false,
+  onHistoryLoaded,
   onSessionSelect,
   onVisibilityChange,
 }) => {
@@ -107,6 +113,14 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     setIsLoading(false);
     setHistorySessions([]);
   }, [assistantAccount]);
+
+  useEffect(() => {
+    if (historyLoaded) {
+      setHistorySessions(cachedSessions);
+      return;
+    }
+    setHistorySessions([]);
+  }, [cachedSessions, historyLoaded]);
 
   useEffect(() => {
     onVisibilityChange?.(shouldRenderSidebar);
@@ -152,6 +166,10 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     }
 
     openSidebar();
+    if (historyLoaded) {
+      setHistorySessions(cachedSessions);
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -162,6 +180,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       const result = await getHistorySessionsList(params);
       const sessions = Array.isArray(result.content) ? result.content : [];
       setHistorySessions(sessions);
+      onHistoryLoaded?.(sessions);
     } catch (error) {
       console.error('Failed to load history sessions:', error);
       showToast('获取历史会话失败');
@@ -169,7 +188,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [assistantAccount, closeSidebar, isVisible, openSidebar, shouldRenderSidebar]);
+  }, [assistantAccount, cachedSessions, closeSidebar, historyLoaded, isVisible, onHistoryLoaded, openSidebar, shouldRenderSidebar]);
 
   const handleClose = useCallback(() => {
     closeSidebar();

@@ -10,12 +10,6 @@ import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { MessagePart } from '../types';
 import { createMarkdownComponents } from './markdownComponents';
 
-const STREAMING_CURSOR_HTML = '<span class="streaming-cursor"></span>';
-
-function withStreamingCursor(content: string, isStreaming: boolean): string {
-  return isStreaming ? `${content}${STREAMING_CURSOR_HTML}` : content;
-}
-
 interface ThinkingBlockProps {
   part: MessagePart;
 }
@@ -64,7 +58,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
             rehypePlugins={[rehypeRaw, rehypeKatex]}
             components={markdownComponents.current}
           >
-            {withStreamingCursor(part.content, part.isStreaming)}
+            {part.content}
           </ReactMarkdown>
         </div>
       )}

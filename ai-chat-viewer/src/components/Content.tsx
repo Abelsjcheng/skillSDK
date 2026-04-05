@@ -10,7 +10,6 @@ const BOTTOM_AUTO_SCROLL_THRESHOLD = 24;
 interface ContentProps {
   messages: Message[];
   welinkSessionId: string;
-  isLoading: boolean;
   isLoadingHistory: boolean;
   hasMoreHistory: boolean;
   onLoadMoreHistory: () => void;

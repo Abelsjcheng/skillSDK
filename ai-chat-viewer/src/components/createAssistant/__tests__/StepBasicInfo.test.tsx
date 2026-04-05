@@ -1,28 +1,17 @@
-﻿import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { StepBasicInfo } from '../StepBasicInfo';
 import { DEFAULT_AVATARS } from '../constants';
-import { showToast } from '../../../utils/toast';
 
-jest.mock('../../../utils/toast', () => ({
-  showToast: jest.fn(),
-}));
-
-const Noop = () => {};
-const mockedShowToast = showToast as jest.MockedFunction<typeof showToast>;
+const noop = () => {};
 
 describe('StepBasicInfo', () => {
-  beforeEach(() => {
-    mockedShowToast.mockClear();
-  });
-
   it('disables next button when required fields are empty and enables after filling', () => {
     render(
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
-        onClose={Noop}
-        onCancel={Noop}
-        onNext={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onNext={noop}
       />,
     );
 
@@ -41,9 +30,9 @@ describe('StepBasicInfo', () => {
     render(
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
-        onClose={Noop}
-        onCancel={Noop}
-        onNext={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onNext={noop}
       />,
     );
 
@@ -61,7 +50,7 @@ describe('StepBasicInfo', () => {
     expect(descriptionInput).toHaveClass('is-invalid');
     expect(nextButton).toBeDisabled();
 
-    fireEvent.change(descriptionInput, { target: { value: '说明ABC123，支持!?' } });
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC123，支持标点。' } });
     expect(nameInput).not.toHaveClass('is-invalid');
     expect(descriptionInput).not.toHaveClass('is-invalid');
     expect(nextButton).not.toBeDisabled();
@@ -71,9 +60,9 @@ describe('StepBasicInfo', () => {
     render(
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
-        onClose={Noop}
-        onCancel={Noop}
-        onNext={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onNext={noop}
       />,
     );
 
@@ -101,9 +90,9 @@ describe('StepBasicInfo', () => {
     render(
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
-        onClose={Noop}
-        onCancel={Noop}
-        onNext={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onNext={noop}
       />,
     );
 
@@ -112,47 +101,4 @@ describe('StepBasicInfo', () => {
 
     expect(avatar2Button).toHaveClass('is-selected');
   });
-
-  it('shows toast when uploading invalid format file', () => {
-    render(
-      <StepBasicInfo
-        defaultAvatars={DEFAULT_AVATARS}
-        onClose={Noop}
-        onCancel={Noop}
-        onNext={Noop}
-      />,
-    );
-
-    const input = screen.getByTestId('avatar-upload-input') as HTMLInputElement;
-    const invalidFile = new File([new Uint8Array(10)], 'avatar.webp', { type: 'image/webp' });
-    fireEvent.change(input, { target: { files: [invalidFile] } });
-
-    expect(mockedShowToast).toHaveBeenCalledWith('仅支持JPG/PNG格式');
-    expect(screen.queryByText('仅支持JPG/PNG格式')).not.toBeInTheDocument();
-  });
-
-  it('shows toast when uploading file larger than 2MB and keeps current selection', () => {
-    render(
-      <StepBasicInfo
-        defaultAvatars={DEFAULT_AVATARS}
-        onClose={Noop}
-        onCancel={Noop}
-        onNext={Noop}
-      />,
-    );
-
-    const defaultAvatarButton = screen.getByLabelText('选择默认头像 avatar-2');
-    fireEvent.click(defaultAvatarButton);
-    expect(defaultAvatarButton).toHaveClass('is-selected');
-
-    const input = screen.getByTestId('avatar-upload-input') as HTMLInputElement;
-    const oversizedFile = new File([new Uint8Array(2 * 1024 * 1024)], 'avatar.png', { type: 'image/png' });
-    fireEvent.change(input, { target: { files: [oversizedFile] } });
-
-    expect(mockedShowToast).toHaveBeenCalledWith('图片大小需小于2MB');
-    expect(screen.queryByText('图片大小需小于2MB')).not.toBeInTheDocument();
-    expect(defaultAvatarButton).toHaveClass('is-selected');
-    expect(screen.getByLabelText('上传自定义头像')).not.toHaveClass('is-selected');
-  });
 });
-

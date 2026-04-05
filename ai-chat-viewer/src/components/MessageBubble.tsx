@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -52,13 +52,49 @@ function messageContainsCodeBlock(message: Message): boolean {
   }
   return hasMarkdownCodeBlock(message.content);
 }
+
+function hasVisibleText(value?: string): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function shouldRenderPart(part: MessagePart): boolean {
+  switch (part.type) {
+    case 'text':
+    case 'thinking':
+    case 'error':
+      return hasVisibleText(part.content);
+    case 'tool':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.toolName)
+        || hasVisibleText(part.title)
+        || hasVisibleText(part.output)
+        || hasVisibleText(part.error)
+        || Boolean(part.input)
+        || Boolean(part.status);
+    case 'question':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.header)
+        || hasVisibleText(part.question)
+        || Boolean(part.options?.length)
+        || hasVisibleText(part.output)
+        || Boolean(part.answered);
+    case 'permission':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.permType)
+        || hasVisibleText(part.permissionId)
+        || hasVisibleText(part.response)
+        || Boolean(part.permResolved);
+    case 'file':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.fileName)
+        || hasVisibleText(part.fileUrl);
+    default:
+      return hasVisibleText(part.content);
+  }
+}
+
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
 const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
-const STREAMING_CURSOR_HTML = '<span class="streaming-cursor"></span>';
-
-function withStreamingCursor(content: string, isStreaming?: boolean): string {
-  return isStreaming ? `${content}${STREAMING_CURSOR_HTML}` : content;
-}
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -80,13 +116,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     [],
   );
 
-  const renderMarkdown = (content: string, isStreaming?: boolean) => (
+  const renderMarkdown = (content: string) => (
     <ReactMarkdown
       remarkPlugins={MARKDOWN_REMARK_PLUGINS}
       rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
       components={markdownComponents}
     >
-      {withStreamingCursor(content, isStreaming)}
+      {content}
     </ReactMarkdown>
   );
 
@@ -121,13 +157,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       case 'file':
         return (
           <div key={part.partId} className="file-part">
-            <span className="file-part__icon">馃搸</span>
+            <span className="file-part__icon">附件</span>
             {part.fileUrl ? (
               <a href={part.fileUrl} target="_blank" rel="noopener noreferrer">
-                {part.fileName ?? '鏂囦欢'}
+                {part.fileName ?? '文件'}
               </a>
             ) : (
-              <span>{part.fileName ?? '鏂囦欢'}</span>
+              <span>{part.fileName ?? '文件'}</span>
             )}
           </div>
         );
@@ -139,7 +175,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       default:
         return (
           <div key={part.partId} className="text-part">
-            {renderMarkdown(part.content, part.isStreaming)}
+            {renderMarkdown(part.content)}
           </div>
         );
     }
@@ -155,7 +191,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    const normalizedParts = message.parts ? syncToolCallIdForQuestionParts(message.parts) : undefined;
+    const normalizedParts = message.parts
+      ? syncToolCallIdForQuestionParts(message.parts).filter(shouldRenderPart)
+      : undefined;
     if (normalizedParts && normalizedParts.length > 0) {
       return (
         <div className="message-parts">
@@ -169,7 +207,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content, message.isStreaming);
+      return renderMarkdown(message.content);
     }
     return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
   };

@@ -34,6 +34,86 @@ export function normalizeRole(role: unknown): MessageRole {
   return 'assistant';
 }
 
+export function collectUserMessageIds(messages: Message[]): Set<string> {
+  return new Set(
+    messages
+      .filter((message) => normalizeRole(message.role) === 'user')
+      .map((message) => message.id),
+  );
+}
+
+export function contentTypeForRole(role: Message['role']): NonNullable<Message['contentType']> {
+  switch (role) {
+    case 'assistant':
+      return 'markdown';
+    case 'tool':
+      return 'code';
+    default:
+      return 'plain';
+  }
+}
+
+export function replaceOptimisticMessage(
+  messages: Message[],
+  tempId: string,
+  resolvedMessage: Message,
+): Message[] {
+  const tempIndex = messages.findIndex((message) => message.id === tempId);
+  const resolvedIndex = messages.findIndex((message) => message.id === resolvedMessage.id);
+
+  if (resolvedIndex >= 0) {
+    const next = [...messages];
+    next[resolvedIndex] = {
+      ...next[resolvedIndex],
+      ...resolvedMessage,
+    };
+    if (tempIndex >= 0 && tempIndex !== resolvedIndex) {
+      next.splice(tempIndex, 1);
+    }
+    return next;
+  }
+
+  if (tempIndex >= 0) {
+    const next = [...messages];
+    next[tempIndex] = resolvedMessage;
+    return next;
+  }
+
+  return [...messages, resolvedMessage];
+}
+
+export function updateLatestQuestionPart(
+  messages: Message[],
+  matcher: (part: MessagePart) => boolean,
+  updater: (part: MessagePart) => MessagePart,
+): Message[] {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex];
+    if (!message.parts || message.parts.length === 0) {
+      continue;
+    }
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+      if (part.type !== 'question' || !matcher(part)) {
+        continue;
+      }
+
+      const nextMessages = [...messages];
+      const nextParts = [...message.parts];
+      nextParts[partIndex] = updater(part);
+      nextMessages[messageIndex] = {
+        ...message,
+        isStreaming: false,
+        parts: nextParts,
+      };
+      return nextMessages;
+    }
+  }
+
+  return messages;
+}
+
 function normalizePartStatus(status: unknown): MessagePart['status'] | undefined {
   if (typeof status !== 'string') {
     return undefined;

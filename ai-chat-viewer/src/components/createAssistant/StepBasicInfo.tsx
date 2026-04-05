@@ -1,4 +1,4 @@
-﻿import React, { ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, GetFilePathResult, UploadTinyImageResult } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
@@ -74,7 +74,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       }) as GetFilePathResult
       handleAvatarUpload(fileResult)
     } catch (error) {
-      console.error();
+      console.error('chooseImage failed in StepBasicInfo:', error);
     }
   }, []);
 

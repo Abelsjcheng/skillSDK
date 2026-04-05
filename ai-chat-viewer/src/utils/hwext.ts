@@ -11,7 +11,6 @@ import type {
 } from '../types';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
 import { APP_ID } from '../constants';
-import { showToast } from './toast';
 
 export interface HWH5EXTError {
   code?: string;

@@ -4,6 +4,7 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import copyIcon from '../imgs/icon-copy.svg';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
+import { copyTextToClipboard } from '../utils/clipboard';
 import { showToast } from '../utils/toast';
 import '../styles/CodeBlock.less';
 
@@ -30,40 +31,24 @@ function normalizeLanguage(language?: string): string {
   return aliasMap[normalized] ?? normalized;
 }
 
-function copyText(text: string): Promise<void> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-
-  return new Promise((resolve, reject) => {
-    try {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
-
 export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCopy = useCallback(() => {
-    void copyText(code).then(() => {
-      showToast('复制成功');
-      setCopied(true);
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    });
+    void copyTextToClipboard(code)
+      .then(() => {
+        showToast('复制成功');
+        setCopied(true);
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+        }
+        timerRef.current = setTimeout(() => setCopied(false), 2000);
+      })
+      .catch((error) => {
+        console.error('copyTextToClipboard failed in CodeBlock:', error);
+      });
   }, [code]);
 
   useEffect(() => () => {
