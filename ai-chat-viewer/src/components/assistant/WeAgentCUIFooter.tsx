@@ -1,4 +1,4 @@
-import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import React, { DragEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import send_icon from '../../imgs/send_icon.svg';
 import stop_icon from '../../imgs/stop_icon.svg';
 import check_icon from '../../imgs/check.svg';
@@ -13,6 +13,18 @@ interface WeAgentCUIFooterProps {
   onSend: (message: string) => void;
   onStop: () => void;
   leftActions?: React.ReactNode;
+}
+
+function containsDraggedFiles(dataTransfer: DataTransfer | null): boolean {
+  if (!dataTransfer) {
+    return false;
+  }
+
+  if (dataTransfer.files.length > 0) {
+    return true;
+  }
+
+  return Array.from(dataTransfer.types).includes('Files');
 }
 
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
@@ -102,6 +114,31 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     setIsShortcutPopupOpen(false);
   };
 
+  const handlePcFileDragEnter = (event: DragEvent<HTMLTextAreaElement>) => {
+    if (!containsDraggedFiles(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+  };
+
+  const handlePcFileDragOver = (event: DragEvent<HTMLTextAreaElement>) => {
+    if (!containsDraggedFiles(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+  };
+
+  const handlePcFileDrop = (event: DragEvent<HTMLTextAreaElement>) => {
+    if (!containsDraggedFiles(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   if (!isPcMiniApp) {
     return (
       <div className="we-agent-cui-footer">
@@ -151,6 +188,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         placeholder="有问题尽管问我~"
         value={value}
         onChange={(event) => setValue(event.target.value)}
+        onDragEnter={handlePcFileDragEnter}
+        onDragOver={handlePcFileDragOver}
+        onDrop={handlePcFileDrop}
         onKeyDown={handlePcKeyDown}
         rows={1}
       />
