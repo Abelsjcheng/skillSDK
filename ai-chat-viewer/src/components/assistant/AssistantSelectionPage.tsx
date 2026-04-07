@@ -5,15 +5,9 @@ import {
   dispatchSwitchAssistantSelectEvent,
 } from '../../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
+import AssistantCardList from './AssistantCardList';
 import AssistantPageHeader from './AssistantPageHeader';
-
-export interface AssistantItem {
-  id: string;
-  name: string;
-  tag: string;
-  description: string;
-  icon?: string;
-}
+import type { AssistantItem } from '../../types/assistant';
 
 interface AssistantSelectionPageProps {
   title: string;
@@ -76,15 +70,6 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
     onSelectAssistant?.(assistantId);
   };
 
-  const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-
-    event.preventDefault();
-    handleSelectAssistant(assistantId);
-  };
-
   return (
     <div
       className="switch-assistant"
@@ -97,39 +82,11 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
       <AssistantPageHeader title={title} isPcMiniApp={isPcMiniApp} onService={onService} />
 
       <main className="switch-assistant__content">
-        <div className="switch-assistant__list">
-          {assistantList.map((assistant) => (
-            <article
-              key={assistant.id}
-              className={`switch-assistant__card${
-                currentSelectedAssistantId === assistant.id ? ' switch-assistant__card--selected' : ''
-              }`}
-              onClick={() => handleSelectAssistant(assistant.id)}
-              onKeyDown={(event) => handleAssistantKeyDown(event, assistant.id)}
-              tabIndex={0}
-              role="button"
-              aria-pressed={currentSelectedAssistantId === assistant.id}
-            >
-              <div className="switch-assistant__avatar">
-                {assistant.icon ? (
-                  <img
-                    src={assistant.icon}
-                    alt=""
-                    className="switch-assistant__avatar-img"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </div>
-              <div className="switch-assistant__desc">
-                <div className="switch-assistant__desc-row">
-                  <span className="switch-assistant__name">{assistant.name}</span>
-                  {assistant.tag ? <span className="switch-assistant__tag">{assistant.tag}</span> : null}
-                </div>
-                <p className="switch-assistant__summary">{assistant.description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+        <AssistantCardList
+          assistants={assistantList}
+          selectedAssistantId={currentSelectedAssistantId}
+          onSelectAssistant={handleSelectAssistant}
+        />
       </main>
 
       <footer className="switch-assistant__actions">

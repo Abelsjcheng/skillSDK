@@ -1,0 +1,77 @@
+import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
+import type { AssistantItem } from '../types/assistant';
+import { resolveAssistantTag } from './assistantTag';
+import {
+  buildOpenWeAgentCUIParams,
+  getWeAgentDetails,
+  openWeAgentCUI,
+  resolveRobotIdForOpenWeAgentCUI,
+  resolveWeCodeUrlForOpenWeAgentCUI,
+  type WeAgentListItem,
+} from './hwext';
+
+export const DEFAULT_ASSISTANT_LIST_QUERY = {
+  pageSize: 20,
+  pageNumber: 1,
+};
+
+export function mapWeAgentListToAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
+  return list.map((assistant) => ({
+    id: assistant.partnerAccount,
+    name: assistant.name ?? '',
+    tag: resolveAssistantTag(assistant),
+    description: assistant.description ?? '',
+    icon: resolveAssistantIconUrl(assistant.icon),
+  }));
+}
+
+export function resolveSelectableAssistantId(
+  list: WeAgentListItem[],
+  currentAssistantId: string,
+  ...fallbackAssistantIds: Array<string | undefined>
+): string {
+  const availableAssistantIds = new Set(list.map((assistant) => assistant.partnerAccount));
+
+  if (availableAssistantIds.has(currentAssistantId)) {
+    return currentAssistantId;
+  }
+
+  for (const fallbackAssistantId of fallbackAssistantIds) {
+    if (fallbackAssistantId && availableAssistantIds.has(fallbackAssistantId)) {
+      return fallbackAssistantId;
+    }
+  }
+
+  return '';
+}
+
+export async function openAssistantByPartnerAccount(
+  assistantList: WeAgentListItem[],
+  partnerAccount: string,
+): Promise<boolean> {
+  if (!partnerAccount) {
+    return false;
+  }
+
+  const selectedAssistant = assistantList.find(
+    (assistant) => assistant.partnerAccount === partnerAccount,
+  );
+  const detailResult = await getWeAgentDetails({ partnerAccount });
+  const detail = detailResult?.WeAgentDetailsArray?.[0];
+  if (!detail) {
+    console.warn('No we-agent detail found for partnerAccount:', partnerAccount);
+    return false;
+  }
+
+  const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
+  const robotId = resolveRobotIdForOpenWeAgentCUI({
+    detailRobotId: detail.robotId,
+    listRobotId: selectedAssistant?.robotId,
+  });
+  const params = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
+    bizRobotId: detail.bizRobotId,
+    robotId,
+  });
+  await openWeAgentCUI(params);
+  return true;
+}

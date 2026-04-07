@@ -25,7 +25,7 @@ interface WeAgentHistorySidebarProps {
 }
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
-const HISTORY_SIDEBAR_ANIMATION_DURATION = 500;
+const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
 const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
   { key: 'today', label: '今天' },
   { key: 'yesterday', label: '昨天' },

@@ -1,30 +1,27 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
-import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
+import AssistantCardList from '../components/assistant/AssistantCardList';
+import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
+import type { AssistantItem } from '../types/assistant';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
-import { resolveAssistantTag } from '../utils/assistantTag';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import {
+  DEFAULT_ASSISTANT_LIST_QUERY,
+  mapWeAgentListToAssistantItems,
+  openAssistantByPartnerAccount,
+  resolveSelectableAssistantId,
+} from '../utils/assistantSelection';
+import {
   buildCustomerServiceWebviewUri,
-  buildOpenWeAgentCUIParams,
-  getWeAgentDetails,
   getWeAgentList,
   isPcMiniApp,
   MOCK_CUSTOMER_SERVICE_SOURCE_URL,
   openH5Webview,
-  openWeAgentCUI,
-  resolveRobotIdForOpenWeAgentCUI,
-  resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 
-const DEFAULT_LIST_QUERY = {
-  pageSize: 20,
-  pageNumber: 1,
-};
 const CREATE_ASSISTANT_ROUTE = '/createAssistant';
 
 function buildCreateAssistantSearch(): string {
@@ -34,32 +31,23 @@ function buildCreateAssistantSearch(): string {
   return `?${params.toString()}`;
 }
 
-function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
-  return list.map((assistant) => ({
-    id: assistant.partnerAccount,
-    name: assistant.name ?? '',
-    tag: resolveAssistantTag(assistant),
-    description: assistant.description ?? '',
-    icon: resolveAssistantIconUrl(assistant.icon),
-  }));
-}
-
 const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
   const navigate = useNavigate();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 
-  const assistantItems = useMemo(() => toAssistantItems(assistantList), [assistantList]);
+  const assistantItems = useMemo<AssistantItem[]>(
+    () => mapWeAgentListToAssistantItems(assistantList),
+    [assistantList],
+  );
 
   const loadAssistantList = useCallback(async (): Promise<void> => {
     try {
-      const result = await getWeAgentList(DEFAULT_LIST_QUERY);
+      const result = await getWeAgentList(DEFAULT_ASSISTANT_LIST_QUERY);
       const list = result && Array.isArray(result.content) ? result.content : [];
       setAssistantList(list);
-      setSelectedAssistantId((current) => (
-        list.some((assistant) => assistant.partnerAccount === current) ? current : ''
-      ));
+      setSelectedAssistantId((current) => resolveSelectableAssistantId(list, current));
     } catch (error) {
       console.error('getWeAgentList failed in SelectAssistant:', error);
       showToast('获取助理列表失败');
@@ -93,40 +81,16 @@ const SelectAssistant: React.FC = () => {
     if (!selectedAssistantId) return;
 
     try {
-      const selectedAssistant = assistantList.find(
-        (assistant) => assistant.partnerAccount === selectedAssistantId,
-      );
-      const detailResult = await getWeAgentDetails({ partnerAccount: selectedAssistantId });
-      const detail = detailResult?.WeAgentDetailsArray?.[0];
-      if (!detail) {
-        console.warn('No we-agent detail found for partnerAccount:', selectedAssistantId);
+      const opened = await openAssistantByPartnerAccount(assistantList, selectedAssistantId);
+      if (!opened) {
         return;
       }
-      const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, selectedAssistantId);
-      const robotId = resolveRobotIdForOpenWeAgentCUI({
-        detailRobotId: detail.robotId,
-        listRobotId: selectedAssistant?.robotId,
-      });
-      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedAssistantId, {
-        bizRobotId: detail.bizRobotId,
-        robotId,
-      });
-      await openWeAgentCUI(params);
       window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in SelectAssistant:', error);
       showToast('打开助理失败');
     }
   }, [assistantList, selectedAssistantId]);
-
-  const handleAssistantKeyDown = (event: React.KeyboardEvent<HTMLElement>, assistantId: string) => {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-
-    event.preventDefault();
-    setSelectedAssistantId(assistantId);
-  };
 
   const handleServiceClick = useCallback(() => {
     openH5Webview({
@@ -160,39 +124,11 @@ const SelectAssistant: React.FC = () => {
         </header>
 
         <main className="start-assistant__content">
-          <div className="switch-assistant__list">
-            {assistantItems.map((assistant) => (
-              <article
-                key={assistant.id}
-                className={`switch-assistant__card${
-                  selectedAssistantId === assistant.id ? ' switch-assistant__card--selected' : ''
-                }`}
-                onClick={() => setSelectedAssistantId(assistant.id)}
-                onKeyDown={(event) => handleAssistantKeyDown(event, assistant.id)}
-                tabIndex={0}
-                role="button"
-                aria-pressed={selectedAssistantId === assistant.id}
-              >
-                <div className="switch-assistant__avatar">
-                  {assistant.icon ? (
-                    <img
-                      src={assistant.icon}
-                      alt=""
-                      className="switch-assistant__avatar-img"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </div>
-                <div className="switch-assistant__desc">
-                  <div className="switch-assistant__desc-row">
-                    <span className="switch-assistant__name">{assistant.name}</span>
-                    {assistant.tag ? <span className="switch-assistant__tag">{assistant.tag}</span> : null}
-                  </div>
-                  <p className="switch-assistant__summary">{assistant.description}</p>
-                </div>
-              </article>
-            ))}
-          </div>
+          <AssistantCardList
+            assistants={assistantItems}
+            selectedAssistantId={selectedAssistantId}
+            onSelectAssistant={setSelectedAssistantId}
+          />
         </main>
 
         <footer className="start-assistant__actions">
