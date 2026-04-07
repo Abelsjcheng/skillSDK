@@ -97,6 +97,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchRequestIdRef = useRef(0);
 
   const groupedHistorySessions = useMemo(
     () => groupHistorySessionsByUpdatedAt(historySessions),
@@ -144,6 +145,46 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     });
   }, []);
 
+  const refreshHistorySessions = useCallback(async (showLoading: boolean) => {
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
+    try {
+      const currentAssistantAccount = assistantAccount.trim();
+      const params = currentAssistantAccount
+        ? { assistantAccount: currentAssistantAccount, businessSessionDomain: 'miniapp' as const }
+        : { businessSessionDomain: 'miniapp' as const };
+      const result = await getHistorySessionsList(params);
+
+      if (fetchRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      const sessions = Array.isArray(result.content) ? result.content : [];
+      setHistorySessions(sessions);
+      onHistoryLoaded?.(sessions);
+    } catch (error) {
+      if (fetchRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      console.error('Failed to load history sessions:', error);
+      showToast('获取历史会话失败');
+
+      if (showLoading) {
+        setHistorySessions([]);
+      }
+    } finally {
+      if (fetchRequestIdRef.current === requestId && showLoading) {
+        setIsLoading(false);
+      }
+    }
+  }, [assistantAccount, onHistoryLoaded]);
+
   const closeSidebar = useCallback(() => {
     if (!shouldRenderSidebar) {
       return;
@@ -166,29 +207,16 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     }
 
     openSidebar();
-    if (historyLoaded) {
+
+    if (cachedSessions.length > 0) {
       setHistorySessions(cachedSessions);
+      setIsLoading(false);
+      void refreshHistorySessions(false);
       return;
     }
-    setIsLoading(true);
 
-    try {
-      const currentAssistantAccount = assistantAccount.trim();
-      const params = currentAssistantAccount
-        ? { assistantAccount: currentAssistantAccount, businessSessionDomain: 'miniapp' as const }
-        : { businessSessionDomain: 'miniapp' as const };
-      const result = await getHistorySessionsList(params);
-      const sessions = Array.isArray(result.content) ? result.content : [];
-      setHistorySessions(sessions);
-      onHistoryLoaded?.(sessions);
-    } catch (error) {
-      console.error('Failed to load history sessions:', error);
-      showToast('获取历史会话失败');
-      setHistorySessions([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [assistantAccount, cachedSessions, closeSidebar, historyLoaded, isVisible, onHistoryLoaded, openSidebar, shouldRenderSidebar]);
+    void refreshHistorySessions(true);
+  }, [cachedSessions, closeSidebar, isVisible, openSidebar, refreshHistorySessions, shouldRenderSidebar]);
 
   const handleClose = useCallback(() => {
     closeSidebar();
