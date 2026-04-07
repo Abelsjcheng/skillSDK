@@ -123,8 +123,8 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   }, [cachedSessions, historyLoaded]);
 
   useEffect(() => {
-    onVisibilityChange?.(shouldRenderSidebar);
-  }, [onVisibilityChange, shouldRenderSidebar]);
+    onVisibilityChange?.(isVisible);
+  }, [isVisible, onVisibilityChange]);
 
   useEffect(() => () => {
     if (closeTimerRef.current) {

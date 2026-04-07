@@ -78,6 +78,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
   const [historySessionsCache, setHistorySessionsCache] = useState<SkillSession[] | null>(null);
   const [historySessionsLoaded, setHistorySessionsLoaded] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -101,6 +102,28 @@ function App({ assistantAccount = '' }: AppProps) {
     errorMessage?: string;
   }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
+
+  useEffect(() => {
+    if (isPc) {
+      setKeyboardHeight(0);
+      return;
+    }
+
+    if (typeof window === 'undefined' || typeof window.HWH5?.onKeyboardHeightChane !== 'function') {
+      return;
+    }
+
+    const handleKeyboardHeightChange = (res: { height: number }) => {
+      const nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
+      setKeyboardHeight(nextHeight > 0 ? nextHeight : 0);
+    };
+
+    window.HWH5.onKeyboardHeightChane(handleKeyboardHeightChange);
+
+    return () => {
+      window.HWH5?.offKeyboardHeightChane?.();
+    };
+  }, [isPc]);
 
   const ensurePendingAssistantMessage = useCallback(() => {
     if (streamingMsgIdRef.current) {
@@ -887,49 +910,54 @@ function App({ assistantAccount = '' }: AppProps) {
             />
           </div>
 
-          <div className="we-agent-cui-actions" aria-label="多功能按钮区">
-            <button
-              type="button"
-              className="we-agent-cui-actions__button"
-              onClick={(event) => {
-                runButtonClickWithDebounce(event, () => {
-                  void handleCreateSession();
-                });
-              }}
-              aria-label="新建会话"
-            >
-              <img
-                className="we-agent-cui-actions__icon"
-                src={createSession}
-                alt=""
+          <div
+            className="we-agent-cui-bottom"
+            style={isPc ? undefined : { marginBottom: `${keyboardHeight}px` }}
+          >
+            <div className="we-agent-cui-actions" aria-label="多功能按钮区">
+              <button
+                type="button"
+                className="we-agent-cui-actions__button"
+                onClick={(event) => {
+                  runButtonClickWithDebounce(event, () => {
+                    void handleCreateSession();
+                  });
+                }}
+                aria-label="新建会话"
+              >
+                <img
+                  className="we-agent-cui-actions__icon"
+                  src={createSession}
+                  alt=""
+                />
+              </button>
+              {isOutputting ? (
+                <div className="we-agent-cui-actions__status" aria-live="polite">
+                  输出中...
+                </div>
+              ) : null}
+              <WeAgentHistorySidebar
+                assistantAccount={assistantAccount}
+                currentWelinkSessionId={welinkSessionId ?? ''}
+                cachedSessions={historySessionsCache ?? []}
+                historyLoaded={historySessionsLoaded}
+                onHistoryLoaded={(sessions) => {
+                  setHistorySessionsCache(sessions);
+                  setHistorySessionsLoaded(true);
+                }}
+                onSessionSelect={handleSwitchWeAgentSession}
+                onVisibilityChange={setIsHistorySidebarVisible}
               />
-            </button>
-            {isOutputting ? (
-              <div className="we-agent-cui-actions__status" aria-live="polite">
-                输出中...
-              </div>
-            ) : null}
-            <WeAgentHistorySidebar
-              assistantAccount={assistantAccount}
-              currentWelinkSessionId={welinkSessionId ?? ''}
-              cachedSessions={historySessionsCache ?? []}
-              historyLoaded={historySessionsLoaded}
-              onHistoryLoaded={(sessions) => {
-                setHistorySessionsCache(sessions);
-                setHistorySessionsLoaded(true);
-              }}
-              onSessionSelect={handleSwitchWeAgentSession}
-              onVisibilityChange={setIsHistorySidebarVisible}
-            />
-          </div>
+            </div>
 
-          <div className="footer-wrapper">
-            <WeAgentCUIFooter
-              isPcMiniApp={isPc}
-              mode={footerMode}
-              onSend={handleGenerate}
-              onStop={handleStop}
-            />
+            <div className="footer-wrapper">
+              <WeAgentCUIFooter
+                isPcMiniApp={isPc}
+                mode={footerMode}
+                onSend={handleGenerate}
+                onStop={handleStop}
+              />
+            </div>
           </div>
         </div>
       </div>

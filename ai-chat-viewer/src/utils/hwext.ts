@@ -259,6 +259,8 @@ interface HWH5Bridge {
   getDeviceInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  onKeyboardHeightChane?: (listener: (res: { height: number }) => void) => void;
+  offKeyboardHeightChane?: () => void;
   navigateBack: () => void;
   close: () => void;
 }

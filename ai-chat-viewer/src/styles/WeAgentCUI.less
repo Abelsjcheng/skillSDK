@@ -192,6 +192,13 @@
   box-sizing: border-box;
 }
 
+.we-agent-cui-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: margin-bottom 0.2s ease;
+}
+
 .app-container--we-agent-cui.pc-mode {
   height: 100vh;
   padding: 0;
@@ -199,11 +206,12 @@
 
   .we-agent-cui-main {
     padding: 16px 0 30px;
-    transition: padding-left 0.2s ease;
+    transition: padding-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .we-agent-cui-chat-panel {
     padding: 0 150px;
+    transition: padding 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -297,12 +305,15 @@
   border: none;
   background: rgba(0, 0, 0, 0.25);
   cursor: pointer;
+  opacity: 0;
 }
 
 .we-agent-history-sidebar--mobile .we-agent-history-sidebar__mask {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
+  transition: opacity 0.24s ease;
+  will-change: opacity;
 }
 
 .we-agent-history-sidebar__panel {
@@ -314,7 +325,7 @@
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
 
@@ -374,12 +385,15 @@
   right: -24px;
   width: 24px;
   height: 22px;
-  transform: translateY(-50%);
+  transform: translate(-284px, -50%);
+  opacity: 0;
   background: #ffffff url('../imgs/assistant-bg.svg') center / cover no-repeat;
   border: none;
   border-radius: 0 8px 8px 0;
   box-sizing: border-box;
   z-index: 1;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
+  will-change: transform, opacity;
 }
 
 .we-agent-history-sidebar__close-icon {
@@ -478,15 +492,33 @@
 .we-agent-history-sidebar.is-open {
   pointer-events: auto;
 
+  .we-agent-history-sidebar__mask {
+    opacity: 1;
+  }
+
   .we-agent-history-sidebar__panel {
     transform: translateX(0);
+  }
+
+  .we-agent-history-sidebar__close-button {
+    transform: translate(0, -50%);
+    opacity: 1;
   }
 }
 
 .we-agent-history-sidebar.is-closing {
   pointer-events: none;
 
+  .we-agent-history-sidebar__mask {
+    opacity: 0;
+  }
+
   .we-agent-history-sidebar__panel {
     transform: translateX(-100%);
+  }
+
+  .we-agent-history-sidebar__close-button {
+    transform: translate(-284px, -50%);
+    opacity: 0;
   }
 }

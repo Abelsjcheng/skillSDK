@@ -3,10 +3,10 @@ import type { SkillSession } from './hwext';
 
 export function ensureSessionTimestamps(session: SkillSession): SkillSession {
   const now = new Date().toISOString();
-  const createdAt = session.createdAt.trim() ? session.createdAt : now;
-  const updatedAt = session.updatedAt.trim() ? session.updatedAt : createdAt;
+  const createdAt = session?.createdAt?.trim() ? session.createdAt : now;
+  const updatedAt = session?.updatedAt?.trim() ? session.updatedAt : createdAt;
 
-  if (createdAt === session.createdAt && updatedAt === session.updatedAt) {
+  if (createdAt === session?.createdAt && updatedAt === session?.updatedAt) {
     return session;
   }
 
