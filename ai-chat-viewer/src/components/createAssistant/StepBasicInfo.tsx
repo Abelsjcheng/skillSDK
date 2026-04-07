@@ -191,11 +191,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         </div>
 
         <div className="digital-twin__field">
-          <label className="digital-twin__label" htmlFor="digital-twin-name">
+          <span id="digital-twin-name-label" className="digital-twin__label">
             名称
-          </label>
+          </span>
           <input
             id="digital-twin-name"
+            aria-labelledby="digital-twin-name-label"
             className={`digital-twin__input ${nameIsInvalid ? 'is-invalid' : ''}`.trim()}
             type="text"
             value={name}
@@ -206,11 +207,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         </div>
 
         <div className="digital-twin__field">
-          <label className="digital-twin__label" htmlFor="digital-twin-description">
+          <span id="digital-twin-description-label" className="digital-twin__label">
             简介
-          </label>
+          </span>
           <textarea
             id="digital-twin-description"
+            aria-labelledby="digital-twin-description-label"
             className={`digital-twin__textarea ${descriptionIsInvalid ? 'is-invalid' : ''}`.trim()}
             value={description}
             placeholder="介绍助理的功能和应用场景"

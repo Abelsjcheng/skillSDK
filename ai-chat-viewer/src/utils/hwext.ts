@@ -259,8 +259,9 @@ interface HWH5Bridge {
   getDeviceInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
-  onKeyboardHeightChane?: (listener: (res: { height: number }) => void) => void;
-  offKeyboardHeightChane?: () => void;
+  onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
+  offKeyboardHeightChange?: () => void;
+  disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;
   navigateBack: () => void;
   close: () => void;
 }
@@ -295,7 +296,20 @@ const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 export function isPcMiniApp(): boolean {
   if (typeof window === 'undefined') return false;
-  return false;
+  return true;
+}
+
+export function isIosMobileDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(userAgent)) {
+    return true;
+  }
+
+  return /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
 }
 
 function tryGetPedestal(): Pedestal | null {

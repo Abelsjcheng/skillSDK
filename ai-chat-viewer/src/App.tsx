@@ -20,6 +20,7 @@ import {
   getSessionMessageHistory,
   getUserInfo,
   getWeAgentDetails,
+  isIosMobileDevice,
   isPcMiniApp,
   registerSessionListener,
   sendMessage as sendMessageApi,
@@ -63,6 +64,7 @@ const HISTORY_PAGE_SIZE = 20;
 
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
+  const isIosKeyboardLiftEnabled = isIosMobileDevice();
   const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -104,12 +106,13 @@ function App({ assistantAccount = '' }: AppProps) {
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
 
   useEffect(() => {
-    if (isPc) {
+    if (!isIosKeyboardLiftEnabled) {
       setKeyboardHeight(0);
+      window.HWH5?.offKeyboardHeightChange?.();
       return;
     }
 
-    if (typeof window === 'undefined' || typeof window.HWH5?.onKeyboardHeightChane !== 'function') {
+    if (typeof window === 'undefined' || typeof window.HWH5?.onKeyboardHeightChange !== 'function') {
       return;
     }
 
@@ -118,12 +121,23 @@ function App({ assistantAccount = '' }: AppProps) {
       setKeyboardHeight(nextHeight > 0 ? nextHeight : 0);
     };
 
-    window.HWH5.onKeyboardHeightChane(handleKeyboardHeightChange);
+    const setupKeyboardHeightListener = async () => {
+      try {
+        await window.HWH5?.disableAutoPushUpPage?.({ status: true });
+      } catch (error) {
+        console.error('disableAutoPushUpPage failed:', error);
+      }
+
+      window.HWH5.onKeyboardHeightChange?.(handleKeyboardHeightChange);
+    };
+
+    void setupKeyboardHeightListener();
 
     return () => {
-      window.HWH5?.offKeyboardHeightChane?.();
+      window.HWH5?.offKeyboardHeightChange?.();
+      setKeyboardHeight(0);
     };
-  }, [isPc]);
+  }, [isIosKeyboardLiftEnabled]);
 
   const ensurePendingAssistantMessage = useCallback(() => {
     if (streamingMsgIdRef.current) {
@@ -912,7 +926,9 @@ function App({ assistantAccount = '' }: AppProps) {
 
           <div
             className="we-agent-cui-bottom"
-            style={isPc ? undefined : { marginBottom: `${keyboardHeight}px` }}
+            style={isIosKeyboardLiftEnabled && keyboardHeight > 0
+              ? { transform: `translate3d(0, -${keyboardHeight}px, 0)` }
+              : undefined}
           >
             <div className="we-agent-cui-actions" aria-label="多功能按钮区">
               <button
