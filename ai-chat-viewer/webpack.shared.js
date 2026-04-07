@@ -1,6 +1,34 @@
-const BASE_BROWSERS_TARGET = '>0.5%, last 2 versions, not dead';
+const BASE_BROWSERS_TARGET = {
+  ie: '11',
+};
 
 const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
+const TRANSPILE_NODE_MODULES = [
+  /node_modules[\\/]react-markdown[\\/]/,
+  /node_modules[\\/]remark-[^\\/]+[\\/]/,
+  /node_modules[\\/]rehype-[^\\/]+[\\/]/,
+  /node_modules[\\/]unified[\\/]/,
+  /node_modules[\\/]bail[\\/]/,
+  /node_modules[\\/]trough[\\/]/,
+  /node_modules[\\/]vfile[^\\/]*[\\/]/,
+  /node_modules[\\/]unist-[^\\/]+[\\/]/,
+  /node_modules[\\/]mdast-[^\\/]+[\\/]/,
+  /node_modules[\\/]hast-[^\\/]+[\\/]/,
+  /node_modules[\\/]micromark[^\\/]*[\\/]/,
+  /node_modules[\\/]decode-named-character-reference[\\/]/,
+  /node_modules[\\/]character-entities[^\\/]*[\\/]/,
+  /node_modules[\\/]property-information[\\/]/,
+  /node_modules[\\/]space-separated-tokens[\\/]/,
+  /node_modules[\\/]comma-separated-tokens[\\/]/,
+];
+
+function shouldExcludeFromBabel(filePath) {
+  if (!/node_modules/.test(filePath)) {
+    return false;
+  }
+
+  return !TRANSPILE_NODE_MODULES.some((pattern) => pattern.test(filePath));
+}
 
 function createBabelRule({ includePolyfills = false } = {}) {
   const presetEnvOptions = { targets: BASE_BROWSERS_TARGET };
@@ -11,7 +39,7 @@ function createBabelRule({ includePolyfills = false } = {}) {
 
   return {
     test: /\.(ts|tsx|js|jsx)$/,
-    exclude: /node_modules/,
+    exclude: shouldExcludeFromBabel,
     use: {
       loader: 'babel-loader',
       options: {
@@ -74,4 +102,3 @@ module.exports = {
   RESOLVE_EXTENSIONS,
   createModuleRules,
 };
-

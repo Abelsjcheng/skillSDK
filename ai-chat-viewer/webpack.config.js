@@ -14,6 +14,7 @@ module.exports = (env = {}) => {
     : String(rawIsProEnv).toLowerCase() === 'true';
 
   return {
+    target: ['web', 'es5'],
     entry: './src/index.tsx',
     output: {
       path: path.resolve(__dirname, 'dist'),
@@ -71,6 +72,19 @@ module.exports = (env = {}) => {
       port: 3000,
       hot: true,
       historyApiFallback: true,
+      proxy: [
+        {
+          context: ['/api'],
+          target: 'http://localhost:8082',
+          changeOrigin: true,
+        },
+        {
+          context: ['/ws'],
+          target: 'ws://localhost:8082',
+          ws: true,
+          changeOrigin: true,
+        },
+      ],
     },
     devtool: false,
     performance: {

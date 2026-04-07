@@ -6,6 +6,7 @@ const {
 } = require('./webpack.shared');
 
 module.exports = {
+  target: ['web', 'es5'],
   entry: './src/pages/createAssistant.tsx',
   output: {
     path: path.resolve(__dirname, 'dist/create-assistant-page'),

@@ -7,6 +7,7 @@ const {
 
 module.exports = {
   mode: 'production',
+  target: ['web', 'es5'],
   entry: './src/lib/index.ts',
   output: {
     path: path.resolve(__dirname, 'dist/lib'),
