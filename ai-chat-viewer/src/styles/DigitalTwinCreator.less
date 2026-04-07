@@ -168,7 +168,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+
+  > * + * {
+    margin-left: 12px;
+  }
 }
 
 .digital-twin__avatar-option {
@@ -296,17 +299,23 @@
   margin-top: 8px;
   display: flex;
   align-items: center;
-  gap: 36px;
+
+  > * + * {
+    margin-left: 36px;
+  }
 }
 
 .digital-twin__radio-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   color: rgba(51, 51, 51, 1);
   font-size: 14px;
   font-weight: 400;
   line-height: 22px;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .digital-twin__radio-item input[type='radio'] {
@@ -450,8 +459,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
   overflow: hidden;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .digital-twin__action-btn {
@@ -553,7 +565,10 @@
   width: 100%;
   height: 48px;
   align-items: stretch;
-  gap: 16px;
+
+  > * + * {
+    margin-left: 16px;
+  }
 }
 
 .digital-twin--mobile .digital-twin__radio-item {
@@ -607,4 +622,5 @@
   padding: 12px 16px;
   justify-content: flex-start;
 }
+
 

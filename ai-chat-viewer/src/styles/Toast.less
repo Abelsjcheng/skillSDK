@@ -37,8 +37,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
   pointer-events: auto;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .toast--mobile .toast__text {

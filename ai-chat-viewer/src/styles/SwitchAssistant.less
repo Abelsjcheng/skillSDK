@@ -22,9 +22,12 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   -ms-overflow-style: none;
   scrollbar-width: none;
+
+  > * + * {
+    margin-top: 12px;
+  }
 }
 
 .switch-assistant__list::-webkit-scrollbar {
@@ -82,8 +85,11 @@
 .switch-assistant__desc-row {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .switch-assistant__name {

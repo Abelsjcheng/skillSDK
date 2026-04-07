@@ -29,11 +29,14 @@
 .code-block__toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   padding: 0;
   border: none;
   background: transparent;
   cursor: pointer;
+
+  > * + * {
+    margin-left: 4px;
+  }
 }
 
 .code-block__chevron-icon {

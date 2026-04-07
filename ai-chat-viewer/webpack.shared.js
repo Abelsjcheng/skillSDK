@@ -1,17 +1,72 @@
-const BASE_BROWSERS_TARGET = '>0.5%, last 2 versions, not dead';
+const BASE_BROWSERS_TARGET = {
+  chrome: '49',
+  edge: '15',
+  firefox: '45',
+  safari: '10',
+  ios: '10',
+};
+
+const WEBPACK_ES5_TARGET = ['web', 'es5'];
+
+const WEBPACK_ES5_OUTPUT_ENVIRONMENT = {
+  arrowFunction: false,
+  bigIntLiteral: false,
+  const: false,
+  destructuring: false,
+  dynamicImport: false,
+  forOf: false,
+  module: false,
+  optionalChaining: false,
+  templateLiteral: false,
+};
+
+const TRANSPILE_DEPENDENCIES = [
+  'hast-util-from-html-isomorphic',
+  'react-markdown',
+  'react-syntax-highlighter',
+  'remark-breaks',
+  'remark-gfm',
+  'remark-math',
+  'rehype-katex',
+];
 
 const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 
+function shouldTranspileDependency(filePath) {
+  const packageMatches = [...filePath.matchAll(/[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/g)];
+
+  if (packageMatches.length === 0) {
+    return true;
+  }
+
+  const packageName = packageMatches[packageMatches.length - 1][1];
+  return TRANSPILE_DEPENDENCIES.includes(packageName);
+}
+
+function createEs5Output(output) {
+  return {
+    ...output,
+    environment: {
+      ...WEBPACK_ES5_OUTPUT_ENVIRONMENT,
+      ...(output.environment || {}),
+    },
+  };
+}
+
 function createBabelRule({ includePolyfills = false } = {}) {
-  const presetEnvOptions = { targets: BASE_BROWSERS_TARGET };
+  const presetEnvOptions = {
+    bugfixes: true,
+    forceAllTransforms: true,
+    targets: BASE_BROWSERS_TARGET,
+  };
   if (includePolyfills) {
     presetEnvOptions.useBuiltIns = 'usage';
-    presetEnvOptions.corejs = '3.36';
+    presetEnvOptions.corejs = '3.44';
   }
 
   return {
     test: /\.(ts|tsx|js|jsx)$/,
-    exclude: /node_modules/,
+    exclude: (filePath) => !shouldTranspileDependency(filePath),
     use: {
       loader: 'babel-loader',
       options: {
@@ -20,7 +75,6 @@ function createBabelRule({ includePolyfills = false } = {}) {
           ['@babel/preset-react', { runtime: 'automatic' }],
           '@babel/preset-typescript',
         ],
-        plugins: ['@babel/plugin-proposal-optional-chaining'],
       },
     },
   };
@@ -72,6 +126,7 @@ function createModuleRules({ includePolyfills = false, singletonStyleTag = false
 
 module.exports = {
   RESOLVE_EXTENSIONS,
+  WEBPACK_ES5_TARGET,
+  createEs5Output,
   createModuleRules,
 };
-
