@@ -446,7 +446,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsWeAgentDetailsArrayResult : NSObject
-@property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *WeAgentDetailsArray;
+@property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *weAgentDetailsArray;
 
 - (NSDictionary *)toDictionary;
 @end

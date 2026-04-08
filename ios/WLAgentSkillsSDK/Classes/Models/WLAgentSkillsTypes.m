@@ -966,14 +966,14 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _WeAgentDetailsArray = @[];
+        _weAgentDetailsArray = @[];
     }
     return self;
 }
 
 - (NSDictionary *)toDictionary {
     return @{
-        @"WeAgentDetailsArray" : WLAgentSkillsSerializeModelArray(self.WeAgentDetailsArray)
+        @"weAgentDetailsArray" : WLAgentSkillsSerializeModelArray(self.weAgentDetailsArray)
     };
 }
 
