@@ -485,7 +485,7 @@ export interface WeAgentDetails {
 }
 
 export interface WeAgentDetailsArray {
-  WeAgentDetailsArray: WeAgentDetails[];
+  weAgentDetailsArray: WeAgentDetails[];
 }
 
 export interface WeAgentUriResult {

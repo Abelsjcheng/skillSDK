@@ -677,7 +677,7 @@ export class SkillSDK {
         this.weAgentStore.saveCurrentDetail(list[0]);
       }
       return {
-        WeAgentDetailsArray: list
+        weAgentDetailsArray: list
       };
     } catch (error) {
       throw this.normalizeError('getWeAgentDetails', error);
