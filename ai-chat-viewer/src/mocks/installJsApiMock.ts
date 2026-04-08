@@ -1680,7 +1680,7 @@ function buildMockApi(): HWH5EXT {
       }
 
       return {
-        WeAgentDetailsArray: details,
+        weAgentDetailsArray: details,
       };
     },
 

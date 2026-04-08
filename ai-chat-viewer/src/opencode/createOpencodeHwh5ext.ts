@@ -559,7 +559,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         .filter((partnerAccount) => partnerAccount === config.assistantAccount)
         .map(() => assistantDetail);
       return {
-        WeAgentDetailsArray: details.length > 0 ? details : [assistantDetail],
+        weAgentDetailsArray: details.length > 0 ? details : [assistantDetail],
       };
     },
 

@@ -43,7 +43,7 @@ describe('PersonalAssistantCreator', () => {
 
       if (payload.funName === 'getWeAgentDetails') {
         return {
-          WeAgentDetailsArray: [
+          weAgentDetailsArray: [
             {
               name: 'assistant-writing',
               icon: 'https://example.com/a.png',

@@ -22,7 +22,7 @@ describe('SwitchAssistant', () => {
       }
       if (payload.funName === 'getWeAgentDetails') {
         return {
-          WeAgentDetailsArray: [
+          weAgentDetailsArray: [
             {
               name: '编程助理',
               icon: '',

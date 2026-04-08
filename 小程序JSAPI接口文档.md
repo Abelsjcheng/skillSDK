@@ -1058,9 +1058,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| WeAgentDetailsArray | Array<WeAgentDetails> | 助理详情数组 |
+| weAgentDetailsArray | Array<WeAgentDetails> | 助理详情数组 |
 
-`WeAgentDetailsArray` 中每个对象字段：
+`weAgentDetailsArray` 中每个对象字段：
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
@@ -1103,7 +1103,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 window.HWH5EXT.getWeAgentDetails({
   partnerAccount: 'x00_1'
 }).then((result) => {
-  result.WeAgentDetailsArray.forEach((detail) => {
+  result.weAgentDetailsArray.forEach((detail) => {
     console.log('助理详情:', detail.name, detail.weCodeUrl);
   });
 }).catch((error) => {

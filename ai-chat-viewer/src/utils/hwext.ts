@@ -174,7 +174,7 @@ export interface WeAgentListResult {
 }
 
 export interface WeAgentDetailsArrayResult {
-  WeAgentDetailsArray: WeAgentDetails[];
+  weAgentDetailsArray: WeAgentDetails[];
 }
 
 export interface CreateDigitalTwinResult {

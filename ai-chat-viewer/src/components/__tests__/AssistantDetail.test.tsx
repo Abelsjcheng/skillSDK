@@ -10,7 +10,7 @@ describe('AssistantDetail', () => {
         callMethod: jest.fn((_method: string, payload: { funName: string; params: unknown }) => {
           if (payload.funName === 'getWeAgentDetails') {
             return {
-              WeAgentDetailsArray: [
+              weAgentDetailsArray: [
                 {
                   name: '小咪',
                   icon: '',
@@ -73,7 +73,7 @@ describe('AssistantDetail', () => {
         callMethod: jest.fn((_method: string, payload: { funName: string; params: unknown }) => {
           if (payload.funName === 'getWeAgentDetails') {
             return {
-              WeAgentDetailsArray: [
+              weAgentDetailsArray: [
                 {
                   name: '外部助理',
                   icon: '',

@@ -780,7 +780,7 @@
          - PC 端（`isPcMiniApp === true`）：调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`。
 5. 助理详情页面（`/assistantDetail`）：
    - 读取 query 参数 `partnerAccount`；
-   - 调用 `getWeAgentDetails({ partnerAccount })` 获取详情并渲染 `WeAgentDetailsArray[0]`（封装层按端能力适配实际入参）。
+   - 调用 `getWeAgentDetails({ partnerAccount })` 获取详情并渲染 `weAgentDetailsArray[0]`（封装层按端能力适配实际入参）。
 6. 切换助理页面（`/switchAssistant`）：
    - 读取 query 参数 `partnerAccount`；
    - 调用 `getWeAgentList` 渲染 `content` 列表，并默认选中与 query 匹配的助理项；

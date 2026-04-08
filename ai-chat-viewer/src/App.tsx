@@ -367,7 +367,7 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const resolveAssistantDetail = useCallback(async (currentAssistantAccount: string) => {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
-    const detail = detailsResult.WeAgentDetailsArray?.[0];
+    const detail = detailsResult.weAgentDetailsArray?.[0];
     if (!detail) {
       throw new Error('未获取到助理详情');
     }
