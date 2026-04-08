@@ -410,13 +410,13 @@ interface CreateDigitalTwinParams {
 15. 全页面取消“禁止复制”限制：不通过触摸事件 `preventDefault` 或样式策略阻断系统默认文本选择与复制行为。
 16. 历史会话侧栏的每个会话 item 标题按单行省略处理，超出宽度显示 `...`。
 17. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
-18. 历史会话面板按端分流：移动端改为“左侧抽屉 + 右侧蒙层”方案；PC 端为左侧固定宽度 `260px` 的历史会话栏，并通过页面布局为右侧对话区预留空间，形成左右分栏显示。PC 端 `weAgentCUI` 根容器去除外层 `padding`；右侧 AI 对话容器单独承担上下内边距，固定 `padding-top: 16px`、`padding-bottom: 30px`。默认状态下右侧 AI 对话容器左右内边距为 `150px`，内容宽度占满右侧可用区域；当历史会话侧边栏展开时，左右内边距切换为 `50px`，内容宽度仍占满右侧可用区域，不再限制 `max-width`。
+18. 历史会话面板按端分流：移动端改为“左侧抽屉 + 右侧蒙层”方案；PC 端为左侧固定宽度 `260px` 的历史会话栏，并通过页面布局为右侧对话区预留空间，形成左右分栏显示。由于组件触发按钮位于多功能按钮区内部，PC 端侧边栏外层容器必须脱离按钮区局部定位上下文，采用覆盖整个页面左侧区域的定位方式，避免被按钮区 `32px` 高度裁剪。PC 端 `weAgentCUI` 根容器去除外层 `padding`；右侧 AI 对话容器单独承担上下内边距，固定 `padding-top: 16px`、`padding-bottom: 30px`。默认状态下右侧 AI 对话容器左右内边距为 `150px`，内容宽度占满右侧可用区域；当历史会话侧边栏展开时，左右内边距切换为 `50px`，内容宽度仍占满右侧可用区域，不再限制 `max-width`。
 19. PC 端历史会话关闭按钮不参与页面分栏宽度计算：侧边栏布局宽度始终按 `260px` 计算，关闭按钮通过 `position: absolute` 悬浮到侧边栏右侧，可超出侧边栏盒模型显示，但不额外占用页面宽度。
 20. 历史会话侧边栏面板改为“整块容器统一 `padding: 20px 18px`”的布局模式；顶部标题区位于该容器内部，尺寸为“高 `32px`、宽占满”；标题文案为“历史对话”，文本左侧内边距 `12px`，样式 `12px/500`、`rgba(51,51,51,1)`。标题区下方内容区继续承担分组列表和空态内容。
 21. 历史会话侧边栏在挂载显示时增加过渡动画：面板使用轻量平移动画进入，蒙层同步做透明度过渡；历史数据请求过程中不再渲染“加载中...”文字，仅保留面板基础结构。
 22. 历史会话空态图片尺寸调整为宽 `100px`、高自适应，避免当前图标占位过小。
 23. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
-24. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。用户提交回答成功后，`QuestionCard` 本身继续保留“已回答/回答结果”展示，同时通过上抛 `sendMessage` 返回结果让 `App` 复用现有 `appendMessageFromOperation` 链路插入一条独立用户消息；AI 后续回复仍沿用现有流式消息机制，作为后续独立助手消息块展示。
+24. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
 25. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
 26. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
 26. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。
@@ -425,6 +425,17 @@ interface CreateDigitalTwinParams {
 22. 本地 JSAPI mock 的目标扩展到全部业务页面：`activateAssistant`、`selectAssistant`、`switchAssistant`、`assistantDetail`、`createAssistant`、`weAgentCUI` 都应能在浏览器本地通过 mock 数据直接访问与联动。
 23. mock 环境不单独维护一套伪判端逻辑，端类型判断统一复用 `src/utils/hwext.ts` 中的 `isPcMiniApp`：仅当存在真实或 mock 的 `window.Pedestal.callMethod` 时视为 PC，否则按移动端处理，避免样式和 toast 分流与生产逻辑偏离。
 24. 为保证页面在浏览器本地可完整跑通，mock 除业务 JSAPI 外还需补齐最小宿主桥能力：`HWH5.openWebview`、`HWH5.showToast`、`HWH5.getDeviceInfo`、`HWH5.getUserInfo`、`HWH5.getAccountInfo`、`HWH5.navigateBack`、`HWH5.close`；其中 `showToast` 仅模拟原生提示调用，不额外渲染页面内 UI。
+
+## 18. 无用代码清理策略
+
+1. 不做“为清理而清理”的大改造，只删除已确认无引用或与当前实现重复的代码，避免引入页面样式和行为回归。
+2. `CodeBlock` 复制逻辑统一复用 `src/utils/clipboard.ts`，不在组件内部重复保留一套 `textarea + execCommand` 实现。
+3. `digitalTwinValidation.ts` 中未参与当前头像校验逻辑的历史常量需同步移除，保持实现语义与实际行为一致。
+4. `StepBasicInfo`、`App`、`hwext` 等文件中的未使用 import / 类型 / 常量直接删除，避免继续作为噪音留在主链路代码中。
+5. 已与当前实现脱节的测试用例按现状收敛：
+   - 删除已经不存在的 DOM 或上传链路断言；
+   - 保留仍覆盖真实行为的页面入口、交互和参数组装断言。
+6. 现阶段不删除独立 webpack 页面入口、库导出接口和 `example` 演示代码，因为这些文件虽然在主应用运行时不一定被直接引用，但仍属于构建产物的一部分。
 
 
 

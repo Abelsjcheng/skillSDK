@@ -263,7 +263,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `WeAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
+| `weAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
 
 `WeAgentDetails` 对象新增字段：`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`id`（字符串）；移除 `robotId` 字段。
 
@@ -271,7 +271,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ```json
 {
-  "WeAgentDetailsArray": [
+  "weAgentDetailsArray": [
     {
       "name": "员工助手",
       "icon": "http://www.test.com/xxx",
@@ -301,9 +301,9 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 ### 实现方法
 
 1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-2. SDK 解析返回 `data[]` 并组装为 `WeAgentDetailsArray`。
+2. SDK 解析返回 `data[]` 并组装为 `weAgentDetailsArray`。
 3. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
-4. SDK 返回 `Promise<WeAgentDetailsArray>`。
+4. SDK 返回 `Promise<weAgentDetailsArray>`。
 
 ---
 
@@ -471,7 +471,7 @@ type WeAgentDetails = {
 
 ```typescript
 type WeAgentDetailsArray = {
-  WeAgentDetailsArray: WeAgentDetails[]
+  weAgentDetailsArray: WeAgentDetails[]
 }
 ```
 
