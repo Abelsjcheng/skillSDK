@@ -53,9 +53,12 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
   box-sizing: border-box;
   background: transparent;
+
+  > * + * {
+    margin-left: 12px;
+  }
 }
 
 .start-assistant__action-btn {

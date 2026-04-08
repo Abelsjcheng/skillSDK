@@ -197,7 +197,10 @@
   justify-content: flex-end;
   min-width: 0;
   flex: 1;
-  gap: 16px;
+
+  > * + * {
+    margin-left: 16px;
+  }
 }
 
 .assistant-detail__value-with-actions .assistant-detail__icon-btn {
@@ -207,8 +210,11 @@
 .assistant-detail__action-group {
   display: flex;
   align-items: center;
-  gap: 8px;
   margin-left: 0;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .assistant-detail__action-group .assistant-detail__icon-btn {
