@@ -7,7 +7,7 @@ import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
 import { showToast } from '../../utils/toast';
 
-type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
+type HistorySessionGroupKey = 'today' | 'yesterday' | 'threeDaysAgo';
 
 interface HistorySessionGroup {
   key: HistorySessionGroupKey;
@@ -30,7 +30,7 @@ const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
 const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
   { key: 'today', label: '今天' },
   { key: 'yesterday', label: '昨天' },
-  { key: 'sevenDaysAgo', label: '7天前' },
+  { key: 'threeDaysAgo', label: '3天前' },
 ];
 
 function getStartOfDayTimestamp(value: Date): number {
@@ -40,7 +40,7 @@ function getStartOfDayTimestamp(value: Date): number {
 function resolveHistorySessionGroupKey(updatedAt: string): HistorySessionGroupKey {
   const updatedTimestamp = new Date(updatedAt).getTime();
   if (Number.isNaN(updatedTimestamp)) {
-    return 'sevenDaysAgo';
+    return 'threeDaysAgo';
   }
 
   const todayStart = getStartOfDayTimestamp(new Date());
@@ -53,14 +53,14 @@ function resolveHistorySessionGroupKey(updatedAt: string): HistorySessionGroupKe
   if (dayDiff === 1) {
     return 'yesterday';
   }
-  return 'sevenDaysAgo';
+  return 'threeDaysAgo';
 }
 
 function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessionGroup[] {
   const grouped = new Map<HistorySessionGroupKey, SkillSession[]>([
     ['today', []],
     ['yesterday', []],
-    ['sevenDaysAgo', []],
+    ['threeDaysAgo', []],
   ]);
 
   const sortedSessions = [...sessions].sort(
@@ -78,7 +78,7 @@ function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessi
   return HISTORY_SESSION_GROUP_ORDER
     .map(({ key, label }) => ({
       key,
-      label: key === 'sevenDaysAgo' ? '3天前' : label,
+      label,
       sessions: grouped.get(key) ?? [],
     }))
     .filter((group) => group.sessions.length > 0);
