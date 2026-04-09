@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { BRAIN_ILLUSTRATION, DEFAULT_AVATARS } from './createAssistant/constants';
 import { StepBasicInfo } from './createAssistant/StepBasicInfo';
 import { StepBrainSelect } from './createAssistant/StepBrainSelect';
+import { isPcMiniApp } from '../constants';
 import type {
   CreateDigitalTwinParams,
   DigitalTwinBasicInfoPayload,
@@ -13,7 +14,6 @@ import {
   getAgentType,
   getQueryParam,
   getWeAgentDetails,
-  isPcMiniApp,
   openWeAgentCUI,
   resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,

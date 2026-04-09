@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { isPcMiniApp } from '../constants';
 import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { isPcMiniApp, replyPermission } from '../utils/hwext';
+import { replyPermission } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 
 interface PermissionCardProps {

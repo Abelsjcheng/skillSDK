@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
+import { isPcMiniApp } from '../constants';
 import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
@@ -9,7 +10,6 @@ import {
   buildCustomerServiceWebviewUri,
   getQueryParam,
   getWeAgentDetails,
-  isPcMiniApp,
   openH5Webview,
   type WeAgentDetails,
 } from '../utils/hwext';

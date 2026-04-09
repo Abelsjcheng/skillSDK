@@ -1,12 +1,12 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { APP_ID, isPcMiniApp } from '../constants';
 import activateGuideMobile from '../imgs/activate-guide.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from '../utils/hwext';
+import { getWeAgentList, openH5Webview, type WeAgentListItem } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
-import { APP_ID } from '../constants';
 
 const CREATE_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#createAssistant`;
 const SELECT_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#selectAssistant`;

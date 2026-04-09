@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { isPcMiniApp } from '../../constants';
 import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import { getHistorySessionsList, isPcMiniApp, type SkillSession } from '../../utils/hwext';
+import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
 import { showToast } from '../../utils/toast';
 
 type HistorySessionGroupKey = 'today' | 'yesterday' | 'sevenDaysAgo';
@@ -77,7 +78,7 @@ function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessi
   return HISTORY_SESSION_GROUP_ORDER
     .map(({ key, label }) => ({
       key,
-      label,
+      label: key === 'sevenDaysAgo' ? '3天前' : label,
       sessions: grouped.get(key) ?? [],
     }))
     .filter((group) => group.sessions.length > 0);

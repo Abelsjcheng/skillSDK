@@ -1,4 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { isIosMobileDevice, isPcMiniApp } from './constants';
 import { Content } from './components/Content';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
@@ -20,8 +21,6 @@ import {
   getSessionMessageHistory,
   getUserInfo,
   getWeAgentDetails,
-  isIosMobileDevice,
-  isPcMiniApp,
   registerSessionListener,
   sendMessage as sendMessageApi,
   stopSkill,
@@ -873,7 +872,6 @@ function App({ assistantAccount = '' }: AppProps) {
         const next = prev.filter((session) => session.welinkSessionId !== newSession.welinkSessionId);
         return [newSession, ...next];
       });
-      showToast('成功创建新会话');
     } catch (err) {
       console.error('Failed to create new session:', err);
       showToast('新建会话失败');

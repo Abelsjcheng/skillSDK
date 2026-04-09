@@ -1,4 +1,5 @@
-﻿import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import selectionIcon from '../../imgs/selection_icon.png';
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, GetFilePathResult, UploadTinyImageResult } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canProceedNext, hasInvalidDescription, hasInvalidName, validateAvatarFile } from '../../utils/digitalTwinValidation';
@@ -169,7 +170,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                 }}
               >
                 <img src={avatar.image} alt={`默认头像 ${avatar.id}`} className="digital-twin__avatar-option-img" />
-                {selected ? <span className="digital-twin__check">✓</span> : null}
+                {selected ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
               </button>
             );
           })}
@@ -186,7 +187,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             }}
           >
             +
-            {avatarType === 'custom' ? <span className="digital-twin__check">✓</span> : null}
+            {avatarType === 'custom' ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
           </button>
         </div>
 

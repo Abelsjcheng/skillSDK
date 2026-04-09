@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
+import { isPcMiniApp } from '../constants';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   DEFAULT_ASSISTANT_LIST_QUERY,
@@ -11,7 +12,6 @@ import {
   buildCustomerServiceWebviewUri,
   getQueryParam,
   getWeAgentList,
-  isPcMiniApp,
   MOCK_CUSTOMER_SERVICE_SOURCE_URL,
   openH5Webview,
   type WeAgentListItem,

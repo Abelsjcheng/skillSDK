@@ -10,7 +10,7 @@ import type {
   ControlSkillWeCodeResponse,
 } from '../types';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
-import { APP_ID } from '../constants';
+import { APP_ID, isPcMiniApp } from '../constants';
 
 export interface HWH5EXTError {
   code?: string;
@@ -293,24 +293,6 @@ export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
 export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
-
-export function isPcMiniApp(): boolean {
-  if (typeof window === 'undefined') return false;
-  return true;
-}
-
-export function isIosMobileDevice(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return false;
-  }
-
-  const userAgent = navigator.userAgent || '';
-  if (/iPhone|iPad|iPod/i.test(userAgent)) {
-    return true;
-  }
-
-  return /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
-}
 
 function tryGetPedestal(): Pedestal | null {
   if (typeof window === 'undefined') return null;

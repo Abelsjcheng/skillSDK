@@ -1,6 +1,6 @@
 import warningIcon from '../imgs/warn_icon.svg';
 import closeIcon from '../imgs/close_icon.svg';
-import { isPcMiniApp } from './hwext';
+import { isPcMiniApp } from '../constants';
 import '../styles/Toast.less';
 
 interface ToastOptions {

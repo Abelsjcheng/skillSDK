@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import AssistantCardList from '../components/assistant/AssistantCardList';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
+import { isPcMiniApp } from '../constants';
 import type { AssistantItem } from '../types/assistant';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
@@ -15,7 +16,6 @@ import {
 import {
   buildCustomerServiceWebviewUri,
   getWeAgentList,
-  isPcMiniApp,
   MOCK_CUSTOMER_SERVICE_SOURCE_URL,
   openH5Webview,
   type WeAgentListItem,
