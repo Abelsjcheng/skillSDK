@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import AssistantCardList from '../components/assistant/AssistantCardList';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
+import AssistantCardList from '../components/assistant/AssistantCardList';
 import { isPcMiniApp } from '../constants';
+import { useI18n } from '../i18n';
 import type { AssistantItem } from '../types/assistant';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
@@ -34,6 +35,7 @@ function buildCreateAssistantSearch(): string {
 const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 
@@ -50,11 +52,11 @@ const SelectAssistant: React.FC = () => {
       setSelectedAssistantId((current) => resolveSelectableAssistantId(list, current));
     } catch (error) {
       console.error('getWeAgentList failed in SelectAssistant:', error);
-      showToast('获取助理列表失败');
+      showToast(t('selectAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedAssistantId('');
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadAssistantList();
@@ -88,9 +90,9 @@ const SelectAssistant: React.FC = () => {
       window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in SelectAssistant:', error);
-      showToast('打开助理失败');
+      showToast(t('selectAssistant.openFailed'));
     }
-  }, [assistantList, selectedAssistantId]);
+  }, [assistantList, selectedAssistantId, t]);
 
   const handleServiceClick = useCallback(() => {
     openH5Webview({
@@ -101,10 +103,10 @@ const SelectAssistant: React.FC = () => {
   if (!isPc) {
     return (
       <AssistantSelectionPage
-        title="选择助理"
+        title={t('selectAssistant.title')}
         isPcMiniApp={isPc}
-        leftButtonText="创建助理"
-        rightButtonText="开始使用"
+        leftButtonText={t('selectAssistant.createAssistant')}
+        rightButtonText={t('selectAssistant.startUsing')}
         onLeftButtonClick={handleCreateAssistant}
         onRightButtonClick={handleEnableNow}
         onService={handleServiceClick}
@@ -120,7 +122,7 @@ const SelectAssistant: React.FC = () => {
     <div className="start-assistant--pc">
       <div className="start-assistant__panel">
         <header className="start-assistant__header">
-          <h1 className="start-assistant__title">选择助理</h1>
+          <h1 className="start-assistant__title">{t('selectAssistant.title')}</h1>
         </header>
 
         <main className="start-assistant__content">
@@ -141,7 +143,7 @@ const SelectAssistant: React.FC = () => {
               });
             }}
           >
-            创建助理
+            {t('selectAssistant.createAssistant')}
           </button>
           <button
             type="button"
@@ -153,7 +155,7 @@ const SelectAssistant: React.FC = () => {
             }}
             disabled={!selectedAssistantId}
           >
-            开始使用
+            {t('selectAssistant.startUsing')}
           </button>
         </footer>
       </div>

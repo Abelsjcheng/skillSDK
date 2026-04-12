@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import { isPcMiniApp } from '../constants';
+import { useI18n } from '../i18n';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   DEFAULT_ASSISTANT_LIST_QUERY,
@@ -24,6 +25,7 @@ interface SwitchAssistantProps {
 
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
+  const { t } = useI18n();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
@@ -50,11 +52,11 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       ));
     } catch (error) {
       console.error('getWeAgentList failed in SwitchAssistant:', error);
-      showToast('获取助理列表失败');
+      showToast(t('switchAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedPartnerAccount('');
     }
-  }, [partnerAccount, preferredDefaultPartnerAccount]);
+  }, [partnerAccount, preferredDefaultPartnerAccount, t]);
 
   useEffect(() => {
     void loadAssistantList();
@@ -71,9 +73,9 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       window.HWH5.close();
     } catch (error) {
       console.error('openWeAgentCUI failed in SwitchAssistant:', error);
-      showToast('打开助理失败');
+      showToast(t('switchAssistant.openFailed'));
     }
-  }, [assistantList, selectedPartnerAccount]);
+  }, [assistantList, selectedPartnerAccount, t]);
 
   const handleLeftButtonClick = useCallback(() => {
     if (isPc) {
@@ -103,10 +105,10 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 
   return (
     <AssistantSelectionPage
-      title="切换助理"
+      title={t('switchAssistant.title')}
       isPcMiniApp={isPc}
-      leftButtonText="取消选择"
-      rightButtonText="确认切换"
+      leftButtonText={t('switchAssistant.cancelSelect')}
+      rightButtonText={t('switchAssistant.confirmSwitch')}
       defaultSelectedAssistantId={preferredDefaultPartnerAccount}
       onLeftButtonClick={handleLeftButtonClick}
       onRightButtonClick={handleRightButtonClick}

@@ -1,7 +1,8 @@
 import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import send_icon from '../../imgs/send_icon.svg';
-import stop_icon from '../../imgs/stop_icon.svg';
-import check_icon from '../../imgs/check.svg';
+import checkIcon from '../../imgs/check.svg';
+import sendIcon from '../../imgs/send_icon.svg';
+import stopIcon from '../../imgs/stop_icon.svg';
+import { useI18n } from '../../i18n';
 import '../../styles/WeAgentCUIFooter.less';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
@@ -20,12 +21,6 @@ interface WeAgentCUIFooterProps {
   leftActions?: React.ReactNode;
 }
 
-const INPUT_PLACEHOLDER = '有问题尽管问我呀';
-const SHORTCUT_OPTIONS: ShortcutOption[] = [
-  { mode: 'enter', label: 'Enter键发送消息' },
-  { mode: 'ctrlEnter', label: 'Ctrl+Enter键发送消息' },
-];
-
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,
   mode,
@@ -33,14 +28,19 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   onStop,
   leftActions,
 }) => {
+  const { t } = useI18n();
   const [value, setValue] = useState('');
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
+  const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
+    { mode: 'enter', label: t('weAgent.shortcut.enterSend') },
+    { mode: 'ctrlEnter', label: t('weAgent.shortcut.ctrlEnterSend') },
+  ]), [t]);
   const shortcutModeLabel = useMemo(
-    () => (shortcutMode === 'enter' ? 'Enter发送' : 'Ctrl+Enter发送'),
-    [shortcutMode],
+    () => (shortcutMode === 'enter' ? t('weAgent.shortcut.enterAction') : t('weAgent.shortcut.ctrlEnterAction')),
+    [shortcutMode, t],
   );
   const sendButtonClassName = useMemo(
     () => ([
@@ -51,8 +51,8 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       .join(' ')),
     [isGenerating],
   );
-  const sendButtonLabel = isGenerating ? '停止' : '发送';
-  const sendButtonIcon = isGenerating ? stop_icon : send_icon;
+  const sendButtonLabel = isGenerating ? t('common.stop') : t('common.send');
+  const sendButtonIcon = isGenerating ? stopIcon : sendIcon;
 
   useEffect(() => {
     if (!isPcMiniApp || !isShortcutPopupOpen) {
@@ -153,7 +153,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         <input
           type="text"
           className="we-agent-cui-footer__input"
-          placeholder={INPUT_PLACEHOLDER}
+          placeholder={t('weAgent.inputPlaceholder')}
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={handleMobileKeyDown}
@@ -167,7 +167,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     <div className="we-agent-cui-footer we-agent-cui-footer--pc">
       <textarea
         className="we-agent-cui-footer__input"
-        placeholder={INPUT_PLACEHOLDER}
+        placeholder={t('weAgent.inputPlaceholder')}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handlePcKeyDown}
@@ -181,9 +181,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
               <div
                 className="we-agent-cui-footer__shortcut-popup"
                 role="menu"
-                aria-label="发送快捷键设置"
+                aria-label={t('weAgent.shortcut.settings')}
               >
-                {SHORTCUT_OPTIONS.map((option) => (
+                {shortcutOptions.map((option) => (
                   <button
                     key={option.mode}
                     type="button"
@@ -201,7 +201,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                   >
                     <span className="we-agent-cui-footer__shortcut-check-slot">
                       {shortcutMode === option.mode ? (
-                        <img className="we-agent-cui-footer__shortcut-check-icon" src={check_icon} alt="" />
+                        <img className="we-agent-cui-footer__shortcut-check-icon" src={checkIcon} alt="" />
                       ) : null}
                     </span>
                     <span className="we-agent-cui-footer__shortcut-text">{option.label}</span>

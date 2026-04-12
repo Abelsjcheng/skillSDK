@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useI18n } from '../i18n';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import copyIcon from '../imgs/icon-copy.svg';
+import '../styles/CodeBlock.less';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { showToast } from '../utils/toast';
-import '../styles/CodeBlock.less';
 
 interface CodeBlockProps {
   code: string;
@@ -32,6 +33,7 @@ function normalizeLanguage(language?: string): string {
 }
 
 export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,7 +41,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   const handleCopy = useCallback(() => {
     void copyTextToClipboard(code)
       .then(() => {
-        showToast('复制成功');
+        showToast(t('common.copySuccess'));
         setCopied(true);
         if (timerRef.current) {
           clearTimeout(timerRef.current);
@@ -49,7 +51,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
       .catch((error) => {
         console.error('copyTextToClipboard failed in CodeBlock:', error);
       });
-  }, [code]);
+  }, [code, t]);
 
   useEffect(() => () => {
     if (timerRef.current) {
@@ -60,15 +62,17 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   const normalizedLanguage = normalizeLanguage(language);
 
   return (
-    <div className={[
-      'code-block',
-      collapsed ? 'code-block--collapsed' : '',
-    ].filter(Boolean).join(' ')}>
+    <div
+      className={[
+        'code-block',
+        collapsed ? 'code-block--collapsed' : '',
+      ].filter(Boolean).join(' ')}
+    >
       <div className="code-block__header">
         <button
           className="code-block__toggle"
           type="button"
-          aria-label={collapsed ? 'Expand code block' : 'Collapse code block'}
+          aria-label={collapsed ? t('codeBlock.expand') : t('codeBlock.collapse')}
           aria-expanded={!collapsed}
           onClick={() => setCollapsed((current) => !current)}
         >
@@ -94,8 +98,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
             });
           }}
           type="button"
-          aria-label={copied ? 'Copied' : 'Copy code'}
-          title={copied ? 'Copied' : 'Copy code'}
+          aria-label={copied ? t('codeBlock.copied') : t('codeBlock.copy')}
+          title={copied ? t('codeBlock.copied') : t('codeBlock.copy')}
         >
           <img className="code-block__copy-icon" src={copyIcon} alt="" />
         </button>

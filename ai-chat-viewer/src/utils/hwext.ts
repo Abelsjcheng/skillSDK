@@ -257,6 +257,7 @@ interface HWH5Bridge {
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
+  getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
   onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
@@ -268,6 +269,12 @@ interface HWH5Bridge {
 
 export interface HWH5DeviceInfo {
   statusBarHeight: number;
+  safeAreaInsetBottom: number;
+  [key: string]: unknown;
+}
+
+export interface HWH5AppInfo {
+  language: string;
   [key: string]: unknown;
 }
 
@@ -537,11 +544,11 @@ function toTrimmedString(value: unknown): string {
 
 export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   if (isPcMiniApp()) {
-    return { statusBarHeight: 0 };
+    return { statusBarHeight: 0, safeAreaInsetBottom: 0 };
   }
 
-  const result = await Promise.resolve(window.HWH5?.getDeviceInfo?.());
-  const deviceInfo = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+  const result = await window.HWH5?.getDeviceInfo?.();
+  const deviceInfo = (result && typeof result === 'object' ? result : {}) as HWH5DeviceInfo;
   return {
     ...deviceInfo,
     statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
@@ -550,6 +557,16 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
 
 export async function getStatusBarHeight(): Promise<number> {
   return (await getDeviceInfo()).statusBarHeight;
+}
+
+export async function getAppInfo(): Promise<HWH5AppInfo> {
+  const result = await Promise.resolve(window.HWH5?.getAppInfo?.());
+  const appInfo = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+
+  return {
+    ...appInfo,
+    language: toTrimmedString(appInfo.language) || 'zh',
+  };
 }
 
 export async function getUserInfo(): Promise<HWH5UserInfo> {

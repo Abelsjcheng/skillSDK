@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { isPcMiniApp } from '../../constants';
+import { useI18n } from '../../i18n';
 import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
@@ -11,7 +12,6 @@ type HistorySessionGroupKey = 'today' | 'yesterday' | 'threeDaysAgo';
 
 interface HistorySessionGroup {
   key: HistorySessionGroupKey;
-  label: string;
   sessions: SkillSession[];
 }
 
@@ -27,11 +27,7 @@ interface WeAgentHistorySidebarProps {
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
-const HISTORY_SESSION_GROUP_ORDER: Array<{ key: HistorySessionGroupKey; label: string }> = [
-  { key: 'today', label: '今天' },
-  { key: 'yesterday', label: '昨天' },
-  { key: 'threeDaysAgo', label: '3天前' },
-];
+const HISTORY_SESSION_GROUP_ORDER: HistorySessionGroupKey[] = ['today', 'yesterday', 'threeDaysAgo'];
 
 function getStartOfDayTimestamp(value: Date): number {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
@@ -76,9 +72,8 @@ function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessi
   });
 
   return HISTORY_SESSION_GROUP_ORDER
-    .map(({ key, label }) => ({
+    .map((key) => ({
       key,
-      label,
       sessions: grouped.get(key) ?? [],
     }))
     .filter((group) => group.sessions.length > 0);
@@ -94,6 +89,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   onVisibilityChange,
 }) => {
   const isPc = isPcMiniApp();
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRenderSidebar, setShouldRenderSidebar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +101,12 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     () => groupHistorySessionsByUpdatedAt(historySessions),
     [historySessions],
   );
+
+  const historyGroupLabels = useMemo<Record<HistorySessionGroupKey, string>>(() => ({
+    today: t('weAgent.today'),
+    yesterday: t('weAgent.yesterday'),
+    threeDaysAgo: t('weAgent.threeDaysAgo'),
+  }), [t]);
 
   useEffect(() => {
     if (closeTimerRef.current) {
@@ -175,7 +177,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       }
 
       console.error('Failed to load history sessions:', error);
-      showToast('获取历史会话失败');
+      showToast(t('weAgent.loadHistoryFailed'));
 
       if (showLoading) {
         setHistorySessions([]);
@@ -185,7 +187,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
         setIsLoading(false);
       }
     }
-  }, [assistantAccount, onHistoryLoaded]);
+  }, [assistantAccount, onHistoryLoaded, t]);
 
   const closeSidebar = useCallback(() => {
     if (!shouldRenderSidebar) {
@@ -236,13 +238,13 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
         isPc ? 'we-agent-history-sidebar--pc' : 'we-agent-history-sidebar--mobile',
         isVisible ? 'is-open' : 'is-closing',
       ].join(' ')}
-      aria-label="历史会话侧边栏"
+      aria-label={t('weAgent.historySidebar')}
     >
       {!isPc && (
         <button
           type="button"
           className="we-agent-history-sidebar__mask"
-          aria-label="关闭历史会话侧边栏"
+          aria-label={t('weAgent.closeHistorySidebar')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               handleClose();
@@ -255,7 +257,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="we-agent-history-sidebar__header">
-          <h3 className="we-agent-history-sidebar__header-title">历史对话</h3>
+          <h3 className="we-agent-history-sidebar__header-title">{t('weAgent.history')}</h3>
         </header>
         <div className="we-agent-history-sidebar__body">
           {!isLoading && groupedHistorySessions.length === 0 && (
@@ -263,17 +265,17 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
               <img
                 className="we-agent-history-sidebar__empty-image"
                 src={iconWeAgentHistory}
-                alt="暂无历史会话"
+                alt={t('weAgent.noHistorySessions')}
               />
             </div>
           )}
           {!isLoading && groupedHistorySessions.map((group) => (
             <section key={group.key} className="we-agent-history-sidebar__group">
-              <div className="we-agent-history-sidebar__group-title">{group.label}</div>
+              <div className="we-agent-history-sidebar__group-title">{historyGroupLabels[group.key]}</div>
               <div className="we-agent-history-sidebar__group-items">
                 {group.sessions.map((session) => {
                   const sessionId = session.welinkSessionId;
-                  const sessionTitle = session.title?.trim() || '未命名会话';
+                  const sessionTitle = session.title?.trim() || t('weAgent.untitledSession');
                   const isSelected = currentWelinkSessionId === sessionId;
 
                   return (
@@ -304,7 +306,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
         <button
           type="button"
           className="we-agent-history-sidebar__close-button"
-          aria-label="关闭历史会话"
+          aria-label={t('weAgent.closeHistorySidebar')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               handleClose();
@@ -332,7 +334,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
             void handleOpen();
           });
         }}
-        aria-label="历史会话"
+        aria-label={t('weAgent.openHistorySidebar')}
       >
         <img
           className="we-agent-cui-actions__icon"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../i18n';
 import backIcon from '../../imgs/back_icon.svg';
 import closeIcon from '../../imgs/close_icon.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
@@ -22,6 +23,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   onClose = noop,
   onService = noop,
 }) => {
+  const { t } = useI18n();
   const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
 
   if (isPcMiniApp) {
@@ -30,7 +32,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
         <button
           type="button"
           className="assistant-page-header__pc-btn"
-          aria-label="关闭"
+          aria-label={t('common.close')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               dispatchAssistantCloseEvent();
@@ -44,7 +46,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
         <button
           type="button"
           className="assistant-page-header__pc-btn"
-          aria-label="客服"
+          aria-label={t('common.service')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               onService();
@@ -71,7 +73,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
         <button
           type="button"
           className="assistant-page-header__icon-btn"
-          aria-label="返回"
+          aria-label={t('common.back')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               window.HWH5.navigateBack();
@@ -83,7 +85,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
         <button
           type="button"
           className="assistant-page-header__icon-btn"
-          aria-label="客服"
+          aria-label={t('common.service')}
           onClick={(event) => {
             runButtonClickWithDebounce(event, () => {
               onService();

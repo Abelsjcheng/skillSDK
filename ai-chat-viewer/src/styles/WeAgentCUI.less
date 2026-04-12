@@ -197,6 +197,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .we-agent-cui-chat-panel {
@@ -206,6 +207,7 @@
   flex-direction: column;
   width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
 
   > * + * {
     margin-top: 12px;
@@ -215,7 +217,8 @@
 .we-agent-cui-bottom {
   display: flex;
   flex-direction: column;
-  will-change: transform;
+  flex-shrink: 0;
+  overflow: hidden;
 
   > * + * {
     margin-top: 12px;

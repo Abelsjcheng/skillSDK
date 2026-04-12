@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { MessageBubble } from './MessageBubble';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
+import { useI18n } from '../i18n';
 import type { Message, QuestionAnswerSubmission } from '../types';
+import { MessageBubble } from './MessageBubble';
 import '../styles/Content.less';
 
 const TOP_LOAD_THRESHOLD = 24;
@@ -10,6 +11,7 @@ const BOTTOM_AUTO_SCROLL_THRESHOLD = 24;
 interface ContentProps {
   messages: Message[];
   welinkSessionId: string;
+  scrollToBottomSignal?: number;
   isLoadingHistory: boolean;
   hasMoreHistory: boolean;
   onLoadMoreHistory: () => void;
@@ -24,6 +26,7 @@ interface ContentProps {
 export const Content: React.FC<ContentProps> = ({
   messages,
   welinkSessionId,
+  scrollToBottomSignal = 0,
   isLoadingHistory,
   hasMoreHistory,
   onLoadMoreHistory,
@@ -34,6 +37,7 @@ export const Content: React.FC<ContentProps> = ({
   weAgentAssistantDescription = '',
   weAgentAssistantAvatar = '',
 }) => {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const preservingAnchorRef = useRef<{
     active: boolean;
@@ -46,7 +50,7 @@ export const Content: React.FC<ContentProps> = ({
   });
   const shouldAutoScrollRef = useRef(true);
 
-  const welcomeTitle = weAgentUserName ? `早上好，${weAgentUserName}` : '';
+  const welcomeTitle = weAgentUserName ? t('weAgent.welcomeMorning', { name: weAgentUserName }) : '';
   const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
   const welcomeAvatar = weAgentAssistantAvatar || assistantAvatar;
 
@@ -125,6 +129,22 @@ export const Content: React.FC<ContentProps> = ({
     shouldAutoScrollRef.current = true;
   }, [welinkSessionId]);
 
+  useEffect(() => {
+    if (scrollToBottomSignal <= 0) {
+      return undefined;
+    }
+
+    scrollToBottom();
+
+    const rafId = window.requestAnimationFrame(scrollToBottom);
+    const timerId = window.setTimeout(scrollToBottom, 80);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timerId);
+    };
+  }, [scrollToBottom, scrollToBottomSignal]);
+
   if (messages.length === 0) {
     return (
       <div className="content content--we-agent-cui">
@@ -147,7 +167,7 @@ export const Content: React.FC<ContentProps> = ({
     >
       <div className="messages-container messages-container--we-agent-cui">
         {!isLoadingHistory && !hasMoreHistory && (
-          <div className="history-status history-status--end">没有更多消息</div>
+          <div className="history-status history-status--end">{t('weAgent.noMoreMessages')}</div>
         )}
         {messages.map((message) => (
           <div key={message.id} data-message-id={message.id}>

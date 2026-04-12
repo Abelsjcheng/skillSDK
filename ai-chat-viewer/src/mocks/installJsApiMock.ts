@@ -39,6 +39,7 @@ interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<{ statusBarHeight: number }>;
+  getAppInfo?: () => Promise<{ language: string }>;
   getUserInfo?: () => Promise<{
     uid: string;
     userNameZH: string;
@@ -1397,6 +1398,20 @@ function ensureDefaultMockRouteQueryInHash(): void {
   }
 }
 
+function resolveMockLanguage(): string {
+  const query = new URLSearchParams(window.location.search);
+  const hashValue = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+  const hashQueryIndex = hashValue.indexOf('?');
+  const hashQuery = hashQueryIndex >= 0 ? new URLSearchParams(hashValue.slice(hashQueryIndex + 1)) : null;
+  const candidate = (query.get('language')
+    || query.get('lang')
+    || hashQuery?.get('language')
+    || hashQuery?.get('lang')
+    || '').trim().toLowerCase();
+
+  return candidate === 'en' ? 'en' : 'zh';
+}
+
 function ensureMockHWH5Bridge(): void {
   const hwh5 = (window.HWH5 ?? {}) as MockHWH5Bridge;
 
@@ -1419,6 +1434,10 @@ function ensureMockHWH5Bridge(): void {
 
   if (typeof hwh5.getDeviceInfo !== 'function') {
     hwh5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
+  }
+
+  if (typeof hwh5.getAppInfo !== 'function') {
+    hwh5.getAppInfo = async () => ({ language: resolveMockLanguage() });
   }
 
   if (typeof hwh5.getUserInfo !== 'function') {

@@ -4,6 +4,7 @@ import { Content } from './components/Content';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
 import { resolveAssistantIconUrl } from './components/createAssistant/constants';
+import { t as translate, useI18n } from './i18n';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   Message,
@@ -17,6 +18,7 @@ import {
 } from './utils/avatar';
 import {
   createNewSession,
+  getDeviceInfo,
   getHistorySessionsList,
   getSessionMessageHistory,
   getUserInfo,
@@ -64,6 +66,7 @@ const HISTORY_PAGE_SIZE = 20;
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
   const isIosKeyboardLiftEnabled = isIosMobileDevice();
+  const { t } = useI18n();
   const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -80,6 +83,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const [historySessionsCache, setHistorySessionsCache] = useState<SkillSession[] | null>(null);
   const [historySessionsLoaded, setHistorySessionsLoaded] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -114,15 +118,18 @@ function App({ assistantAccount = '' }: AppProps) {
     if (typeof window === 'undefined' || typeof window.HWH5?.onKeyboardHeightChange !== 'function') {
       return;
     }
-
+    let safeAreaInsetBottom = 0;
     const handleKeyboardHeightChange = (res: { height: number }) => {
-      const nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
+      let nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
+      nextHeight = nextHeight - 49 - safeAreaInsetBottom / window.devicePixelRatio;
       setKeyboardHeight(nextHeight > 0 ? nextHeight : 0);
     };
 
     const setupKeyboardHeightListener = async () => {
       try {
         await window.HWH5?.disableAutoPushUpPage?.({ status: true });
+        const deviceInfo = await getDeviceInfo()
+        safeAreaInsetBottom = deviceInfo.safeAreaInsetBottom;
       } catch (error) {
         console.error('disableAutoPushUpPage failed:', error);
       }
@@ -286,6 +293,7 @@ function App({ assistantAccount = '' }: AppProps) {
       knownUserMessageIdsRef.current = collectUserMessageIds(next);
       return next;
     });
+    setScrollToBottomSignal((prev) => prev + 1);
 
     return result;
   }, [welinkSessionId]);
@@ -322,7 +330,7 @@ function App({ assistantAccount = '' }: AppProps) {
     } catch (err) {
       console.error('Failed to submit question answer:', err);
       setSessionStatus('idle');
-      showToast('提交回答失败');
+      showToast(translate('weAgent.submitAnswerFailed'));
       throw err;
     }
   }, [finalizeStreamingMessage, sendUserMessage]);
@@ -357,7 +365,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       console.error('Failed to load more history messages:', err);
-      showToast('获取历史消息失败');
+      showToast(translate('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
@@ -368,7 +376,7 @@ function App({ assistantAccount = '' }: AppProps) {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
     const detail = detailsResult.weAgentDetailsArray?.[0];
     if (!detail) {
-      throw new Error('未获取到助理详情');
+      throw new Error(translate('weAgent.missingAssistantDetail'));
     }
 
     setWeAgentAssistantName(detail.name ?? '');
@@ -437,7 +445,7 @@ function App({ assistantAccount = '' }: AppProps) {
       } catch (err) {
         console.error('Failed to initialize weAgent session:', err);
         if (!disposed) {
-          showToast('初始化会话失败');
+          showToast(translate('weAgent.initSessionFailed'));
         }
       }
     };
@@ -481,7 +489,7 @@ function App({ assistantAccount = '' }: AppProps) {
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
-        showToast('获取历史消息失败');
+        showToast(translate('weAgent.loadHistoryFailed'));
       }
     };
 
@@ -698,7 +706,7 @@ function App({ assistantAccount = '' }: AppProps) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          appendAssistantErrorBlock(msg.error ?? '', 'AI 回复失败');
+          appendAssistantErrorBlock(msg.error ?? '', translate('weAgent.aiReplyFailed'));
           break;
 
         case 'error':
@@ -708,7 +716,7 @@ function App({ assistantAccount = '' }: AppProps) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          appendAssistantErrorBlock(msg.error ?? '', 'AI 回复失败');
+          appendAssistantErrorBlock(msg.error ?? '', translate('weAgent.aiReplyFailed'));
           break;
 
         case 'snapshot':
@@ -820,8 +828,8 @@ function App({ assistantAccount = '' }: AppProps) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
-      showToast('发送消息失败');
-      console.error('发送消息失败', err);
+      showToast(translate('weAgent.sendMessageFailed'));
+      console.error(translate('weAgent.sendMessageFailed'), err);
     }
   }, [welinkSessionId, sendUserMessage]);
 
@@ -838,7 +846,7 @@ function App({ assistantAccount = '' }: AppProps) {
     } catch (err) {
       suppressFooterAutoResetRef.current = false;
       console.error('Failed to stop skill:', err);
-      showToast('停止生成失败');
+      showToast(translate('weAgent.stopGenerateFailed'));
       setFooterMode('generating');
     }
   }, [welinkSessionId, finalizeStreamingMessage]);
@@ -850,7 +858,7 @@ function App({ assistantAccount = '' }: AppProps) {
     }
 
     if (messages.length === 0) {
-      showToast('当前是最新会话');
+      showToast(translate('weAgent.newestSession'));
       return;
     }
 
@@ -874,7 +882,7 @@ function App({ assistantAccount = '' }: AppProps) {
       });
     } catch (err) {
       console.error('Failed to create new session:', err);
-      showToast('新建会话失败');
+      showToast(translate('weAgent.createSessionFailed'));
     }
   }, [messages.length, resolveAssistantDetail, createSessionForAssistant]);
 
@@ -903,6 +911,9 @@ function App({ assistantAccount = '' }: AppProps) {
         'app-container--we-agent-cui',
         isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
       ].filter(Boolean).join(' ')}
+      style={isIosKeyboardLiftEnabled && keyboardHeight > 0
+        ? { height: `calc(100vh - ${keyboardHeight}px)` }
+        : undefined}
     >
       <div className="we-agent-cui-main">
         <div className="we-agent-cui-chat-panel">
@@ -910,6 +921,7 @@ function App({ assistantAccount = '' }: AppProps) {
             <Content
               messages={messages}
               welinkSessionId={welinkSessionId ?? ''}
+              scrollToBottomSignal={scrollToBottomSignal}
               isLoadingHistory={isLoadingHistory}
               hasMoreHistory={hasMoreHistory}
               onLoadMoreHistory={loadMoreHistory}
@@ -922,13 +934,8 @@ function App({ assistantAccount = '' }: AppProps) {
             />
           </div>
 
-          <div
-            className="we-agent-cui-bottom"
-            style={isIosKeyboardLiftEnabled && keyboardHeight > 0
-              ? { transform: `translate3d(0, -${keyboardHeight}px, 0)` }
-              : undefined}
-          >
-            <div className="we-agent-cui-actions" aria-label="多功能按钮区">
+          <div className="we-agent-cui-bottom">
+            <div className="we-agent-cui-actions" aria-label={t('weAgent.multiActionArea')}>
               <button
                 type="button"
                 className="we-agent-cui-actions__button"
@@ -937,7 +944,7 @@ function App({ assistantAccount = '' }: AppProps) {
                     void handleCreateSession();
                   });
                 }}
-                aria-label="新建会话"
+                aria-label={t('weAgent.newSession')}
               >
                 <img
                   className="we-agent-cui-actions__icon"
@@ -947,7 +954,7 @@ function App({ assistantAccount = '' }: AppProps) {
               </button>
               {isOutputting ? (
                 <div className="we-agent-cui-actions__status" aria-live="polite">
-                  输出中...
+                  {t('weAgent.outputting')}
                 </div>
               ) : null}
               <WeAgentHistorySidebar

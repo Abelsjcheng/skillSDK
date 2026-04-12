@@ -1,6 +1,7 @@
-import warningIcon from '../imgs/warn_icon.svg';
 import closeIcon from '../imgs/close_icon.svg';
+import warningIcon from '../imgs/warn_icon.svg';
 import { isPcMiniApp } from '../constants';
+import { t } from '../i18n';
 import '../styles/Toast.less';
 
 interface ToastOptions {
@@ -12,7 +13,13 @@ interface ToastOptions {
 const DEFAULT_DURATION = 2000;
 const DEFAULT_TOAST_CLASS_NAME = 'toast';
 const DEFAULT_HIDE_CLASS_NAME = 'toast-hide';
-const ICON_TOAST_CLASS_NAMES: Record<string, { icon: string; text: string; closeArea: string; closeButton: string; closeIcon: string }> = {
+const ICON_TOAST_CLASS_NAMES: Record<string, {
+  icon: string;
+  text: string;
+  closeArea: string;
+  closeButton: string;
+  closeIcon: string;
+}> = {
   toast: {
     icon: 'toast__icon',
     text: 'toast__text',
@@ -67,7 +74,7 @@ export function showToast(message: string, options?: ToastOptions): void {
       const closeButton = document.createElement('button');
       closeButton.type = 'button';
       closeButton.className = iconToastClassNames.closeButton;
-      closeButton.setAttribute('aria-label', '关闭提示');
+      closeButton.setAttribute('aria-label', t('toast.closeHint'));
       closeButton.addEventListener('click', removeToast);
 
       const closeButtonIcon = document.createElement('img');
