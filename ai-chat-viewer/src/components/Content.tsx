@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
-import { useI18n } from '../i18n';
 import type { Message, QuestionAnswerSubmission } from '../types';
 import { MessageBubble } from './MessageBubble';
 import '../styles/Content.less';
@@ -37,7 +37,7 @@ export const Content: React.FC<ContentProps> = ({
   weAgentAssistantDescription = '',
   weAgentAssistantAvatar = '',
 }) => {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const preservingAnchorRef = useRef<{
     active: boolean;

@@ -1,23 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import bannerEn from '../../imgs/banner-en.png';
+import banner from '../../imgs/banner.png';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
 import { INTERNAL_ASSISTANTS } from './constants';
-import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 import { CreatorStepFooter } from './CreatorStepFooter';
+import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 
 interface StepBrainSelectProps {
   isPcMiniApp?: boolean;
-  illustration: string;
   onClose: () => void;
   onCancel: () => void;
   onPrev: () => void;
   onConfirm: (payload: DigitalTwinBrainPayload) => void;
   loadAgentTypes?: () => Promise<InternalAssistantOption[]>;
 }
-
-const GUIDE_DOCUMENT_URL = '';
 
 async function defaultLoadAgentTypes(): Promise<InternalAssistantOption[]> {
   if (typeof window === 'undefined') {
@@ -41,13 +41,14 @@ async function defaultLoadAgentTypes(): Promise<InternalAssistantOption[]> {
 
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   isPcMiniApp = true,
-  illustration,
   onClose,
   onCancel,
   onPrev,
   onConfirm,
   loadAgentTypes,
 }) => {
+  const { t, i18n } = useTranslation();
+  const illustration = (i18n.resolvedLanguage ?? i18n.language) === 'en' ? bannerEn : banner;
   const [brainType, setBrainType] = useState<BrainType | undefined>('internal');
   const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>();
   const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>(INTERNAL_ASSISTANTS);
@@ -61,13 +62,13 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
       }
     } catch (error) {
       console.error('getAgentType failed in StepBrainSelect:', error);
-      showToast('获取内部助手列表失败');
+      showToast(t('createAssistant.loadInternalAssistantsFailed'));
       setInternalAssistants(INTERNAL_ASSISTANTS);
     }
-  }, [loadAgentTypes]);
+  }, [loadAgentTypes, t]);
 
   useEffect(() => {
-    fetchAgentTypes();
+    void fetchAgentTypes();
   }, [fetchAgentTypes]);
 
   const confirmEnabled = useMemo(
@@ -90,10 +91,12 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     });
   }, [brainType, confirmEnabled, onConfirm, selectedBizRobotId]);
 
-  const handleOpenGuideDocument = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    if (typeof window === 'undefined') return;
-    window.open(GUIDE_DOCUMENT_URL, '_blank');
+  const handleOpenGuideDocument = useCallback((url: string) => {
+    if (isPcMiniApp) {
+      (window as any)?.Pedestal.callMethod('method://pedestal/openUrl', url);
+    } else {
+      window?.HWH5.openWebview?.({ uri: url })
+    }
   }, []);
 
   return (
@@ -102,8 +105,12 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
       <div className="digital-twin__content digital-twin__content--step2">
         <div className="digital-twin__brain-type-block">
-          <h3 className="digital-twin__brain-title">请选择你的「个人助理」能力提供方：</h3>
-          <div className="digital-twin__brain-radios" role="radiogroup" aria-label="个人助理能力提供方">
+          <h3 className="digital-twin__brain-title">{t('createAssistant.brainTitle')}</h3>
+          <div
+            className="digital-twin__brain-radios"
+            role="radiogroup"
+            aria-label={t('createAssistant.brainTypeGroup')}
+          >
             <label className="digital-twin__radio-item">
               <input
                 type="radio"
@@ -111,7 +118,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                 checked={brainType === 'internal'}
                 onChange={() => handleBrainTypeChange('internal')}
               />
-              <span>内部提供方</span>
+              <span>{t('createAssistant.internalProvider')}</span>
             </label>
             <label className="digital-twin__radio-item">
               <input
@@ -120,7 +127,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                 checked={brainType === 'custom'}
                 onChange={() => handleBrainTypeChange('custom')}
               />
-              <span>自定义</span>
+              <span>{t('createAssistant.customProvider')}</span>
             </label>
           </div>
         </div>
@@ -128,7 +135,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         <div className="digital-twin__brain-detail">
           {brainType === 'internal' ? (
             <>
-              <h4 className="digital-twin__brain-subtitle">请选择</h4>
+              <h4 className="digital-twin__brain-subtitle">{t('createAssistant.brainSubtitle')}</h4>
               {internalAssistants.length > 0 ? (
                 <div className="digital-twin__assistant-grid">
                   {internalAssistants.map((assistant) => {
@@ -156,7 +163,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                           ) : null}
                           <span className="digital-twin__assistant-label">{assistant.name}</span>
                         </span>
-                        {selected ? <span className="digital-twin__check">✓</span> : null}
+                        {selected ? <span className="digital-twin__check">&#10003;</span> : null}
                       </button>
                     );
                   })}
@@ -167,42 +174,46 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
           {brainType === 'custom' ? (
             <p className="digital-twin__custom-tip">
-              需在本地电脑自定义部署第三方助手，点击查看
-              <a
-                href={GUIDE_DOCUMENT_URL}
+              {t('createAssistant.customTipPrefix')}
+              <span
                 className="digital-twin__custom-tip-link"
-                target="_blank"
-                rel="noreferrer"
-                onClick={handleOpenGuideDocument}
+                onClick={() => {
+                  handleOpenGuideDocument('');
+                }}
               >
-                指导文档→
-              </a>
+                {t('createAssistant.guideDocument')}
+              </span>
             </p>
           ) : null}
         </div>
 
         {brainType === 'internal' ? (
-          <a
-            href={GUIDE_DOCUMENT_URL}
-            className="digital-twin__brain-illustration-wrap"
-            target="_blank"
-            rel="noreferrer"
-            onClick={handleOpenGuideDocument}
-          >
-            <img className="digital-twin__brain-illustration" src={illustration} alt="个人助理插画" />
-          </a>
+          <img
+            className="digital-twin__brain-illustration"
+            src={illustration}
+            alt={t('createAssistant.illustrationAlt')}
+            onClick={() => {
+              handleOpenGuideDocument('');
+            }}
+          />
         ) : null}
       </div>
 
       <CreatorStepFooter
         isPcMiniApp={isPcMiniApp}
         pcButtons={[
-          { label: '取消', onClick: onCancel, variant: 'cancel' },
-          { label: '上一步', onClick: onPrev, variant: 'cancel' },
-          { label: '确定', onClick: handleConfirm, variant: 'confirm', enabled: confirmEnabled, withStateClass: true },
+          { label: t('createAssistant.cancel'), onClick: onCancel, variant: 'cancel' },
+          { label: t('createAssistant.prev'), onClick: onPrev, variant: 'cancel' },
+          {
+            label: t('createAssistant.confirm'),
+            onClick: handleConfirm,
+            variant: 'confirm',
+            enabled: confirmEnabled,
+            withStateClass: true,
+          },
         ]}
         mobileButton={{
-          label: '确定',
+          label: t('createAssistant.confirm'),
           onClick: handleConfirm,
           variant: 'confirm',
           enabled: confirmEnabled,

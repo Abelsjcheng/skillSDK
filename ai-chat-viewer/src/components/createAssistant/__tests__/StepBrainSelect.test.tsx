@@ -1,8 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StepBrainSelect } from '../StepBrainSelect';
-import { BRAIN_ILLUSTRATION } from '../constants';
 
-const Noop = () => {};
+const noop = () => {};
 
 describe('StepBrainSelect', () => {
   const getAgentTypeMock = jest.fn();
@@ -24,11 +23,10 @@ describe('StepBrainSelect', () => {
   it('enables confirm when selecting custom brain', async () => {
     render(
       <StepBrainSelect
-        illustration={BRAIN_ILLUSTRATION}
-        onClose={Noop}
-        onCancel={Noop}
-        onPrev={Noop}
-        onConfirm={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onPrev={noop}
+        onConfirm={noop}
       />,
     );
 
@@ -47,11 +45,10 @@ describe('StepBrainSelect', () => {
   it('keeps confirm disabled for internal brain before selecting an internal assistant', async () => {
     render(
       <StepBrainSelect
-        illustration={BRAIN_ILLUSTRATION}
-        onClose={Noop}
-        onCancel={Noop}
-        onPrev={Noop}
-        onConfirm={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onPrev={noop}
+        onConfirm={noop}
       />,
     );
 
@@ -66,11 +63,10 @@ describe('StepBrainSelect', () => {
   it('enables confirm after selecting an internal assistant and marks selected style', async () => {
     render(
       <StepBrainSelect
-        illustration={BRAIN_ILLUSTRATION}
-        onClose={Noop}
-        onCancel={Noop}
-        onPrev={Noop}
-        onConfirm={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onPrev={noop}
+        onConfirm={noop}
       />,
     );
 
@@ -86,11 +82,10 @@ describe('StepBrainSelect', () => {
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
     render(
       <StepBrainSelect
-        illustration={BRAIN_ILLUSTRATION}
-        onClose={Noop}
-        onCancel={Noop}
-        onPrev={Noop}
-        onConfirm={Noop}
+        onClose={noop}
+        onCancel={noop}
+        onPrev={noop}
+        onConfirm={noop}
       />,
     );
 
@@ -111,11 +106,10 @@ describe('StepBrainSelect', () => {
     const onPrevMock = jest.fn();
     render(
       <StepBrainSelect
-        illustration={BRAIN_ILLUSTRATION}
-        onClose={Noop}
-        onCancel={Noop}
+        onClose={noop}
+        onCancel={noop}
         onPrev={onPrevMock}
-        onConfirm={Noop}
+        onConfirm={noop}
       />,
     );
 

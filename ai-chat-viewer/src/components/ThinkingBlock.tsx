@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Components } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
@@ -6,7 +7,6 @@ import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import { useI18n } from '../i18n';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { MessagePart } from '../types';
 import { createMarkdownComponents } from './markdownComponents';
@@ -16,7 +16,7 @@ interface ThinkingBlockProps {
 }
 
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const prevStreamingRef = useRef(part.isStreaming);
   const markdownComponents = useRef<Components>(createMarkdownComponents());

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import AssistantCardList from '../components/assistant/AssistantCardList';
 import { isPcMiniApp } from '../constants';
-import { useI18n } from '../i18n';
 import type { AssistantItem } from '../types/assistant';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
@@ -35,7 +35,7 @@ function buildCreateAssistantSearch(): string {
 const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 

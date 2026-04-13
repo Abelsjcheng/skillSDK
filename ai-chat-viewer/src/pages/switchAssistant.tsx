@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import { isPcMiniApp } from '../constants';
-import { useI18n } from '../i18n';
+import { ensureLanguageInitialized } from '../i18n/config';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   DEFAULT_ASSISTANT_LIST_QUERY,
@@ -25,7 +26,7 @@ interface SwitchAssistantProps {
 
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
@@ -38,6 +39,10 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     () => mapWeAgentListToAssistantItems(assistantList),
     [assistantList],
   );
+
+  useEffect(() => {
+    void ensureLanguageInitialized();
+  }, []);
 
   const loadAssistantList = useCallback(async (): Promise<void> => {
     try {

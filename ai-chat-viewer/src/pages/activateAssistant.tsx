@@ -1,7 +1,10 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { APP_ID, isPcMiniApp } from '../constants';
+import activateGuideMobileEn from '../imgs/activate-guide-en.png';
 import activateGuideMobile from '../imgs/activate-guide.png';
+import activateGuidePcEn from '../imgs/activate-guide-pc-en.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { getWeAgentList, openH5Webview, type WeAgentListItem } from '../utils/hwext';
@@ -17,8 +20,16 @@ const DEFAULT_LIST_QUERY = {
 
 const ActivateAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
-  const activateGuideImage = isPc ? activateGuidePc : activateGuideMobile;
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  const isEnglish = i18n.resolvedLanguage === 'en' || i18n.language === 'en';
+  const activateGuideImage = isPc
+    ? isEnglish
+      ? activateGuidePcEn
+      : activateGuidePc
+    : isEnglish
+      ? activateGuideMobileEn
+      : activateGuideMobile;
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
 
   const loadAssistantList = useCallback(async (): Promise<WeAgentListItem[]> => {
@@ -29,11 +40,11 @@ const ActivateAssistant: React.FC = () => {
       return list;
     } catch (error) {
       console.error('getWeAgentList failed in ActivateAssistant:', error);
-      showToast('获取助理列表失败');
+      showToast(t('activateAssistant.loadFailed'));
       setAssistantList([]);
       return [];
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadAssistantList();
@@ -57,7 +68,7 @@ const ActivateAssistant: React.FC = () => {
       <div className="activate-assistant__center">
         <section className="activate-assistant__content">
           <div className="activate-assistant__carousel">
-            <img src={activateGuideImage} alt="激活助理引导图" className="activate-assistant__image" />
+            <img src={activateGuideImage} alt={t('activateAssistant.guideAlt')} className="activate-assistant__image" />
           </div>
         </section>
 
@@ -71,7 +82,7 @@ const ActivateAssistant: React.FC = () => {
               });
             }}
           >
-            选择助理
+            {t('activateAssistant.selectAssistant')}
           </button>
         </section>
       </div>

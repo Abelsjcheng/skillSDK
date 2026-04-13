@@ -253,6 +253,7 @@ interface Pedestal {
 
 interface HWH5Bridge {
   openWebview: (payload: { uri: string }) => void;
+  openIMChat?: (payload: { chatId: string }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
@@ -291,6 +292,7 @@ declare global {
     HWH5EXT?: HWH5EXT;
     Pedestal?: Pedestal;
     HWH5: HWH5Bridge;
+    onReceive?: (schema: string, payload: string) => void;
   }
 }
 
@@ -542,6 +544,14 @@ function toTrimmedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function toAppLanguage(value: string): 'zh' | 'en' {
+  if (isPcMiniApp()) {
+    return value === '1033' ? 'en' : 'zh'
+  } else {
+    return value === 'en' ? 'en' : 'zh'
+  }
+}
+
 export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   if (isPcMiniApp()) {
     return { statusBarHeight: 0, safeAreaInsetBottom: 0 };
@@ -560,13 +570,40 @@ export async function getStatusBarHeight(): Promise<number> {
 }
 
 export async function getAppInfo(): Promise<HWH5AppInfo> {
-  const result = await Promise.resolve(window.HWH5?.getAppInfo?.());
-  const appInfo = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+  try {
+    if (isPcMiniApp()) {
+      const language = window?.localStorage?.getItem('language') || '';
+      return {
+        language: toAppLanguage(language),
+      };
+    }
 
-  return {
-    ...appInfo,
-    language: toTrimmedString(appInfo.language) || 'zh',
-  };
+    const result = await window.HWH5?.getAppInfo?.();
+    const appInfo = (result && typeof result === 'object' ? result : {}) as HWH5AppInfo;
+
+    return {
+      language: toAppLanguage(appInfo.language),
+    };
+  } catch (error) {
+    return {
+      language: 'zh',
+    };
+  }
+}
+
+export function registerAppLanguageListener(listener: (language: 'zh' | 'en') => void): void {
+  if (isPcMiniApp()) {
+    window.onReceive = (schema: string, payload: string) => {
+      if (schema === '') {
+        const language = toAppLanguage(payload);
+        if (!language) {
+          return;
+        }
+        listener(language);
+      }
+    };
+    return;
+  }
 }
 
 export async function getUserInfo(): Promise<HWH5UserInfo> {

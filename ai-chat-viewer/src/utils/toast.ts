@@ -1,7 +1,5 @@
-import closeIcon from '../imgs/close_icon.svg';
 import warningIcon from '../imgs/warn_icon.svg';
 import { isPcMiniApp } from '../constants';
-import { t } from '../i18n';
 import '../styles/Toast.less';
 
 interface ToastOptions {
@@ -16,16 +14,10 @@ const DEFAULT_HIDE_CLASS_NAME = 'toast-hide';
 const ICON_TOAST_CLASS_NAMES: Record<string, {
   icon: string;
   text: string;
-  closeArea: string;
-  closeButton: string;
-  closeIcon: string;
 }> = {
   toast: {
     icon: 'toast__icon',
     text: 'toast__text',
-    closeArea: 'toast__close-area',
-    closeButton: 'toast__close-button',
-    closeIcon: 'toast__close-icon',
   },
 };
 
@@ -68,26 +60,8 @@ export function showToast(message: string, options?: ToastOptions): void {
       text.className = iconToastClassNames.text;
       text.textContent = message;
 
-      const closeArea = document.createElement('div');
-      closeArea.className = iconToastClassNames.closeArea;
-
-      const closeButton = document.createElement('button');
-      closeButton.type = 'button';
-      closeButton.className = iconToastClassNames.closeButton;
-      closeButton.setAttribute('aria-label', t('toast.closeHint'));
-      closeButton.addEventListener('click', removeToast);
-
-      const closeButtonIcon = document.createElement('img');
-      closeButtonIcon.className = iconToastClassNames.closeIcon;
-      closeButtonIcon.src = closeIcon;
-      closeButtonIcon.alt = '';
-      closeButtonIcon.setAttribute('aria-hidden', 'true');
-
-      closeButton.appendChild(closeButtonIcon);
-      closeArea.appendChild(closeButton);
       toast.appendChild(icon);
       toast.appendChild(text);
-      toast.appendChild(closeArea);
     } else {
       toast.textContent = message;
     }

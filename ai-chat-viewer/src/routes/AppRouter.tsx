@@ -1,13 +1,12 @@
 import React, { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import PersonalAssistantCreator from '../components/PersonalAssistantCreator';
-import { setLanguage } from '../i18n';
+import { ensureLanguageInitialized } from '../i18n/config';
 import ActivateAssistant from '../pages/activateAssistant';
 import AssistantDetail from '../pages/assistantDetail';
 import SelectAssistant from '../pages/selectAssistant';
 import SwitchAssistant from '../pages/switchAssistant';
 import WeAgentCUI from '../pages/weAgentCUI';
-import { getAppInfo } from '../utils/hwext';
 
 const FULL_PAGE_ROUTE_STYLE: React.CSSProperties = {
   width: '100vw',
@@ -16,27 +15,7 @@ const FULL_PAGE_ROUTE_STYLE: React.CSSProperties = {
 
 export const AppRouter: React.FC = () => {
   useEffect(() => {
-    let disposed = false;
-
-    const initializeLanguage = async () => {
-      try {
-        const appInfo = await getAppInfo();
-        if (!disposed) {
-          setLanguage(appInfo.language);
-        }
-      } catch (error) {
-        console.error('getAppInfo failed in AppRouter:', error);
-        if (!disposed) {
-          setLanguage('zh');
-        }
-      }
-    };
-
-    void initializeLanguage();
-
-    return () => {
-      disposed = true;
-    };
+    void ensureLanguageInitialized();
   }, []);
 
   return (

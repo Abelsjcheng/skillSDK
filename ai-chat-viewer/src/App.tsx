@@ -1,10 +1,10 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isIosMobileDevice, isPcMiniApp } from './constants';
 import { Content } from './components/Content';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
 import { resolveAssistantIconUrl } from './components/createAssistant/constants';
-import { t as translate, useI18n } from './i18n';
 import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   Message,
@@ -66,7 +66,7 @@ const HISTORY_PAGE_SIZE = 20;
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
   const isIosKeyboardLiftEnabled = isIosMobileDevice();
-  const { t } = useI18n();
+  const { t, i18n } = useTranslation();
   const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -88,7 +88,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
-  const assistantAccountRef = useRef(assistantAccount.trim());
+  const assistantAccountRef = useRef(assistantAccount);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
@@ -107,6 +107,7 @@ function App({ assistantAccount = '' }: AppProps) {
     errorMessage?: string;
   }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
+  const shouldUseEnglishUserName = (i18n.resolvedLanguage ?? i18n.language) === 'en';
 
   useEffect(() => {
     if (!isIosKeyboardLiftEnabled) {
@@ -168,7 +169,7 @@ function App({ assistantAccount = '' }: AppProps) {
           return prev;
         }
 
-        if (currentMessage.meta?.pending && finalParts.length === 0 && !finalText.trim()) {
+        if (currentMessage.meta?.pending && finalParts.length === 0 && !finalText) {
           return prev.filter((message) => message.id !== finalId);
         }
 
@@ -196,7 +197,7 @@ function App({ assistantAccount = '' }: AppProps) {
   }, []);
 
   const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
-    const normalizedMessage = message.trim() || fallbackMessage;
+    const normalizedMessage = message || fallbackMessage;
     const currentStreamingMessageId = streamingMsgIdRef.current;
     const assemblerText = assemblerRef.current.getText();
     const assemblerParts = assemblerRef.current
@@ -257,11 +258,11 @@ function App({ assistantAccount = '' }: AppProps) {
   }, []);
 
   const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
-    if (!welinkSessionId || !content.trim()) {
+    if (!welinkSessionId || !content) {
       return null;
     }
 
-    const trimmedContent = content.trim();
+    const trimmedContent = content?.trim();
     const tempId = genMessageId('user');
     const optimisticMessage: Message = {
       id: tempId,
@@ -299,8 +300,8 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [welinkSessionId]);
 
   const updateHistorySessionTitle = useCallback((sessionId: string, title: string) => {
-    const normalizedSessionId = sessionId.trim();
-    const nextTitle = title.trim();
+    const normalizedSessionId = sessionId;
+    const nextTitle = title;
     if (!normalizedSessionId || !nextTitle) {
       return;
     }
@@ -330,7 +331,7 @@ function App({ assistantAccount = '' }: AppProps) {
     } catch (err) {
       console.error('Failed to submit question answer:', err);
       setSessionStatus('idle');
-      showToast(translate('weAgent.submitAnswerFailed'));
+      showToast(t('weAgent.submitAnswerFailed'));
       throw err;
     }
   }, [finalizeStreamingMessage, sendUserMessage]);
@@ -365,7 +366,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       console.error('Failed to load more history messages:', err);
-      showToast(translate('weAgent.loadHistoryFailed'));
+      showToast(t('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
@@ -376,7 +377,7 @@ function App({ assistantAccount = '' }: AppProps) {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
     const detail = detailsResult.weAgentDetailsArray?.[0];
     if (!detail) {
-      throw new Error(translate('weAgent.missingAssistantDetail'));
+      throw new Error(t('weAgent.missingAssistantDetail'));
     }
 
     setWeAgentAssistantName(detail.name ?? '');
@@ -401,7 +402,7 @@ function App({ assistantAccount = '' }: AppProps) {
   );
 
   useEffect(() => {
-    assistantAccountRef.current = assistantAccount.trim();
+    assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
     knownUserMessageIdsRef.current.clear();
     setWeAgentAssistantName('');
@@ -412,7 +413,7 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [assistantAccount]);
 
   useEffect(() => {
-    const currentAssistantAccount = assistantAccountRef.current.trim();
+    const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
       console.error('缺少 assistantAccount 参数');
       return;
@@ -424,7 +425,7 @@ function App({ assistantAccount = '' }: AppProps) {
       try {
         const userInfo = await getUserInfo();
         if (!disposed) {
-          setWeAgentUserName(userInfo.userNameZH);
+          setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
           setWeAgentUserAvatar(buildCorpUserAvatar(userInfo.corpUserId));
         }
 
@@ -445,7 +446,7 @@ function App({ assistantAccount = '' }: AppProps) {
       } catch (err) {
         console.error('Failed to initialize weAgent session:', err);
         if (!disposed) {
-          showToast(translate('weAgent.initSessionFailed'));
+          showToast(t('weAgent.initSessionFailed'));
         }
       }
     };
@@ -455,7 +456,7 @@ function App({ assistantAccount = '' }: AppProps) {
     return () => {
       disposed = true;
     };
-  }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
+  }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant, shouldUseEnglishUserName]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -489,7 +490,7 @@ function App({ assistantAccount = '' }: AppProps) {
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         console.error('Failed to load messages:', err);
-        showToast(translate('weAgent.loadHistoryFailed'));
+        showToast(t('weAgent.loadHistoryFailed'));
       }
     };
 
@@ -583,7 +584,7 @@ function App({ assistantAccount = '' }: AppProps) {
         }
 
         case 'message.user': {
-          const messageId = msg.messageId?.trim();
+          const messageId = msg.messageId;
           if (!messageId || knownUserMessageIdsRef.current.has(messageId)) {
             break;
           }
@@ -676,7 +677,7 @@ function App({ assistantAccount = '' }: AppProps) {
           break;
 
         case 'session.title': {
-          const sessionId = String(msg.welinkSessionId ?? welinkSessionId ?? '').trim();
+          const sessionId = String(msg.welinkSessionId ?? welinkSessionId ?? '');
           const nextTitle = typeof msg.title === 'string' ? msg.title : '';
           updateHistorySessionTitle(sessionId, nextTitle);
           break;
@@ -706,7 +707,7 @@ function App({ assistantAccount = '' }: AppProps) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          appendAssistantErrorBlock(msg.error ?? '', translate('weAgent.aiReplyFailed'));
+          appendAssistantErrorBlock(msg.error ?? '', t('weAgent.aiReplyFailed'));
           break;
 
         case 'error':
@@ -716,7 +717,7 @@ function App({ assistantAccount = '' }: AppProps) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          appendAssistantErrorBlock(msg.error ?? '', translate('weAgent.aiReplyFailed'));
+          appendAssistantErrorBlock(msg.error ?? '', t('weAgent.aiReplyFailed'));
           break;
 
         case 'snapshot':
@@ -815,7 +816,7 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage, ensurePendingAssistantMessage, updateHistorySessionTitle, sendUserMessage]);
 
   const handleGenerate = useCallback(async (content: string) => {
-    if (!welinkSessionId || !content.trim()) return;
+    if (!welinkSessionId || !content) return;
 
     setSessionStatus('busy');
     setFooterMode('generating');
@@ -828,8 +829,8 @@ function App({ assistantAccount = '' }: AppProps) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
-      showToast(translate('weAgent.sendMessageFailed'));
-      console.error(translate('weAgent.sendMessageFailed'), err);
+      showToast(t('weAgent.sendMessageFailed'));
+      console.error(t('weAgent.sendMessageFailed'), err);
     }
   }, [welinkSessionId, sendUserMessage]);
 
@@ -846,19 +847,19 @@ function App({ assistantAccount = '' }: AppProps) {
     } catch (err) {
       suppressFooterAutoResetRef.current = false;
       console.error('Failed to stop skill:', err);
-      showToast(translate('weAgent.stopGenerateFailed'));
+      showToast(t('weAgent.stopGenerateFailed'));
       setFooterMode('generating');
     }
   }, [welinkSessionId, finalizeStreamingMessage]);
 
   const handleCreateSession = useCallback(async () => {
-    const currentAssistantAccount = assistantAccountRef.current.trim();
+    const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
       return;
     }
 
     if (messages.length === 0) {
-      showToast(translate('weAgent.newestSession'));
+      showToast(t('weAgent.newestSession'));
       return;
     }
 
@@ -882,12 +883,12 @@ function App({ assistantAccount = '' }: AppProps) {
       });
     } catch (err) {
       console.error('Failed to create new session:', err);
-      showToast(translate('weAgent.createSessionFailed'));
+      showToast(t('weAgent.createSessionFailed'));
     }
   }, [messages.length, resolveAssistantDetail, createSessionForAssistant]);
 
   const handleSwitchWeAgentSession = useCallback((nextWelinkSessionId: string) => {
-    const normalizedSessionId = nextWelinkSessionId.trim();
+    const normalizedSessionId = nextWelinkSessionId;
     if (!normalizedSessionId || normalizedSessionId === welinkSessionId) {
       return;
     }

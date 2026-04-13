@@ -157,7 +157,7 @@ interface CreateDigitalTwinParams {
      - `internal`：显示 3x2 按钮组（由 `window.getAgentType()` 动态提供）；
      - `custom`：显示提示文案。
    - 内部助手数据请求过程中及空结果场景均不展示“内部助手加载中...”与“暂无可用内部助手”文案。
-4. 内容区新增第三容器用于展示插画，尺寸为 `height: 114px; width: 100%`，圆角半径 `12px`。
+4. 内容区新增第三容器用于展示插画，尺寸为 `height: 114px; width: 100%`，圆角半径 `12px`；插画由 `StepBrainSelect` 组件内部直接从 `src/imgs` 静态导入，按当前国际化语言切换：中文使用 `banner.png`，英文使用 `banner-en.png`，不再通过父组件 props 透传。插画本身直接使用单个 `img` 标签渲染并绑定点击打开指导文档，不再额外包裹 `a` 或 `div` 容器。
 5. 操作区使用 `padding: 16px 24px 12px`，按钮右对齐。
    - 按钮顺序为：取消 / 上一步 / 确定；
    - “上一步”按钮样式与“取消”一致（`64x28`、圆角 `4px`、浅灰背景）。
@@ -222,7 +222,7 @@ interface CreateDigitalTwinParams {
    - 文件大小超限（`>= 2MB`）使用 toast 提示：`图片大小需小于2MB`
    - 文件格式不合法使用 toast 提示：`仅支持JPG/PNG格式`
    - 页面 1 不再维护 `avatarError` 组件内错误文本状态
-3. 页面 1 上传校验 toast 按端分流：PC 端采用统一自定义结构（高度固定 `46px`、宽度按内容自适应、白底圆角 `8px`、`padding: 12px 16px`、顶部 `50px` 水平居中；左侧 `14x14` 警告图标来自 `src/imgs`，与右侧错误文案间距 `8px`；文案样式 `14px/400`、`rgba(25,25,25,1)`；右侧增加固定宽度 `40px` 的关闭操作区，内部放置 `8x8` 关闭图标按钮，点击后立即关闭 toast）；移动端统一调用宿主 `HWH5.showToast({ msg, type: 'w' })`，不再渲染页面内自定义 toast。
+3. 页面 1 上传校验 toast 按端分流：PC 端采用统一自定义结构（高度固定 `46px`、宽度按内容自适应、白底圆角 `8px`、`padding: 12px 16px`、顶部 `50px` 水平居中；左侧 `14x14` 警告图标来自 `src/imgs`，与右侧错误文案间距 `8px`；文案样式 `14px/400`、`rgba(25,25,25,1)`）；移动端统一调用宿主 `HWH5.showToast({ msg, type: 'w' })`，不再渲染页面内自定义 toast。
 4. 点击头像项即切换选中态并更新预览区。
 5. 页面切换不清空已输入数据。
 6. 点击“上一步”时从页面 2 返回页面 1，且页面 1 的头像选择、名称和简介保持不变。
@@ -313,7 +313,11 @@ interface CreateDigitalTwinParams {
    - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
    - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
    - 页面根容器背景统一使用纯色：`rgba(244,247,253,1)`。
-2. 内容区仅展示第一张本地图片资源 `src/imgs/activate-guide-1.svg`，不再保留轮播状态与指示器逻辑。
+2. 内容区仅展示本地引导图资源，不再保留轮播状态与指示器逻辑；图片选择规则统一按端类型与当前国际化语言确定：
+   - PC 中文：`src/imgs/activate-guide-pc.png`
+   - PC 英文：`src/imgs/activate-guide-pc-en.png`
+   - 移动中文：`src/imgs/activate-guide.png`
+   - 移动英文：`src/imgs/activate-guide-en.png`
 3. “选择助理/立即启用”按钮按端区分样式：移动端使用 `250x38`、圆角 `99px`；PC 端使用 `140x32`、圆角 `4px`；背景统一为线性渐变 `linear-gradient(90deg, #1f78ff 0%, #42b0ff 100%)`，当前版本点击事件空实现（预留业务接入）。
 
 ## 13. 依赖版本兼容决策
@@ -330,10 +334,10 @@ interface CreateDigitalTwinParams {
    - `isPcMiniApp === false`（移动）：沿用现有 `44px` 高度与左侧返回+客服按钮布局。
 4. 内容区改为通过内边距控制与标题区间距，使用 `padding: 12px 16px 16px`（上 `12px`、左右 `16px`），包含三个白底圆角卡片（圆角 `8px`）：
    - 卡片 1：头像（`72x72`，圆角 `19px`）+ 名称“小咪”+ 标签“员工助手”；名称文本需独立水平居中，标签不参与名称居中计算；
-   - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行（左“创建者”，右 `creatorName + ' ' + createdBy`）；
-   - 卡片 3：组织信息两行（“部门/测试”“责任人/测试”），其中“责任人”值展示为 `ownerName + ' ' + ownerWelinkId`，行样式与创建者行保持一致；“部门”这一行的 label 与值之间固定间距 `16px`，值允许自动换行显示。
+   - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行；创建者右侧值按当前语言选择：中文使用 `creatorName + ' ' + createdBy`，英文使用 `creatorNameEn + ' ' + createdBy`；
+   - 卡片 3：内部助理场景仅展示 1 行“能力提供方 / displayTag”，不再展示“部门/责任人”；外部助理场景继续展示 `APPID` 与 `密钥` 两行。
    - 卡片 2 中“助理简介内容”和“创建者行”之间增加 `1px solid rgba(0,0,0,0.05)` 分割线；
-   - 卡片 3 中“部门”与“责任人”两行之间增加 `1px solid rgba(0,0,0,0.05)` 分割线。
+   - 卡片 3 仅在外部助理双行场景下保留上下分层布局；内部助理单行场景不再需要“部门/责任人”之间的分割线。
    - 标题区与头像区域相关图标/图片均通过 `src/imgs` 静态资源导入，不再使用内联 SVG 或纯色块占位。
 5. 页面为静态展示页，当前版本不接入接口与状态管理；按钮点击仅保留空实现占位，后续按业务接入。
 
@@ -394,17 +398,19 @@ interface CreateDigitalTwinParams {
    - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px; background: #fff`；
    - placeholder 固定为“有问题尽管问我~”；
    - 发送按钮为 `24x24` 图标按钮，图标尺寸 `20x20`。
-8. 样式文件 `src/styles/WeAgentCUI.less` 负责维护 WeAgentCUI 布局，class 前缀统一使用 `we-agent-cui-`。
-9. 新增图标资源：
+8. iOS 端 `WeAgentCUI` 输入框唤起软键盘时，不再通过对底部输入区做 `transform` 上抬来规避遮挡；改为继续监听 `HWH5.onKeyboardHeightChange`，并将键盘高度写入页面根容器的布局变量，由 `we-agent-cui-main` 按真实高度缩减可视区域。键盘打开期间页面外层需保持 `overflow: hidden`，只允许消息内容区内部滚动，避免 iOS WebView 暴露整页滚动条。
+9. `WeAgentCUI` 内容区滚动容器需保持“可滚动但隐藏滚动条”的策略；除通用 `.content` 样式外，还需对 `.content--we-agent-cui` 单独补充 `scrollbar-width: none`、`-ms-overflow-style: none` 与 `::-webkit-scrollbar { display: none; width: 0; height: 0; }`，尽量降低 iOS WebView 中系统滚动指示条的可见概率。
+10. 样式文件 `src/styles/WeAgentCUI.less` 负责维护 WeAgentCUI 布局，class 前缀统一使用 `we-agent-cui-`。
+11. 新增图标资源：
    - `src/imgs/icon-we-agent-new-session.svg`
    - `src/imgs/icon-we-agent-history.svg`
    - `src/imgs/icon-we-agent-send.svg`
-10. `aiChat` 页面及其相关逻辑已移除，不再保留 `variant` 分支与 `/aiChat` 路由。
-11. 在 `weAgentCUI` 变体下，当消息列表为空时，`Content` 区渲染欢迎块（头像 + 标题 + 副标题），样式规则如下：
+12. `aiChat` 页面及其相关逻辑已移除，不再保留 `variant` 分支与 `/aiChat` 路由。
+13. 在 `weAgentCUI` 变体下，当消息列表为空时，`Content` 区渲染欢迎块（头像 + 标题 + 副标题），样式规则如下：
    - 顶部间距 `27px`；
    - 纵向 `12px` 间距、水平居中；
    - 头像容器 `72x72`，圆角 `124px`，白色 `2px` 边框；
-   - 标题文本使用运行时用户信息动态生成（如存在 `weAgentUserName` 则展示 `早上好，${weAgentUserName}`），样式 `18px/500/26px`、`rgba(25,25,25,1)`；
+   - 标题文本使用运行时用户信息动态生成（如存在 `weAgentUserName` 则展示 `早上好，${weAgentUserName}`）；其中 `weAgentUserName` 按当前国际化语言选择用户字段：中文取 `userNameZH`，英文取 `userNameEN`，样式 `18px/500/26px`、`rgba(25,25,25,1)`；
    - 副标题文本使用运行时助理信息动态拼接（`weAgentAssistantName | weAgentAssistantDescription`），样式 `14px/400/22px`、`rgba(89,89,89,1)`；
    - 不为欢迎标题和副标题提供默认兜底文案；当对应数据为空时直接不渲染文本节点。
 12. `WeAgentCUI` 消息区不保留“复制消息”“发送到IM”入口，`App -> Content -> MessageBubble` 组件链路中移除 `onCopy`、`onSendToIM` 参数透传。
@@ -450,6 +456,33 @@ interface CreateDigitalTwinParams {
 2. 这样既满足“脚本归档在 `.build_config`”的整理诉求，也兼容外部仍通过 `node ./build.js ${appid}` 执行的现有习惯。
 3. `indexURL` 的 host 更新使用 `URL` 解析后写回，不手写字符串替换，避免未来 `indexURL` 带 query/hash 时被误改。
 4. 脚本只修改 `plugin.json` 的 `indexURL` 与 `appId`，不引入额外构建流程依赖，也不改动其他字段。
+
+## 20. 国际化方案迁移设计
+
+1. `ai-chat-viewer` 的国际化底座从项目内自研轻量实现迁移为 `react-i18next + i18next`，统一收口到社区标准能力，便于后续扩展语言包、命名空间与按需加载。
+2. 迁移后不再保留 `src/i18n/index.ts` 这一层自定义运行时封装；组件内统一直接使用 `useTranslation()`，非 React 模块统一直接引用 `i18n` 实例调用 `i18n.t(...)`。
+3. 现有文案 key 体系保持不变，继续使用扁平 key 形式（如 `weAgent.outputting`、`codeBlock.copy`），避免业务层在本轮迁移中同时改动 key 命名和调用方式。
+4. `src/i18n` 目录调整为标准资源组织：
+   - `src/i18n/config.ts`：负责初始化 `i18next`、注册 `react-i18next`、导出 `i18n` 实例与语言标准化方法；
+   - `src/i18n/resources/zh.ts`、`src/i18n/resources/en.ts`：分别维护中英文资源；
+   - `src/i18n/types.ts`：提供资源类型声明与 `i18next` 模块增强，尽量保留 key 的类型约束能力。
+5. 启动语言初始化继续复用 `getAppInfo().language`：语言来源兼容统一在 [hwext.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/utils/hwext.ts) 的 `getAppInfo()` 函数内部实现，通过 `isPcMiniApp()` 区分端类型，移动端直接读取 `window.HWH5.getAppInfo()`，PC 端直接读取 `window.localStorage?.getItem('language')`，并在该函数内部统一映射为 `{ language: 'zh' | 'en' }`。前端 `normalizeLanguage` 仅作为最后一道兜底，兼容 `1033 -> en`、`2052 -> zh` 以及 `en-US` / `zh-CN` 等旧值，再调用 `i18n.changeLanguage(...)`。
+6. PC 端新增运行时语言桥接：在 `hwext.ts` 中统一封装宿主 `window.onReceive(payload)` 监听，其中 `2052` 映射为 `zh`、`1033` 映射为 `en`；应用初始化时注册一次监听，收到合法语言值后直接通知 `i18n` 单例执行 `changeLanguage`，不增加 `localStorage` 回写、旧回调链保留等额外兼容逻辑。
+7. 页面入口需在最早阶段引入 `src/i18n/config.ts`，确保首次渲染前完成国际化实例初始化，避免首屏出现未初始化或文案闪动；同时在该配置层内注册运行时语言监听。
+8. 本轮迁移范围优先覆盖当前已接入自研 i18n 的链路：
+   - `App.tsx`
+   - `routes/AppRouter.tsx`
+   - `utils/toast.ts`
+   - `utils/streaming.ts`
+   - `activateAssistant`
+   - `createAssistant` / `PersonalAssistantCreator` / `StepBasicInfo` / `StepBrainSelect` / `CreatorStepHeader`
+   - `assistantDetail`
+   - `selectAssistant` / `switchAssistant`
+   - `CodeBlock` / `PermissionCard` / `QuestionCard` / `ThinkingBlock`
+   - `Content` / `AssistantPageHeader` / `WeAgentCUIFooter` / `WeAgentHistorySidebar`
+9. 当前尚未纳入国际化体系的硬编码中文页面和组件不在本轮库迁移中强制一并改造；本轮目标是在完成底座迁移后，逐页补齐剩余文案，且 `activateAssistant`、创建助理相关页面与 `assistantDetail` 已纳入当前覆盖范围。
+10. 旧的 `src/i18n/messages.ts` 不再作为运行时词典入口保留；原有资源内容拆分迁移到 `resources/zh.ts` 与 `resources/en.ts` 后，可直接删除旧文件，避免双套词典并存。
+11. 非 React 场景（如 toast、streaming、工具层辅助方法）禁止继续自定义包装 `t()`；统一直接依赖单例 `i18n`，减少额外抽象层。
 
 
 

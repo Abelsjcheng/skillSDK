@@ -1,8 +1,8 @@
 import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import checkIcon from '../../imgs/check.svg';
 import sendIcon from '../../imgs/send_icon.svg';
 import stopIcon from '../../imgs/stop_icon.svg';
-import { useI18n } from '../../i18n';
 import '../../styles/WeAgentCUIFooter.less';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
@@ -28,7 +28,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   onStop,
   leftActions,
 }) => {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);

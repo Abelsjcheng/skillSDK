@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useI18n } from '../i18n';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import copyIcon from '../imgs/icon-copy.svg';
 import '../styles/CodeBlock.less';
@@ -33,7 +33,7 @@ function normalizeLanguage(language?: string): string {
 }
 
 export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

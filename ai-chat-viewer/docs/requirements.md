@@ -138,9 +138,6 @@
      - 左侧为警告图标（从 `src/imgs` 导入），尺寸 `14px x 14px`；
      - 图标与文案间距：`8px`；
      - 右侧错误文案样式：`14px / 400`，颜色 `rgba(25,25,25,1)`。
-     - 弹窗右侧新增固定宽度 `40px` 的关闭操作区；
-     - 关闭操作区内为关闭按钮，按钮图标从 `src/imgs` 导入，尺寸 `8px x 8px`；
-     - 点击关闭按钮后需立即关闭当前 toast。
    - 移动端统一调用宿主已有 `HWH5.showToast()` 能力展示，不再渲染页面内自定义 toast；
    - `HWH5.showToast()` 入参仅传 `{ msg, type: 'w' }`，其中 `msg` 为提示文本。
 
@@ -305,6 +302,11 @@
 1. 作为内容区第三个容器显示一张插画。
 2. 尺寸：高度 `114px`，宽度自适应占满一行（`100%`）。
 3. 圆角半径：`12px`。
+4. 插画资源由 `StepBrainSelect` 组件内部直接从 `src/imgs` 导入使用，不再通过父组件 props 透传，也不再使用内联 SVG / data URI。
+5. 插画按当前国际化语言切换：
+   - 中文使用 `src/imgs/banner.png`
+   - 英文使用 `src/imgs/banner-en.png`
+6. 个人助理插画需要支持点击打开指导文档；插画本身直接使用单个 `img` 标签承载点击事件，不再额外包裹 `a` 或 `div` 容器。
 
 ### 5.4 操作按钮区
 
@@ -464,9 +466,11 @@
    - 移动端（`isPcMiniApp === false`）图片容器尺寸为 `322px x 350px`；
    - PC 端（`isPcMiniApp === true`）图片容器尺寸为 `500px x 347px`；
    - 图片自适应容器大小展示；
-   - 激活引导图按端区分：
-      - `isPcMiniApp === true`（PC）使用 `src/imgs/activate-guide-pc.png`；
-      - `isPcMiniApp === false`（移动）使用 `src/imgs/activate-guide.png`；
+   - 激活引导图按端与语言共同区分：
+      - `isPcMiniApp === true`（PC）且当前语言为中文时，使用 `src/imgs/activate-guide-pc.png`；
+      - `isPcMiniApp === true`（PC）且当前语言为英文时，使用 `src/imgs/activate-guide-pc-en.png`；
+      - `isPcMiniApp === false`（移动）且当前语言为中文时，使用 `src/imgs/activate-guide.png`；
+      - `isPcMiniApp === false`（移动）且当前语言为英文时，使用 `src/imgs/activate-guide-en.png`；
    - 不展示轮播按钮区域。
 2. 操作区：
    - 移动端按钮距离图片 `63px`；
@@ -504,23 +508,25 @@
       - 容器 2：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding: 12px 12px 0 12px`。
       - 容器 2 内助理简介标题：左对齐，文本 `助理简介`，字体 `14px/500/22px`，颜色 `rgba(51,51,51,1)`。
        - 容器 2 内助理简介内容：距离标题 `8px`，宽度占满，高度自适应，文本 `你的全能AI生活助理`，字体 `14px/400/22px`，颜色 `rgba(102,102,102,1)`。
-       - 容器 2 内创建者块：距离简介块 `12px`，高度 `48px`，宽度占满，左文案 `创建者`（`14px/500/22px`，`rgba(51,51,51,1)`），右文案展示 `creatorName + ' ' + createdBy`（`14px/400/22px`，`rgba(102,102,102,1)`）。
+       - 容器 2 内创建者块：距离简介块 `12px`，高度 `48px`，宽度占满，左文案 `创建者`（`14px/500/22px`，`rgba(51,51,51,1)`），右文案按当前语言展示：
+         - 中文：`creatorName + ' ' + createdBy`
+         - 英文：`creatorNameEn + ' ' + createdBy`
+         - 样式统一为 `14px/400/22px`，`rgba(102,102,102,1)`。
        - 助理简介块与创建者块之间增加描边：`1px solid rgba(0,0,0,0.05)`。
        - 容器 3：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding-left: 12px; padding-right: 12px;`。
-      - 容器 3 内两个 item 样式与创建者块一致，按 `bizRobotId` 分支展示：
+      - 容器 3 内 item 样式与创建者块一致，按 `bizRobotId` 分支展示：
          - `bizRobotId` 有值（内部助理）：
-            - item 1：左侧 `部门`，右侧展示 `ownerDeptName`；
-            - item 2：左侧 `责任人`，右侧展示 `ownerName + ' ' + ownerWelinkId`。
+            - 仅展示 1 个 item：左侧 `能力提供方`，右侧展示 `displayTag`；
+            - 不再展示 `部门` 与 `责任人`。
          - `bizRobotId` 为空（外部助理）：
             - item 1：左侧 `APPID`，右侧展示 `appKey`；
             - item 2：左侧 `密钥`，右侧展示 `appSecret` 的掩码文本（`*`）；
             - 右侧密钥支持按压查看：按下显示明文，松手恢复 `*` 掩码。
-      - 容器 3 中 `部门` 行的 label 与值之间固定间距 `16px`，部门值允许按多行自动换行显示，不再使用横向滚动承载。
-      - 容器 3 中 `责任人`、`APPID`、`密钥` 对应右侧值显示块保持不溢出容器边界。
-      - “部门”与“责任人”两个 item 之间增加描边：`1px solid rgba(0,0,0,0.05)`。
+      - 容器 3 中 `能力提供方`、`APPID`、`密钥` 对应右侧值显示块保持不溢出容器边界。
+      - 内部助理场景下，容器 3 不再渲染第二行组织信息，也不再展示“部门/责任人”之间的描边分割。
 4. 数据渲染约束：
    - 页面展示数据全部来自 `getWeAgentDetails` 接口返回；
-   - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、部门、责任人、头像）。
+   - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、能力提供方、头像）。
    - 助理类型判断规则：`bizRobotId` 有值视为内部助理，`bizRobotId` 为空视为外部助理。
 
 ## 15. 切换助理页面
@@ -604,7 +610,7 @@
    - 第一行为“对话人名+发送时间 + 头像”，二者间距 `4px`，整行靠右。
    - 文本样式：`12px / 400 / 20px`，颜色 `rgba(57,57,57,1)`，示例：`测试 2026-04-13 08:07`。
    - 头像尺寸：`24px x 24px`，圆角 `12px`。
-   - 用户名数据来源：`window.HWH5.getUserInfo()` 返回 `userNameZH`。
+   - 用户名数据来源：`window.HWH5.getUserInfo()` 返回的用户信息；当前语言为中文时取 `userNameZH`，当前语言为英文时取 `userNameEN`。
    - 发送后用户消息时间来源：`sendMessage` 返回结果中的 `createdAt`。
    - 用户头像来源：静态在线地址 `https://` 拼接 `getUserInfo` 返回的 `corpUserId`。
    - 消息内容块距第一行 `4px`，圆角 `24px 0 24px 24px`，`padding: 10px 20px`，背景 `linear-gradient(270deg, rgba(13,148,255,1), rgba(22,115,246,1) 100%)`，文字白色 `14px / 400 / 22px`。
@@ -634,6 +640,8 @@
    - 内部左侧输入框与右侧发送按钮间距 `8px`。
    - 输入框 placeholder：`有问题尽管问我~`。
    - 发送按钮尺寸 `24px x 24px`，发送图标尺寸 `20px x 20px`。
+   - iOS 端唤起软键盘后，不允许通过 `transform` 将底部输入区视觉上移；需改为根据键盘高度真实缩减 `WeAgentCUI` 主内容区高度，并保持页面外层不可滚动，仅消息区内部可滚动。
+   - `WeAgentCUI` 内容区滚动容器需隐藏滚动条：补充 `scrollbar-width: none`、`-ms-overflow-style: none`，并对 `::-webkit-scrollbar` 使用 `display: none; width: 0; height: 0;`，保持消息区可滚动但默认不显示滚动条。
 8. 当对话内容区消息为空时，显示欢迎块：
    - 欢迎块距离内容区顶部 `27px`；
    - 欢迎块内包含 3 个容器，容器间距 `12px`，内容均水平居中；
@@ -952,6 +960,37 @@
    - `indexURL`：仅替换 URL 的 host 值为传入的 `appid`，保留原协议、路径、query、hash 不变
 5. 当前 `plugin.json` 默认形态为 `h5://<host>/index.html`，脚本需兼容自定义 scheme 的解析，不允许通过简单字符串拼接破坏原有 URL 结构。
 6. 脚本应保持输出最小可读：成功时打印目标文件路径和最终写入的 `appid`，失败时打印明确原因。
+
+## 24. 国际化底座迁移需求
+
+1. `ai-chat-viewer` 当前自研国际化实现需迁移到 `react-i18next` 第三方方案，后续页面和组件统一基于标准 `i18next` 实例工作。
+2. 本轮迁移后不保留 [src/i18n/index.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/index.ts)；原先通过该文件导出的 `t`、`useI18n`、`setLanguage` 等能力全部移除。
+3. 国际化资源目录需调整为：
+   - [src/i18n/config.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/config.ts)
+   - [src/i18n/resources/zh.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/resources/zh.ts)
+   - [src/i18n/resources/en.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/resources/en.ts)
+   - [src/i18n/types.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/types.ts)
+4. 当前已有文案 key 不调整命名方式，继续沿用扁平 key 形式，避免页面改造时同时重命名资源 key。
+5. 组件内国际化调用统一使用 `useTranslation()`：
+   - 不再引入 `useI18n()`
+   - 不再使用项目自定义 hook 包装层
+6. 非 React 模块国际化调用统一直接引用 `i18n` 实例并使用 `i18n.t(...)`：
+   - 适用范围包括 toast、streaming、辅助工具模块
+   - 不再额外保留项目级 `t()` 包装函数
+7. 启动语言初始化仍以 `getAppInfo().language` 为准，语言来源兼容统一收口到 [src/utils/hwext.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/utils/hwext.ts) 的 `getAppInfo()` 函数内部：
+   - 通过 `isPcMiniApp()` 区分端类型；
+   - 移动端直接调用 `window.HWH5.getAppInfo()` 并读取返回值中的 `language`；
+   - PC 端直接调用 `window.localStorage?.getItem('language')` 读取语言值；
+   - `getAppInfo()` 最终统一返回 `{ language: 'zh' | 'en' }`，业务层与页面层不再区分 PC/移动语言来源。
+   - PC 端需新增运行时语言变化监听：应用初始化时注册宿主回调 `window.onReceive = (payload) => {}`，`payload='2052'` 表示中文、`payload='1033'` 表示英文；收到监听后直接更新 `i18next` 当前语言即可，不额外承担本地存储回写或其他桥接兼容逻辑。
+8. 前端 `normalizeLanguage` 继续保留为最后一道兜底兼容，兼容规则需覆盖：
+   - `en` / `en-US` / `en_US` / `1033` 统一归为 `en`
+   - `zh` / `zh-CN` / `zh_CN` / `2052` 统一归为 `zh`
+   - 其他值统一回退到 `zh`
+9. 页面入口需在应用启动时优先初始化国际化配置，确保根组件渲染前 `i18next` 已完成实例注册。
+10. 本轮迁移优先覆盖当前已经接入国际化的页面、组件和工具模块，要求迁移后展示文案与迁移前保持一致；其中 `activateAssistant` 页面、`createAssistant` 页面与 `assistantDetail` 页面需补齐接入现有 `react-i18next` 方案。
+11. 当前尚未接入国际化的硬编码中文文案不要求在本轮一并全部替换；但 `activateAssistant`、`createAssistant` 与 `assistantDetail` 不再归类为后续补齐页面，需在当前版本完成文案替换。
+12. 迁移完成后，旧 [src/i18n/messages.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/messages.ts) 不再保留为运行时入口，避免出现双套资源定义并存。
 
 
 

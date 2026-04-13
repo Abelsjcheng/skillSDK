@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useI18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import type { MessagePart, QuestionAnswerSubmission } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 
@@ -18,7 +18,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   onAnswered,
   readonly = false,
 }) => {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [customInput, setCustomInput] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState(getAnswerText(part));
   const [answered, setAnswered] = useState(Boolean(part.answered || getAnswerText(part)));

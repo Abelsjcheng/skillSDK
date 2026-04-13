@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { StepBasicInfo } from '../StepBasicInfo';
 import { DEFAULT_AVATARS } from '../constants';
+import { StepBasicInfo } from '../StepBasicInfo';
 
 const noop = () => {};
 
@@ -46,7 +46,7 @@ describe('StepBasicInfo', () => {
     expect(nextButton).toBeDisabled();
 
     fireEvent.change(nameInput, { target: { value: '智能助手1' } });
-    fireEvent.change(descriptionInput, { target: { value: '说明ABC🙂' } });
+    fireEvent.change(descriptionInput, { target: { value: '说明ABC😀' } });
     expect(descriptionInput).toHaveClass('is-invalid');
     expect(nextButton).toBeDisabled();
 

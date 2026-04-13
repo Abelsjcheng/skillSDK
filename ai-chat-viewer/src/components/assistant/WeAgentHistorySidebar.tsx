@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { isPcMiniApp } from '../../constants';
-import { useI18n } from '../../i18n';
 import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
@@ -89,7 +89,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   onVisibilityChange,
 }) => {
   const isPc = isPcMiniApp();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRenderSidebar, setShouldRenderSidebar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

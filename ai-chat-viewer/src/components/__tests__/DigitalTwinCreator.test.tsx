@@ -10,7 +10,7 @@ const TEXT = {
   prev: '\u4e0a\u4e00\u6b65',
   closeCreate: '\u5173\u95ed\u521b\u5efa\u4e2a\u4eba\u52a9\u7406',
   cancel: '\u53d6\u6d88',
-  customAssistant: '\u81ea\u5b9a\u4e49\u52a9\u624b',
+  customAssistant: '\u81ea\u5b9a\u4e49',
   confirm: '\u786e\u5b9a',
   chooseDefaultAvatar2: '\u9009\u62e9\u9ed8\u8ba4\u5934\u50cf avatar-2',
 };

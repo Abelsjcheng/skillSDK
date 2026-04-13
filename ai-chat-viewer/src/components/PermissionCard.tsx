@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isPcMiniApp } from '../constants';
-import { useI18n } from '../i18n';
 import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
@@ -29,7 +29,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
   readonly = false,
 }) => {
   const isPc = isPcMiniApp();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const permTypeLabels = useMemo<Record<string, string>>(() => ({
     file_write: t('permission.fileWrite'),
     file_read: t('permission.fileRead'),

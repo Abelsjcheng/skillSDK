@@ -1,4 +1,5 @@
-﻿import type { BrainType, GetFilePathResult } from '../types/digitalTwin';
+import i18n from '../i18n/config';
+import type { BrainType, GetFilePathResult } from '../types/digitalTwin';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
@@ -66,5 +67,5 @@ export function validateAvatarFile(file: GetFilePathResult): AvatarValidationRes
     return { valid: true };
   }
 
-  return { valid: false, reason: '仅支持JPG/PNG格式', code: 'format' };
+  return { valid: false, reason: i18n.t('createAssistant.invalidAvatarFormat'), code: 'format' };
 }

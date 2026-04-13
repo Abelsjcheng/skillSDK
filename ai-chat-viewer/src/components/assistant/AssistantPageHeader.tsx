@@ -1,5 +1,5 @@
 import React from 'react';
-import { useI18n } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import backIcon from '../../imgs/back_icon.svg';
 import closeIcon from '../../imgs/close_icon.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
@@ -23,7 +23,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   onClose = noop,
   onService = noop,
 }) => {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
 
   if (isPcMiniApp) {
