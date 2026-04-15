@@ -455,6 +455,7 @@
 
 1. 若 `messageId` 为空或已存在，则不新增消息
 2. 新增后会作为普通用户消息气泡渲染
+3. `message.user` 同时也是“新一轮 assistant 回复开始”的边界信号：若当前仍存在上一轮 assistant 的流式消息目标块，需先结束并清空该流式上下文，再为新一轮准备独立的 pending assistant 消息，避免后续 AI 回复复用上一条 assistant 消息块
 
 ### 10.9 `snapshot`
 

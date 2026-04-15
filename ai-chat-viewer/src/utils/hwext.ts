@@ -458,7 +458,7 @@ function normalizeString(value?: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function getUrlHost(value: string): string {
+export function getUrlHost(value: string): string {
   const normalizedValue = normalizeString(value);
   if (!normalizedValue) {
     return '';

@@ -530,6 +530,12 @@
    - 页面展示数据全部来自 `getWeAgentDetails` 接口返回；
    - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、能力提供方、头像）。
    - 助理类型判断规则：`bizRobotId` 有值视为内部助理，`bizRobotId` 为空视为外部助理。
+5. 客服按钮跳转规则：
+   - PC 端保持现有打开方式不变；
+   - 移动端点击客服时：
+      - 若当前 `weCodeUrl` 解析出的 host 等于 `APP_ID`，则直接调用 `openWebview({ uri: CUSTOMER_SERVICE_WEBVIEW_URI })`；
+      - 若当前 `weCodeUrl` 解析出的 host 不等于 `APP_ID`，则继续使用现有 `buildCustomerServiceWebviewUri(weCodeUrl)` 逻辑；
+      - 若 `weCodeUrl` 为空，则保持当前不可跳转提示。
 
 ## 15. 切换助理页面
 
@@ -566,6 +572,9 @@
       - “取消选择”按钮：`156px x 44px`，圆角半径 `50px`，背景 `rgba(255,255,255,1)`；
       - “确认切换”按钮：`156px x 44px`，圆角半径 `50px`，背景 `rgba(13,148,255,1)`。
    - 两个按钮点击事件当前均为空实现（占位）。
+6. 客服按钮跳转规则：
+   - PC 端保持现有打开方式不变；
+   - 移动端点击客服时，直接调用 `openWebview({ uri: CUSTOMER_SERVICE_WEBVIEW_URI })`，不再拼接 `sourceURL`。
 
 ## 16. 启动助理页面
 
@@ -745,8 +754,9 @@
 22. `WeAgentCUI` 中 AI 流式回复的消息 ID 处理规则：
    - 当页面先插入“正在生成中，请稍等...”占位助手消息时，可先使用前端本地生成的临时消息 ID；
    - 不在 `step.start` 等“仅表示开始处理”的事件中删除占位消息，避免页面从“正在生成中”短暂变为空白；
-   - 仅当收到真正承载内容的 AI 流式事件（如 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file`、`streaming`）时，若当前仍是占位助手消息，则先删除该占位消息，再新增一条使用真实 `messageId` 的助手消息承载内容；
-   - 后续该条 AI 回复消息的内容增量、结束态、错误块等更新都需继续落在新建的真实 `messageId` 消息对象上，不再保留前端临时 ID 作为最终消息 ID。
+   - 占位助手消息的本地 `id` 仅用于前端稳定渲染，不作为服务端真实消息身份；
+   - 当收到真正承载内容的 AI 流式事件（如 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file`、`streaming`）且事件中带有真实 `messageId` 时，当前流式助手消息需写入 `serverMessageId = messageId`，后续所有实时更新、补流恢复、快照恢复都优先按 `serverMessageId` 归并；
+   - 若本地已存在 `serverMessageId` 相同的助手消息，则不得再次 append 一条新消息，必须复用原消息对象更新内容，避免“生成中占位 + 真实 AI 回复”重复渲染。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
 

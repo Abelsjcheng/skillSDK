@@ -188,6 +188,57 @@ function App({ assistantAccount = '' }: AppProps) {
     streamingMsgIdRef.current = null;
   }, []);
 
+  const preparePendingAssistantMessageForNextTurn = useCallback(() => {
+    const currentStreamingMessageId = streamingMsgIdRef.current;
+    const currentStreamingMessage = currentStreamingMessageId
+      ? messagesRef.current.find((message) => message.id === currentStreamingMessageId)
+      : null;
+
+    if (currentStreamingMessage?.meta?.pending) {
+      return null;
+    }
+
+    finalizeStreamingMessage();
+    const pendingMessage = createPendingAssistantMessage();
+    streamingMsgIdRef.current = pendingMessage.id;
+    return pendingMessage;
+  }, [finalizeStreamingMessage]);
+
+  const findMessageIdByServerMessageId = useCallback((messages: Message[], serverMessageId?: string | null) => {
+    if (!serverMessageId) {
+      return null;
+    }
+
+    const normalizedServerMessageId = String(serverMessageId);
+    const matchedMessage = messages.find((message) => (
+      message.serverMessageId === normalizedServerMessageId || message.id === normalizedServerMessageId
+    ));
+    return matchedMessage?.id ?? null;
+  }, []);
+
+  const resolveStreamingAssistantTarget = useCallback((messages: Message[], serverMessageId?: string | null) => {
+    const currentStreamingMessageId = streamingMsgIdRef.current;
+    const currentStreamingMessage = currentStreamingMessageId
+      ? messages.find((message) => message.id === currentStreamingMessageId)
+      : null;
+    const matchedMessageId = findMessageIdByServerMessageId(messages, serverMessageId);
+    const shouldDropCurrentPending = Boolean(
+      currentStreamingMessageId
+      && matchedMessageId
+      && currentStreamingMessageId !== matchedMessageId
+      && currentStreamingMessage?.meta?.pending
+      && !currentStreamingMessage.serverMessageId
+    );
+
+    return {
+      currentStreamingMessageId,
+      matchedMessageId,
+      targetMessageId: matchedMessageId ?? currentStreamingMessageId ?? null,
+      normalizedServerMessageId: serverMessageId ? String(serverMessageId) : undefined,
+      shouldDropCurrentPending,
+    };
+  }, [findMessageIdByServerMessageId]);
+
   const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
     const normalizedMessage = message || fallbackMessage;
     const currentStreamingMessageId = streamingMsgIdRef.current;
@@ -547,30 +598,44 @@ function App({ assistantAccount = '' }: AppProps) {
           const currentParts = assembler.getParts();
 
           setMessages((prev) => {
-            if (streamingMsgIdRef.current) {
-              return prev.map((m) =>
-                m.id === streamingMsgIdRef.current
+            const {
+              currentStreamingMessageId,
+              targetMessageId,
+              normalizedServerMessageId,
+              shouldDropCurrentPending,
+            } = resolveStreamingAssistantTarget(prev, msg.messageId);
+            const next = shouldDropCurrentPending && currentStreamingMessageId
+              ? prev.filter((message) => message.id !== currentStreamingMessageId)
+              : prev;
+
+            if (targetMessageId) {
+              streamingMsgIdRef.current = targetMessageId;
+              return next.map((message) =>
+                message.id === targetMessageId
                   ? {
-                    ...m,
+                    ...message,
+                    serverMessageId: normalizedServerMessageId ?? message.serverMessageId,
                     content: currentText,
                     parts: [...currentParts],
                     isStreaming: true,
-                    meta: m.meta?.pending
+                    meta: message.meta?.pending
                       ? {
-                        ...m.meta,
+                        ...message.meta,
                         pending: false,
                       }
-                      : m.meta,
+                      : message.meta,
                   }
-                  : m,
+                  : message,
               );
             }
-            const id = msg.messageId || genMessageId();
+
+            const id = normalizedServerMessageId ?? genMessageId();
             streamingMsgIdRef.current = id;
             return [
-              ...prev,
+              ...next,
               {
                 id,
+                serverMessageId: normalizedServerMessageId,
                 role: 'assistant',
                 content: currentText,
                 timestamp: Date.now(),
@@ -589,6 +654,7 @@ function App({ assistantAccount = '' }: AppProps) {
           }
 
           const content = msg.content ?? '';
+          const pendingMessage = preparePendingAssistantMessageForNextTurn();
           setMessages((prev) => {
             const hasUserMessage = knownUserMessageIdsRef.current.has(messageId);
             let next = prev;
@@ -607,9 +673,7 @@ function App({ assistantAccount = '' }: AppProps) {
               knownUserMessageIdsRef.current.add(messageId);
             }
 
-            if (!streamingMsgIdRef.current) {
-              const pendingMessage = createPendingAssistantMessage();
-              streamingMsgIdRef.current = pendingMessage.id;
+            if (pendingMessage) {
               next = [...next, pendingMessage];
             }
 
@@ -753,11 +817,23 @@ function App({ assistantAccount = '' }: AppProps) {
             const nextRole = normalizeRole(msg.role);
             const nextParts = mapRawParts(msg.parts, true);
             setMessages((prev) => {
-              if (streamingMsgIdRef.current) {
-                return prev.map((message) =>
-                  message.id === streamingMsgIdRef.current
+              const {
+                currentStreamingMessageId,
+                targetMessageId,
+                normalizedServerMessageId,
+                shouldDropCurrentPending,
+              } = resolveStreamingAssistantTarget(prev, msg.messageId);
+              const next = shouldDropCurrentPending && currentStreamingMessageId
+                ? prev.filter((message) => message.id !== currentStreamingMessageId)
+                : prev;
+
+              if (targetMessageId) {
+                streamingMsgIdRef.current = targetMessageId;
+                return next.map((message) =>
+                  message.id === targetMessageId
                     ? {
                       ...message,
+                      serverMessageId: normalizedServerMessageId ?? message.serverMessageId,
                       role: nextRole,
                       content: '',
                       contentType: contentTypeForRole(nextRole),
@@ -774,10 +850,11 @@ function App({ assistantAccount = '' }: AppProps) {
                 );
               }
 
-              const id = msg.messageId || genMessageId();
+              const id = normalizedServerMessageId ?? genMessageId();
               streamingMsgIdRef.current = id;
               const streamingMsg: Message = {
                 id,
+                serverMessageId: normalizedServerMessageId,
                 role: nextRole,
                 content: '',
                 contentType: contentTypeForRole(nextRole),
@@ -785,7 +862,7 @@ function App({ assistantAccount = '' }: AppProps) {
                 isStreaming: true,
                 parts: nextParts,
               };
-              return [...prev, streamingMsg];
+              return [...next, streamingMsg];
             });
           }
           break;
@@ -830,7 +907,16 @@ function App({ assistantAccount = '' }: AppProps) {
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage, updateHistorySessionTitle, sendUserMessage]);
+  }, [
+    welinkSessionId,
+    appendAssistantErrorBlock,
+    findMessageIdByServerMessageId,
+    finalizeStreamingMessage,
+    preparePendingAssistantMessageForNextTurn,
+    resolveStreamingAssistantTarget,
+    updateHistorySessionTitle,
+    sendUserMessage,
+  ]);
 
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content) return;

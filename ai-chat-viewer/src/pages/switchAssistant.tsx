@@ -11,10 +11,9 @@ import {
   resolveSelectableAssistantId,
 } from '../utils/assistantSelection';
 import {
-  buildCustomerServiceWebviewUri,
+  CUSTOMER_SERVICE_WEBVIEW_URI,
   getQueryParam,
   getWeAgentList,
-  MOCK_CUSTOMER_SERVICE_SOURCE_URL,
   openH5Webview,
   type WeAgentListItem,
 } from '../utils/hwext';
@@ -104,7 +103,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 
   const handleServiceClick = useCallback(() => {
     openH5Webview({
-      uri: buildCustomerServiceWebviewUri(MOCK_CUSTOMER_SERVICE_SOURCE_URL),
+      uri: CUSTOMER_SERVICE_WEBVIEW_URI,
     });
   }, []);
 

@@ -167,6 +167,7 @@ export interface MessagePart
 /** A single message in the conversation */
 export interface Message {
   id: string;
+  serverMessageId?: string;
   role: MessageRole;
   content: string;
   contentType?: BackendContentType | 'code';

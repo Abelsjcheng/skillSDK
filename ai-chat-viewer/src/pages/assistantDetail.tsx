@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
-import { isPcMiniApp } from '../constants';
+import { APP_ID, isPcMiniApp } from '../constants';
 import { ensureLanguageInitialized } from '../i18n/config';
 import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
@@ -10,7 +10,9 @@ import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
 import {
   buildCustomerServiceWebviewUri,
+  CUSTOMER_SERVICE_WEBVIEW_URI,
   getQueryParam,
+  getUrlHost,
   getWeAgentDetails,
   openH5Webview,
   type WeAgentDetails,
@@ -129,7 +131,9 @@ const AssistantDetail: React.FC = () => {
     }
 
     openH5Webview({
-      uri: buildCustomerServiceWebviewUri(sourceUrl),
+      uri: getUrlHost(sourceUrl) === APP_ID
+        ? CUSTOMER_SERVICE_WEBVIEW_URI
+        : buildCustomerServiceWebviewUri(sourceUrl),
     });
   }, [detail?.weCodeUrl, t]);
 
