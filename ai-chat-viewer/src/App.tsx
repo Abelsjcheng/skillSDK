@@ -9,13 +9,12 @@ import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   Message,
   MessagePart,
+  PendingAssistantPreview,
   QuestionAnswerSubmission,
   SessionStatus,
   StreamMessage,
 } from './types';
-import {
-  buildCorpUserAvatar,
-} from './utils/avatar';
+import { buildCorpUserAvatar } from './utils/avatar';
 import {
   createNewSession,
   getDeviceInfo,
@@ -47,9 +46,6 @@ import {
   getLatestAvailableSessionByUpdatedAt,
   hasMoreHistoryByCursor,
 } from './utils/session';
-import {
-  createPendingAssistantMessage,
-} from './utils/streaming';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import { showToast } from './utils/toast';
 import createSession from './imgs/createSession.svg';
@@ -85,6 +81,11 @@ function App({ assistantAccount = '' }: AppProps) {
   const [historySessionsLoaded, setHistorySessionsLoaded] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
+  const [pendingAssistantPreview, setPendingAssistantPreview] = useState<PendingAssistantPreview>({
+    visible: false,
+    welinkSessionId: null,
+    startedAt: 0,
+  });
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -148,6 +149,30 @@ function App({ assistantAccount = '' }: AppProps) {
     };
   }, [isIosKeyboardLiftEnabled]);
 
+  const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
+    setPendingAssistantPreview((prev) => (
+      prev.visible && prev.welinkSessionId === sessionId
+        ? prev
+        : {
+          visible: true,
+          welinkSessionId: sessionId,
+          startedAt: Date.now(),
+        }
+    ));
+  }, []);
+
+  const hidePendingAssistantPreview = useCallback(() => {
+    setPendingAssistantPreview((prev) => (
+      prev.visible
+        ? {
+          visible: false,
+          welinkSessionId: null,
+          startedAt: 0,
+        }
+        : prev
+    ));
+  }, []);
+
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
 
@@ -161,23 +186,13 @@ function App({ assistantAccount = '' }: AppProps) {
           return prev;
         }
 
-        if (currentMessage.meta?.pending && finalParts.length === 0 && !finalText) {
-          return prev.filter((message) => message.id !== finalId);
-        }
-
         return prev.map((message) =>
           message.id === finalId
             ? {
               ...message,
-              content: currentMessage.meta?.pending ? finalText : message.content,
+              content: finalText || message.content,
               isStreaming: false,
-              parts: [...finalParts],
-              meta: currentMessage.meta?.pending
-                ? {
-                  ...message.meta,
-                  pending: false,
-                }
-                : message.meta,
+              parts: finalParts.length > 0 ? [...finalParts] : message.parts,
             }
             : message,
         );
@@ -186,23 +201,8 @@ function App({ assistantAccount = '' }: AppProps) {
 
     assemblerRef.current.reset();
     streamingMsgIdRef.current = null;
-  }, []);
-
-  const preparePendingAssistantMessageForNextTurn = useCallback(() => {
-    const currentStreamingMessageId = streamingMsgIdRef.current;
-    const currentStreamingMessage = currentStreamingMessageId
-      ? messagesRef.current.find((message) => message.id === currentStreamingMessageId)
-      : null;
-
-    if (currentStreamingMessage?.meta?.pending) {
-      return null;
-    }
-
-    finalizeStreamingMessage();
-    const pendingMessage = createPendingAssistantMessage();
-    streamingMsgIdRef.current = pendingMessage.id;
-    return pendingMessage;
-  }, [finalizeStreamingMessage]);
+    hidePendingAssistantPreview();
+  }, [hidePendingAssistantPreview]);
 
   const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
     const normalizedMessage = message || fallbackMessage;
@@ -227,21 +227,13 @@ function App({ assistantAccount = '' }: AppProps) {
           const baseParts = currentMessage.parts && currentMessage.parts.length > 0
             ? currentMessage.parts.map((part) => ({ ...part, isStreaming: false }))
             : assemblerParts;
-          const nextContent = currentMessage.meta?.pending
-            ? assemblerText || normalizedMessage
-            : currentMessage.content || assemblerText || normalizedMessage;
+          const nextContent = currentMessage.content || assemblerText || normalizedMessage;
 
           nextMessages[streamingMessageIndex] = {
             ...currentMessage,
             content: nextContent,
             isStreaming: false,
             parts: [...baseParts, errorPart],
-            meta: currentMessage.meta?.pending
-              ? {
-                ...currentMessage.meta,
-                pending: false,
-              }
-              : currentMessage.meta,
           };
           return nextMessages;
         }
@@ -263,7 +255,34 @@ function App({ assistantAccount = '' }: AppProps) {
 
     assemblerRef.current.reset();
     streamingMsgIdRef.current = null;
+    hidePendingAssistantPreview();
+  }, [hidePendingAssistantPreview]);
+
+  const upsertAssistantMessage = useCallback((messageId: string, updater: (current?: Message) => Message) => {
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex((message) => message.id === messageId);
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = updater(next[existingIndex]);
+        return next;
+      }
+
+      return [...prev, updater(undefined)];
+    });
   }, []);
+
+  const ensureStreamingMessageContext = useCallback((messageId: string) => {
+    if (streamingMsgIdRef.current && streamingMsgIdRef.current !== messageId) {
+      finalizeStreamingMessage();
+    }
+
+    if (streamingMsgIdRef.current !== messageId) {
+      assemblerRef.current.reset();
+      streamingMsgIdRef.current = messageId;
+    }
+
+    hidePendingAssistantPreview();
+  }, [finalizeStreamingMessage, hidePendingAssistantPreview]);
 
   const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
     if (!welinkSessionId || !content) {
@@ -414,12 +433,15 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantDetailRef.current = null;
     knownUserMessageIdsRef.current.clear();
     setOutputtingSessionId(null);
+    hidePendingAssistantPreview();
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
-  }, [assistantAccount]);
+  }, [assistantAccount, hidePendingAssistantPreview]);
 
   useEffect(() => {
     activeWelinkSessionIdRef.current = welinkSessionId;
@@ -554,47 +576,31 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'question':
         case 'permission.ask':
         case 'file': {
+          const messageId = msg.messageId;
+          if (!messageId) {
+            break;
+          }
+
           setSessionStatus('busy');
           setOutputtingSessionId(activeWelinkSessionId);
+          ensureStreamingMessageContext(messageId);
+
           const assembler = assemblerRef.current;
           assembler.handleMessage(msg);
-
           const currentText = assembler.getText();
           const currentParts = assembler.getParts();
 
-          setMessages((prev) => {
-            if (streamingMsgIdRef.current) {
-              return prev.map((m) =>
-                m.id === streamingMsgIdRef.current
-                  ? {
-                    ...m,
-                    content: currentText,
-                    parts: [...currentParts],
-                    isStreaming: true,
-                    meta: m.meta?.pending
-                      ? {
-                        ...m.meta,
-                        pending: false,
-                      }
-                      : m.meta,
-                  }
-                  : m,
-              );
-            }
-            const id = msg.messageId || genMessageId();
-            streamingMsgIdRef.current = id;
-            return [
-              ...prev,
-              {
-                id,
-                role: 'assistant',
-                content: currentText,
-                timestamp: Date.now(),
-                isStreaming: true,
-                parts: [...currentParts],
-              },
-            ];
-          });
+          upsertAssistantMessage(messageId, (current) => ({
+            id: messageId,
+            role: current?.role ?? 'assistant',
+            content: currentText,
+            contentType: current?.contentType ?? 'markdown',
+            timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
+            isStreaming: true,
+            parts: [...currentParts],
+            meta: current?.meta,
+            isHistory: current?.isHistory,
+          }));
           break;
         }
 
@@ -604,30 +610,29 @@ function App({ assistantAccount = '' }: AppProps) {
             break;
           }
 
+          finalizeStreamingMessage();
+          setSessionStatus('busy');
+          setOutputtingSessionId(activeWelinkSessionId);
+          showPendingAssistantPreview(activeWelinkSessionId);
+
           const content = msg.content ?? '';
-          const pendingMessage = preparePendingAssistantMessageForNextTurn();
           setMessages((prev) => {
             const hasUserMessage = knownUserMessageIdsRef.current.has(messageId);
-            let next = prev;
-
-            if (!hasUserMessage) {
-              const nextMessage: Message = {
-                id: messageId,
-                role: 'user',
-                content,
-                contentType: 'plain',
-                timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
-                isStreaming: false,
-              };
-
-              next = [...prev, nextMessage];
-              knownUserMessageIdsRef.current.add(messageId);
+            if (hasUserMessage) {
+              return prev;
             }
 
-            if (pendingMessage) {
-              next = [...next, pendingMessage];
-            }
+            const nextMessage: Message = {
+              id: messageId,
+              role: 'user',
+              content,
+              contentType: 'plain',
+              timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
+              isStreaming: false,
+            };
 
+            const next = [...prev, nextMessage];
+            knownUserMessageIdsRef.current.add(messageId);
             return next;
           });
           break;
@@ -681,6 +686,9 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'step.start':
           setSessionStatus('busy');
           setOutputtingSessionId(activeWelinkSessionId);
+          if (!streamingMsgIdRef.current) {
+            showPendingAssistantPreview(activeWelinkSessionId);
+          }
           break;
 
         case 'step.done':
@@ -723,6 +731,9 @@ function App({ assistantAccount = '' }: AppProps) {
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
             setOutputtingSessionId(activeWelinkSessionId);
+            if (!streamingMsgIdRef.current) {
+              showPendingAssistantPreview(activeWelinkSessionId);
+            }
           } else if (msg.sessionStatus === 'retry') {
             setSessionStatus('retry');
           }
@@ -752,8 +763,11 @@ function App({ assistantAccount = '' }: AppProps) {
           break;
 
         case 'snapshot':
-          if (msg.messages && msg.messages.length > 0) {
-            const snapshotMessages: Message[] = msg.messages
+          assemblerRef.current.reset();
+          streamingMsgIdRef.current = null;
+          hidePendingAssistantPreview();
+          {
+            const snapshotMessages: Message[] = (msg.messages ?? [])
               .map((sm) => snapshotMessageToMessage(sm))
               .reverse();
             setMessages(snapshotMessages);
@@ -761,49 +775,31 @@ function App({ assistantAccount = '' }: AppProps) {
           }
           break;
 
-        case 'streaming':
-          if (msg.parts && msg.parts.length > 0) {
-            setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
-            setOutputtingSessionId(msg.sessionStatus === 'busy' ? activeWelinkSessionId : null);
-            const nextRole = normalizeRole(msg.role);
-            const nextParts = mapRawParts(msg.parts, true);
-            setMessages((prev) => {
-              if (streamingMsgIdRef.current) {
-                return prev.map((message) =>
-                  message.id === streamingMsgIdRef.current
-                    ? {
-                      ...message,
-                      role: nextRole,
-                      content: '',
-                      contentType: contentTypeForRole(nextRole),
-                      isStreaming: true,
-                      parts: nextParts,
-                      meta: message.meta?.pending
-                        ? {
-                          ...message.meta,
-                          pending: false,
-                        }
-                        : message.meta,
-                    }
-                    : message,
-                );
-              }
-
-              const id = msg.messageId || genMessageId();
-              streamingMsgIdRef.current = id;
-              const streamingMsg: Message = {
-                id,
-                role: nextRole,
-                content: '',
-                contentType: contentTypeForRole(nextRole),
-                timestamp: Date.now(),
-                isStreaming: true,
-                parts: nextParts,
-              };
-              return [...prev, streamingMsg];
-            });
+        case 'streaming': {
+          const messageId = msg.messageId;
+          if (!messageId || !msg.parts || msg.parts.length === 0) {
+            break;
           }
+
+          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
+          setOutputtingSessionId(msg.sessionStatus === 'busy' ? activeWelinkSessionId : null);
+          ensureStreamingMessageContext(messageId);
+
+          const nextRole = normalizeRole(msg.role);
+          const nextParts = mapRawParts(msg.parts, true);
+          upsertAssistantMessage(messageId, (current) => ({
+            id: messageId,
+            role: nextRole,
+            content: current?.content ?? '',
+            contentType: contentTypeForRole(nextRole),
+            timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
+            isStreaming: true,
+            parts: nextParts,
+            meta: current?.meta,
+            isHistory: current?.isHistory,
+          }));
           break;
+        }
 
         default:
           break;
@@ -845,7 +841,17 @@ function App({ assistantAccount = '' }: AppProps) {
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage, updateHistorySessionTitle, sendUserMessage]);
+  }, [
+    welinkSessionId,
+    appendAssistantErrorBlock,
+    ensureStreamingMessageContext,
+    finalizeStreamingMessage,
+    hidePendingAssistantPreview,
+    showPendingAssistantPreview,
+    upsertAssistantMessage,
+    updateHistorySessionTitle,
+    sendUserMessage,
+  ]);
 
   const handleGenerate = useCallback(async (content: string) => {
     if (!welinkSessionId || !content) return;
@@ -853,6 +859,9 @@ function App({ assistantAccount = '' }: AppProps) {
     setSessionStatus('busy');
     setFooterMode('generating');
     setOutputtingSessionId(welinkSessionId);
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
+    showPendingAssistantPreview(welinkSessionId);
     shouldResetFooterOnCompletionRef.current = true;
     suppressFooterAutoResetRef.current = false;
 
@@ -866,7 +875,7 @@ function App({ assistantAccount = '' }: AppProps) {
       showToast(t('weAgent.sendMessageFailed'));
       console.error(t('weAgent.sendMessageFailed'), err);
     }
-  }, [welinkSessionId, sendUserMessage]);
+  }, [welinkSessionId, sendUserMessage, showPendingAssistantPreview]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -907,6 +916,9 @@ function App({ assistantAccount = '' }: AppProps) {
       const newSession = ensureSessionTimestamps(
         await createSessionForAssistant(currentAssistantAccount, detail.appKey),
       );
+      hidePendingAssistantPreview();
+      assemblerRef.current.reset();
+      streamingMsgIdRef.current = null;
       setOutputtingSessionId(null);
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
@@ -921,7 +933,7 @@ function App({ assistantAccount = '' }: AppProps) {
       console.error('Failed to create new session:', err);
       showToast(t('weAgent.createSessionFailed'));
     }
-  }, [messages.length, resolveAssistantDetail, createSessionForAssistant]);
+  }, [messages.length, resolveAssistantDetail, createSessionForAssistant, hidePendingAssistantPreview]);
 
   const handleSwitchWeAgentSession = useCallback((nextWelinkSessionId: string) => {
     const normalizedSessionId = nextWelinkSessionId;
@@ -958,6 +970,7 @@ function App({ assistantAccount = '' }: AppProps) {
           <div className="content-wrapper">
             <Content
               messages={messages}
+              pendingAssistantPreview={pendingAssistantPreview}
               welinkSessionId={welinkSessionId ?? ''}
               scrollToBottomSignal={scrollToBottomSignal}
               isLoadingHistory={isLoadingHistory}

@@ -162,7 +162,6 @@
 | `message.timestamp` | `Message` | 渲染消息时间 |
 | `message.parts` | `Message` | 若存在则优先使用，不直接渲染 `message.content` |
 | `message.content` | `Message` | 仅在无可展示 `parts` 时作为回退内容 |
-| `message.meta.pending` | `Message.meta` | 若为 `true`，先显示“输出中”占位态 |
 | `message.isHistory` | `Message` | 历史 assistant 消息中的 `question` / `permission` 会进入只读态 |
 | `message.isStreaming` | `Message` | 配合卡片内部状态使用，控制流式中的展示状态 |
 
@@ -455,7 +454,7 @@
 
 1. 若 `messageId` 为空或已存在，则不新增消息
 2. 新增后会作为普通用户消息气泡渲染
-3. `message.user` 同时也是“新一轮 assistant 回复开始”的边界信号：若当前仍存在上一轮 assistant 的流式消息目标块，需先结束并清空该流式上下文，再为新一轮准备独立的 pending assistant 消息，避免后续 AI 回复复用上一条 assistant 消息块
+3. `message.user` 同时也是“新一轮 assistant 回复开始”的边界信号：若当前仍存在上一轮 assistant 的流式消息目标块，需先结束并清空该流式上下文，并打开独立的“正在生成中，请稍等...”预览块
 
 ### 10.9 `snapshot`
 
@@ -557,10 +556,11 @@
 
 [`MessageBubble.tsx`](../src/components/MessageBubble.tsx) 中的核心规则如下：
 
-1. 若 `message.meta.pending = true`，先渲染“输出中”占位
-2. 若 `message.parts` 存在，则优先渲染 `parts`
-3. `parts` 渲染前会先做过滤，空内容块不会展示
-4. 若 `message.parts` 不存在或没有可展示内容，则回退渲染 `message.content`
+1. `messages` 列表中只渲染真实消息，不再包含“正在生成中，请稍等...”占位消息
+2. 独立占位块由页面级临时状态单独渲染，不参与正式消息身份管理
+3. 若 `message.parts` 存在，则优先渲染 `parts`
+4. `parts` 渲染前会先做过滤，空内容块不会展示
+5. 若 `message.parts` 不存在或没有可展示内容，则回退渲染 `message.content`
 5. 若 `message.content === ''`，该消息不渲染
 
 当前 `renderPart()` 分发关系：

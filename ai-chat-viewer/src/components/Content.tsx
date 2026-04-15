@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
-import type { Message, QuestionAnswerSubmission } from '../types';
+import type { Message, PendingAssistantPreview, QuestionAnswerSubmission } from '../types';
 import { MessageBubble } from './MessageBubble';
+import { PendingAssistantBubble } from './PendingAssistantBubble';
 import '../styles/Content.less';
 
 const TOP_LOAD_THRESHOLD = 24;
@@ -10,6 +11,7 @@ const BOTTOM_AUTO_SCROLL_THRESHOLD = 24;
 
 interface ContentProps {
   messages: Message[];
+  pendingAssistantPreview: PendingAssistantPreview;
   welinkSessionId: string;
   scrollToBottomSignal?: number;
   isLoadingHistory: boolean;
@@ -25,6 +27,7 @@ interface ContentProps {
 
 export const Content: React.FC<ContentProps> = ({
   messages,
+  pendingAssistantPreview,
   welinkSessionId,
   scrollToBottomSignal = 0,
   isLoadingHistory,
@@ -116,7 +119,7 @@ export const Content: React.FC<ContentProps> = ({
       window.cancelAnimationFrame(rafId);
       window.clearTimeout(timerId);
     };
-  }, [getMessageOffsetTop, messages, scrollToBottom]);
+  }, [getMessageOffsetTop, messages, pendingAssistantPreview.startedAt, pendingAssistantPreview.visible, scrollToBottom]);
 
   useEffect(() => {
     if (!isLoadingHistory && preservingAnchorRef.current.active) {
@@ -145,7 +148,7 @@ export const Content: React.FC<ContentProps> = ({
     };
   }, [scrollToBottom, scrollToBottomSignal]);
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !pendingAssistantPreview.visible) {
     return (
       <div className="content content--we-agent-cui">
         <div className="we-agent-cui-welcome">
@@ -166,7 +169,7 @@ export const Content: React.FC<ContentProps> = ({
       onScroll={handleScroll}
     >
       <div className="messages-container messages-container--we-agent-cui">
-        {!isLoadingHistory && !hasMoreHistory && (
+        {messages.length > 0 && !isLoadingHistory && !hasMoreHistory && (
           <div className="history-status history-status--end">{t('weAgent.noMoreMessages')}</div>
         )}
         {messages.map((message) => (
@@ -182,6 +185,15 @@ export const Content: React.FC<ContentProps> = ({
             />
           </div>
         ))}
+        {pendingAssistantPreview.visible && pendingAssistantPreview.welinkSessionId === welinkSessionId ? (
+          <div data-message-id="pending-assistant-preview">
+            <PendingAssistantBubble
+              startedAt={pendingAssistantPreview.startedAt}
+              weAgentAssistantName={weAgentAssistantName}
+              weAgentAssistantAvatar={weAgentAssistantAvatar}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

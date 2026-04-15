@@ -15,7 +15,6 @@ import { createMarkdownComponents } from './markdownComponents';
 import type { Message, MessagePart, QuestionAnswerSubmission } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import assistantAvatar from '../imgs/assistant-avatar.svg';
-import generatingIcon from '../imgs/generating_icon.png';
 import userAvatar from '../imgs/switch-assistant-avatar.svg';
 import 'katex/dist/katex.min.css';
 
@@ -107,7 +106,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
-  const isPendingAssistant = normalizedRole === 'assistant' && Boolean(message.meta?.pending);
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
 
@@ -182,15 +180,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderContent = () => {
-    if (isPendingAssistant) {
-      return (
-        <div className="we-agent-message__pending">
-          <img className="we-agent-message__pending-icon" src={generatingIcon} alt="" />
-          <span className="we-agent-message__pending-text">{message.content}</span>
-        </div>
-      );
-    }
-
     const normalizedParts = message.parts
       ? syncToolCallIdForQuestionParts(message.parts).filter(shouldRenderPart)
       : undefined;
@@ -243,7 +232,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           className={[
             'we-agent-message__bubble',
             isUser ? 'is-user' : 'is-assistant',
-            isPendingAssistant ? 'is-pending' : '',
             hasCodeBlock ? 'has-code-block' : '',
           ].filter(Boolean).join(' ')}
         >

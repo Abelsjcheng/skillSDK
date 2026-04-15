@@ -752,11 +752,12 @@
    - 若当前不存在可复用的 AI 回复消息，则新建一条助手消息承载错误块；
    - 错误块文案优先展示事件中的 `error` 字段，无明确内容时使用场景兜底文案。
 22. `WeAgentCUI` 中 AI 流式回复的消息 ID 处理规则：
-   - 当页面先插入“正在生成中，请稍等...”占位助手消息时，可先使用前端本地生成的临时消息 ID；
-   - 不在 `step.start` 等“仅表示开始处理”的事件中删除占位消息，避免页面从“正在生成中”短暂变为空白；
-   - 占位助手消息的本地 `id` 仅用于前端稳定渲染，不作为服务端真实消息身份；
-   - 当收到真正承载内容的 AI 流式事件（如 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file`、`streaming`）且事件中带有真实 `messageId` 时，当前流式助手消息需写入 `serverMessageId = messageId`，后续所有实时更新、补流恢复、快照恢复都优先按 `serverMessageId` 归并；
-   - 若本地已存在 `serverMessageId` 相同的助手消息，则不得再次 append 一条新消息，必须复用原消息对象更新内容，避免“生成中占位 + 真实 AI 回复”重复渲染。
+   - “正在生成中，请稍等...”占位块不再作为 `Message` 插入 `messages`，而是改为独立的临时预览渲染态；
+   - `messages` 列表中仅保留真实消息，assistant 消息 `id` 只使用服务端真实 `messageId`；
+   - `streamingMsgIdRef` 仅保存当前真实 assistant 消息的 `messageId`，在尚未收到真正承载内容的 AI 事件前必须保持为空；
+   - 当收到真正承载内容的 AI 流式事件（如 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file`、`streaming`）时，直接使用事件中的真实 `messageId` 创建或更新 assistant 消息；
+   - `step.start`、`session.status=busy`、`message.user` 等事件仅负责驱动独立占位块显示，不得创建随机 `id` 的 fake assistant message；
+   - `snapshot`、历史消息恢复、`streaming` 补流到来时，需清理本地占位块，并继续只按真实 `messageId` 恢复 assistant 消息，避免重复渲染。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
 

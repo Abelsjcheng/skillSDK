@@ -177,8 +177,13 @@ export interface Message {
   meta?: {
     tokens?: StreamMessage['tokens'];
     cost?: number;
-    pending?: boolean;
   };
+}
+
+export interface PendingAssistantPreview {
+  visible: boolean;
+  welinkSessionId: string | null;
+  startedAt: number;
 }
 
 /** Session status for UI display */
