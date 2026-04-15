@@ -265,7 +265,6 @@ export function mapRawParts(
 export function sessionMessageToMessage(sessionMessage: SessionMessage): Message {
   return {
     id: String(sessionMessage.id),
-    serverMessageId: String(sessionMessage.id),
     role: normalizeRole(sessionMessage.role),
     content: sessionMessage.content ?? '',
     contentType: sessionMessage.contentType ?? 'plain',
@@ -280,7 +279,6 @@ export function messageOperationToMessage(
 ): Message {
   return {
     id: String(messageOperation.id),
-    serverMessageId: String(messageOperation.id),
     role: normalizeRole(messageOperation.role),
     content: messageOperation.content ?? '',
     contentType: messageOperation.contentType ?? 'plain',
@@ -293,7 +291,6 @@ export function messageOperationToMessage(
 export function snapshotMessageToMessage(snapshot: SessionMessageSnapshot): Message {
   return {
     id: snapshot.id,
-    serverMessageId: snapshot.id,
     role: normalizeRole(snapshot.role),
     content: snapshot.content ?? '',
     contentType: snapshot.contentType ?? 'plain',
