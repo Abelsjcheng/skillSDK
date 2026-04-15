@@ -20,6 +20,28 @@ describe('StepBrainSelect', () => {
     });
   });
 
+  it('defaults to selecting the first internal assistant and enables confirm', async () => {
+    render(
+      <StepBrainSelect
+        onClose={noop}
+        onCancel={noop}
+        onPrev={noop}
+        onConfirm={noop}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
+    });
+
+    const firstAssistantButton = await screen.findByRole('button', { name: '写作助手' });
+    const confirmButton = screen.getByRole('button', { name: '确定' });
+
+    expect(firstAssistantButton).toHaveClass('is-selected');
+    expect(confirmButton).not.toBeDisabled();
+    expect(confirmButton).toHaveClass('is-active');
+  });
+
   it('enables confirm when selecting custom brain', async () => {
     render(
       <StepBrainSelect
@@ -34,15 +56,14 @@ describe('StepBrainSelect', () => {
       expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
     });
 
-    const confirmButton = screen.getByRole('button', { name: '确定' });
-    expect(confirmButton).toBeDisabled();
-
     fireEvent.click(screen.getByLabelText('自定义'));
+    const confirmButton = screen.getByRole('button', { name: '确定' });
+
     expect(confirmButton).not.toBeDisabled();
     expect(confirmButton).toHaveClass('is-active');
   });
 
-  it('keeps confirm disabled for internal brain before selecting an internal assistant', async () => {
+  it('marks the clicked internal assistant as selected', async () => {
     render(
       <StepBrainSelect
         onClose={noop}
@@ -52,34 +73,14 @@ describe('StepBrainSelect', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('内部提供方'));
-    await screen.findByRole('button', { name: '写作助手' });
+    const secondAssistantButton = await screen.findByRole('button', { name: '会议助手' });
+    fireEvent.click(secondAssistantButton);
 
-    const confirmButton = screen.getByRole('button', { name: '确定' });
-    expect(confirmButton).toBeDisabled();
-    expect(confirmButton).toHaveClass('is-disabled');
-  });
-
-  it('enables confirm after selecting an internal assistant and marks selected style', async () => {
-    render(
-      <StepBrainSelect
-        onClose={noop}
-        onCancel={noop}
-        onPrev={noop}
-        onConfirm={noop}
-      />,
-    );
-
-    fireEvent.click(screen.getByLabelText('内部提供方'));
-    const assistantButton = await screen.findByRole('button', { name: '写作助手' });
-    fireEvent.click(assistantButton);
-
-    expect(assistantButton).toHaveClass('is-selected');
+    expect(secondAssistantButton).toHaveClass('is-selected');
     expect(screen.getByRole('button', { name: '确定' })).not.toBeDisabled();
   });
 
-  it('shows illustration only for internal provider and opens guide when clicked', async () => {
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+  it('reselects the first internal assistant when switching back from custom', async () => {
     render(
       <StepBrainSelect
         onClose={noop}
@@ -89,20 +90,17 @@ describe('StepBrainSelect', () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
-    });
-
-    const illustration = screen.getByAltText('个人助理插画');
-    fireEvent.click(illustration);
-    expect(openSpy).toHaveBeenCalledTimes(1);
+    await screen.findByRole('button', { name: '写作助手' });
 
     fireEvent.click(screen.getByLabelText('自定义'));
-    expect(screen.queryByAltText('个人助理插画')).toBeNull();
-    openSpy.mockRestore();
+    fireEvent.click(screen.getByLabelText('内部提供方'));
+
+    const firstAssistantButton = screen.getByRole('button', { name: '写作助手' });
+    expect(firstAssistantButton).toHaveClass('is-selected');
+    expect(screen.getByRole('button', { name: '确定' })).not.toBeDisabled();
   });
 
-  it('calls onPrev when clicking previous button', () => {
+  it('calls onPrev when clicking previous button', async () => {
     const onPrevMock = jest.fn();
     render(
       <StepBrainSelect
@@ -112,6 +110,10 @@ describe('StepBrainSelect', () => {
         onConfirm={noop}
       />,
     );
+
+    await waitFor(() => {
+      expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
+    });
 
     fireEvent.click(screen.getByRole('button', { name: '上一步' }));
     expect(onPrevMock).toHaveBeenCalledTimes(1);

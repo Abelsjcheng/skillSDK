@@ -116,6 +116,9 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         showOrigin: true,
         type: 1,
       })) as GetFilePathResult;
+      if (!fileResult.filePath) {
+        return;
+      }
       await handleAvatarUpload(fileResult);
     } catch (error) {
       console.error('chooseImage failed in StepBasicInfo:', error);
@@ -169,6 +172,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                 src={currentAvatarSrc}
                 alt={t('createAssistant.avatarPreview')}
                 className="digital-twin__avatar-preview-img"
+                draggable="false"
               />
             ) : null}
           </div>
@@ -199,6 +203,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                   src={avatar.image}
                   alt={t('createAssistant.defaultAvatarAlt', { id: avatar.id })}
                   className="digital-twin__avatar-option-img"
+                  draggable="false"
                 />
                 {selected ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
               </button>
@@ -207,9 +212,8 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
           <button
             type="button"
-            className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${
-              avatarType === 'custom' ? 'is-selected' : ''
-            }`.trim()}
+            className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${avatarType === 'custom' ? 'is-selected' : ''
+              }`.trim()}
             aria-label={t('createAssistant.uploadCustomAvatar')}
             onClick={(event) => {
               runButtonClickWithDebounce(event, () => {
@@ -235,6 +239,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             placeholder={t('createAssistant.namePlaceholder')}
             onChange={(event) => setName(event.target.value)}
             onTouchStart={handleMobileInputTouchStart}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              return false;
+            }}
           />
         </div>
 
@@ -250,6 +259,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
             placeholder={t('createAssistant.descriptionPlaceholder')}
             onChange={(event) => setDescription(event.target.value)}
             onTouchStart={handleMobileInputTouchStart}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              return false;
+            }}
           />
         </div>
       </div>

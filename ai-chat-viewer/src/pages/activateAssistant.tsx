@@ -68,7 +68,7 @@ const ActivateAssistant: React.FC = () => {
       <div className="activate-assistant__center">
         <section className="activate-assistant__content">
           <div className="activate-assistant__carousel">
-            <img src={activateGuideImage} alt={t('activateAssistant.guideAlt')} className="activate-assistant__image" />
+            <img src={activateGuideImage} alt={t('activateAssistant.guideAlt')} className="activate-assistant__image" draggable="false" />
           </div>
         </section>
 

@@ -30,7 +30,7 @@ export const zh = {
   'weAgent.missingAssistantDetail': '未获取到助理详情',
   'weAgent.aiReplyFailed': 'AI 回复失败',
   'weAgent.multiActionArea': '多功能按钮区',
-  'weAgent.welcomeMorning': '早上好，{name}',
+  'weAgent.welcomeMorning': '早上好，{{name}}',
   'weAgent.noMoreMessages': '没有更多消息',
   'weAgent.history': '历史对话',
   'weAgent.historySidebar': '历史会话侧边栏',

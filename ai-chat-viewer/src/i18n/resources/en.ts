@@ -30,7 +30,7 @@ export const en = {
   'weAgent.missingAssistantDetail': 'Assistant details were not found',
   'weAgent.aiReplyFailed': 'AI reply failed',
   'weAgent.multiActionArea': 'Action buttons',
-  'weAgent.welcomeMorning': 'Good morning, {name}',
+  'weAgent.welcomeMorning': 'Good morning, {{name}}',
   'weAgent.noMoreMessages': 'No more messages',
   'weAgent.history': 'Historical',
   'weAgent.historySidebar': 'History session sidebar',

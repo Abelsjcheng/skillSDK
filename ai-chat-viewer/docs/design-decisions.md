@@ -165,7 +165,7 @@ interface CreateDigitalTwinParams {
 7. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
 8. “确定”启用条件：
    - `brainType === 'custom'`：可直接启用；
-   - `brainType === 'internal'`：需 `selectedBizRobotId` 已选择。
+   - `brainType === 'internal'`：内部助手列表有数据时默认选中第一项，因此默认可启用；仅当列表为空且 `selectedBizRobotId` 为空时保持禁用。
 9. 第二页内容区标题文本与父容器顶部间距固定为 `6px`，并将标题元素默认外边距重置为 `0` 以避免偏差。
 10. 第二页单选圆点按钮使用自定义样式：圆点容器 `20px x 20px`、左侧间距 `0px`；容器内圆点 `16.67px x 16.67px` 且垂直居中；按钮文本与圆点容器间距 `8px`；未选中为 `1.2px` 灰色边框白底，选中为蓝色外环与白色 `6.67px` 圆心。
 11. 第二页第二个容器标题文本（“请选择”）与其父容器顶部间距固定为 `12px`，并重置标题默认外边距，避免浏览器默认样式干扰。
@@ -209,7 +209,7 @@ interface CreateDigitalTwinParams {
 1. `step = 1`
 2. 页面 1 默认选中第一个默认头像（若存在）
 3. 页面 1 `name/description` 为空
-4. 页面 2 `brainType/selectedBizRobotId` 为空
+4. 页面 2 默认 `brainType = 'internal'`，`selectedBizRobotId` 默认取内部助手列表第一项的 `bizRobotId`（若存在）
 5. 页面 1 点击“下一步”时将当前头像/名称/简介快照缓存到 `PersonalAssistantCreator`，页面 2 点击“上一步”返回时通过初始化参数回填 `StepBasicInfo` 本地状态，确保数据不丢失。
 
 ## 7. 交互与校验决策
@@ -235,6 +235,7 @@ interface CreateDigitalTwinParams {
    - `icon` 显示为内部助手按钮图标
    - `bizRobotId` 用作内部助手唯一标识与确认入参
    - `getAgentType` 返回值直接通过 `setInternalAssistants` 设置，不做 `normalizeInternalAssistants` 归一化
+   - 当内部助手列表存在数据时，`selectedBizRobotId` 自动落到第一项；若从“自定义助手”切回“内部助手”时当前无选中项，也同样自动回落到第一项
    - 不渲染“内部助手加载中...”与“暂无可用内部助手”提示文案
 11. 页面 2 选择“自定义助手”时，提示文案固定为“需在本地电脑自定义部署第三方助手，点击查看指导文档→”；其中“指导文档→”采用超链接渲染，点击打开 web 页面，链接地址当前留空；链接文本颜色固定为 `rgb(9,146,255)`。
 12. 点击“确定”时调用 `window.createDigitalTwin(params)`，`params` 字段映射：
@@ -385,7 +386,7 @@ interface CreateDigitalTwinParams {
 1. `WeAgentCUI` 为当前唯一对话页，`App` 仅保留 `weAgentCUI` 数据流与会话能力（消息加载、发送、流式更新、停止、历史分页）。
 2. 页面结构为：`对话内容区 + 多功能按钮区 + 底部输入区`。
 4. `weAgentCUI` 页面根容器背景统一使用线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
-5. 多功能按钮区高度固定为 `32px`，左侧提供相邻排列的“新建会话”“历史会话”两个 `32px x 32px` 的白底圆角按钮，按钮间距固定 `8px`，图标统一为 `16px x 16px`；其中“新建会话”按钮按最简规则直接使用 `messages.length === 0` 判断当前是否为空会话，满足时不重复创建会话，直接 toast 提示“当前是最新会话”；中间增加白底圆角状态提示块“输出中...”，高度 `32px`、圆角 `20px`、文本样式 `12px/400`、颜色 `rgba(38,159,255,1)`，仅在 AI 生成阶段显示，且位置固定在整行多功能按钮区的水平中点。
+5. 多功能按钮区高度固定为 `32px`，左侧提供相邻排列的“新建会话”“历史会话”两个 `32px x 32px` 的白底圆角按钮，按钮间距固定 `8px`，图标统一为 `16px x 16px`；其中“新建会话”按钮按最简规则直接使用 `messages.length === 0` 判断当前是否为空会话，满足时不重复创建会话，直接 toast 提示“当前是最新会话”；中间增加白底圆角状态提示块“输出中...”，高度 `32px`、圆角 `20px`、文本样式 `12px/400`、颜色 `rgba(38,159,255,1)`，仅在 AI 生成阶段显示，且位置固定在整行多功能按钮区的水平中点。该提示块必须与当前激活的 `welinkSessionId` 绑定，切换会话后不继承旧会话的生成态，旧会话晚到的 `busy/idle/error` 事件也不得影响当前会话的显示状态。
 6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
    - 用户消息右对齐，头部文案为“测试 + 时间”，右侧头像 `24x24`；
    - 助手消息左对齐，头部文案为“小米 + 时间”，左侧头像 `24x24`；
@@ -411,6 +412,7 @@ interface CreateDigitalTwinParams {
    - 纵向 `12px` 间距、水平居中；
    - 头像容器 `72x72`，圆角 `124px`，白色 `2px` 边框；
    - 标题文本使用运行时用户信息动态生成（如存在 `weAgentUserName` 则展示 `早上好，${weAgentUserName}`）；其中 `weAgentUserName` 按当前国际化语言选择用户字段：中文取 `userNameZH`，英文取 `userNameEN`，样式 `18px/500/26px`、`rgba(25,25,25,1)`；
+   - 对应国际化资源中的用户名占位符统一使用 `i18next` 标准插值语法 `{{name}}`，避免欢迎块渲染时把 `{name}` 原样输出到页面；
    - 副标题文本使用运行时助理信息动态拼接（`weAgentAssistantName | weAgentAssistantDescription`），样式 `14px/400/22px`、`rgba(89,89,89,1)`；
    - 不为欢迎标题和副标题提供默认兜底文案；当对应数据为空时直接不渲染文本节点。
 12. `WeAgentCUI` 消息区不保留“复制消息”“发送到IM”入口，`App -> Content -> MessageBubble` 组件链路中移除 `onCopy`、`onSendToIM` 参数透传。
@@ -432,6 +434,8 @@ interface CreateDigitalTwinParams {
 26. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
 26. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。
 27. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
+28. `WeAgentCUI` 对 AI 流式助手消息采用“只在真正有内容时删 pending 再建真实消息”的策略：页面先插入“正在生成中，请稍等...”占位消息时允许使用本地随机 ID，但不在 `step.start` 这类仅表示开始处理的事件中删除它；仅当 `text.delta / text.done / thinking.delta / thinking.done / tool.update / question / permission.ask / file / streaming` 等真正承载内容的事件到达时，若当前流式消息仍为 pending，则先删除该占位消息，再基于现有 assembler 状态创建一条使用真实 `messageId` 的助手消息，并同步更新 `streamingMsgIdRef`。后续 `session.error / error / step.done` 等更新继续复用该真实 ID，避免最终消息列表中残留前端临时 ID，且避免界面从“正在生成中”短暂闪为空白。
+29. 上述 pending -> 真实消息切换在实现上应统一复用单一 helper，避免在普通内容流分支与 `streaming` 分支重复拼装消息对象，降低维护成本。
 21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 22. 本地 JSAPI mock 的目标扩展到全部业务页面：`activateAssistant`、`selectAssistant`、`switchAssistant`、`assistantDetail`、`createAssistant`、`weAgentCUI` 都应能在浏览器本地通过 mock 数据直接访问与联动。
 23. mock 环境不单独维护一套伪判端逻辑，端类型判断统一复用 `src/utils/hwext.ts` 中的 `isPcMiniApp`：仅当存在真实或 mock 的 `window.Pedestal.callMethod` 时视为 PC，否则按移动端处理，避免样式和 toast 分流与生产逻辑偏离。

@@ -50,7 +50,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   const { t, i18n } = useTranslation();
   const illustration = (i18n.resolvedLanguage ?? i18n.language) === 'en' ? bannerEn : banner;
   const [brainType, setBrainType] = useState<BrainType | undefined>('internal');
-  const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>();
+  const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>(INTERNAL_ASSISTANTS[0]?.bizRobotId);
   const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>(INTERNAL_ASSISTANTS);
 
   const fetchAgentTypes = useCallback(async (): Promise<void> => {
@@ -71,6 +71,19 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
     void fetchAgentTypes();
   }, [fetchAgentTypes]);
 
+  useEffect(() => {
+    if (brainType !== 'internal') {
+      return;
+    }
+
+    const hasSelectedAssistant = internalAssistants.some((assistant) => assistant.bizRobotId === selectedBizRobotId);
+    if (hasSelectedAssistant) {
+      return;
+    }
+
+    setSelectedBizRobotId(internalAssistants[0]?.bizRobotId);
+  }, [brainType, internalAssistants, selectedBizRobotId]);
+
   const confirmEnabled = useMemo(
     () => canConfirm(brainType, selectedBizRobotId),
     [brainType, selectedBizRobotId],
@@ -78,9 +91,6 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
 
   const handleBrainTypeChange = useCallback((value: BrainType) => {
     setBrainType(value);
-    if (value === 'custom') {
-      setSelectedBizRobotId(undefined);
-    }
   }, []);
 
   const handleConfirm = useCallback(() => {

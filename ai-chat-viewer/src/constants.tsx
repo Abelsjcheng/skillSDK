@@ -15,7 +15,7 @@ export function isPcMiniApp(): boolean {
     return false;
   }
 
-  return true;
+  return false;
 }
 
 export function isIosMobileDevice(): boolean {
