@@ -146,7 +146,7 @@ const AssistantDetail: React.FC = () => {
   };
 
   return (
-    <div className="assistant-detail" onClick={handleBackgroundClick}>
+    <div className={`assistant-detail${isPc ? ' assistant-detail--pc' : ''}`} onClick={handleBackgroundClick}>
       <AssistantPageHeader title={t('assistantDetail.title')} isPcMiniApp={isPc} onService={handleServiceClick} />
 
       <main className="assistant-detail__content">

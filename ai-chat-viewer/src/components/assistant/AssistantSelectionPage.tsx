@@ -72,7 +72,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
 
   return (
     <div
-      className="switch-assistant"
+      className={`switch-assistant${isPcMiniApp ? ' switch-assistant--pc' : ''}`}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           dispatchAssistantCloseEvent();

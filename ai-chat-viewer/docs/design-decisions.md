@@ -33,15 +33,16 @@
 8. `src/styles/ActivateAssistant.less`
 9. `src/imgs/activate-guide-1.svg`
 10. `src/imgs/activate-guide-2.svg`
-11. `src/imgs/assistant-bg.svg`
-12. `src/styles/PersonalAssistantCreator.less`
-13. `src/types/digitalTwin.ts`
-14. `src/pages/createAssistant.tsx`
-15. `public/create-assistant-page.html`
-16. `webpack.create-assistant-page.config.js`
-17. `src/pages/assistantDetail.tsx`
-18. `src/pages/switchAssistant.tsx`
-19. `src/components/assistant/AssistantPageHeader.tsx`
+11. `src/imgs/assistant-bg.png`
+12. `src/imgs/assistant-pc-bg.png`
+13. `src/styles/PersonalAssistantCreator.less`
+14. `src/types/digitalTwin.ts`
+15. `src/pages/createAssistant.tsx`
+16. `public/create-assistant-page.html`
+17. `webpack.create-assistant-page.config.js`
+18. `src/pages/assistantDetail.tsx`
+19. `src/pages/switchAssistant.tsx`
+20. `src/components/assistant/AssistantPageHeader.tsx`
 20. `src/styles/AssistantPageHeader.less`
 21. `src/styles/AssistantDetail.less`
 22. `src/styles/SwitchAssistant.less`
@@ -435,10 +436,11 @@ interface CreateDigitalTwinParams {
 24. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
 25. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
 26. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
-26. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；若当前仍残留上一轮 assistant 的流式目标块，则需先收口并重置流式上下文，再为本轮准备新的 pending assistant 消息，避免后续 AI 回复继续写入前一条 assistant 消息块。
+26. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；该阶段仅打开独立的“正在生成中，请稍等...”预览块，并重置上一轮 assistant 的流式上下文，不再向 `messages` 插入随机 `id` 的 pending assistant message。
 27. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
-28. `WeAgentCUI` 对 AI 流式助手消息采用“本地稳定渲染 ID + 服务端真实消息 ID 归并”的策略：页面先插入“正在生成中，请稍等...”占位消息时继续使用前端本地随机 `id` 作为 React 渲染 key，不在 `step.start` 这类仅表示开始处理的事件中删除它；当 `text.delta / text.done / thinking.delta / thinking.done / tool.update / question / permission.ask / file / streaming` 等真正承载内容的事件到达且带有真实 `messageId` 时，当前流式助手消息需写入 `serverMessageId`，后续实时增量、`streaming` 补流、`snapshot`/历史恢复都优先按 `serverMessageId` 归并到同一条消息对象，避免“生成中占位”和真实 AI 回复因 ID 不一致而重复显示。
-29. 上述 AI 消息归并在实现上应统一复用单一 helper，避免普通内容流分支、`streaming` 分支、`snapshot` 恢复分支各自按 `id` 独立 append，导致同一条服务端消息在本地出现多份副本。
+28. `WeAgentCUI` 对 AI 流式助手消息采用“独立占位预览 + 真实消息直写”的策略：页面显示“正在生成中，请稍等...”时，不把该占位块作为 `Message` 写入 `messages`；该独立占位预览仅由 `message.user` 事件拉起。真正承载内容的 AI 事件根据 SDK 文档保证都会携带真实 `messageId`，因此实时内容、`streaming` 补流、`snapshot`/历史恢复都直接按该真实 `messageId` 创建或更新 assistant 消息，不再做随机占位消息 ID 提权。
+29. `streamingMsgIdRef` 保持原命名，但语义收敛为“当前真实 assistant 消息的 `messageId` 引用”：在尚未收到真正内容前始终为 `null`；收到首个承载内容事件时写入真实 `messageId`；会话结束、停止、错误、切换会话、快照恢复时统一清空。
+30. 通用助理背景图分流继续留在样式层实现：移动端默认使用 `assistant-bg.png`，PC 端新增 `assistant-pc-bg.png` 并通过 `.pc-mode`、`--pc` 这类页面级 class 覆盖 `background-image`；不把背景图选择下沉到组件内的 `isPcMiniApp()` 运行时判断，避免同一视觉资源策略散落到 JSX 逻辑里。
 21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 22. 本地 JSAPI mock 的目标扩展到全部业务页面：`activateAssistant`、`selectAssistant`、`switchAssistant`、`assistantDetail`、`createAssistant`、`weAgentCUI` 都应能在浏览器本地通过 mock 数据直接访问与联动。
 23. mock 环境不单独维护一套伪判端逻辑，端类型判断统一复用 `src/utils/hwext.ts` 中的 `isPcMiniApp`：仅当存在真实或 mock 的 `window.Pedestal.callMethod` 时视为 PC，否则按移动端处理，避免样式和 toast 分流与生产逻辑偏离。
