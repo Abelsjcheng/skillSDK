@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import assistantAvatar from '../imgs/assistant-avatar.svg';
+import defaultAvatar from '../imgs/defaultAvatar.png';
 import generatingIcon from '../imgs/generating_icon.png';
+import AvatarImage from './AvatarImage';
 
 interface PendingAssistantBubbleProps {
   startedAt: number;
@@ -27,13 +28,17 @@ export const PendingAssistantBubble: React.FC<PendingAssistantBubbleProps> = ({
   const { t } = useTranslation();
   const assistantName = weAgentAssistantName.trim();
   const messageMetaText = `${assistantName} ${formatMessageTime(startedAt || Date.now())}`.trim();
-  const resolvedAssistantAvatar = weAgentAssistantAvatar || assistantAvatar;
 
   return (
     <div className="message-block message-we-agent message-assistant">
       <div className="we-agent-message we-agent-message--assistant">
         <div className="we-agent-message__meta is-assistant">
-          <img className="we-agent-message__avatar" src={resolvedAssistantAvatar} alt="" />
+          <AvatarImage
+            className="we-agent-message__avatar"
+            src={weAgentAssistantAvatar}
+            fallbackSrc={defaultAvatar}
+            alt=""
+          />
           <span className="we-agent-message__meta-text">{messageMetaText}</span>
         </div>
         <div className="we-agent-message__bubble is-assistant is-pending">

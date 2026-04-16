@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import AvatarImage from '../components/AvatarImage';
 import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import { APP_ID, isPcMiniApp } from '../constants';
 import { ensureLanguageInitialized } from '../i18n/config';
+import defaultAvatar from '../imgs/defaultAvatar.png';
 import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
@@ -152,9 +154,12 @@ const AssistantDetail: React.FC = () => {
       <main className="assistant-detail__content">
         <section className="assistant-detail__card assistant-detail__card--profile">
           <div className="assistant-detail__avatar">
-            {displayIcon ? (
-              <img src={displayIcon} alt={t('assistantDetail.avatarAlt')} className="assistant-detail__avatar-img" />
-            ) : null}
+            <AvatarImage
+              src={displayIcon}
+              fallbackSrc={defaultAvatar}
+              alt={t('assistantDetail.avatarAlt')}
+              className="assistant-detail__avatar-img"
+            />
           </div>
           <div className="assistant-detail__name-row">
             <span className="assistant-detail__name">{displayName}</span>

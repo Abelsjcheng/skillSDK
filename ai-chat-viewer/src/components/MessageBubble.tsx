@@ -6,6 +6,7 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
+import AvatarImage from './AvatarImage';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
@@ -14,8 +15,7 @@ import { ErrorBlock } from './ErrorBlock';
 import { createMarkdownComponents } from './markdownComponents';
 import type { Message, MessagePart, QuestionAnswerSubmission } from '../types';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
-import assistantAvatar from '../imgs/assistant-avatar.svg';
-import userAvatar from '../imgs/switch-assistant-avatar.svg';
+import defaultAvatar from '../imgs/defaultAvatar.png';
 import 'katex/dist/katex.min.css';
 
 interface MessageBubbleProps {
@@ -209,8 +209,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const userName = weAgentUserName.trim();
   const assistantName = weAgentAssistantName.trim();
   const messageMetaText = `${isUser ? userName : assistantName} ${messageTimeText}`.trim();
-  const resolvedUserAvatar = weAgentUserAvatar || userAvatar;
-  const resolvedAssistantAvatar = weAgentAssistantAvatar || assistantAvatar;
 
   return (
     <div className={`message-block message-we-agent ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -219,11 +217,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {isUser ? (
             <>
               <span className="we-agent-message__meta-text">{messageMetaText}</span>
-              <img className="we-agent-message__avatar" src={resolvedUserAvatar} alt="" />
+              <AvatarImage
+                className="we-agent-message__avatar"
+                src={weAgentUserAvatar}
+                fallbackSrc={defaultAvatar}
+                alt=""
+              />
             </>
           ) : (
             <>
-              <img className="we-agent-message__avatar" src={resolvedAssistantAvatar} alt="" />
+              <AvatarImage
+                className="we-agent-message__avatar"
+                src={weAgentAssistantAvatar}
+                fallbackSrc={defaultAvatar}
+                alt=""
+              />
               <span className="we-agent-message__meta-text">{messageMetaText}</span>
             </>
           )}

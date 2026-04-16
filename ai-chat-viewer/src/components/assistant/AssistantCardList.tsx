@@ -1,4 +1,6 @@
 import React from 'react';
+import AvatarImage from '../AvatarImage';
+import defaultAvatar from '../../imgs/defaultAvatar.png';
 import type { AssistantItem } from '../../types/assistant';
 
 interface AssistantCardListProps {
@@ -39,14 +41,13 @@ const AssistantCardList: React.FC<AssistantCardListProps> = ({
           aria-pressed={selectedAssistantId === assistant.id}
         >
           <div className="switch-assistant__avatar">
-            {assistant.icon ? (
-              <img
-                src={assistant.icon}
-                alt=""
-                className="switch-assistant__avatar-img"
-                aria-hidden="true"
-              />
-            ) : null}
+            <AvatarImage
+              src={assistant.icon}
+              fallbackSrc={defaultAvatar}
+              alt=""
+              className="switch-assistant__avatar-img"
+              aria-hidden="true"
+            />
           </div>
           <div className="switch-assistant__desc">
             <div className="switch-assistant__desc-row">

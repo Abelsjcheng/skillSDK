@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import AvatarImage from '../AvatarImage';
 import bannerEn from '../../imgs/banner-en.png';
 import banner from '../../imgs/banner.png';
+import defaultAvatar from '../../imgs/defaultAvatar.png';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canConfirm } from '../../utils/digitalTwinValidation';
@@ -163,14 +165,13 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                         aria-label={assistant.name}
                       >
                         <span className="digital-twin__assistant-content">
-                          {assistant.icon ? (
-                            <img
-                              src={assistant.icon}
-                              alt=""
-                              className="digital-twin__assistant-icon"
-                              aria-hidden="true"
-                            />
-                          ) : null}
+                          <AvatarImage
+                            src={assistant.icon}
+                            fallbackSrc={defaultAvatar}
+                            alt=""
+                            className="digital-twin__assistant-icon"
+                            aria-hidden="true"
+                          />
                           <span className="digital-twin__assistant-label">{assistant.name}</span>
                         </span>
                         {selected ? <span className="digital-twin__check">&#10003;</span> : null}

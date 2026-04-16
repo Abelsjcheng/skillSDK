@@ -53,35 +53,6 @@ export function contentTypeForRole(role: Message['role']): NonNullable<Message['
   }
 }
 
-export function replaceOptimisticMessage(
-  messages: Message[],
-  tempId: string,
-  resolvedMessage: Message,
-): Message[] {
-  const tempIndex = messages.findIndex((message) => message.id === tempId);
-  const resolvedIndex = messages.findIndex((message) => message.id === resolvedMessage.id);
-
-  if (resolvedIndex >= 0) {
-    const next = [...messages];
-    next[resolvedIndex] = {
-      ...next[resolvedIndex],
-      ...resolvedMessage,
-    };
-    if (tempIndex >= 0 && tempIndex !== resolvedIndex) {
-      next.splice(tempIndex, 1);
-    }
-    return next;
-  }
-
-  if (tempIndex >= 0) {
-    const next = [...messages];
-    next[tempIndex] = resolvedMessage;
-    return next;
-  }
-
-  return [...messages, resolvedMessage];
-}
-
 export function updateLatestQuestionPart(
   messages: Message[],
   matcher: (part: MessagePart) => boolean,

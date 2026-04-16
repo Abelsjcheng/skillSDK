@@ -22,7 +22,9 @@ const WEBPACK_ES5_OUTPUT_ENVIRONMENT = {
 
 const TRANSPILE_DEPENDENCIES = [
   'hast-util-from-html-isomorphic',
+  'i18next',
   'react-markdown',
+  'react-i18next',
   'react-syntax-highlighter',
   'remark-breaks',
   'remark-gfm',

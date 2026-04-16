@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import selectionIcon from '../../imgs/selection_icon.png';
+import defaultAvatar from '../../imgs/defaultAvatar.png';
 import type {
   DefaultAvatarOption,
   DigitalTwinBasicInfoPayload,
@@ -16,6 +17,7 @@ import {
   validateAvatarFile,
 } from '../../utils/digitalTwinValidation';
 import { showToast } from '../../utils/toast';
+import AvatarImage from '../AvatarImage';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
 
@@ -167,14 +169,13 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       <div className="digital-twin__content digital-twin__content--step1">
         <div className="digital-twin__avatar-preview-wrap">
           <div className="digital-twin__avatar-preview">
-            {currentAvatarSrc ? (
-              <img
-                src={currentAvatarSrc}
-                alt={t('createAssistant.avatarPreview')}
-                className="digital-twin__avatar-preview-img"
-                draggable="false"
-              />
-            ) : null}
+            <AvatarImage
+              src={currentAvatarSrc}
+              fallbackSrc={defaultAvatar}
+              alt={t('createAssistant.avatarPreview')}
+              className="digital-twin__avatar-preview-img"
+              draggable="false"
+            />
           </div>
           <p className="digital-twin__avatar-tip">{t('createAssistant.avatarTip')}</p>
         </div>
@@ -199,8 +200,9 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                   });
                 }}
               >
-                <img
+                <AvatarImage
                   src={avatar.image}
+                  fallbackSrc={defaultAvatar}
                   alt={t('createAssistant.defaultAvatarAlt', { id: avatar.id })}
                   className="digital-twin__avatar-option-img"
                   draggable="false"

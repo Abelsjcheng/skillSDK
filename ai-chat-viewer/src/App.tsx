@@ -36,7 +36,6 @@ import {
   mapRawParts,
   messageOperationToMessage,
   normalizeRole,
-  replaceOptimisticMessage,
   sessionMessageToMessage,
   snapshotMessageToMessage,
   updateLatestQuestionPart,

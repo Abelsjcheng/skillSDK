@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import assistantAvatar from '../imgs/assistant-avatar.svg';
+import defaultAvatar from '../imgs/defaultAvatar.png';
 import type { Message, PendingAssistantPreview, QuestionAnswerSubmission } from '../types';
+import AvatarImage from './AvatarImage';
 import { MessageBubble } from './MessageBubble';
 import { PendingAssistantBubble } from './PendingAssistantBubble';
 import '../styles/Content.less';
@@ -55,7 +56,6 @@ export const Content: React.FC<ContentProps> = ({
 
   const welcomeTitle = weAgentUserName ? t('weAgent.welcomeMorning', { name: weAgentUserName }) : '';
   const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
-  const welcomeAvatar = weAgentAssistantAvatar || assistantAvatar;
 
   const getMessageOffsetTop = useCallback((messageId: string | null): number | null => {
     if (!messageId) return null;
@@ -153,7 +153,12 @@ export const Content: React.FC<ContentProps> = ({
       <div className="content content--we-agent-cui">
         <div className="we-agent-cui-welcome">
           <div className="we-agent-cui-welcome__avatar-wrap" aria-hidden="true">
-            <img src={welcomeAvatar} alt="" className="we-agent-cui-welcome__avatar" />
+            <AvatarImage
+              src={weAgentAssistantAvatar}
+              fallbackSrc={defaultAvatar}
+              alt=""
+              className="we-agent-cui-welcome__avatar"
+            />
           </div>
           {welcomeTitle ? <div className="we-agent-cui-welcome__title">{welcomeTitle}</div> : null}
           {welcomeSubtitle ? <div className="we-agent-cui-welcome__subtitle">{welcomeSubtitle}</div> : null}
