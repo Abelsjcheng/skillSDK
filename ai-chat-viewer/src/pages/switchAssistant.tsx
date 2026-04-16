@@ -10,6 +10,7 @@ import {
   openAssistantByPartnerAccount,
   resolveSelectableAssistantId,
 } from '../utils/assistantSelection';
+import { WeLog } from '../utils/logger';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getQueryParam,
@@ -55,7 +56,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
         partnerAccount,
       ));
     } catch (error) {
-      console.error('getWeAgentList failed in SwitchAssistant:', error);
+      WeLog(`SwitchAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_ASSISTANT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
       showToast(t('switchAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedPartnerAccount('');
@@ -76,7 +77,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       }
       window.HWH5.close();
     } catch (error) {
-      console.error('openWeAgentCUI failed in SwitchAssistant:', error);
+      WeLog(`SwitchAssistant openWeAgentCUI failed | extra=${JSON.stringify({ selectedPartnerAccount })} | error=${JSON.stringify(error)}`);
       showToast(t('switchAssistant.openFailed'));
     }
   }, [assistantList, selectedPartnerAccount, t]);

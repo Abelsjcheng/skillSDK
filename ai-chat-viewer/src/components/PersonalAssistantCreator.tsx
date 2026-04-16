@@ -20,6 +20,7 @@ import {
   resolveWeCodeUrlForOpenWeAgentCUI,
   type CreateDigitalTwinResult,
 } from '../utils/hwext';
+import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
 
@@ -77,7 +78,9 @@ const PersonalAssistantCreator: React.FC = () => {
         const createResult = await createDigitalTwin(params);
 
         if (!resolvePartnerAccount(createResult)) {
-          console.error('create assistant failed', createResult);
+          WeLog(`PersonalAssistantCreator createDigitalTwin returned invalid result | extra=${JSON.stringify({
+            createResult,
+          })}`);
           showToast(t('createAssistant.createFailed'));
           return;
         }
@@ -122,7 +125,7 @@ const PersonalAssistantCreator: React.FC = () => {
           window.HWH5.close();
         }
       } catch (error) {
-        console.error('confirm create assistant failed:', error);
+        WeLog(`PersonalAssistantCreator confirmCreateAssistant failed | extra=${JSON.stringify({ from })} | error=${JSON.stringify(error)}`);
         showToast(t('createAssistant.createFailed'));
       }
     },

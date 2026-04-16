@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
 import { APP_ID, isPcMiniApp } from '../constants';
+import { WeLog } from './logger';
 
 export interface HWH5EXTError {
   code?: string;
@@ -253,6 +254,7 @@ interface Pedestal {
 
 interface HWH5Bridge {
   openWebview: (payload: { uri: string }) => void;
+  log?: (payload: { content: string; type: 'i' }) => Promise<unknown> | unknown;
   openIMChat?: (payload: { chatId: string }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
@@ -332,12 +334,12 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
         params.onMessage(msg);
       });
       void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
-        console.error('registerSessionListener failed:', err);
+        WeLog(`hwext registerSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
       });
     },
     unregisterSessionListener: (params) => {
       void call<void>('unregisterSessionListener', params).catch((err) => {
-        console.error('unregisterSessionListener failed:', err);
+        WeLog(`hwext unregisterSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),

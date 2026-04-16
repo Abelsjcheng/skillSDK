@@ -10,6 +10,7 @@ import iconCopy from '../imgs/icon-copy.svg';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { WeLog } from '../utils/logger';
 import {
   buildCustomerServiceWebviewUri,
   CUSTOMER_SERVICE_WEBVIEW_URI,
@@ -70,7 +71,7 @@ const AssistantDetail: React.FC = () => {
           setDetail(nextDetail);
         }
       } catch (error) {
-        console.error('getWeAgentDetails failed in AssistantDetail:', error);
+        WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ partnerAccount })} | error=${JSON.stringify(error)}`);
         showToast(t('assistantDetail.loadFailed'));
         if (!cancelled) {
           setDetail(null);
@@ -116,7 +117,7 @@ const AssistantDetail: React.FC = () => {
       await copyTextToClipboard(content);
       showToast(successMessage);
     } catch (error) {
-      console.error('Copy failed in AssistantDetail:', error);
+      WeLog(`AssistantDetail copyTextToClipboard failed | error=${JSON.stringify(error)}`);
       showToast(t('assistantDetail.copyFailed'));
     }
   };

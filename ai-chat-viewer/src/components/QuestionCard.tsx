@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MessagePart, QuestionAnswerSubmission } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
+import { WeLog } from '../utils/logger';
 
 interface QuestionCardProps {
   part: MessagePart;
@@ -55,7 +56,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       setSelectedAnswer(answer);
       setCustomInput(answer);
     } catch (err) {
-      console.error('Failed to submit answer:', err);
+      WeLog(`QuestionCard submit answer failed | extra=${JSON.stringify({
+        partId: part.partId,
+        toolCallId: part.toolCallId,
+      })} | error=${JSON.stringify(err)}`);
     } finally {
       setSubmitting(false);
     }

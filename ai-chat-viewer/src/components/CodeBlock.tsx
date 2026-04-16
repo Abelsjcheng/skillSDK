@@ -7,6 +7,7 @@ import copyIcon from '../imgs/icon-copy.svg';
 import '../styles/CodeBlock.less';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 
 interface CodeBlockProps {
@@ -49,7 +50,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
         timerRef.current = setTimeout(() => setCopied(false), 2000);
       })
       .catch((error) => {
-        console.error('copyTextToClipboard failed in CodeBlock:', error);
+        WeLog(`CodeBlock copyTextToClipboard failed | error=${JSON.stringify(error)}`);
       });
   }, [code, t]);
 

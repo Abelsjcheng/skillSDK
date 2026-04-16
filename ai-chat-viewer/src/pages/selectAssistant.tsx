@@ -14,6 +14,7 @@ import {
   openAssistantByPartnerAccount,
   resolveSelectableAssistantId,
 } from '../utils/assistantSelection';
+import { WeLog } from '../utils/logger';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getWeAgentList,
@@ -50,7 +51,7 @@ const SelectAssistant: React.FC = () => {
       setAssistantList(list);
       setSelectedAssistantId((current) => resolveSelectableAssistantId(list, current));
     } catch (error) {
-      console.error('getWeAgentList failed in SelectAssistant:', error);
+      WeLog(`SelectAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_ASSISTANT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
       showToast(t('selectAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedAssistantId('');
@@ -88,7 +89,7 @@ const SelectAssistant: React.FC = () => {
       }
       window.HWH5.close();
     } catch (error) {
-      console.error('openWeAgentCUI failed in SelectAssistant:', error);
+      WeLog(`SelectAssistant openWeAgentCUI failed | extra=${JSON.stringify({ selectedAssistantId })} | error=${JSON.stringify(error)}`);
       showToast(t('selectAssistant.openFailed'));
     }
   }, [assistantList, selectedAssistantId, t]);

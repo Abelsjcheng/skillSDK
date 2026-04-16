@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isIosMobileDevice, isPcMiniApp } from './constants';
 import { Content } from './components/Content';
@@ -46,6 +46,7 @@ import {
   hasMoreHistoryByCursor,
 } from './utils/session';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
+import { WeLog } from './utils/logger';
 import { showToast } from './utils/toast';
 import createSession from './imgs/createSession.svg';
 import './styles/App.less';
@@ -134,7 +135,7 @@ function App({ assistantAccount = '' }: AppProps) {
         const deviceInfo = await getDeviceInfo()
         safeAreaInsetBottom = deviceInfo.safeAreaInsetBottom;
       } catch (error) {
-        console.error('disableAutoPushUpPage failed:', error);
+        WeLog(`App setupKeyboardHeightListener failed | error=${JSON.stringify(error)}`);
       }
 
       window.HWH5.onKeyboardHeightChange?.(handleKeyboardHeightChange);
@@ -339,7 +340,7 @@ function App({ assistantAccount = '' }: AppProps) {
     try {
       await sendUserMessage(answer, toolCallId);
     } catch (err) {
-      console.error('Failed to submit question answer:', err);
+      WeLog(`App sendMessage failed | extra=${JSON.stringify({ welinkSessionId, toolCallId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
       showToast(t('weAgent.submitAnswerFailed'));
       throw err;
@@ -375,7 +376,10 @@ function App({ assistantAccount = '' }: AppProps) {
       hasMoreHistoryRef.current = nextHasMoreHistory;
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
-      console.error('Failed to load more history messages:', err);
+      WeLog(`App getSessionMessageHistory failed | extra=${JSON.stringify({
+        welinkSessionId,
+        beforeSeq: nextBeforeSeqRef.current ?? undefined,
+      })} | error=${JSON.stringify(err)}`);
       showToast(t('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
@@ -433,7 +437,7 @@ function App({ assistantAccount = '' }: AppProps) {
   useEffect(() => {
     const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
-      console.error('缺少 assistantAccount 参数');
+      WeLog('App 缺少 assistantAccount 参数');
       return;
     }
 
@@ -462,7 +466,9 @@ function App({ assistantAccount = '' }: AppProps) {
 
         setWelinkSessionId(session.welinkSessionId);
       } catch (err) {
-        console.error('Failed to initialize weAgent session:', err);
+        WeLog(`App initializeWeAgentSession failed | extra=${JSON.stringify({
+          assistantAccount: currentAssistantAccount,
+        })} | error=${JSON.stringify(err)}`);
         if (!disposed) {
           showToast(t('weAgent.initSessionFailed'));
         }
@@ -507,7 +513,7 @@ function App({ assistantAccount = '' }: AppProps) {
         hasMoreHistoryRef.current = nextHasMoreHistory;
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
-        console.error('Failed to load messages:', err);
+        WeLog(`App getSessionMessageHistory failed | extra=${JSON.stringify({ welinkSessionId })} | error=${JSON.stringify(err)}`);
         showToast(t('weAgent.loadHistoryFailed'));
       }
     };
@@ -660,9 +666,6 @@ function App({ assistantAccount = '' }: AppProps) {
               )),
             };
           }));
-          if (hasStreamingPermission && currentStreamingMessageId) {
-            finalizeStreamingMessage();
-          }
           break;
         }
 
@@ -720,7 +723,10 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'session.error':
           setSessionStatus('error');
           setOutputtingSessionId(null);
-          console.error(msg.error ?? '会话错误');
+          WeLog(`App ${msg.error ?? '会话错误'} | extra=${JSON.stringify({
+            type: 'session.error',
+            welinkSessionId: activeWelinkSessionId,
+          })}`);
           if (!suppressFooterAutoResetRef.current) {
             setFooterMode('generate');
           }
@@ -731,7 +737,10 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'error':
           setSessionStatus('error');
           setOutputtingSessionId(null);
-          console.error(msg.error ?? '未知错误');
+          WeLog(`App ${msg.error ?? '未知错误'} | extra=${JSON.stringify({
+            type: 'error',
+            welinkSessionId: activeWelinkSessionId,
+          })}`);
           if (!suppressFooterAutoResetRef.current) {
             setFooterMode('generate');
           }
@@ -786,7 +795,11 @@ function App({ assistantAccount = '' }: AppProps) {
     onErrorRef.current = (err) => {
       const errorCode = err.code ?? (err.errorCode !== undefined ? String(err.errorCode) : 'unknown');
       const errorMessage = err.message ?? err.errorMessage ?? 'unknown error';
-      console.error('Session listener error:', `${errorCode}: ${errorMessage}`);
+      WeLog(`App Session listener error | extra=${JSON.stringify({
+        errorCode,
+        errorMessage,
+        welinkSessionId,
+      })}`);
     };
 
     onCloseRef.current = (reason) => {
@@ -849,7 +862,7 @@ function App({ assistantAccount = '' }: AppProps) {
       setFooterMode('generate');
       setOutputtingSessionId(null);
       showToast(t('weAgent.sendMessageFailed'));
-      console.error(t('weAgent.sendMessageFailed'), err);
+      WeLog(`App sendMessage failed | extra=${JSON.stringify({ welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
   }, [welinkSessionId, sendUserMessage]);
 
@@ -866,7 +879,7 @@ function App({ assistantAccount = '' }: AppProps) {
       finalizeStreamingMessage();
     } catch (err) {
       suppressFooterAutoResetRef.current = false;
-      console.error('Failed to stop skill:', err);
+      WeLog(`App stopSkill failed | extra=${JSON.stringify({ welinkSessionId })} | error=${JSON.stringify(err)}`);
       showToast(t('weAgent.stopGenerateFailed'));
       setFooterMode('generating');
     }
@@ -906,7 +919,7 @@ function App({ assistantAccount = '' }: AppProps) {
         return [newSession, ...next];
       });
     } catch (err) {
-      console.error('Failed to create new session:', err);
+      WeLog(`App createNewSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
       showToast(t('weAgent.createSessionFailed'));
     }
   }, [messages.length, resolveAssistantDetail, createSessionForAssistant, hidePendingAssistantPreview]);
@@ -1001,7 +1014,7 @@ function App({ assistantAccount = '' }: AppProps) {
             <div className="footer-wrapper">
               <WeAgentCUIFooter
                 isPcMiniApp={isPc}
-                mode={footerMode}
+                mode={isOutputting ? 'generating' : footerMode}
                 onSend={handleGenerate}
                 onStop={handleStop}
               />

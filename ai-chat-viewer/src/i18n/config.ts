@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import { en } from './resources/en';
 import { zh } from './resources/zh';
 import { getAppInfo, registerAppLanguageListener } from '../utils/hwext';
+import { WeLog } from '../utils/logger';
 
 export type AppLanguage = 'zh' | 'en';
 
@@ -71,7 +72,7 @@ export function ensureLanguageInitialized(): Promise<void> {
       const appInfo = await getAppInfo();
       await i18n.changeLanguage(normalizeLanguage(appInfo.language));
     } catch (error) {
-      console.error('ensureLanguageInitialized failed:', error);
+      WeLog(`i18n ensureLanguageInitialized failed | error=${JSON.stringify(error)}`);
       await i18n.changeLanguage('zh');
     }
   })();

@@ -34,6 +34,7 @@ import type {
   WeAgentUriResult,
 } from '../utils/hwext';
 import { HOST } from '../constants';
+import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
@@ -1797,7 +1798,6 @@ export function installJsApiMock(): void {
     ensureDefaultMockRouteQueryInHash();
   } catch (error) {
     // mock 安装失败不应阻断页面渲染，避免首屏白屏
-    // eslint-disable-next-line no-console
-    console.error('[ai-chat-viewer] installJsApiMock failed:', error);
+    WeLog(`installJsApiMock installJsApiMock failed | error=${JSON.stringify(error)}`);
   }
 }

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { APP_ID, isPcMiniApp } from '../constants';
@@ -8,6 +8,7 @@ import activateGuidePcEn from '../imgs/activate-guide-pc-en.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { getWeAgentList, openH5Webview, type WeAgentListItem } from '../utils/hwext';
+import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
 
@@ -39,7 +40,7 @@ const ActivateAssistant: React.FC = () => {
       setAssistantList(list);
       return list;
     } catch (error) {
-      console.error('getWeAgentList failed in ActivateAssistant:', error);
+      WeLog(`ActivateAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
       showToast(t('activateAssistant.loadFailed'));
       setAssistantList([]);
       return [];

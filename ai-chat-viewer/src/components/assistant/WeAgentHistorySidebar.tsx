@@ -6,6 +6,7 @@ import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
+import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
 
 type HistorySessionGroupKey = 'today' | 'yesterday' | 'threeDaysAgo';
@@ -176,7 +177,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
         return;
       }
 
-      console.error('Failed to load history sessions:', error);
+      WeLog(`WeAgentHistorySidebar getHistorySessionsList failed | extra=${JSON.stringify({
+        assistantAccount: assistantAccount.trim() || undefined,
+      })} | error=${JSON.stringify(error)}`);
       showToast(t('weAgent.loadHistoryFailed'));
 
       if (showLoading) {

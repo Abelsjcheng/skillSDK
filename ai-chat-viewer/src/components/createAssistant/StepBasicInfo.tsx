@@ -16,6 +16,7 @@ import {
   hasInvalidName,
   validateAvatarFile,
 } from '../../utils/digitalTwinValidation';
+import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
 import AvatarImage from '../AvatarImage';
 import { CreatorStepFooter } from './CreatorStepFooter';
@@ -102,7 +103,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         setAvatarType('custom');
         setCustomAvatarPreview(urlObj.pathname);
       } catch (error) {
-        console.error('uploadFile failed in StepBasicInfo:', error);
+        WeLog(`StepBasicInfo uploadFile failed | extra=${JSON.stringify({ filePath: file.filePath })} | error=${JSON.stringify(error)}`);
         showToast(t('createAssistant.uploadAvatarFailed'));
       }
     },
@@ -123,7 +124,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       }
       await handleAvatarUpload(fileResult);
     } catch (error) {
-      console.error('chooseImage failed in StepBasicInfo:', error);
+      WeLog(`StepBasicInfo chooseImage failed | error=${JSON.stringify(error)}`);
       showToast(t('createAssistant.chooseAvatarFailed'));
     }
   }, [handleAvatarUpload, t]);

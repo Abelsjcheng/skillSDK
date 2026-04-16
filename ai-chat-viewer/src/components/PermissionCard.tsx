@@ -4,6 +4,7 @@ import { isPcMiniApp } from '../constants';
 import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
+import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 
 interface PermissionCardProps {
@@ -71,7 +72,11 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
       setPermissionResponse(response);
       onResolved?.();
     } catch (err) {
-      console.error('Failed to reply permission:', err);
+      WeLog(`PermissionCard replyPermission failed | extra=${JSON.stringify({
+        welinkSessionId,
+        permissionId: part.permissionId,
+        response,
+      })} | error=${JSON.stringify(err)}`);
       showToast(t('permission.processFailed'));
     } finally {
       setSubmitting(false);

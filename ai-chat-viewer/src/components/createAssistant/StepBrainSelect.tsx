@@ -7,6 +7,7 @@ import defaultAvatar from '../../imgs/defaultAvatar.png';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canConfirm } from '../../utils/digitalTwinValidation';
+import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
 import { INTERNAL_ASSISTANTS } from './constants';
 import { CreatorStepFooter } from './CreatorStepFooter';
@@ -63,7 +64,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         setInternalAssistants(result);
       }
     } catch (error) {
-      console.error('getAgentType failed in StepBrainSelect:', error);
+      WeLog(`StepBrainSelect getAgentType failed | error=${JSON.stringify(error)}`);
       showToast(t('createAssistant.loadInternalAssistantsFailed'));
       setInternalAssistants(INTERNAL_ASSISTANTS);
     }
