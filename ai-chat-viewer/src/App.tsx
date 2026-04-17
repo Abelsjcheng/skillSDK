@@ -296,7 +296,8 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [finalizeStreamingMessage, hidePendingAssistantPreview]);
 
   const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
-    if (!welinkSessionId || !content) {
+    if (!welinkSessionId) {
+      showToast(t('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
@@ -319,7 +320,7 @@ function App({ assistantAccount = '' }: AppProps) {
     setScrollToBottomSignal((prev) => prev + 1);
 
     return result;
-  }, [welinkSessionId]);
+  }, [t, welinkSessionId]);
 
   const updateHistorySessionTitle = useCallback((sessionId: string, title: string) => {
     const normalizedSessionId = sessionId;

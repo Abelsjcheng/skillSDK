@@ -23,6 +23,7 @@ export const zh = {
   'weAgent.newestSession': '当前是最新会话',
   'weAgent.createSessionFailed': '新建会话失败',
   'weAgent.sendMessageFailed': '发送消息失败',
+  'weAgent.sendMessageWithoutSessionFailed': '未创建会话，发送消息失败',
   'weAgent.stopGenerateFailed': '停止生成失败',
   'weAgent.submitAnswerFailed': '提交回答失败',
   'weAgent.loadHistoryFailed': '获取历史消息失败',

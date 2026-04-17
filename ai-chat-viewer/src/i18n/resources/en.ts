@@ -23,6 +23,7 @@ export const en = {
   'weAgent.newestSession': 'This is already the latest session',
   'weAgent.createSessionFailed': 'Failed to create a new session',
   'weAgent.sendMessageFailed': 'Failed to send message',
+  'weAgent.sendMessageWithoutSessionFailed': 'Failed to send message because no session was created',
   'weAgent.stopGenerateFailed': 'Failed to stop generation',
   'weAgent.submitAnswerFailed': 'Failed to submit answer',
   'weAgent.loadHistoryFailed': 'Failed to load chat history',
