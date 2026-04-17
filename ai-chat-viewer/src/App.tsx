@@ -173,6 +173,17 @@ function App({ assistantAccount = '' }: AppProps) {
     ));
   }, []);
 
+  const resetCurrentSessionViewState = useCallback(() => {
+    hidePendingAssistantPreview();
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
+    shouldResetFooterOnCompletionRef.current = false;
+    suppressFooterAutoResetRef.current = false;
+    setFooterMode('generate');
+    setSessionStatus('idle');
+    setOutputtingSessionId(null);
+  }, [hidePendingAssistantPreview]);
+
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
 
@@ -905,10 +916,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const newSession = ensureSessionTimestamps(
         await createSessionForAssistant(currentAssistantAccount, detail.appKey),
       );
-      hidePendingAssistantPreview();
-      assemblerRef.current.reset();
-      streamingMsgIdRef.current = null;
-      setOutputtingSessionId(null);
+      resetCurrentSessionViewState();
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
       setHistorySessionsCache((prev) => {
@@ -930,17 +938,11 @@ function App({ assistantAccount = '' }: AppProps) {
       return;
     }
 
-    finalizeStreamingMessage();
-    shouldResetFooterOnCompletionRef.current = false;
-    suppressFooterAutoResetRef.current = false;
+    resetCurrentSessionViewState();
     knownUserMessageIdsRef.current.clear();
-
-    setFooterMode('generate');
-    setSessionStatus('idle');
-    setOutputtingSessionId(null);
     setMessages([]);
     setWelinkSessionId(normalizedSessionId);
-  }, [finalizeStreamingMessage, welinkSessionId]);
+  }, [resetCurrentSessionViewState, welinkSessionId]);
 
   return (
     <div
