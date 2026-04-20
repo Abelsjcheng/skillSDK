@@ -23,54 +23,55 @@
 
 ### 2.1 新增文件（实现目标）
 
-1. `src/components/PersonalAssistantCreator.tsx`
-2. `src/pages/activateAssistant.tsx`
-3. `src/components/createAssistant/StepBasicInfo.tsx`
-4. `src/components/createAssistant/StepBrainSelect.tsx`
-5. `src/components/createAssistant/CreatorStepHeader.tsx`
-6. `src/components/createAssistant/CreatorStepFooter.tsx`
-7. `src/components/createAssistant/constants.ts`
-8. `src/styles/ActivateAssistant.less`
-9. `src/imgs/activate-guide-1.svg`
-10. `src/imgs/activate-guide-2.svg`
-11. `src/imgs/assistant-bg.png`
-12. `src/imgs/assistant-pc-bg.png`
-13. `src/styles/PersonalAssistantCreator.less`
-14. `src/types/digitalTwin.ts`
-15. `src/pages/createAssistant.tsx`
-16. `public/create-assistant-page.html`
-17. `webpack.create-assistant-page.config.js`
-18. `src/pages/assistantDetail.tsx`
-19. `src/pages/switchAssistant.tsx`
-20. `src/components/assistant/AssistantPageHeader.tsx`
-20. `src/styles/AssistantPageHeader.less`
-21. `src/styles/AssistantDetail.less`
-22. `src/styles/SwitchAssistant.less`
-23. `src/imgs/icon-back.svg`
-24. `src/imgs/icon-service.svg`
-25. `src/imgs/icon-close.svg`
-26. `src/imgs/assistant-avatar.svg`
-27. `src/imgs/switch-assistant-avatar.svg`
-28. `example/assistant-components-demo/index.html`
-29. `example/assistant-components-demo/webpack.config.js`
-30. `example/assistant-components-demo/src/index.tsx`
-31. `example/assistant-components-demo/README.md`
-32. `src/components/assistant/AssistantSelectionPage.tsx`
-33. `src/pages/selectAssistant.tsx`
-34. `src/components/__tests__/SelectAssistant.test.tsx`
+1. `src/pages/createAssistantBasic.tsx`
+2. `src/pages/selectBrainAssistant.tsx`
+3. `src/pages/activateAssistant.tsx`
+4. `src/components/createAssistant/StepBasicInfo.tsx`
+5. `src/components/createAssistant/StepBrainSelect.tsx`
+6. `src/components/createAssistant/CreatorStepHeader.tsx`
+7. `src/components/createAssistant/CreatorStepFooter.tsx`
+8. `src/components/createAssistant/constants.ts`
+9. `src/styles/ActivateAssistant.less`
+10. `src/imgs/activate-guide-1.svg`
+11. `src/imgs/activate-guide-2.svg`
+12. `src/imgs/assistant-bg.png`
+13. `src/imgs/assistant-pc-bg.png`
+14. `src/styles/DigitalTwinCreator.less`
+15. `src/types/digitalTwin.ts`
+16. `src/pages/createAssistant.tsx`
+17. `public/create-assistant-page.html`
+18. `webpack.create-assistant-page.config.js`
+19. `src/pages/assistantDetail.tsx`
+20. `src/pages/switchAssistant.tsx`
+21. `src/components/assistant/AssistantPageHeader.tsx`
+22. `src/styles/AssistantPageHeader.less`
+23. `src/styles/AssistantDetail.less`
+24. `src/styles/SwitchAssistant.less`
+25. `src/imgs/icon-back.svg`
+26. `src/imgs/icon-service.svg`
+27. `src/imgs/icon-close.svg`
+28. `src/imgs/assistant-avatar.svg`
+29. `src/imgs/switch-assistant-avatar.svg`
+30. `example/assistant-components-demo/index.html`
+31. `example/assistant-components-demo/webpack.config.js`
+32. `example/assistant-components-demo/src/index.tsx`
+33. `example/assistant-components-demo/README.md`
+34. `src/components/assistant/AssistantSelectionPage.tsx`
+35. `src/pages/selectAssistant.tsx`
+36. `src/components/__tests__/SelectAssistant.test.tsx`
 
 ### 2.2 修改文件（导出目标）
 
 1. `src/lib/index.ts`
 2. `package.json`
-3. `src/components/__tests__/PersonalAssistantCreator.test.tsx`
+3. `src/routes/CreateAssistantPageRouter.tsx`
 4. `src/routes/AppRouter.tsx`
 
 ## 3. 页面打包导出策略
 
 1. 新增独立页面打包配置 `webpack.create-assistant-page.config.js`，以 `src/pages/createAssistant.tsx` 作为入口。
 2. 页面构建产物输出到 `dist/create-assistant-page`，包含 `index.html` 与页面脚本。
-3. `src/lib/index.ts` 不再导出 `PersonalAssistantCreator`，保留 `AIChatViewer` 现有库导出能力。
+3. `src/lib/index.ts` 不导出创建助理流程组件，保留 `AIChatViewer` 现有库导出能力。
 4. 在 `package.json` 增加页面构建与本地预览脚本（`build:create-assistant-page`、`serve:create-assistant-page`）。
 5. 页面模板需保证 `html/body/#root` 为 `100%` 宽高，确保组件可占满页面。
 6. 页面入口不使用 `React.StrictMode` 包裹，避免开发环境下页面 2 初始化 `useEffect` 双执行导致重复请求。
@@ -115,7 +116,7 @@ interface CreateDigitalTwinParams {
 ```
 
 决策说明：
-1. 页面内部复用 `PersonalAssistantCreator`，其签名保持 `const PersonalAssistantCreator: React.FC = () => ...` 且不接收 `props`。
+1. 创建助理流程最终由两个路由页面容器承载：第一页基础信息页与第二页能力选择页；旧的 `PersonalAssistantCreator` 统一步骤壳组件下线，不再作为运行时入口。
 2. 图像资源内置于 `constants.ts`；内部助手数据通过 `window.getAgentType()` 动态获取。
 3. 提交结果保留在页面内部闭环，不向宿主返回数据。
 
@@ -193,8 +194,7 @@ interface CreateDigitalTwinParams {
 
 状态归属拆分：
 
-1. `PersonalAssistantCreator` 仅维护跨页面状态：
-   - `step: 1 | 2`
+1. 创建助理不再通过 `PersonalAssistantCreator` 内部 `step` 状态切页；第一页固定路由为 `/createAssistant`，第二页固定路由为 `/selectBrainAssistant`。
 2. `StepBasicInfo` 维护页面 1 状态：
    - `avatarType: 'default' | 'custom'`
    - `avatarId?: string`
@@ -211,7 +211,7 @@ interface CreateDigitalTwinParams {
 2. 页面 1 默认选中第一个默认头像（若存在）
 3. 页面 1 `name/description` 为空
 4. 页面 2 默认 `brainType = 'internal'`，`selectedBizRobotId` 默认取内部助手列表第一项的 `bizRobotId`（若存在）
-5. 页面 1 点击“下一步”时将当前头像/名称/简介快照缓存到 `PersonalAssistantCreator`，页面 2 点击“上一步”返回时通过初始化参数回填 `StepBasicInfo` 本地状态，确保数据不丢失。
+5. 页面 1 点击“下一步”时将当前头像/名称/简介快照写入路由 `state` 草稿；页面 2 点击“上一步”或浏览器返回时回到 `/createAssistant`，并继续携带该草稿回填 `StepBasicInfo` 本地状态，避免依赖本地存储。
 
 ## 7. 交互与校验决策
 
@@ -249,12 +249,12 @@ interface CreateDigitalTwinParams {
 
 ## 8. 样式与实现约束
 
-1. 样式集中在 `src/styles/PersonalAssistantCreator.less`，使用 BEM 风格命名前缀：`digital-twin-`。
+1. 创建助理样式集中在 `src/styles/DigitalTwinCreator.less`，使用 BEM 风格命名前缀：`digital-twin-`。
 2. 布局单位优先使用 `px`，严格按需求值实现。
 3. 颜色值优先使用需求中的 `rgba(...)` 原值。
 4. 不引入新 UI 库；沿用当前项目原生 `button/input/textarea` + Less。
 5. 组件根节点与主容器必须设置 `width: 100%; height: 100%;`，确保填满父容器。
-6. 页面入口直接渲染 `PersonalAssistantCreator`，不创建额外父容器。
+6. 页面入口直接渲染路由页容器，并由路由页显式引入 `DigitalTwinCreator.less`，不再通过旧步骤壳组件间接注入样式。
 7. 布局采用 `header + content + actions` 的纵向弹性结构：`header/actions` 固定，`content` 使用 `flex: 1; min-height: 0; overflow: auto`。
 8. 页面打包模式下入口文件负责挂载页面根节点，不通过库导出组件进行外部挂载。
 9. 页面模板层（`html/body/#root`）需设置为 `width: 100%; height: 100%; margin: 0;`。
@@ -291,17 +291,19 @@ interface CreateDigitalTwinParams {
 
 ## 11. 路由实现决策
 
-1. 在主入口 `src/index.tsx` 基于 `react-router` 引入 `HashRouter`，路由配置下沉到独立路由组件。
-2. 路由表包含六个业务页与重定向规则：
+1. 在主入口 `src/index.tsx` 基于 `react-router-dom` 引入官方 `HashRouter`，路由配置下沉到独立路由组件，不再维护项目内自定义 `HashRouter`。
+2. 路由表包含创建助理双页与其他业务页：
    - `/weAgentCUI` -> `App`（WeAgentCUI 对话页）
-   - `/createAssistant` -> `PersonalAssistantCreator`（创建个人助理页）
+   - `/createAssistant` -> 创建个人助理第一页
+   - `/selectBrainAssistant` -> 创建个人助理第二页
    - `/activateAssistant` -> `ActivateAssistant`（激活助理页）
    - `/assistantDetail` -> `AssistantDetail`（助理详情页）
    - `/switchAssistant` -> `SwitchAssistant`（切换助理页）
    - `/selectAssistant` -> `SelectAssistant`（启动助理页）
    - `/` 与 `*` -> 重定向到 `/weAgentCUI`
 3. 页面路由切换不改变原有业务逻辑，只做视图层分发。
-4. `create-assistant-page` 独立打包入口维持现状，用于单页发布场景；与主入口路由方案并存。
+4. `create-assistant-page` 独立打包入口同步引入 Hash Router，并与主入口复用 `/createAssistant`、`/selectBrainAssistant` 两个创建助理路由，保证浏览器返回行为一致。
+5. 创建助理拆分为两个路由页后，页面级容器需继续显式引入 `src/styles/DigitalTwinCreator.less`，不能再依赖旧的 `PersonalAssistantCreator` 组件间接带入样式，避免出现新路由页结构已切换但样式丢失的问题。
 
 ## 11.1 WeCodeUrl Host 解析
 
@@ -484,7 +486,7 @@ interface CreateDigitalTwinParams {
    - `utils/toast.ts`
    - `utils/streaming.ts`
    - `activateAssistant`
-   - `createAssistant` / `PersonalAssistantCreator` / `StepBasicInfo` / `StepBrainSelect` / `CreatorStepHeader`
+   - `createAssistant` / `createAssistantBasic` / `selectBrainAssistant` / `StepBasicInfo` / `StepBrainSelect` / `CreatorStepHeader`
    - `assistantDetail`
    - `selectAssistant` / `switchAssistant`
    - `CodeBlock` / `PermissionCard` / `QuestionCard` / `ThinkingBlock`

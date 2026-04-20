@@ -1,10 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { StepBrainSelect } from '../components/createAssistant/StepBrainSelect';
 import { isPcMiniApp } from '../constants';
-import { DEFAULT_AVATARS } from './createAssistant/constants';
-import { StepBasicInfo } from './createAssistant/StepBasicInfo';
-import { StepBrainSelect } from './createAssistant/StepBrainSelect';
 import type {
+  CreateAssistantRouteState,
   CreateDigitalTwinParams,
   DigitalTwinBasicInfoPayload,
   DigitalTwinBrainPayload,
@@ -29,39 +29,74 @@ function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-const PersonalAssistantCreator: React.FC = () => {
+function closeCreateAssistantWindow(): void {
+  if (typeof window !== 'undefined' && (window as any).Pedestal?.remote?.getCurrentWindow) {
+    (window as any).Pedestal.remote.getCurrentWindow().close();
+  }
+}
+
+const SelectBrainAssistantPage: React.FC = () => {
   const { t } = useTranslation();
   const isPc = isPcMiniApp();
-  const [step, setStep] = useState<1 | 2>(1);
-  const basicInfoRef = useRef<DigitalTwinBasicInfoPayload | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const routeState = location.state as CreateAssistantRouteState | null;
+  const draft = useMemo<DigitalTwinBasicInfoPayload | null>(() => routeState?.draft ?? null, [routeState]);
+  const draftExists = Boolean(draft);
+  const from = useMemo(() => getQueryParam('from', location.search) ?? '', [location.search]);
 
-  const from = useMemo(() => getQueryParam('from') ?? '', []);
+  useEffect(() => {
+    if (draftExists) {
+      return;
+    }
 
-  const handleNext = useCallback((payload: DigitalTwinBasicInfoPayload) => {
-    basicInfoRef.current = payload;
-    setStep(2);
-  }, []);
+    navigate(
+      {
+        pathname: '/createAssistant',
+        search: location.search,
+      },
+      { replace: true },
+    );
+  }, [draftExists, location.search, navigate]);
+
+  if (!draftExists) {
+    return null;
+  }
 
   const handleClose = useCallback(() => {
-    if (typeof window !== 'undefined' && (window as any).Pedestal?.remote?.getCurrentWindow) {
-      (window as any).Pedestal.remote.getCurrentWindow().close();
-    }
+    closeCreateAssistantWindow();
   }, []);
 
   const handleCancel = useCallback(() => {
-    if (typeof window !== 'undefined' && (window as any).Pedestal?.remote?.getCurrentWindow) {
-      (window as any).Pedestal.remote.getCurrentWindow().close();
-    }
+    closeCreateAssistantWindow();
   }, []);
 
   const handlePrev = useCallback(() => {
-    setStep(1);
-  }, []);
+    navigate(
+      {
+        pathname: '/createAssistant',
+        search: location.search,
+      },
+      {
+        replace: true,
+        state: draft ? ({ draft } satisfies CreateAssistantRouteState) : undefined,
+      },
+    );
+  }, [draft, location.search, navigate]);
 
   const handleConfirm = useCallback(
     async (payload: DigitalTwinBrainPayload) => {
-      const basicInfo = basicInfoRef.current;
-      if (!basicInfo) return;
+      const basicInfo = draft;
+      if (!basicInfo) {
+        navigate(
+          {
+            pathname: '/createAssistant',
+            search: location.search,
+          },
+          { replace: true },
+        );
+        return;
+      }
 
       const params: CreateDigitalTwinParams = {
         name: basicInfo.name,
@@ -76,9 +111,10 @@ const PersonalAssistantCreator: React.FC = () => {
 
       try {
         const createResult = await createDigitalTwin(params);
+        const partnerAccount = resolvePartnerAccount(createResult);
 
-        if (!resolvePartnerAccount(createResult)) {
-          WeLog(`PersonalAssistantCreator createDigitalTwin returned invalid result | extra=${JSON.stringify({
+        if (!partnerAccount) {
+          WeLog(`SelectBrainAssistantPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
             createResult,
           })}`);
           showToast(t('createAssistant.createFailed'));
@@ -86,7 +122,6 @@ const PersonalAssistantCreator: React.FC = () => {
         }
 
         if (from !== 'weAgent') {
-          const partnerAccount = resolvePartnerAccount(createResult);
           if (!isPc) {
             if (typeof window.HWH5.openIMChat === 'function') {
               await window.HWH5.openIMChat({ chatId: partnerAccount });
@@ -99,65 +134,51 @@ const PersonalAssistantCreator: React.FC = () => {
           return;
         }
 
-        const partnerAccount = resolvePartnerAccount(createResult);
-        if (!partnerAccount) {
-          console.warn('createDigitalTwin did not return partnerAccount for weAgent flow.');
-          return;
-        }
-
         const detailResult = await getWeAgentDetails({ partnerAccount });
         const detail = detailResult?.weAgentDetailsArray?.[0];
         if (!detail) {
           console.warn('getWeAgentDetails did not return detail for partnerAccount:', partnerAccount);
           return;
         }
+
         const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
         const robotId = resolveRobotIdForOpenWeAgentCUI({
-          detailRobotId: detail.robotId,
+          detailId: detail.id,
           createRobotId: createResult.robotId,
         });
         const openParams = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
           bizRobotId: detail.bizRobotId,
           robotId,
         });
+
         await openWeAgentCUI(openParams);
+
         if (!isPc) {
           window.HWH5.close();
         }
       } catch (error) {
-        WeLog(`PersonalAssistantCreator confirmCreateAssistant failed | extra=${JSON.stringify({ from })} | error=${JSON.stringify(error)}`);
+        WeLog(`SelectBrainAssistantPage confirmCreateAssistant failed | extra=${JSON.stringify({ from })} | error=${JSON.stringify(error)}`);
         showToast(t('createAssistant.createFailed'));
       }
     },
-    [from, isPc, t],
+    [draft, from, isPc, location.search, navigate, t],
   );
 
   return (
     <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>
-      {step === 1 ? (
-        <StepBasicInfo
-          isPcMiniApp={isPc}
-          defaultAvatars={DEFAULT_AVATARS}
-          initialValue={basicInfoRef.current}
-          onClose={handleClose}
-          onCancel={handleCancel}
-          onNext={handleNext}
-        />
-      ) : (
-        <StepBrainSelect
-          isPcMiniApp={isPc}
-          onClose={handleClose}
-          onCancel={handleCancel}
-          onPrev={handlePrev}
-          onConfirm={handleConfirm}
-          loadAgentTypes={async () => {
-            const result = await getAgentType();
-            return result && Array.isArray(result.content) ? result.content : [];
-          }}
-        />
-      )}
+      <StepBrainSelect
+        isPcMiniApp={isPc}
+        onClose={handleClose}
+        onCancel={handleCancel}
+        onPrev={handlePrev}
+        onConfirm={handleConfirm}
+        loadAgentTypes={async () => {
+          const result = await getAgentType();
+          return result && Array.isArray(result.content) ? result.content : [];
+        }}
+      />
     </div>
   );
 };
 
-export default PersonalAssistantCreator;
+export default SelectBrainAssistantPage;

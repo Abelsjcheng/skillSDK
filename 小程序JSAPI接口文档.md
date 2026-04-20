@@ -1072,15 +1072,21 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | appSecret | string | 助理 SK |
 | partnerAccount | string | 助理账号 ID |
 | createdBy | string | 创建者 weLinkId |
+| creatorWorkId | string | 创建者工号 |
+| creatorW3Account | string | 创建者账号 |
 | creatorName | string | 创建者名称 |
 | creatorNameEn | string | 创建者英文名称 |
 | ownerWelinkId | string | 责任人 weLinkId |
+| ownerW3Account | string | 大脑机器人责任人账号 |
 | ownerName | string | 责任人名称 |
 | ownerNameEn | string | 责任人英文名称 |
 | ownerDeptName | string | 责任部门中文名 |
 | ownerDeptNameEn | string | 责任部门英文名 |
+| id | string | 助理对应机器人 ID（当助理详情解析 `weCodeUrl` 的 host 与常量 `APP_ID` 不一致时，用于拼接 `weAgentUri` 的 `robotId` query） |
+| bizRobotName | string | 助理对应业务机器人名称（中文） |
+| bizRobotNameEn | string | 助理对应业务机器人名称（英文） |
+| bizRobotTag | string | 大脑机器人 tag |
 | bizRobotId | string | 助理对应业务机器人 ID |
-| robotId | string | 助理对应机器人 ID（当助理详情解析 `weCodeUrl` 的 host 与常量 `APP_ID` 不一致时，用于拼接 `weAgentUri` 的 `robotId` query） |
 | weCodeUrl | string | 助理 We 码地址 |
 
 ### 行为说明

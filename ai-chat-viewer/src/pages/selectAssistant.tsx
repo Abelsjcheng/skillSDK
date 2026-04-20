@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import AssistantCardList from '../components/assistant/AssistantCardList';
 import { isPcMiniApp } from '../constants';

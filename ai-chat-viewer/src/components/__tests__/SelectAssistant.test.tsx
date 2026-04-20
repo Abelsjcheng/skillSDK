@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter } from 'react-router-dom';
 import SelectAssistant from '../../pages/selectAssistant';
 
 const TEXT_SELECT_ASSISTANT = '\u9009\u62e9\u52a9\u7406';

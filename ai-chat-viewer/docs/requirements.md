@@ -12,7 +12,7 @@
 ## 2. 交付范围
 
 1. 新增一个独立页面打包入口（暂记为 `create-assistant-page`），产物包含可直接访问的 `index.html` 与对应脚本资源。
-2. 页面内部复用 `PersonalAssistantCreator` 实现 UI 与交互，但不通过 `src/lib/index.ts` 对外导出该组件。
+2. 页面内部通过两个路由页面容器承载创建助理流程：第一页基础信息页与第二页能力选择页；不再保留 `PersonalAssistantCreator` 作为统一步骤壳组件。
 3. 页面内部包含 2 个页面：
    - 页面 1：基础信息录入（头像、名称、简介）。
    - 页面 2：助理大脑类型选择（内部助手/自定义助手）。
@@ -25,7 +25,7 @@
 7. 状态职责拆分：
    - 页面 1 的状态变量在 `StepBasicInfo` 内部管理；
    - 页面 2 的状态变量在 `StepBrainSelect` 内部管理；
-   - `PersonalAssistantCreator` 仅保留跨页面公共方法与步骤切换控制。
+   - 跨页面共享的第一页草稿通过路由 `state` 在 `/createAssistant` 与 `/selectBrainAssistant` 两个路由页面之间传递与回填，不落本地存储。
 8. 新增“激活助理页面”，用于展示激活引导轮播与“立即启用”操作按钮。
 9. 新增“助理详情页面”，用于展示助理基础信息、简介、创建者与组织信息。
 10. 新增“切换助理页面”，用于展示可滚动助理列表并支持切换入口。
@@ -44,11 +44,11 @@
 ## 3. 页面流程
 
 1. 进入页面 1（基础信息页）。
-2. 当“名称 + 简介”均已填写时，“下一步”可点击；点击后进入页面 2。
+2. 当“名称 + 简介”均已填写时，“下一步”可点击；点击后通过路由跳转进入页面 2（`#/selectBrainAssistant`）。
 3. 页面 2 选择“大脑类型”并完成子项选择（如需）后，“确定”可点击。
 4. 任一页面点击右上角 `X` 或“取消”时，直接调用 `window.Pedestal.remote.getCurrentWindow().close()` 关闭当前窗口。
-5. 页面 2 点击“上一步”时返回页面 1。
-6. 页面 2 点击“上一步”返回页面 1 后，第一页中的头像选择、名称、简介需按返回前状态完整保留（包含自定义头像预览）。
+5. 页面 2 点击“上一步”时返回页面 1（`#/createAssistant`）。
+6. 页面 2 点击“上一步”返回页面 1 后，第一页中的头像选择、名称、简介需按返回前状态完整保留（包含自定义头像预览）；用户在页面 2 点击浏览器返回时，也需返回到页面 1。
 7. 页面 2 点击“确定”时调用 `window.createDigitalTwin()`，并按规则组装分身创建入参。
 
 ### 3.1 全局布局约束
@@ -62,7 +62,7 @@
 
 ### 3.2 页面入口渲染约束
 
-1. 页面入口需直接渲染 `PersonalAssistantCreator`，不额外包裹父容器。
+1. 主工程路由入口与 `create-assistant-page` 独立打包入口都需通过 Hash Router 承载创建助理相关页面，由两个路由页容器直接渲染创建助理 UI，不再保留 `PersonalAssistantCreator` 统一步骤壳组件。
 2. 页面根节点层级（`html`、`body`、`#root`）需设置宽高为 `100%`。
 3. 组件渲染后需占满整个页面可视区域。
 4. 页面入口不使用 `React.StrictMode` 包裹，避免开发环境下页面 2 的初始化 `useEffect` 重复触发。
@@ -343,8 +343,8 @@
    - `brainType`：`internal` 或 `custom`。
    - `agentTypeList`：由 `window.getAgentType()` 返回的内部助手列表（`name/icon/bizRobotId`）。
    - `selectedBizRobotId`：当 `brainType=internal` 时必填。
-3. `PersonalAssistantCreator` 内部状态：
-   - `step`：页面步骤切换状态（1/2）。
+3. 跨页面共享状态：
+   - 第一步草稿通过路由 `state` 在两个路由页之间传递与回填。
 
 ### 6.2 输出行为（页面内部）
 
@@ -378,7 +378,7 @@
 ## 8. 验收标准（功能）
 
 1. 个人助理功能可作为独立页面产物打包导出，并可直接访问页面入口运行。
-2. `src/lib/index.ts` 不再导出 `PersonalAssistantCreator`，避免以独立组件方式对外提供。
+2. `src/lib/index.ts` 不导出创建助理流程组件；创建助理仅以页面路由与独立打包页形式提供。
 3. 页面 1 与页面 2 的区域结构、布局关系、文案、尺寸和颜色符合需求。
 4. 页面 1 的“下一步”严格受“名称/简介必填”控制。
 5. 页面 2 的“确定”严格受选择状态控制。
@@ -386,7 +386,7 @@
 7. `X` 与取消点击会触发 `window.Pedestal.remote.getCurrentWindow().close()` 且不报错；页面 2 初始化会触发 `window.getAgentType()`；确定点击会触发 `window.createDigitalTwin()` 且入参符合本文件定义。
 8. 下一步行为正常可用，且符合本文件定义（无需对外事件）。
 9. 页面内部主容器以 `100%` 宽高自适应填充整个页面。
-10. 页面入口直接渲染组件，不存在额外父容器包裹层。
+10. 两个创建助理路由页都通过统一页面容器承载 `digital-twin-` 样式，不依赖旧的步骤壳组件间接挂载。
 11. 两个页面的底部操作区均完整显示在容器内，不出现底部溢出。
 12. 清理冗余样式属性后，页面视觉表现与交互行为保持不变。
 13. 在不改变视觉与交互验收结果的前提下，可提取页面 1 与页面 2 的重复代码为公共实现（如标题区、footer 操作区、主按钮状态 class 组装），以降低维护成本。
@@ -439,11 +439,12 @@
 
 ## 11. 路由页面划分（React Router）
 
-1. 主工程入口（`src/index.tsx`）需通过 `react-router` 管理页面路由。
-2. 路由模式使用 Hash 路由（`HashRouter`）。
-3. 当前保留六个页面路由：
+1. 主工程入口（`src/index.tsx`）需通过 `react-router-dom` 管理页面路由。
+2. 路由模式使用 `react-router-dom` 提供的 `HashRouter`。
+3. 当前保留七个页面路由：
    - `WeAgentCUI 对话页面`：哈希路径 `#/weAgentCUI`
-   - `创建个人助理页面`：哈希路径 `#/createAssistant`
+   - `创建个人助理第一页`：哈希路径 `#/createAssistant`
+   - `创建个人助理第二页`：哈希路径 `#/selectBrainAssistant`
    - `激活助理页面`：哈希路径 `#/activateAssistant`
    - `助理详情页面`：哈希路径 `#/assistantDetail`
    - `切换助理页面`：哈希路径 `#/switchAssistant`
@@ -784,8 +785,8 @@
          - 非空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#selectAssistant' })`。
 3. 启动助理页面（`/selectAssistant`）：
    - 页面初始化调用 `getWeAgentList`，并将返回的 `content` 助理信息填充到列表项；
-   - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
-   - 路由渲染约束：`AppRouter` 需使用 `useLocation` 获取当前路由，并通过 `<Routes location={location} key={pathname+search+hash}>` 驱动页面渲染，保证 HashRouter 下 hash/query 变化后组件正确重渲染；
+   - 点击“创建助理”：通过 `react-router-dom` 导航到 `/createAssistant?from=weAgent`；
+   - 路由渲染约束：统一使用 `react-router-dom` 的路由能力，不再维护自定义 `HashRouter` 实现；
    - 点击“创建助理”仅通过 `react-router` 导航处理，不再依赖手动改 `window.location.hash` 与 `window.location.reload()` 强刷页面；
    - 选中某个助理后点击“立即启用”：
       - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
@@ -797,7 +798,10 @@
       - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 4. 创建助理页面（`/createAssistant`）：
    - 页面初始化读取 query 参数 `from`；
-   - 进入第二步后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
+   - 第一页点击“下一步”时，将基础信息草稿写入路由 `state`，并通过路由跳转到 `/selectBrainAssistant`，同时保留当前 query 参数；
+   - 第二页（`/selectBrainAssistant`）初始化时先从路由 `state` 读取第一页草稿；若草稿缺失，则重定向回 `/createAssistant`；
+   - 第二页进入后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
+   - 第二页点击浏览器返回时，应回到 `/createAssistant`；
    - 点击“确定”调用 `createDigitalTwin`；
    - 若 `from=weAgent`：
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；

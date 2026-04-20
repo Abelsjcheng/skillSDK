@@ -152,15 +152,18 @@ export interface WeAgentDetails {
   partnerAccount: string;
   createdBy: string;
   creatorName: string;
-  creatorWorkId?: string;
+  creatorWorkId: string;
+  creatorW3Account: string;
   creatorNameEn: string;
   ownerWelinkId: string;
+  ownerW3Account: string;
   ownerName: string;
   ownerNameEn: string;
   ownerDeptName: string;
   ownerDeptNameEn: string;
+  id: string;
   bizRobotId: string;
-  robotId?: string;
+  bizRobotTag: string;
   bizRobotName?: string;
   bizRobotNameEn?: string;
   weCodeUrl: string;
@@ -197,7 +200,7 @@ export interface BuildOpenWeAgentCUIOptions {
 }
 
 export interface ResolveRobotIdOptions {
-  detailRobotId?: string;
+  detailId?: string;
   listRobotId?: string;
   createRobotId?: string;
 }
@@ -492,7 +495,7 @@ export function resolveWeCodeUrlForOpenWeAgentCUI(
 }
 
 export function resolveRobotIdForOpenWeAgentCUI(options: ResolveRobotIdOptions): string {
-  return normalizeString(options.detailRobotId)
+  return normalizeString(options.detailId)
     || normalizeString(options.listRobotId)
     || normalizeString(options.createRobotId);
 }

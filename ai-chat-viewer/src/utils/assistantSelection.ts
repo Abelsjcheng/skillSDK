@@ -65,7 +65,7 @@ export async function openAssistantByPartnerAccount(
 
   const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
   const robotId = resolveRobotIdForOpenWeAgentCUI({
-    detailRobotId: detail.robotId,
+    detailId: detail.id,
     listRobotId: selectedAssistant?.robotId,
   });
   const params = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {

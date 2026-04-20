@@ -17,6 +17,10 @@
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
 | `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并按需持久化助理详情 |
+| `updateWeAgent` | `PUT /v4-1/we-crew` | 更新个人助理信息 |
+| `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
+| `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
+| `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`/`error`），并按接口语义返回业务字段（如 `message`、`content`）。
@@ -265,7 +269,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 |---|---|---|
 | `weAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
 
-`WeAgentDetails` 对象新增字段：`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`id`（字符串）；移除 `robotId` 字段。
+`WeAgentDetails` 对象新增字段：`id`（字符串）、`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`ownerWelinkId`（责任人的 id，字符串）、`creatorWorkId`（创建者的工号，字符串）、`bizRobotTag`（大脑机器人 tag，字符串）、`ownerW3Account`（大脑机器人责任人的账号，字符串）、`creatorW3Account`（创建者的账号，字符串）；移除 `robotId` 字段。
 
 ### 出参示例
 
@@ -281,9 +285,12 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "appKey": "",
       "appSecret": "",
       "createdBy": "",
+      "creatorWorkId": "",
+      "creatorW3Account": "",
       "creatorName": "",
       "creatorNameEn": "",
       "ownerWelinkId": "",
+      "ownerW3Account": "",
       "ownerName": "",
       "ownerNameEn": "",
       "ownerDeptName": "",
@@ -291,6 +298,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "id": "78985451212",
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "employee_assistant",
+      "bizRobotTag": "",
       "bizRobotId": "",
       "weCodeUrl": "https://xxx"
     }
@@ -307,7 +315,247 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ---
 
-## 5. 获取当前 WeAgentUri 接口
+## 5. 更新个人助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+更新当前用户已创建的个人助理信息。
+
+### 接口名
+
+```typescript
+updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `name` | `string` | 是 | 助理名称 |
+| `icon` | `string` | 是 | 助理头像地址 |
+| `description` | `string` | 是 | 助理简介 |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "dig_001",
+  "name": "更新名称",
+  "icon": "/mocloud/xxx",
+  "description": "更新简介"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `updateResult` | `string` | 助理信息更新结果，成功时为 `success` |
+
+### 出参示例
+
+```json
+{
+  "updateResult": "success"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API：`PUT /v4-1/we-crew`。
+2. SDK 按原样透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`。
+3. SDK 从服务端响应中提取 `message`，并映射返回为 `updateResult`。
+
+---
+
+## 6. 删除个人助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+删除当前用户已创建的个人助理。
+
+### 接口名
+
+```typescript
+deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "dig_001"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `deleteResult` | `string` | 助理删除结果，成功时为 `success` |
+
+### 出参示例
+
+```json
+{
+  "deleteResult": "success"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
+2. SDK 透传删除标识参数：
+   - `partnerAccount`：优先使用；
+   - `robotId`：当调用方未传 `partnerAccount` 时可作为补充删除标识。
+3. SDK 从服务端响应中提取 `message`，并映射返回为 `deleteResult`。
+
+---
+
+## 7. 打开助理编辑页面接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+打开助理编辑页面，并注册详情更新回调。
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistantEditPageResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `robotId` | `string` | 是 | 助理机器人 ID |
+| `onUpdated` | `function` | 是 | 监听详情更新回调，回调出参为 `AssistantDetailUpdatedPayload` |
+
+### 入参示例
+
+```typescript
+{
+  partnerAccount: 'x00_1',
+  robotId: '78985451212',
+  onUpdated: (payload) => {
+    console.log(payload.name, payload.icon, payload.description)
+  }
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收 `partnerAccount`、`robotId` 与 `onUpdated` 回调，并在本地注册该回调。
+2. SDK 将 `partnerAccount` 和 `robotId` 作为 query 项拼接到 `h5://S008623/index.html?partnerAccount={partnerAccount}&robotId={robotId}#editAssistant`。
+3. 拼接完成后的 uri 地址当前先记为 `todo`，待后续页面地址方案确认后补齐。
+4. SDK 拉起助理编辑页面。
+5. SDK 返回 `OpenAssistantEditPageResult`，其中 `status` 固定为 `success`。
+
+---
+
+## 8. 通知助理详情更新接口
+
+### 调用方
+
+助理编辑页面调用
+
+### 接口说明
+
+通知 SDK 当前助理详情已更新，并触发 `openAssistantEditPage` 注册的 `onUpdated` 回调。
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promise<NotifyAssistantDetailUpdatedResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `name` | `string` | 是 | 助理名称 |
+| `icon` | `string` | 是 | 助理头像地址 |
+| `description` | `string` | 是 | 助理简介 |
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `robotId` | `string` | 是 | 助理机器人 ID |
+
+### 入参示例
+
+```json
+{
+  "name": "更新名称",
+  "icon": "/mocloud/xxx",
+  "description": "更新简介",
+  "partnerAccount": "x00_1",
+  "robotId": "78985451212"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收 `name`、`icon`、`description`、`partnerAccount`、`robotId`。
+2. SDK 根据 `partnerAccount` 与 `robotId` 定位 `openAssistantEditPage` 已注册的回调监听。
+3. SDK 触发对应的 `onUpdated` 回调，并将以下对象作为回调参数传出：
+   - `name`
+   - `icon`
+   - `description`
+4. SDK 返回 `NotifyAssistantDetailUpdatedResult`，其中 `status` 固定为 `success`。
+
+---
+
+## 9. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -418,6 +666,91 @@ type QueryWeAgentParams = {
 }
 ```
 
+### UpdateWeAgentParams
+
+```typescript
+type UpdateWeAgentParams = {
+  partnerAccount: string
+  robotId?: string
+  name: string
+  icon: string
+  description: string
+}
+```
+
+### UpdateWeAgentResult
+
+```typescript
+type UpdateWeAgentResult = {
+  updateResult: string
+}
+```
+
+### DeleteWeAgentParams
+
+```typescript
+type DeleteWeAgentParams = {
+  partnerAccount: string
+  robotId?: string
+}
+```
+
+### DeleteWeAgentResult
+
+```typescript
+type DeleteWeAgentResult = {
+  deleteResult: string
+}
+```
+
+### AssistantDetailUpdatedPayload
+
+```typescript
+type AssistantDetailUpdatedPayload = {
+  name: string
+  icon: string
+  description: string
+}
+```
+
+### OpenAssistantEditPageParams
+
+```typescript
+type OpenAssistantEditPageParams = {
+  partnerAccount: string
+  robotId: string
+  onUpdated: (payload: AssistantDetailUpdatedPayload) => void
+}
+```
+
+### OpenAssistantEditPageResult
+
+```typescript
+type OpenAssistantEditPageResult = {
+  status: string
+}
+```
+
+### NotifyAssistantDetailUpdatedParams
+
+```typescript
+type NotifyAssistantDetailUpdatedParams = {
+  name: string
+  icon: string
+  description: string
+  partnerAccount: string
+  robotId: string
+}
+```
+
+### NotifyAssistantDetailUpdatedResult
+
+```typescript
+type NotifyAssistantDetailUpdatedResult = {
+  status: string
+}
+```
+
 ### WeAgent
 
 ```typescript
@@ -452,9 +785,12 @@ type WeAgentDetails = {
   appSecret: string
   partnerAccount: string
   createdBy: string
+  creatorWorkId: string
+  creatorW3Account: string
   creatorName: string
   creatorNameEn: string
   ownerWelinkId: string
+  ownerW3Account: string
   ownerName: string
   ownerNameEn: string
   ownerDeptName: string
@@ -462,6 +798,7 @@ type WeAgentDetails = {
   id: string
   bizRobotName: string
   bizRobotNameEn: string
+  bizRobotTag: string
   bizRobotId: string
   weCodeUrl: string
 }

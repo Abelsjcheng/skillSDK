@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { APP_ID, isPcMiniApp } from '../constants';
 import activateGuideMobileEn from '../imgs/activate-guide-en.png';
 import activateGuideMobile from '../imgs/activate-guide.png';
