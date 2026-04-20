@@ -927,18 +927,20 @@ export class SkillSDK {
       appSecret: TypeConverter.toOptionalString(payload.appSecret, 'appSecret') ?? '',
       partnerAccount: TypeConverter.toOptionalString(payload.partnerAccount, 'partnerAccount') ?? '',
       createdBy: TypeConverter.toOptionalString(payload.createdBy, 'createdBy') ?? '',
+      creatorWorkId: TypeConverter.toOptionalString(payload.creatorWorkId, 'creatorWorkId') ?? '',
+      creatorW3Account: TypeConverter.toOptionalString(payload.creatorW3Account, 'creatorW3Account') ?? '',
       creatorName: TypeConverter.toOptionalString(payload.creatorName, 'creatorName') ?? '',
       creatorNameEn: TypeConverter.toOptionalString(payload.creatorNameEn, 'creatorNameEn') ?? '',
       ownerWelinkId: TypeConverter.toOptionalString(payload.ownerWelinkId, 'ownerWelinkId') ?? '',
+      ownerW3Account: TypeConverter.toOptionalString(payload.ownerW3Account, 'ownerW3Account') ?? '',
       ownerName: TypeConverter.toOptionalString(payload.ownerName, 'ownerName') ?? '',
       ownerNameEn: TypeConverter.toOptionalString(payload.ownerNameEn, 'ownerNameEn') ?? '',
       ownerDeptName: TypeConverter.toOptionalString(payload.ownerDeptName, 'ownerDeptName') ?? '',
       ownerDeptNameEn: TypeConverter.toOptionalString(payload.ownerDeptNameEn, 'ownerDeptNameEn') ?? '',
-      id: TypeConverter.toOptionalString(payload.id, 'id')
-        ?? TypeConverter.toOptionalString(payload.robotId, 'robotId')
-        ?? '',
+      id: TypeConverter.toOptionalString(payload.id, 'id') ?? '',
       bizRobotName: TypeConverter.toOptionalString(payload.bizRobotName, 'bizRobotName') ?? '',
       bizRobotNameEn: TypeConverter.toOptionalString(payload.bizRobotNameEn, 'bizRobotNameEn') ?? '',
+      bizRobotTag: TypeConverter.toOptionalString(payload.bizRobotTag, 'bizRobotTag') ?? '',
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };

@@ -470,9 +470,12 @@ export interface WeAgentDetails {
   appSecret: string;
   partnerAccount: string;
   createdBy: string;
+  creatorWorkId: string;
+  creatorW3Account: string;
   creatorName: string;
   creatorNameEn: string;
   ownerWelinkId: string;
+  ownerW3Account: string;
   ownerName: string;
   ownerNameEn: string;
   ownerDeptName: string;
@@ -480,6 +483,7 @@ export interface WeAgentDetails {
   id: string;
   bizRobotName: string;
   bizRobotNameEn: string;
+  bizRobotTag: string;
   bizRobotId: string;
   weCodeUrl: string;
 }
