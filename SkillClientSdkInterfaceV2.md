@@ -21,6 +21,8 @@
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
 | `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
+| `queryQrcodeInfo` | `GET /nologin/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
+| `updateQrcodeInfo` | `PUT /v4-1/we-crew/im-register/qrcode` | 更新二维码信息 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`/`error`），并按接口语义返回业务字段（如 `message`、`content`）。
@@ -555,7 +557,141 @@ notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promis
 
 ---
 
-## 9. 获取当前 WeAgentUri 接口
+## 9. 查询二维码信息接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据二维码唯一标识查询二维码相关信息。
+
+### 接口名
+
+```typescript
+queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `qrcode` | `string` | 是 | 二维码唯一标识 |
+
+### 入参示例
+
+```json
+{
+  "qrcode": "qr_001"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `qrcode` | `string` | 二维码唯一标识 |
+| `weUrl` | `string` | We 侧地址 |
+| `pcUrl` | `string` | PC 侧地址 |
+| `ak` | `string` | Access Key |
+| `sk` | `string` | Secret Key |
+| `status` | `number` | 二维码状态 |
+| `expired` | `boolean` | 过期状态 |
+
+### 出参示例
+
+```json
+{
+  "qrcode": "qr_001",
+  "weUrl": "welink://xxx",
+  "pcUrl": "https://xxx",
+  "ak": "ak_xxx",
+  "sk": "sk_xxx",
+  "status": 1,
+  "expired": false
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`GET /nologin/we-crew/im-register/qrcode/{qrcode}`。
+2. 服务端响应结构为：
+   - `code: string`
+   - `message: string`
+   - `data: object`
+3. SDK 对外不透出服务端包装字段，直接透传 `data` 中的以下字段作为接口返回：
+   - `qrcode`
+   - `weUrl`
+   - `pcUrl`
+   - `ak`
+   - `sk`
+   - `status`
+   - `expired`
+
+---
+
+## 10. 更新二维码信息接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据二维码唯一标识更新二维码信息。
+
+### 接口名
+
+```typescript
+updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `qrcode` | `string` | 是 | 二维码唯一标识 |
+| `ak` | `string` | 否 | Access Key |
+| `status` | `number` | 是 | 二维码状态 |
+
+### 入参示例
+
+```json
+{
+  "qrcode": "qr_001",
+  "ak": "ak_xxx",
+  "status": 2
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 当服务端返回 `code=200` 时固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`PUT /v4-1/we-crew/im-register/qrcode`。
+2. SDK 透传入参 `qrcode`、`ak`、`status`。
+3. 服务端响应结构为：
+   - `code: string`
+   - `message: string`
+4. SDK 根据服务端 `code` 判断结果：
+   - 当 `code` 为 `200` 时，返回 `{ status: "success" }`。
+
+---
+
+## 11. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -747,6 +883,46 @@ type NotifyAssistantDetailUpdatedParams = {
 
 ```typescript
 type NotifyAssistantDetailUpdatedResult = {
+  status: string
+}
+```
+
+### QueryQrcodeInfoParams
+
+```typescript
+type QueryQrcodeInfoParams = {
+  qrcode: string
+}
+```
+
+### QrcodeInfo
+
+```typescript
+type QrcodeInfo = {
+  qrcode: string
+  weUrl: string
+  pcUrl: string
+  ak: string
+  sk: string
+  status: number
+  expired: boolean
+}
+```
+
+### UpdateQrcodeInfoParams
+
+```typescript
+type UpdateQrcodeInfoParams = {
+  qrcode: string
+  ak?: string
+  status: number
+}
+```
+
+### UpdateQrcodeInfoResult
+
+```typescript
+type UpdateQrcodeInfoResult = {
   status: string
 }
 ```
