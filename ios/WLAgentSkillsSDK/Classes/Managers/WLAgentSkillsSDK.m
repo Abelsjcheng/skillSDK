@@ -923,12 +923,58 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
                                                                          success:^(id  _Nullable responseObject) {
-        NSArray<WLAgentSkillsWeAgentDetails *> *detailsList = [self parseWeAgentDetailsListFromResponse:responseObject];
-        if (detailsList.count > 0) {
-            [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[detailsList.firstObject toDictionary]];
+        WLAgentSkillsWeAgentDetailsArrayResult *result = [self weAgentDetailsArrayResultFromPayload:responseObject];
+        [self cacheWeAgentDetailsArrayResult:result partnerAccount:partnerAccount];
+        if (success) {
+            success(result);
         }
-        WLAgentSkillsWeAgentDetailsArrayResult *result = [[WLAgentSkillsWeAgentDetailsArrayResult alloc] init];
-        result.weAgentDetailsArray = detailsList;
+    }
+                                                                         failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 19.1. getAssistantDetails
+
+- (void)getAssistantDetails:(WLAgentSkillsQueryWeAgentParams *)params
+                    success:(void (^)(WLAgentSkillsWeAgentDetailsArrayResult *result))success
+                    failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
+                                                                          fieldName:@"partnerAccount"
+                                                                       errorMessage:&errorMessage];
+    if (partnerAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSDictionary *cachedDictionary = [[WLAgentSkillsWeAgentStore sharedStore]
+        loadWeAgentDetailDictionaryForPartnerAccount:partnerAccount];
+    if ([cachedDictionary isKindOfClass:[NSDictionary class]] && cachedDictionary.count > 0) {
+        WLAgentSkillsWeAgentDetailsArrayResult *cachedResult =
+            [self weAgentDetailsArrayResultFromDetailDictionary:cachedDictionary];
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:cachedDictionary];
+        if (success) {
+            success(cachedResult);
+        }
+        [self refreshAssistantDetailsCacheForPartnerAccount:partnerAccount];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
+                                                                         success:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        WLAgentSkillsWeAgentDetailsArrayResult *result = [strongSelf weAgentDetailsArrayResultFromPayload:responseObject];
+        [strongSelf cacheWeAgentDetailsArrayResult:result partnerAccount:partnerAccount];
         if (success) {
             success(result);
         }
@@ -1226,6 +1272,57 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         [result addObject:[[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:(NSDictionary *)item]];
     }
     return [result copy];
+}
+
+- (WLAgentSkillsWeAgentDetailsArrayResult *)weAgentDetailsArrayResultFromPayload:(id)payload {
+    WLAgentSkillsWeAgentDetailsArrayResult *result = [[WLAgentSkillsWeAgentDetailsArrayResult alloc] init];
+    result.weAgentDetailsArray = [self parseWeAgentDetailsListFromResponse:payload];
+    return result;
+}
+
+- (void)cacheWeAgentDetailsArrayResult:(WLAgentSkillsWeAgentDetailsArrayResult *)result
+                        partnerAccount:(NSString *)partnerAccount {
+    if (result.weAgentDetailsArray.count == 0) {
+        return;
+    }
+    if (partnerAccount.length > 0) {
+        NSDictionary *detailDictionary = [result.weAgentDetailsArray.firstObject toDictionary];
+        [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentDetailDictionary:detailDictionary
+                                                           forPartnerAccount:partnerAccount];
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:detailDictionary];
+    }
+}
+
+- (void)refreshAssistantDetailsCacheForPartnerAccount:(NSString *)partnerAccount {
+    if (partnerAccount.length == 0) {
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
+                                                                         success:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        WLAgentSkillsWeAgentDetailsArrayResult *result = [strongSelf weAgentDetailsArrayResultFromPayload:responseObject];
+        [strongSelf cacheWeAgentDetailsArrayResult:result partnerAccount:partnerAccount];
+    }
+                                                                         failure:^(NSError * _Nonnull error) {
+        // Ignore background refresh failures.
+    }];
+}
+
+- (WLAgentSkillsWeAgentDetailsArrayResult *)weAgentDetailsArrayResultFromDetailDictionary:(NSDictionary *)dictionary {
+    WLAgentSkillsWeAgentDetailsArrayResult *result = [[WLAgentSkillsWeAgentDetailsArrayResult alloc] init];
+    if (![dictionary isKindOfClass:[NSDictionary class]] || dictionary.count == 0) {
+        result.weAgentDetailsArray = @[];
+        return result;
+    }
+    result.weAgentDetailsArray = @[
+        [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:dictionary]
+    ];
+    return result;
 }
 
 - (NSArray<NSDictionary *> *)dictionariesFromWeAgentList:(NSArray<WLAgentSkillsWeAgent *> *)list {

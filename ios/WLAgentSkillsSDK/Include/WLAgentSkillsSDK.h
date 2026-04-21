@@ -109,6 +109,11 @@ NS_ASSUME_NONNULL_BEGIN
                     success:(void (^)(WLAgentSkillsWeAgentDetailsArrayResult *result))success
                     failure:(void (^)(NSError *error))failure;
 
+#pragma mark - 19.1. getAssistantDetails
+- (void)getAssistantDetails:(WLAgentSkillsQueryWeAgentParams *)params
+                    success:(void (^)(WLAgentSkillsWeAgentDetailsArrayResult *result))success
+                    failure:(void (^)(NSError *error))failure;
+
 #pragma mark - 20. getWeAgentUri
 - (WLAgentSkillsWeAgentUriResult *)getWeAgentUri;
 
