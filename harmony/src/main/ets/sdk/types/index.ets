@@ -447,6 +447,78 @@ export interface QueryWeAgentParams {
   partnerAccount: string;
 }
 
+export interface UpdateWeAgentParams {
+  partnerAccount?: string;
+  robotId?: string;
+  name: string;
+  icon: string;
+  description: string;
+}
+
+export interface UpdateWeAgentResult {
+  updateResult: string;
+}
+
+export interface DeleteWeAgentParams {
+  partnerAccount?: string;
+  robotId?: string;
+}
+
+export interface DeleteWeAgentResult {
+  deleteResult: string;
+}
+
+export interface AssistantDetailUpdatedPayload {
+  name: string;
+  icon: string;
+  description: string;
+}
+
+export interface OpenAssistantEditPageParams {
+  partnerAccount?: string;
+  robotId?: string;
+  onUpdated: (payload: AssistantDetailUpdatedPayload) => void;
+}
+
+export interface OpenAssistantEditPageResult {
+  status: string;
+}
+
+export interface NotifyAssistantDetailUpdatedParams {
+  name: string;
+  icon: string;
+  description: string;
+  partnerAccount?: string;
+  robotId?: string;
+}
+
+export interface NotifyAssistantDetailUpdatedResult {
+  status: string;
+}
+
+export interface QueryQrcodeInfoParams {
+  qrcode: string;
+}
+
+export interface QrcodeInfo {
+  qrcode: string;
+  weUrl: string;
+  pcUrl: string;
+  expireTime: string;
+  status: number;
+  expired: boolean;
+}
+
+export interface UpdateQrcodeInfoParams {
+  qrcode: string;
+  ak?: string;
+  status: number;
+}
+
+export interface UpdateQrcodeInfoResult {
+  status: string;
+}
+
 export interface WeAgent {
   name: string;
   icon: string;

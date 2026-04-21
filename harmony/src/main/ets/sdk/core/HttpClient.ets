@@ -64,8 +64,16 @@ export class HttpClient {
     return await this.request<T>(path, http.RequestMethod.POST, body, undefined, options);
   }
 
-  async delete<T>(path: string, options?: RequestOptions): Promise<T> {
-    return await this.request<T>(path, http.RequestMethod.DELETE, undefined, undefined, options);
+  async put<T>(
+    path: string,
+    body?: Record<string, Object>,
+    options?: RequestOptions
+  ): Promise<T> {
+    return await this.request<T>(path, http.RequestMethod.PUT, body, undefined, options);
+  }
+
+  async delete<T>(path: string, query?: QueryParams, options?: RequestOptions): Promise<T> {
+    return await this.request<T>(path, http.RequestMethod.DELETE, undefined, query, options);
   }
 
   private async request<T>(

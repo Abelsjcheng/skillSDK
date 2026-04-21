@@ -11,6 +11,7 @@ import { WeAgentStore } from './utils/WeAgentStore';
 import {
   AgentType,
   AgentTypeList,
+  AssistantDetailUpdatedPayload,
   CloseSkillResult,
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
@@ -19,14 +20,22 @@ import {
   CreateNewSessionParams,
   CreateSessionParams,
   CursorResult,
+  DeleteWeAgentParams,
+  DeleteWeAgentResult,
   GetSessionMessageParams,
   GetSessionMessageHistoryParams,
   HistorySessionsParams,
+  NotifyAssistantDetailUpdatedParams,
+  NotifyAssistantDetailUpdatedResult,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
+  OpenAssistantEditPageParams,
+  OpenAssistantEditPageResult,
   PageParams,
   PageResult,
+  QrcodeInfo,
   QueryWeAgentParams,
+  QueryQrcodeInfoParams,
   RegisterSessionListenerParams,
   RegisterSessionListenerResult,
   RegenerateAnswerParams,
@@ -46,6 +55,10 @@ import {
   StopSkillParams,
   StopSkillResult,
   StreamMessage,
+  UpdateQrcodeInfoParams,
+  UpdateQrcodeInfoResult,
+  UpdateWeAgentParams,
+  UpdateWeAgentResult,
   WeAgent,
   WeAgentDetailsArray,
   WeAgentDetails,
@@ -72,6 +85,7 @@ export class SkillSDK {
   private readonly sessionStateManager: SessionStateManager;
   private readonly weCodeStateManager: WeCodeStateManager;
   private readonly weAgentStore: WeAgentStore;
+  private readonly assistantDetailUpdatedCallbacks: Map<string, (payload: AssistantDetailUpdatedPayload) => void>;
 
   private constructor(config: SkillSDKConfig) {
     this.validateConfig(config);
@@ -88,6 +102,7 @@ export class SkillSDK {
     this.sessionStateManager = new SessionStateManager(this.config.enableLog);
     this.weCodeStateManager = new WeCodeStateManager(this.config.enableLog);
     this.weAgentStore = new WeAgentStore(this.config.context);
+    this.assistantDetailUpdatedCallbacks = new Map();
 
     this.wsManager.setMessageHandler((message: StreamMessage) => {
       this.messageCacheManager.onStreamMessage(message);
@@ -115,6 +130,7 @@ export class SkillSDK {
       SkillSDK.instance.messageCacheManager.clearAll();
       SkillSDK.instance.sessionStateManager.clearAll();
       SkillSDK.instance.weCodeStateManager.clearAll();
+      SkillSDK.instance.assistantDetailUpdatedCallbacks.clear();
       WebSocketManager.destroyInstance();
     } finally {
       SkillSDK.instance = null;
@@ -195,6 +211,7 @@ export class SkillSDK {
       this.messageCacheManager.clearAll();
       this.sessionStateManager.clearAll();
       this.weCodeStateManager.clearAll();
+      this.assistantDetailUpdatedCallbacks.clear();
       return { status: 'success' };
     } catch (error) {
       throw this.normalizeError('closeSkill', error);
@@ -739,6 +756,159 @@ export class SkillSDK {
     }
   }
 
+  // 21. updateWeAgent
+  async updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
+      const robotId = this.normalizeOptionalString(params.robotId);
+      this.resolveAssistantIdentityKey(partnerAccount, robotId);
+      const name = TypeConverter.toRequiredString(params.name, 'name');
+      const icon = TypeConverter.toRequiredString(params.icon, 'icon');
+      const description = TypeConverter.toRequiredString(params.description, 'description');
+
+      const payload: Record<string, Object> = {
+        name,
+        icon,
+        description
+      };
+      if (partnerAccount !== undefined) {
+        payload.partnerAccount = partnerAccount;
+      }
+      if (robotId !== undefined) {
+        payload.robotId = robotId;
+      }
+
+      const result = await this.httpClient.put<Record<string, Object>>(
+        '/v4-1/we-crew',
+        payload,
+        { expectEnvelope: false, useAssistantBaseUrl: true }
+      );
+      return {
+        updateResult: this.resolveMessageResult(result, 'updateWeAgent')
+      };
+    } catch (error) {
+      throw this.normalizeError('updateWeAgent', error);
+    }
+  }
+
+  // 22. deleteWeAgent
+  async deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
+      const robotId = this.normalizeOptionalString(params.robotId);
+      this.resolveAssistantIdentityKey(partnerAccount, robotId);
+
+      const query = this.resolveAssistantIdentityQuery(partnerAccount, robotId);
+      const result = await this.httpClient.delete<Record<string, Object>>(
+        '/v4-1/we-crew',
+        query,
+        { expectEnvelope: false, useAssistantBaseUrl: true }
+      );
+      return {
+        deleteResult: this.resolveMessageResult(result, 'deleteWeAgent')
+      };
+    } catch (error) {
+      throw this.normalizeError('deleteWeAgent', error);
+    }
+  }
+
+  // 23. openAssistantEditPage
+  async openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistantEditPageResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requireFunction(params.onUpdated, 'onUpdated');
+      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
+      const robotId = this.normalizeOptionalString(params.robotId);
+      const identityKey = this.resolveAssistantIdentityKey(partnerAccount, robotId);
+      const context = this.config.context;
+      if (context === undefined) {
+        throw new SkillSdkException(5000, 'context is required');
+      }
+
+      this.assistantDetailUpdatedCallbacks.set(identityKey, params.onUpdated);
+      await context.startAbility({
+        uri: this.buildAssistantEditPageUri(partnerAccount, robotId)
+      });
+      return {
+        status: 'success'
+      };
+    } catch (error) {
+      throw this.normalizeError('openAssistantEditPage', error);
+    }
+  }
+
+  // 24. notifyAssistantDetailUpdated
+  async notifyAssistantDetailUpdated(
+    params: NotifyAssistantDetailUpdatedParams
+  ): Promise<NotifyAssistantDetailUpdatedResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const name = TypeConverter.toRequiredString(params.name, 'name');
+      const icon = TypeConverter.toRequiredString(params.icon, 'icon');
+      const description = TypeConverter.toRequiredString(params.description, 'description');
+      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
+      const robotId = this.normalizeOptionalString(params.robotId);
+      const identityKey = this.resolveAssistantIdentityKey(partnerAccount, robotId);
+
+      const callback = this.assistantDetailUpdatedCallbacks.get(identityKey);
+      if (callback !== undefined) {
+        callback({
+          name,
+          icon,
+          description
+        });
+      }
+      return {
+        status: 'success'
+      };
+    } catch (error) {
+      throw this.normalizeError('notifyAssistantDetailUpdated', error);
+    }
+  }
+
+  // 25. queryQrcodeInfo
+  async queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo> {
+    try {
+      Validator.requireObject(params, 'params');
+      const qrcode = TypeConverter.toRequiredString(params.qrcode, 'qrcode');
+      return await this.httpClient.get<QrcodeInfo>(
+        `/nologin/we-crew/im-register/qrcode/${qrcode}`,
+        undefined,
+        { useAssistantBaseUrl: true }
+      );
+    } catch (error) {
+      throw this.normalizeError('queryQrcodeInfo', error);
+    }
+  }
+
+  // 26. updateQrcodeInfo
+  async updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const qrcode = TypeConverter.toRequiredString(params.qrcode, 'qrcode');
+      const status = TypeConverter.requireInteger(params.status, 'status');
+      const ak = this.normalizeOptionalString(params.ak);
+      const payload: Record<string, Object> = {
+        qrcode,
+        status
+      };
+      if (ak !== undefined) {
+        payload.ak = ak;
+      }
+
+      const result = await this.httpClient.put<Record<string, Object>>(
+        '/v4-1/we-crew/im-register/qrcode',
+        payload,
+        { expectEnvelope: false, useAssistantBaseUrl: true }
+      );
+      return this.resolveUpdateQrcodeInfoResult(result);
+    } catch (error) {
+      throw this.normalizeError('updateQrcodeInfo', error);
+    }
+  }
+
   private async fetchServerMessages(
     welinkSessionId: string,
     page: number,
@@ -987,6 +1157,62 @@ export class SkillSDK {
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };
+  }
+
+  private resolveMessageResult(result: Record<string, Object>, method: string): string {
+    const message = TypeConverter.toOptionalString(result.message, 'message');
+    if (message === undefined) {
+      throw new SkillSdkException(7000, `Unexpected ${method} response schema`);
+    }
+    return message;
+  }
+
+  private resolveUpdateQrcodeInfoResult(result: Record<string, Object>): UpdateQrcodeInfoResult {
+    const code = TypeConverter.toOptionalString(result.code, 'code');
+    if (code !== '200') {
+      throw new SkillSdkException(7000, 'updateQrcodeInfo did not return code 200');
+    }
+    return {
+      status: 'success'
+    };
+  }
+
+  private resolveAssistantIdentityKey(partnerAccount?: string, robotId?: string): string {
+    if (partnerAccount !== undefined) {
+      return partnerAccount;
+    }
+    if (robotId !== undefined) {
+      return robotId;
+    }
+    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
+  }
+
+  private resolveAssistantIdentityQuery(
+    partnerAccount?: string,
+    robotId?: string
+  ): Record<string, string> {
+    const query: Record<string, string> = {};
+    if (partnerAccount !== undefined) {
+      query.partnerAccount = partnerAccount;
+    }
+    if (robotId !== undefined) {
+      query.robotId = robotId;
+    }
+    if (Object.keys(query).length > 0) {
+      return query;
+    }
+    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
+  }
+
+  private buildAssistantEditPageUri(partnerAccount?: string, robotId?: string): string {
+    const baseUri = this.appendHashFragment(SkillSDK.ASSISTANT_H5_URI, 'editAssistant');
+    if (partnerAccount !== undefined) {
+      return this.appendQueryParam(baseUri, 'partnerAccount', partnerAccount);
+    }
+    if (robotId !== undefined) {
+      return this.appendQueryParam(baseUri, 'robotId', robotId);
+    }
+    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
   }
 
   private clamp(value: number, min: number, max: number): number {
