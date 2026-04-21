@@ -1,12 +1,16 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { APP_ID, isPcMiniApp } from '../constants';
+import activateGuideMobileEn from '../imgs/activate-guide-en.png';
 import activateGuideMobile from '../imgs/activate-guide.png';
+import activateGuidePcEn from '../imgs/activate-guide-pc-en.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { getWeAgentList, isPcMiniApp, openH5Webview, type WeAgentListItem } from '../utils/hwext';
+import { getWeAgentList, openH5Webview, type WeAgentListItem } from '../utils/hwext';
+import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
-import { APP_ID } from '../constants';
 
 const CREATE_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#createAssistant`;
 const SELECT_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#selectAssistant`;
@@ -17,8 +21,16 @@ const DEFAULT_LIST_QUERY = {
 
 const ActivateAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
-  const activateGuideImage = isPc ? activateGuidePc : activateGuideMobile;
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  const isEnglish = i18n.resolvedLanguage === 'en' || i18n.language === 'en';
+  const activateGuideImage = isPc
+    ? isEnglish
+      ? activateGuidePcEn
+      : activateGuidePc
+    : isEnglish
+      ? activateGuideMobileEn
+      : activateGuideMobile;
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
 
   const loadAssistantList = useCallback(async (): Promise<WeAgentListItem[]> => {
@@ -28,12 +40,12 @@ const ActivateAssistant: React.FC = () => {
       setAssistantList(list);
       return list;
     } catch (error) {
-      console.error('getWeAgentList failed in ActivateAssistant:', error);
-      showToast('获取助理列表失败');
+      WeLog(`ActivateAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
+      showToast(t('activateAssistant.loadFailed'));
       setAssistantList([]);
       return [];
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadAssistantList();
@@ -57,7 +69,7 @@ const ActivateAssistant: React.FC = () => {
       <div className="activate-assistant__center">
         <section className="activate-assistant__content">
           <div className="activate-assistant__carousel">
-            <img src={activateGuideImage} alt="激活助理引导图" className="activate-assistant__image" />
+            <img src={activateGuideImage} alt={t('activateAssistant.guideAlt')} className="activate-assistant__image" draggable="false" />
           </div>
         </section>
 
@@ -71,7 +83,7 @@ const ActivateAssistant: React.FC = () => {
               });
             }}
           >
-            选择助理
+            {t('activateAssistant.selectAssistant')}
           </button>
         </section>
       </div>

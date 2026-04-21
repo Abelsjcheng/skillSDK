@@ -354,13 +354,18 @@ function buildAssistantDetail(config: OpenCodeBridgeConfig): WeAgentDetails {
     partnerAccount: config.assistantAccount,
     createdBy: config.userId,
     creatorName: config.userNameZH,
+    creatorWorkId: '',
+    creatorW3Account: '',
     creatorNameEn: config.userNameEN,
     ownerWelinkId: config.userId,
+    ownerW3Account: '',
     ownerName: config.userNameZH,
     ownerNameEn: config.userNameEN,
     ownerDeptName: 'Local',
     ownerDeptNameEn: 'Local',
+    id: '',
     bizRobotId: '',
+    bizRobotTag: '',
     bizRobotName: config.assistantName,
     bizRobotNameEn: config.assistantName,
     weCodeUrl: '',
@@ -559,7 +564,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         .filter((partnerAccount) => partnerAccount === config.assistantAccount)
         .map(() => assistantDetail);
       return {
-        WeAgentDetailsArray: details.length > 0 ? details : [assistantDetail],
+        weAgentDetailsArray: details.length > 0 ? details : [assistantDetail],
       };
     },
 

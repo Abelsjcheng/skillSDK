@@ -85,7 +85,7 @@ describe('digitalTwinValidation', () => {
       expect(hasInvalidDescription('')).toBe(false);
       expect(hasInvalidDescription('a')).toBe(true);
       expect(hasInvalidDescription('valid description')).toBe(false);
-      expect(hasInvalidDescription('emoji test 🙂')).toBe(true);
+      expect(hasInvalidDescription('emoji test 😀')).toBe(true);
     });
   });
 });

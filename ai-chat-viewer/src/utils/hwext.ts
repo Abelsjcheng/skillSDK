@@ -10,7 +10,8 @@ import type {
   ControlSkillWeCodeResponse,
 } from '../types';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
-import { APP_ID } from '../constants';
+import { APP_ID, isPcMiniApp } from '../constants';
+import { WeLog } from './logger';
 
 export interface HWH5EXTError {
   code?: string;
@@ -151,15 +152,18 @@ export interface WeAgentDetails {
   partnerAccount: string;
   createdBy: string;
   creatorName: string;
-  creatorWorkId?: string;
+  creatorWorkId: string;
+  creatorW3Account: string;
   creatorNameEn: string;
   ownerWelinkId: string;
+  ownerW3Account: string;
   ownerName: string;
   ownerNameEn: string;
   ownerDeptName: string;
   ownerDeptNameEn: string;
+  id: string;
   bizRobotId: string;
-  robotId?: string;
+  bizRobotTag: string;
   bizRobotName?: string;
   bizRobotNameEn?: string;
   weCodeUrl: string;
@@ -174,7 +178,7 @@ export interface WeAgentListResult {
 }
 
 export interface WeAgentDetailsArrayResult {
-  WeAgentDetailsArray: WeAgentDetails[];
+  weAgentDetailsArray: WeAgentDetails[];
 }
 
 export interface CreateDigitalTwinResult {
@@ -196,7 +200,7 @@ export interface BuildOpenWeAgentCUIOptions {
 }
 
 export interface ResolveRobotIdOptions {
-  detailRobotId?: string;
+  detailId?: string;
   listRobotId?: string;
   createRobotId?: string;
 }
@@ -253,10 +257,13 @@ interface Pedestal {
 
 interface HWH5Bridge {
   openWebview: (payload: { uri: string }) => void;
+  log?: (payload: { content: string; type: 'i' }) => Promise<unknown> | unknown;
+  openIMChat?: (payload: { chatId: string }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
+  getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
   onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
@@ -268,6 +275,12 @@ interface HWH5Bridge {
 
 export interface HWH5DeviceInfo {
   statusBarHeight: number;
+  safeAreaInsetBottom: number;
+  [key: string]: unknown;
+}
+
+export interface HWH5AppInfo {
+  language: string;
   [key: string]: unknown;
 }
 
@@ -284,6 +297,7 @@ declare global {
     HWH5EXT?: HWH5EXT;
     Pedestal?: Pedestal;
     HWH5: HWH5Bridge;
+    onReceive?: (schema: string, payload: string) => void;
   }
 }
 
@@ -293,24 +307,6 @@ export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
 export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
-
-export function isPcMiniApp(): boolean {
-  if (typeof window === 'undefined') return false;
-  return true;
-}
-
-export function isIosMobileDevice(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return false;
-  }
-
-  const userAgent = navigator.userAgent || '';
-  if (/iPhone|iPad|iPod/i.test(userAgent)) {
-    return true;
-  }
-
-  return /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
-}
 
 function tryGetPedestal(): Pedestal | null {
   if (typeof window === 'undefined') return null;
@@ -341,12 +337,12 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
         params.onMessage(msg);
       });
       void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
-        console.error('registerSessionListener failed:', err);
+        WeLog(`hwext registerSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
       });
     },
     unregisterSessionListener: (params) => {
       void call<void>('unregisterSessionListener', params).catch((err) => {
-        console.error('unregisterSessionListener failed:', err);
+        WeLog(`hwext unregisterSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
@@ -467,7 +463,7 @@ function normalizeString(value?: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function getUrlHost(value: string): string {
+export function getUrlHost(value: string): string {
   const normalizedValue = normalizeString(value);
   if (!normalizedValue) {
     return '';
@@ -499,7 +495,7 @@ export function resolveWeCodeUrlForOpenWeAgentCUI(
 }
 
 export function resolveRobotIdForOpenWeAgentCUI(options: ResolveRobotIdOptions): string {
-  return normalizeString(options.detailRobotId)
+  return normalizeString(options.detailId)
     || normalizeString(options.listRobotId)
     || normalizeString(options.createRobotId);
 }
@@ -553,13 +549,21 @@ function toTrimmedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function toAppLanguage(value: string): 'zh' | 'en' {
+  if (isPcMiniApp()) {
+    return value === '1033' ? 'en' : 'zh'
+  } else {
+    return value === 'en' ? 'en' : 'zh'
+  }
+}
+
 export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   if (isPcMiniApp()) {
-    return { statusBarHeight: 0 };
+    return { statusBarHeight: 0, safeAreaInsetBottom: 0 };
   }
 
-  const result = await Promise.resolve(window.HWH5?.getDeviceInfo?.());
-  const deviceInfo = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+  const result = await window.HWH5?.getDeviceInfo?.();
+  const deviceInfo = (result && typeof result === 'object' ? result : {}) as HWH5DeviceInfo;
   return {
     ...deviceInfo,
     statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
@@ -568,6 +572,43 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
 
 export async function getStatusBarHeight(): Promise<number> {
   return (await getDeviceInfo()).statusBarHeight;
+}
+
+export async function getAppInfo(): Promise<HWH5AppInfo> {
+  try {
+    if (isPcMiniApp()) {
+      const language = window?.localStorage?.getItem('language') || '';
+      return {
+        language: toAppLanguage(language),
+      };
+    }
+
+    const result = await window.HWH5?.getAppInfo?.();
+    const appInfo = (result && typeof result === 'object' ? result : {}) as HWH5AppInfo;
+
+    return {
+      language: toAppLanguage(appInfo.language),
+    };
+  } catch (error) {
+    return {
+      language: 'zh',
+    };
+  }
+}
+
+export function registerAppLanguageListener(listener: (language: 'zh' | 'en') => void): void {
+  if (isPcMiniApp()) {
+    window.onReceive = (schema: string, payload: string) => {
+      if (schema === '') {
+        const language = toAppLanguage(payload);
+        if (!language) {
+          return;
+        }
+        listener(language);
+      }
+    };
+    return;
+  }
 }
 
 export async function getUserInfo(): Promise<HWH5UserInfo> {

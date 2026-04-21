@@ -3,8 +3,6 @@ package com.opencode.skill.model;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
-import com.google.gson.annotations.SerializedName;
-
 import java.util.Objects;
 
 @Keep
@@ -26,11 +24,17 @@ public class WeAgentDetails {
     @NonNull
     private String createdBy = "";
     @NonNull
+    private String creatorWorkId = "";
+    @NonNull
+    private String creatorW3Account = "";
+    @NonNull
     private String creatorName = "";
     @NonNull
     private String creatorNameEn = "";
     @NonNull
     private String ownerWelinkId = "";
+    @NonNull
+    private String ownerW3Account = "";
     @NonNull
     private String ownerName = "";
     @NonNull
@@ -40,12 +44,13 @@ public class WeAgentDetails {
     @NonNull
     private String ownerDeptNameEn = "";
     @NonNull
-    @SerializedName(value = "id", alternate = {"robotId"})
     private String id = "";
     @NonNull
     private String bizRobotName = "";
     @NonNull
     private String bizRobotNameEn = "";
+    @NonNull
+    private String bizRobotTag = "";
     @NonNull
     private String bizRobotId = "";
     @NonNull
@@ -124,6 +129,24 @@ public class WeAgentDetails {
     }
 
     @NonNull
+    public String getCreatorWorkId() {
+        return creatorWorkId;
+    }
+
+    public void setCreatorWorkId(@NonNull String creatorWorkId) {
+        this.creatorWorkId = Objects.requireNonNull(creatorWorkId, "creatorWorkId == null");
+    }
+
+    @NonNull
+    public String getCreatorW3Account() {
+        return creatorW3Account;
+    }
+
+    public void setCreatorW3Account(@NonNull String creatorW3Account) {
+        this.creatorW3Account = Objects.requireNonNull(creatorW3Account, "creatorW3Account == null");
+    }
+
+    @NonNull
     public String getCreatorName() {
         return creatorName;
     }
@@ -148,6 +171,15 @@ public class WeAgentDetails {
 
     public void setOwnerWelinkId(@NonNull String ownerWelinkId) {
         this.ownerWelinkId = Objects.requireNonNull(ownerWelinkId, "ownerWelinkId == null");
+    }
+
+    @NonNull
+    public String getOwnerW3Account() {
+        return ownerW3Account;
+    }
+
+    public void setOwnerW3Account(@NonNull String ownerW3Account) {
+        this.ownerW3Account = Objects.requireNonNull(ownerW3Account, "ownerW3Account == null");
     }
 
     @NonNull
@@ -211,6 +243,15 @@ public class WeAgentDetails {
 
     public void setBizRobotNameEn(@NonNull String bizRobotNameEn) {
         this.bizRobotNameEn = Objects.requireNonNull(bizRobotNameEn, "bizRobotNameEn == null");
+    }
+
+    @NonNull
+    public String getBizRobotTag() {
+        return bizRobotTag;
+    }
+
+    public void setBizRobotTag(@NonNull String bizRobotTag) {
+        this.bizRobotTag = Objects.requireNonNull(bizRobotTag, "bizRobotTag == null");
     }
 
     @NonNull

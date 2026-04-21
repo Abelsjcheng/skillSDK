@@ -280,9 +280,12 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *appSecret;
 @property (nonatomic, copy) NSString *partnerAccount;
 @property (nonatomic, copy) NSString *createdBy;
+@property (nonatomic, copy) NSString *creatorWorkId;
+@property (nonatomic, copy) NSString *creatorW3Account;
 @property (nonatomic, copy) NSString *creatorName;
 @property (nonatomic, copy) NSString *creatorNameEn;
 @property (nonatomic, copy) NSString *ownerWelinkId;
+@property (nonatomic, copy) NSString *ownerW3Account;
 @property (nonatomic, copy) NSString *ownerName;
 @property (nonatomic, copy) NSString *ownerNameEn;
 @property (nonatomic, copy) NSString *ownerDeptName;
@@ -290,6 +293,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy) NSString *id;
 @property (nonatomic, copy) NSString *bizRobotName;
 @property (nonatomic, copy) NSString *bizRobotNameEn;
+@property (nonatomic, copy) NSString *bizRobotTag;
 @property (nonatomic, copy) NSString *bizRobotId;
 @property (nonatomic, copy) NSString *weCodeUrl;
 
@@ -446,7 +450,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsWeAgentDetailsArrayResult : NSObject
-@property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *WeAgentDetailsArray;
+@property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *weAgentDetailsArray;
 
 - (NSDictionary *)toDictionary;
 @end

@@ -1,75 +1,67 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import AssistantSelectionPage, { type AssistantItem } from '../components/assistant/AssistantSelectionPage';
-import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
+import { isPcMiniApp } from '../constants';
+import { ensureLanguageInitialized } from '../i18n/config';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
-import { resolveAssistantTag } from '../utils/assistantTag';
 import {
-  buildCustomerServiceWebviewUri,
-  buildOpenWeAgentCUIParams,
+  DEFAULT_ASSISTANT_LIST_QUERY,
+  mapWeAgentListToAssistantItems,
+  openAssistantByPartnerAccount,
+  resolveSelectableAssistantId,
+} from '../utils/assistantSelection';
+import { WeLog } from '../utils/logger';
+import {
+  CUSTOMER_SERVICE_WEBVIEW_URI,
   getQueryParam,
-  getWeAgentDetails,
   getWeAgentList,
-  isPcMiniApp,
-  MOCK_CUSTOMER_SERVICE_SOURCE_URL,
   openH5Webview,
-  openWeAgentCUI,
-  resolveRobotIdForOpenWeAgentCUI,
-  resolveWeCodeUrlForOpenWeAgentCUI,
   type WeAgentListItem,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 
-const DEFAULT_LIST_QUERY = {
-  pageSize: 20,
-  pageNumber: 1,
-};
 interface SwitchAssistantProps {
   defaultSelectedAssistantId?: string;
 }
 
-function toAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
-  return list.map((assistant) => ({
-    id: assistant.partnerAccount,
-    name: assistant.name ?? '',
-    tag: resolveAssistantTag(assistant),
-    description: assistant.description ?? '',
-    icon: resolveAssistantIconUrl(assistant.icon),
-  }));
-}
-
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
+  const { t } = useTranslation();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
-  const preferredDefaultPartnerAccount = useMemo(() => defaultSelectedAssistantId?.trim() ?? '', [defaultSelectedAssistantId]);
-  const assistantItems = useMemo(() => toAssistantItems(assistantList), [assistantList]);
+  const preferredDefaultPartnerAccount = useMemo(
+    () => defaultSelectedAssistantId?.trim() ?? '',
+    [defaultSelectedAssistantId],
+  );
+  const assistantItems = useMemo(
+    () => mapWeAgentListToAssistantItems(assistantList),
+    [assistantList],
+  );
+
+  useEffect(() => {
+    void ensureLanguageInitialized();
+  }, []);
 
   const loadAssistantList = useCallback(async (): Promise<void> => {
     try {
-      const result = await getWeAgentList(DEFAULT_LIST_QUERY);
+      const result = await getWeAgentList(DEFAULT_ASSISTANT_LIST_QUERY);
       const list = result && Array.isArray(result.content) ? result.content : [];
       setAssistantList(list);
-      setSelectedPartnerAccount((current) => {
-        if (list.some((assistant) => assistant.partnerAccount === current)) {
-          return current;
-        }
-        if (preferredDefaultPartnerAccount && list.some((assistant) => assistant.partnerAccount === preferredDefaultPartnerAccount)) {
-          return preferredDefaultPartnerAccount;
-        }
-        if (partnerAccount && list.some((assistant) => assistant.partnerAccount === partnerAccount)) {
-          return partnerAccount;
-        }
-        return '';
-      });
+      setSelectedPartnerAccount((current) => resolveSelectableAssistantId(
+        list,
+        current,
+        preferredDefaultPartnerAccount,
+        partnerAccount,
+      ));
     } catch (error) {
-      console.error('getWeAgentList failed in SwitchAssistant:', error);
-      showToast('获取助理列表失败');
+      WeLog(`SwitchAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_ASSISTANT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
+      showToast(t('switchAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedPartnerAccount('');
     }
-  }, [partnerAccount, preferredDefaultPartnerAccount]);
+  }, [partnerAccount, preferredDefaultPartnerAccount, t]);
 
   useEffect(() => {
     void loadAssistantList();
@@ -79,31 +71,16 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     if (!selectedPartnerAccount) return;
 
     try {
-      const selectedAssistant = assistantList.find(
-        (assistant) => assistant.partnerAccount === selectedPartnerAccount,
-      );
-      const detailResult = await getWeAgentDetails({ partnerAccount: selectedPartnerAccount });
-      const detail = detailResult?.WeAgentDetailsArray?.[0];
-      if (!detail) {
-        console.warn('No we-agent detail found for partnerAccount:', selectedPartnerAccount);
+      const opened = await openAssistantByPartnerAccount(assistantList, selectedPartnerAccount);
+      if (!opened) {
         return;
       }
-      const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, selectedPartnerAccount);
-      const robotId = resolveRobotIdForOpenWeAgentCUI({
-        detailRobotId: detail.robotId,
-        listRobotId: selectedAssistant?.robotId,
-      });
-      const params = buildOpenWeAgentCUIParams(weCodeUrl, selectedPartnerAccount, {
-        bizRobotId: detail.bizRobotId,
-        robotId,
-      });
-      await openWeAgentCUI(params);
       window.HWH5.close();
     } catch (error) {
-      console.error('openWeAgentCUI failed in SwitchAssistant:', error);
-      showToast('打开助理失败');
+      WeLog(`SwitchAssistant openWeAgentCUI failed | extra=${JSON.stringify({ selectedPartnerAccount })} | error=${JSON.stringify(error)}`);
+      showToast(t('switchAssistant.openFailed'));
     }
-  }, [assistantList, selectedPartnerAccount]);
+  }, [assistantList, selectedPartnerAccount, t]);
 
   const handleLeftButtonClick = useCallback(() => {
     if (isPc) {
@@ -127,16 +104,16 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 
   const handleServiceClick = useCallback(() => {
     openH5Webview({
-      uri: buildCustomerServiceWebviewUri(MOCK_CUSTOMER_SERVICE_SOURCE_URL),
+      uri: CUSTOMER_SERVICE_WEBVIEW_URI,
     });
   }, []);
 
   return (
     <AssistantSelectionPage
-      title="切换助理"
+      title={t('switchAssistant.title')}
       isPcMiniApp={isPc}
-      leftButtonText="取消选择"
-      rightButtonText="确认切换"
+      leftButtonText={t('switchAssistant.cancelSelect')}
+      rightButtonText={t('switchAssistant.confirmSwitch')}
       defaultSelectedAssistantId={preferredDefaultPartnerAccount}
       onLeftButtonClick={handleLeftButtonClick}
       onRightButtonClick={handleRightButtonClick}
@@ -150,9 +127,3 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 };
 
 export default SwitchAssistant;
-
-
-
-
-
-

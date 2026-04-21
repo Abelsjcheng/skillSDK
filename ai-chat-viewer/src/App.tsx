@@ -1,4 +1,6 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { isIosMobileDevice, isPcMiniApp } from './constants';
 import { Content } from './components/Content';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
@@ -7,21 +9,19 @@ import { StreamAssembler } from './protocol/StreamAssembler';
 import type {
   Message,
   MessagePart,
+  PendingAssistantPreview,
   QuestionAnswerSubmission,
   SessionStatus,
   StreamMessage,
 } from './types';
-import {
-  buildCorpUserAvatar,
-} from './utils/avatar';
+import { buildCorpUserAvatar } from './utils/avatar';
 import {
   createNewSession,
+  getDeviceInfo,
   getHistorySessionsList,
   getSessionMessageHistory,
   getUserInfo,
   getWeAgentDetails,
-  isIosMobileDevice,
-  isPcMiniApp,
   registerSessionListener,
   sendMessage as sendMessageApi,
   stopSkill,
@@ -36,7 +36,6 @@ import {
   mapRawParts,
   messageOperationToMessage,
   normalizeRole,
-  replaceOptimisticMessage,
   sessionMessageToMessage,
   snapshotMessageToMessage,
   updateLatestQuestionPart,
@@ -46,11 +45,8 @@ import {
   getLatestAvailableSessionByUpdatedAt,
   hasMoreHistoryByCursor,
 } from './utils/session';
-import {
-  createPendingAssistantMessage,
-  shouldCreatePendingAssistantMessage,
-} from './utils/streaming';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
+import { WeLog } from './utils/logger';
 import { showToast } from './utils/toast';
 import createSession from './imgs/createSession.svg';
 import './styles/App.less';
@@ -65,12 +61,15 @@ const HISTORY_PAGE_SIZE = 20;
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
   const isIosKeyboardLiftEnabled = isIosMobileDevice();
+  const { t, i18n } = useTranslation();
   const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle');
   const [footerMode, setFooterMode] = useState<'generate' | 'generating' | 'regenerate'>('generate');
-  const isOutputting = footerMode === 'generating' || sessionStatus === 'busy';
+  const [outputtingSessionId, setOutputtingSessionId] = useState<string | null>(null);
+  const isOutputting = outputtingSessionId === welinkSessionId
+    && (footerMode === 'generating' || sessionStatus === 'busy');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [weAgentUserName, setWeAgentUserName] = useState('');
@@ -81,11 +80,17 @@ function App({ assistantAccount = '' }: AppProps) {
   const [historySessionsCache, setHistorySessionsCache] = useState<SkillSession[] | null>(null);
   const [historySessionsLoaded, setHistorySessionsLoaded] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
+  const [pendingAssistantPreview, setPendingAssistantPreview] = useState<PendingAssistantPreview>({
+    visible: false,
+    welinkSessionId: null,
+    startedAt: 0,
+  });
 
   const assemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
-  const assistantAccountRef = useRef(assistantAccount.trim());
+  const assistantAccountRef = useRef(assistantAccount);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const shouldResetFooterOnCompletionRef = useRef(false);
   const suppressFooterAutoResetRef = useRef(false);
@@ -94,6 +99,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
+  const activeWelinkSessionIdRef = useRef<string | null>(null);
 
   const onMessageRef = useRef<((msg: StreamMessage) => void) | null>(null);
   const onErrorRef = useRef<((err: {
@@ -104,6 +110,7 @@ function App({ assistantAccount = '' }: AppProps) {
     errorMessage?: string;
   }) => void) | null>(null);
   const onCloseRef = useRef<((reason: string) => void) | null>(null);
+  const shouldUseEnglishUserName = (i18n.resolvedLanguage ?? i18n.language) === 'en';
 
   useEffect(() => {
     if (!isIosKeyboardLiftEnabled) {
@@ -115,17 +122,20 @@ function App({ assistantAccount = '' }: AppProps) {
     if (typeof window === 'undefined' || typeof window.HWH5?.onKeyboardHeightChange !== 'function') {
       return;
     }
-
+    let safeAreaInsetBottom = 0;
     const handleKeyboardHeightChange = (res: { height: number }) => {
-      const nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
+      let nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
+      nextHeight = nextHeight - 49 - safeAreaInsetBottom / window.devicePixelRatio;
       setKeyboardHeight(nextHeight > 0 ? nextHeight : 0);
     };
 
     const setupKeyboardHeightListener = async () => {
       try {
         await window.HWH5?.disableAutoPushUpPage?.({ status: true });
+        const deviceInfo = await getDeviceInfo()
+        safeAreaInsetBottom = deviceInfo.safeAreaInsetBottom;
       } catch (error) {
-        console.error('disableAutoPushUpPage failed:', error);
+        WeLog(`App setupKeyboardHeightListener failed | error=${JSON.stringify(error)}`);
       }
 
       window.HWH5.onKeyboardHeightChange?.(handleKeyboardHeightChange);
@@ -139,15 +149,40 @@ function App({ assistantAccount = '' }: AppProps) {
     };
   }, [isIosKeyboardLiftEnabled]);
 
-  const ensurePendingAssistantMessage = useCallback(() => {
-    if (streamingMsgIdRef.current) {
-      return;
-    }
-
-    const pendingMessage = createPendingAssistantMessage();
-    streamingMsgIdRef.current = pendingMessage.id;
-    setMessages((prev) => [...prev, pendingMessage]);
+  const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
+    setPendingAssistantPreview((prev) => (
+      prev.visible && prev.welinkSessionId === sessionId
+        ? prev
+        : {
+          visible: true,
+          welinkSessionId: sessionId,
+          startedAt: Date.now(),
+        }
+    ));
   }, []);
+
+  const hidePendingAssistantPreview = useCallback(() => {
+    setPendingAssistantPreview((prev) => (
+      prev.visible
+        ? {
+          visible: false,
+          welinkSessionId: null,
+          startedAt: 0,
+        }
+        : prev
+    ));
+  }, []);
+
+  const resetCurrentSessionViewState = useCallback(() => {
+    hidePendingAssistantPreview();
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
+    shouldResetFooterOnCompletionRef.current = false;
+    suppressFooterAutoResetRef.current = false;
+    setFooterMode('generate');
+    setSessionStatus('idle');
+    setOutputtingSessionId(null);
+  }, [hidePendingAssistantPreview]);
 
   const finalizeStreamingMessage = useCallback(() => {
     assemblerRef.current.complete();
@@ -162,23 +197,13 @@ function App({ assistantAccount = '' }: AppProps) {
           return prev;
         }
 
-        if (currentMessage.meta?.pending && finalParts.length === 0 && !finalText.trim()) {
-          return prev.filter((message) => message.id !== finalId);
-        }
-
         return prev.map((message) =>
           message.id === finalId
             ? {
               ...message,
-              content: currentMessage.meta?.pending ? finalText : message.content,
+              content: finalText || message.content,
               isStreaming: false,
-              parts: [...finalParts],
-              meta: currentMessage.meta?.pending
-                ? {
-                  ...message.meta,
-                  pending: false,
-                }
-                : message.meta,
+              parts: finalParts.length > 0 ? [...finalParts] : message.parts,
             }
             : message,
         );
@@ -187,10 +212,11 @@ function App({ assistantAccount = '' }: AppProps) {
 
     assemblerRef.current.reset();
     streamingMsgIdRef.current = null;
-  }, []);
+    hidePendingAssistantPreview();
+  }, [hidePendingAssistantPreview]);
 
   const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
-    const normalizedMessage = message.trim() || fallbackMessage;
+    const normalizedMessage = message || fallbackMessage;
     const currentStreamingMessageId = streamingMsgIdRef.current;
     const assemblerText = assemblerRef.current.getText();
     const assemblerParts = assemblerRef.current
@@ -212,21 +238,13 @@ function App({ assistantAccount = '' }: AppProps) {
           const baseParts = currentMessage.parts && currentMessage.parts.length > 0
             ? currentMessage.parts.map((part) => ({ ...part, isStreaming: false }))
             : assemblerParts;
-          const nextContent = currentMessage.meta?.pending
-            ? assemblerText || normalizedMessage
-            : currentMessage.content || assemblerText || normalizedMessage;
+          const nextContent = currentMessage.content || assemblerText || normalizedMessage;
 
           nextMessages[streamingMessageIndex] = {
             ...currentMessage,
             content: nextContent,
             isStreaming: false,
             parts: [...baseParts, errorPart],
-            meta: currentMessage.meta?.pending
-              ? {
-                ...currentMessage.meta,
-                pending: false,
-              }
-              : currentMessage.meta,
           };
           return nextMessages;
         }
@@ -248,52 +266,65 @@ function App({ assistantAccount = '' }: AppProps) {
 
     assemblerRef.current.reset();
     streamingMsgIdRef.current = null;
+    hidePendingAssistantPreview();
+  }, [hidePendingAssistantPreview]);
+
+  const upsertAssistantMessage = useCallback((messageId: string, updater: (current?: Message) => Message) => {
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex((message) => message.id === messageId);
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = updater(next[existingIndex]);
+        return next;
+      }
+
+      return [...prev, updater(undefined)];
+    });
   }, []);
 
+  const ensureStreamingMessageContext = useCallback((messageId: string) => {
+    if (streamingMsgIdRef.current && streamingMsgIdRef.current !== messageId) {
+      finalizeStreamingMessage();
+    }
+
+    if (streamingMsgIdRef.current !== messageId) {
+      assemblerRef.current.reset();
+      streamingMsgIdRef.current = messageId;
+    }
+
+    hidePendingAssistantPreview();
+  }, [finalizeStreamingMessage, hidePendingAssistantPreview]);
+
   const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
-    if (!welinkSessionId || !content.trim()) {
+    if (!welinkSessionId) {
+      showToast(t('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
-    const trimmedContent = content.trim();
-    const tempId = genMessageId('user');
-    const optimisticMessage: Message = {
-      id: tempId,
-      role: 'user',
-      content: trimmedContent,
-      contentType: 'plain',
-      timestamp: Date.now(),
-      isStreaming: false,
-    };
-
-    setMessages((prev) => {
-      const next = [
-        ...prev,
-        optimisticMessage,
-      ];
-      knownUserMessageIdsRef.current = collectUserMessageIds(next);
-      return next;
-    });
-
     const result = await sendMessageApi({
       welinkSessionId,
-      content: trimmedContent,
+      content: content?.trim(),
       ...(toolCallId ? { toolCallId } : {}),
     });
-    const mappedMessage = messageOperationToMessage(result);
+    const userMessage = messageOperationToMessage(result);
 
     setMessages((prev) => {
-      const next = replaceOptimisticMessage(prev, tempId, mappedMessage);
+      const currentUserMessage = prev.find((message) => message.id === userMessage.id)
+      if (currentUserMessage) {
+        return prev;
+      }
+      const next = [...prev, userMessage];
       knownUserMessageIdsRef.current = collectUserMessageIds(next);
       return next;
     });
+    setScrollToBottomSignal((prev) => prev + 1);
 
     return result;
-  }, [welinkSessionId]);
+  }, [t, welinkSessionId]);
 
   const updateHistorySessionTitle = useCallback((sessionId: string, title: string) => {
-    const normalizedSessionId = sessionId.trim();
-    const nextTitle = title.trim();
+    const normalizedSessionId = sessionId;
+    const nextTitle = title;
     if (!normalizedSessionId || !nextTitle) {
       return;
     }
@@ -321,9 +352,9 @@ function App({ assistantAccount = '' }: AppProps) {
     try {
       await sendUserMessage(answer, toolCallId);
     } catch (err) {
-      console.error('Failed to submit question answer:', err);
+      WeLog(`App sendMessage failed | extra=${JSON.stringify({ welinkSessionId, toolCallId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
-      showToast('提交回答失败');
+      showToast(t('weAgent.submitAnswerFailed'));
       throw err;
     }
   }, [finalizeStreamingMessage, sendUserMessage]);
@@ -357,8 +388,11 @@ function App({ assistantAccount = '' }: AppProps) {
       hasMoreHistoryRef.current = nextHasMoreHistory;
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
-      console.error('Failed to load more history messages:', err);
-      showToast('获取历史消息失败');
+      WeLog(`App getSessionMessageHistory failed | extra=${JSON.stringify({
+        welinkSessionId,
+        beforeSeq: nextBeforeSeqRef.current ?? undefined,
+      })} | error=${JSON.stringify(err)}`);
+      showToast(t('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
@@ -367,9 +401,9 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const resolveAssistantDetail = useCallback(async (currentAssistantAccount: string) => {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
-    const detail = detailsResult.WeAgentDetailsArray?.[0];
+    const detail = detailsResult.weAgentDetailsArray?.[0];
     if (!detail) {
-      throw new Error('未获取到助理详情');
+      throw new Error(t('weAgent.missingAssistantDetail'));
     }
 
     setWeAgentAssistantName(detail.name ?? '');
@@ -394,20 +428,28 @@ function App({ assistantAccount = '' }: AppProps) {
   );
 
   useEffect(() => {
-    assistantAccountRef.current = assistantAccount.trim();
+    assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
     knownUserMessageIdsRef.current.clear();
+    setOutputtingSessionId(null);
+    hidePendingAssistantPreview();
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
-  }, [assistantAccount]);
+  }, [assistantAccount, hidePendingAssistantPreview]);
 
   useEffect(() => {
-    const currentAssistantAccount = assistantAccountRef.current.trim();
+    activeWelinkSessionIdRef.current = welinkSessionId;
+  }, [welinkSessionId]);
+
+  useEffect(() => {
+    const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
-      console.error('缺少 assistantAccount 参数');
+      WeLog('App 缺少 assistantAccount 参数');
       return;
     }
 
@@ -417,7 +459,7 @@ function App({ assistantAccount = '' }: AppProps) {
       try {
         const userInfo = await getUserInfo();
         if (!disposed) {
-          setWeAgentUserName(userInfo.userNameZH);
+          setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
           setWeAgentUserAvatar(buildCorpUserAvatar(userInfo.corpUserId));
         }
 
@@ -436,9 +478,11 @@ function App({ assistantAccount = '' }: AppProps) {
 
         setWelinkSessionId(session.welinkSessionId);
       } catch (err) {
-        console.error('Failed to initialize weAgent session:', err);
+        WeLog(`App initializeWeAgentSession failed | extra=${JSON.stringify({
+          assistantAccount: currentAssistantAccount,
+        })} | error=${JSON.stringify(err)}`);
         if (!disposed) {
-          showToast('初始化会话失败');
+          showToast(t('weAgent.initSessionFailed'));
         }
       }
     };
@@ -448,7 +492,7 @@ function App({ assistantAccount = '' }: AppProps) {
     return () => {
       disposed = true;
     };
-  }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant]);
+  }, [assistantAccount, resolveAssistantDetail, createSessionForAssistant, shouldUseEnglishUserName]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -481,14 +525,15 @@ function App({ assistantAccount = '' }: AppProps) {
         hasMoreHistoryRef.current = nextHasMoreHistory;
         setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
-        console.error('Failed to load messages:', err);
-        showToast('获取历史消息失败');
+        WeLog(`App getSessionMessageHistory failed | extra=${JSON.stringify({ welinkSessionId })} | error=${JSON.stringify(err)}`);
+        showToast(t('weAgent.loadHistoryFailed'));
       }
     };
 
     onMessageRef.current = (msg: StreamMessage) => {
-      if (shouldCreatePendingAssistantMessage(msg)) {
-        ensurePendingAssistantMessage();
+      const activeWelinkSessionId = activeWelinkSessionIdRef.current;
+      if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
+        return;
       }
 
       if (
@@ -532,57 +577,51 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'question':
         case 'permission.ask':
         case 'file': {
+          const messageId = msg.messageId;
+          if (!messageId) {
+            break;
+          }
+
           setSessionStatus('busy');
+          setOutputtingSessionId(activeWelinkSessionId);
+          ensureStreamingMessageContext(messageId);
+
           const assembler = assemblerRef.current;
           assembler.handleMessage(msg);
-
           const currentText = assembler.getText();
           const currentParts = assembler.getParts();
 
-          setMessages((prev) => {
-            if (streamingMsgIdRef.current) {
-              return prev.map((m) =>
-                m.id === streamingMsgIdRef.current
-                  ? {
-                    ...m,
-                    content: currentText,
-                    parts: [...currentParts],
-                    isStreaming: true,
-                    meta: m.meta?.pending
-                      ? {
-                        ...m.meta,
-                        pending: false,
-                      }
-                      : m.meta,
-                  }
-                  : m,
-              );
-            }
-            const id = genMessageId();
-            streamingMsgIdRef.current = id;
-            return [
-              ...prev,
-              {
-                id,
-                role: 'assistant',
-                content: currentText,
-                timestamp: Date.now(),
-                isStreaming: true,
-                parts: [...currentParts],
-              },
-            ];
-          });
+          upsertAssistantMessage(messageId, (current) => ({
+            id: messageId,
+            role: current?.role ?? 'assistant',
+            content: currentText,
+            contentType: current?.contentType ?? 'markdown',
+            timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
+            isStreaming: true,
+            parts: [...currentParts],
+            meta: current?.meta,
+            isHistory: current?.isHistory,
+          }));
           break;
         }
 
         case 'message.user': {
-          const messageId = msg.messageId?.trim();
-          if (!messageId || knownUserMessageIdsRef.current.has(messageId)) {
+          const messageId = msg.messageId;
+          if (!messageId) {
             break;
           }
 
+          finalizeStreamingMessage();
+          setSessionStatus('busy');
+          setOutputtingSessionId(activeWelinkSessionId);
+
           const content = msg.content ?? '';
           setMessages((prev) => {
+            const hasUserMessage = knownUserMessageIdsRef.current.has(messageId);
+            if (hasUserMessage) {
+              return prev;
+            }
+
             const nextMessage: Message = {
               id: messageId,
               role: 'user',
@@ -596,6 +635,7 @@ function App({ assistantAccount = '' }: AppProps) {
             knownUserMessageIdsRef.current.add(messageId);
             return next;
           });
+          showPendingAssistantPreview(activeWelinkSessionId);
           break;
         }
 
@@ -638,14 +678,12 @@ function App({ assistantAccount = '' }: AppProps) {
               )),
             };
           }));
-          if (hasStreamingPermission && currentStreamingMessageId) {
-            finalizeStreamingMessage();
-          }
           break;
         }
 
         case 'step.start':
           setSessionStatus('busy');
+          setOutputtingSessionId(activeWelinkSessionId);
           break;
 
         case 'step.done':
@@ -669,7 +707,7 @@ function App({ assistantAccount = '' }: AppProps) {
           break;
 
         case 'session.title': {
-          const sessionId = String(msg.welinkSessionId ?? welinkSessionId ?? '').trim();
+          const sessionId = String(msg.welinkSessionId ?? welinkSessionId ?? '');
           const nextTitle = typeof msg.title === 'string' ? msg.title : '';
           updateHistorySessionTitle(sessionId, nextTitle);
           break;
@@ -678,6 +716,7 @@ function App({ assistantAccount = '' }: AppProps) {
         case 'session.status': {
           if (msg.sessionStatus === 'idle') {
             setSessionStatus('idle');
+            setOutputtingSessionId(null);
             finalizeStreamingMessage();
 
             if (shouldResetFooterOnCompletionRef.current && !suppressFooterAutoResetRef.current) {
@@ -686,6 +725,7 @@ function App({ assistantAccount = '' }: AppProps) {
             shouldResetFooterOnCompletionRef.current = false;
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
+            setOutputtingSessionId(activeWelinkSessionId);
           } else if (msg.sessionStatus === 'retry') {
             setSessionStatus('retry');
           }
@@ -694,27 +734,38 @@ function App({ assistantAccount = '' }: AppProps) {
 
         case 'session.error':
           setSessionStatus('error');
-          console.error(msg.error ?? '会话错误');
+          setOutputtingSessionId(null);
+          WeLog(`App ${msg.error ?? '会话错误'} | extra=${JSON.stringify({
+            type: 'session.error',
+            welinkSessionId: activeWelinkSessionId,
+          })}`);
           if (!suppressFooterAutoResetRef.current) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          appendAssistantErrorBlock(msg.error ?? '', 'AI 回复失败');
+          appendAssistantErrorBlock(msg.error ?? '', t('weAgent.aiReplyFailed'));
           break;
 
         case 'error':
           setSessionStatus('error');
-          console.error(msg.error ?? '未知错误');
+          setOutputtingSessionId(null);
+          WeLog(`App ${msg.error ?? '未知错误'} | extra=${JSON.stringify({
+            type: 'error',
+            welinkSessionId: activeWelinkSessionId,
+          })}`);
           if (!suppressFooterAutoResetRef.current) {
             setFooterMode('generate');
           }
           shouldResetFooterOnCompletionRef.current = false;
-          appendAssistantErrorBlock(msg.error ?? '', 'AI 回复失败');
+          appendAssistantErrorBlock(msg.error ?? '', t('weAgent.aiReplyFailed'));
           break;
 
         case 'snapshot':
-          if (msg.messages && msg.messages.length > 0) {
-            const snapshotMessages: Message[] = msg.messages
+          assemblerRef.current.reset();
+          streamingMsgIdRef.current = null;
+          hidePendingAssistantPreview();
+          {
+            const snapshotMessages: Message[] = (msg.messages ?? [])
               .map((sm) => snapshotMessageToMessage(sm))
               .reverse();
             setMessages(snapshotMessages);
@@ -722,48 +773,31 @@ function App({ assistantAccount = '' }: AppProps) {
           }
           break;
 
-        case 'streaming':
-          if (msg.parts && msg.parts.length > 0) {
-            setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
-            const nextRole = normalizeRole(msg.role);
-            const nextParts = mapRawParts(msg.parts, true);
-            setMessages((prev) => {
-              if (streamingMsgIdRef.current) {
-                return prev.map((message) =>
-                  message.id === streamingMsgIdRef.current
-                    ? {
-                      ...message,
-                      role: nextRole,
-                      content: '',
-                      contentType: contentTypeForRole(nextRole),
-                      isStreaming: true,
-                      parts: nextParts,
-                      meta: message.meta?.pending
-                        ? {
-                          ...message.meta,
-                          pending: false,
-                        }
-                        : message.meta,
-                    }
-                    : message,
-                );
-              }
-
-              const id = genMessageId();
-              streamingMsgIdRef.current = id;
-              const streamingMsg: Message = {
-                id,
-                role: nextRole,
-                content: '',
-                contentType: contentTypeForRole(nextRole),
-                timestamp: Date.now(),
-                isStreaming: true,
-                parts: nextParts,
-              };
-              return [...prev, streamingMsg];
-            });
+        case 'streaming': {
+          const messageId = msg.messageId;
+          if (!messageId || !msg.parts || msg.parts.length === 0) {
+            break;
           }
+
+          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
+          setOutputtingSessionId(msg.sessionStatus === 'busy' ? activeWelinkSessionId : null);
+          ensureStreamingMessageContext(messageId);
+
+          const nextRole = normalizeRole(msg.role);
+          const nextParts = mapRawParts(msg.parts, true);
+          upsertAssistantMessage(messageId, (current) => ({
+            id: messageId,
+            role: nextRole,
+            content: current?.content ?? '',
+            contentType: contentTypeForRole(nextRole),
+            timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
+            isStreaming: true,
+            parts: nextParts,
+            meta: current?.meta,
+            isHistory: current?.isHistory,
+          }));
           break;
+        }
 
         default:
           break;
@@ -773,7 +807,11 @@ function App({ assistantAccount = '' }: AppProps) {
     onErrorRef.current = (err) => {
       const errorCode = err.code ?? (err.errorCode !== undefined ? String(err.errorCode) : 'unknown');
       const errorMessage = err.message ?? err.errorMessage ?? 'unknown error';
-      console.error('Session listener error:', `${errorCode}: ${errorMessage}`);
+      WeLog(`App Session listener error | extra=${JSON.stringify({
+        errorCode,
+        errorMessage,
+        welinkSessionId,
+      })}`);
     };
 
     onCloseRef.current = (reason) => {
@@ -805,13 +843,26 @@ function App({ assistantAccount = '' }: AppProps) {
         listenerRegisteredRef.current = false;
       }
     };
-  }, [welinkSessionId, appendAssistantErrorBlock, finalizeStreamingMessage, ensurePendingAssistantMessage, updateHistorySessionTitle, sendUserMessage]);
+  }, [
+    welinkSessionId,
+    appendAssistantErrorBlock,
+    ensureStreamingMessageContext,
+    finalizeStreamingMessage,
+    hidePendingAssistantPreview,
+    showPendingAssistantPreview,
+    upsertAssistantMessage,
+    updateHistorySessionTitle,
+    sendUserMessage,
+  ]);
 
   const handleGenerate = useCallback(async (content: string) => {
-    if (!welinkSessionId || !content.trim()) return;
+    if (!welinkSessionId || !content) return;
 
     setSessionStatus('busy');
     setFooterMode('generating');
+    setOutputtingSessionId(welinkSessionId);
+    assemblerRef.current.reset();
+    streamingMsgIdRef.current = null;
     shouldResetFooterOnCompletionRef.current = true;
     suppressFooterAutoResetRef.current = false;
 
@@ -821,8 +872,9 @@ function App({ assistantAccount = '' }: AppProps) {
       shouldResetFooterOnCompletionRef.current = false;
       setSessionStatus('idle');
       setFooterMode('generate');
-      showToast('发送消息失败');
-      console.error('发送消息失败', err);
+      setOutputtingSessionId(null);
+      showToast(t('weAgent.sendMessageFailed'));
+      WeLog(`App sendMessage failed | extra=${JSON.stringify({ welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
   }, [welinkSessionId, sendUserMessage]);
 
@@ -835,23 +887,24 @@ function App({ assistantAccount = '' }: AppProps) {
       shouldResetFooterOnCompletionRef.current = false;
       setFooterMode('generate');
       setSessionStatus('idle');
+      setOutputtingSessionId(null);
       finalizeStreamingMessage();
     } catch (err) {
       suppressFooterAutoResetRef.current = false;
-      console.error('Failed to stop skill:', err);
-      showToast('停止生成失败');
+      WeLog(`App stopSkill failed | extra=${JSON.stringify({ welinkSessionId })} | error=${JSON.stringify(err)}`);
+      showToast(t('weAgent.stopGenerateFailed'));
       setFooterMode('generating');
     }
   }, [welinkSessionId, finalizeStreamingMessage]);
 
   const handleCreateSession = useCallback(async () => {
-    const currentAssistantAccount = assistantAccountRef.current.trim();
+    const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
       return;
     }
 
     if (messages.length === 0) {
-      showToast('当前是最新会话');
+      showToast(t('weAgent.newestSession'));
       return;
     }
 
@@ -864,6 +917,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const newSession = ensureSessionTimestamps(
         await createSessionForAssistant(currentAssistantAccount, detail.appKey),
       );
+      resetCurrentSessionViewState();
       setMessages([]);
       setWelinkSessionId(newSession.welinkSessionId);
       setHistorySessionsCache((prev) => {
@@ -873,29 +927,23 @@ function App({ assistantAccount = '' }: AppProps) {
         const next = prev.filter((session) => session.welinkSessionId !== newSession.welinkSessionId);
         return [newSession, ...next];
       });
-      showToast('成功创建新会话');
     } catch (err) {
-      console.error('Failed to create new session:', err);
-      showToast('新建会话失败');
+      WeLog(`App createNewSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
+      showToast(t('weAgent.createSessionFailed'));
     }
-  }, [messages.length, resolveAssistantDetail, createSessionForAssistant]);
+  }, [messages.length, resolveAssistantDetail, createSessionForAssistant, hidePendingAssistantPreview]);
 
   const handleSwitchWeAgentSession = useCallback((nextWelinkSessionId: string) => {
-    const normalizedSessionId = nextWelinkSessionId.trim();
+    const normalizedSessionId = nextWelinkSessionId;
     if (!normalizedSessionId || normalizedSessionId === welinkSessionId) {
       return;
     }
 
-    finalizeStreamingMessage();
-    shouldResetFooterOnCompletionRef.current = false;
-    suppressFooterAutoResetRef.current = false;
+    resetCurrentSessionViewState();
     knownUserMessageIdsRef.current.clear();
-
-    setFooterMode('generate');
-    setSessionStatus('idle');
     setMessages([]);
     setWelinkSessionId(normalizedSessionId);
-  }, [finalizeStreamingMessage, welinkSessionId]);
+  }, [resetCurrentSessionViewState, welinkSessionId]);
 
   return (
     <div
@@ -905,13 +953,18 @@ function App({ assistantAccount = '' }: AppProps) {
         'app-container--we-agent-cui',
         isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
       ].filter(Boolean).join(' ')}
+      style={isIosKeyboardLiftEnabled && keyboardHeight > 0
+        ? { height: `calc(100vh - ${keyboardHeight}px)` }
+        : undefined}
     >
       <div className="we-agent-cui-main">
         <div className="we-agent-cui-chat-panel">
           <div className="content-wrapper">
             <Content
               messages={messages}
+              pendingAssistantPreview={pendingAssistantPreview}
               welinkSessionId={welinkSessionId ?? ''}
+              scrollToBottomSignal={scrollToBottomSignal}
               isLoadingHistory={isLoadingHistory}
               hasMoreHistory={hasMoreHistory}
               onLoadMoreHistory={loadMoreHistory}
@@ -924,13 +977,8 @@ function App({ assistantAccount = '' }: AppProps) {
             />
           </div>
 
-          <div
-            className="we-agent-cui-bottom"
-            style={isIosKeyboardLiftEnabled && keyboardHeight > 0
-              ? { transform: `translate3d(0, -${keyboardHeight}px, 0)` }
-              : undefined}
-          >
-            <div className="we-agent-cui-actions" aria-label="多功能按钮区">
+          <div className="we-agent-cui-bottom">
+            <div className="we-agent-cui-actions" aria-label={t('weAgent.multiActionArea')}>
               <button
                 type="button"
                 className="we-agent-cui-actions__button"
@@ -939,7 +987,7 @@ function App({ assistantAccount = '' }: AppProps) {
                     void handleCreateSession();
                   });
                 }}
-                aria-label="新建会话"
+                aria-label={t('weAgent.newSession')}
               >
                 <img
                   className="we-agent-cui-actions__icon"
@@ -949,7 +997,7 @@ function App({ assistantAccount = '' }: AppProps) {
               </button>
               {isOutputting ? (
                 <div className="we-agent-cui-actions__status" aria-live="polite">
-                  输出中...
+                  {t('weAgent.outputting')}
                 </div>
               ) : null}
               <WeAgentHistorySidebar
@@ -969,7 +1017,7 @@ function App({ assistantAccount = '' }: AppProps) {
             <div className="footer-wrapper">
               <WeAgentCUIFooter
                 isPcMiniApp={isPc}
-                mode={footerMode}
+                mode={isOutputting ? 'generating' : footerMode}
                 onSend={handleGenerate}
                 onStop={handleStop}
               />

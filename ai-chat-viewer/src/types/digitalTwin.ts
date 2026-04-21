@@ -29,6 +29,10 @@ export interface DigitalTwinBasicInfoPayload {
   description: string;
 }
 
+export interface CreateAssistantRouteState {
+  draft?: DigitalTwinBasicInfoPayload;
+}
+
 export interface DigitalTwinBrainPayload {
   digitalTwintype: BrainType;
   bizRobotId?: string;

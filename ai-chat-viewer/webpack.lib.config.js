@@ -1,25 +1,26 @@
 const path = require('path');
 const {
   RESOLVE_EXTENSIONS,
-  BASE_OPTIMIZATION,
+  WEBPACK_ES5_TARGET,
+  createEs5Output,
   createModuleRules,
 } = require('./webpack.shared');
 
 module.exports = {
   mode: 'production',
-  target: ['web', 'es5'],
+  target: WEBPACK_ES5_TARGET,
   entry: './src/lib/index.ts',
-  output: {
+  output: createEs5Output({
     path: path.resolve(__dirname, 'dist/lib'),
     filename: 'index.js',
     library: {
       name: 'AIChatViewer',
       type: 'umd',
     },
-    globalObject: 'globalThis',
+    globalObject: 'this',
     clean: true,
-    publicPath: './'
-  },
+    publicPath: './',
+  }),
   resolve: {
     extensions: RESOLVE_EXTENSIONS,
   },

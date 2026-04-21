@@ -928,7 +928,7 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
             [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[detailsList.firstObject toDictionary]];
         }
         WLAgentSkillsWeAgentDetailsArrayResult *result = [[WLAgentSkillsWeAgentDetailsArrayResult alloc] init];
-        result.WeAgentDetailsArray = detailsList;
+        result.weAgentDetailsArray = detailsList;
         if (success) {
             success(result);
         }

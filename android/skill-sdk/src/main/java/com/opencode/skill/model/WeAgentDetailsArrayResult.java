@@ -11,7 +11,7 @@ import java.util.Objects;
 
 @Keep
 public class WeAgentDetailsArrayResult {
-    @SerializedName("WeAgentDetailsArray")
+    @SerializedName("weAgentDetailsArray")
     @NonNull
     private List<WeAgentDetails> weAgentDetailsArray = new ArrayList<>();
 

@@ -2,18 +2,20 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const {
   RESOLVE_EXTENSIONS,
+  WEBPACK_ES5_TARGET,
+  createEs5Output,
   createModuleRules,
 } = require('./webpack.shared');
 
 module.exports = {
-  target: ['web', 'es5'],
+  target: WEBPACK_ES5_TARGET,
   entry: './src/pages/createAssistant.tsx',
-  output: {
+  output: createEs5Output({
     path: path.resolve(__dirname, 'dist/create-assistant-page'),
     filename: 'js/create-assistant-page.[contenthash].js',
     assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
     clean: true,
-  },
+  }),
   resolve: {
     extensions: RESOLVE_EXTENSIONS,
   },

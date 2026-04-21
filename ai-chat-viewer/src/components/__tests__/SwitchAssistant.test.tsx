@@ -22,7 +22,7 @@ describe('SwitchAssistant', () => {
       }
       if (payload.funName === 'getWeAgentDetails') {
         return {
-          WeAgentDetailsArray: [
+          weAgentDetailsArray: [
             {
               name: '编程助理',
               icon: '',
@@ -33,13 +33,18 @@ describe('SwitchAssistant', () => {
               partnerAccount: 'x00_1',
               createdBy: '',
               creatorName: '',
+              creatorWorkId: '',
+              creatorW3Account: '',
               creatorNameEn: '',
               ownerWelinkId: '',
+              ownerW3Account: '',
               ownerName: '',
               ownerNameEn: '',
               ownerDeptName: '',
               ownerDeptNameEn: '',
+              id: 'robot_1',
               bizRobotId: '',
+              bizRobotTag: '',
               weCodeUrl: 'h5://123456/html/index.html',
             },
           ],

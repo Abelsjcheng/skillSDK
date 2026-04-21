@@ -1,5 +1,6 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getStatusBarHeight } from './hwext';
+import { WeLog } from './logger';
 import { showToast } from './toast';
 
 export function useMobileStatusBarHeight(isPcMiniApp: boolean): number {
@@ -23,7 +24,7 @@ export function useMobileStatusBarHeight(isPcMiniApp: boolean): number {
         if (!cancelled) {
           setStatusBarHeight(0);
         }
-        console.error('getStatusBarHeight failed:', error);
+        WeLog(`useMobileStatusBarHeight getStatusBarHeight failed | error=${JSON.stringify(error)}`);
         showToast('获取状态栏高度失败');
       }
     };

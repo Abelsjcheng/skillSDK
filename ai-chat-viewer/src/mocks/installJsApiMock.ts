@@ -34,11 +34,13 @@ import type {
   WeAgentUriResult,
 } from '../utils/hwext';
 import { HOST } from '../constants';
+import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<{ statusBarHeight: number }>;
+  getAppInfo?: () => Promise<{ language: string }>;
   getUserInfo?: () => Promise<{
     uid: string;
     userNameZH: string;
@@ -1284,13 +1286,18 @@ function seedMockData(): void {
     partnerAccount: DEFAULT_ASSISTANT_ACCOUNT,
     createdBy: 'mock_user_id',
     creatorName: 'Mock User',
+    creatorWorkId: '10001',
+    creatorW3Account: 'mock_user',
     creatorNameEn: 'Mock User',
     ownerWelinkId: 'mock_owner',
+    ownerW3Account: 'mock_owner',
     ownerName: 'Mock Owner',
     ownerNameEn: 'Mock Owner',
     ownerDeptName: 'R&D',
     ownerDeptNameEn: 'R&D',
+    id: 'robot_mock_code',
     bizRobotId: 'biz_robot_1001',
+    bizRobotTag: '',
     bizRobotName: 'Staff Assistant',
     bizRobotNameEn: 'Staff Assistant',
     weCodeUrl: 'h5://921535418692659/index.html',
@@ -1306,13 +1313,18 @@ function seedMockData(): void {
     partnerAccount: 'mock_assistant_002',
     createdBy: 'mock_user_id',
     creatorName: 'Mock User',
+    creatorWorkId: '10001',
+    creatorW3Account: 'mock_user',
     creatorNameEn: 'Mock User',
     ownerWelinkId: 'mock_owner',
+    ownerW3Account: 'mock_owner',
     ownerName: 'Mock Owner',
     ownerNameEn: 'Mock Owner',
     ownerDeptName: '',
     ownerDeptNameEn: '',
+    id: 'robot_mock_external',
     bizRobotId: '',
+    bizRobotTag: '',
     bizRobotName: '',
     bizRobotNameEn: '',
     weCodeUrl: 'h5://921535418692659/index.html#weAgentCUI',
@@ -1395,6 +1407,25 @@ function ensureDefaultMockRouteQueryInHash(): void {
     nextQuery.from = 'weAgent';
     window.location.hash = toRouteHash('/createAssistant', nextQuery);
   }
+
+  if (hashUrl.pathname === '/selectBrainAssistant' && !hashUrl.searchParams.get('from')) {
+    nextQuery.from = 'weAgent';
+    window.location.hash = toRouteHash('/selectBrainAssistant', nextQuery);
+  }
+}
+
+function resolveMockLanguage(): string {
+  const query = new URLSearchParams(window.location.search);
+  const hashValue = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+  const hashQueryIndex = hashValue.indexOf('?');
+  const hashQuery = hashQueryIndex >= 0 ? new URLSearchParams(hashValue.slice(hashQueryIndex + 1)) : null;
+  const candidate = (query.get('language')
+    || query.get('lang')
+    || hashQuery?.get('language')
+    || hashQuery?.get('lang')
+    || '').trim().toLowerCase();
+
+  return candidate === 'en' ? 'en' : 'zh';
 }
 
 function ensureMockHWH5Bridge(): void {
@@ -1419,6 +1450,10 @@ function ensureMockHWH5Bridge(): void {
 
   if (typeof hwh5.getDeviceInfo !== 'function') {
     hwh5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
+  }
+
+  if (typeof hwh5.getAppInfo !== 'function') {
+    hwh5.getAppInfo = async () => ({ language: resolveMockLanguage() });
   }
 
   if (typeof hwh5.getUserInfo !== 'function') {
@@ -1610,6 +1645,7 @@ function buildMockApi(): HWH5EXT {
     createDigitalTwin: async (params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> => {
       const partnerAccount = nextId('mock_assistant');
       const bizRobotId = params.weCrewType === 1 ? (params.bizRobotId ?? nextId('biz_robot')) : '';
+      const robotId = nextId('robot');
 
       const detail: WeAgentDetails = {
         name: params.name,
@@ -1621,13 +1657,18 @@ function buildMockApi(): HWH5EXT {
         partnerAccount,
         createdBy: 'mock_user_id',
         creatorName: 'Mock User',
+        creatorWorkId: '10001',
+        creatorW3Account: 'mock_user',
         creatorNameEn: 'Mock User',
         ownerWelinkId: 'mock_owner',
+        ownerW3Account: 'mock_owner',
         ownerName: 'Mock Owner',
         ownerNameEn: 'Mock Owner',
         ownerDeptName: bizRobotId ? 'R&D' : '',
         ownerDeptNameEn: bizRobotId ? 'R&D' : '',
+        id: robotId,
         bizRobotId,
+        bizRobotTag: '',
         bizRobotName: bizRobotId ? 'Staff Assistant' : '',
         bizRobotNameEn: bizRobotId ? 'Staff Assistant' : '',
         weCodeUrl: buildExternalWeAgentUri(partnerAccount),
@@ -1638,7 +1679,7 @@ function buildMockApi(): HWH5EXT {
 
       return {
         partnerAccount,
-        robotId: bizRobotId || undefined,
+        robotId,
         message: 'success',
       };
     },
@@ -1680,7 +1721,7 @@ function buildMockApi(): HWH5EXT {
       }
 
       return {
-        WeAgentDetailsArray: details,
+        weAgentDetailsArray: details,
       };
     },
 
@@ -1778,7 +1819,6 @@ export function installJsApiMock(): void {
     ensureDefaultMockRouteQueryInHash();
   } catch (error) {
     // mock 安装失败不应阻断页面渲染，避免首屏白屏
-    // eslint-disable-next-line no-console
-    console.error('[ai-chat-viewer] installJsApiMock failed:', error);
+    WeLog(`installJsApiMock installJsApiMock failed | error=${JSON.stringify(error)}`);
   }
 }

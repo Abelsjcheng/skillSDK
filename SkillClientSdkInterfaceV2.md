@@ -17,6 +17,12 @@
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
 | `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并按需持久化助理详情 |
+| `updateWeAgent` | `PUT /v4-1/we-crew` | 更新个人助理信息 |
+| `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
+| `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
+| `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
+| `queryQrcodeInfo` | `GET /nologin/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
+| `updateQrcodeInfo` | `PUT /v4-1/we-crew/im-register/qrcode` | 更新二维码信息 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`/`error`），并按接口语义返回业务字段（如 `message`、`content`）。
@@ -263,15 +269,15 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `WeAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
+| `weAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
 
-`WeAgentDetails` 对象新增字段：`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`id`（字符串）；移除 `robotId` 字段。
+`WeAgentDetails` 对象新增字段：`id`（字符串）、`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`ownerWelinkId`（责任人的 id，字符串）、`creatorWorkId`（创建者的工号，字符串）、`bizRobotTag`（大脑机器人 tag，字符串）、`ownerW3Account`（大脑机器人责任人的账号，字符串）、`creatorW3Account`（创建者的账号，字符串）；移除 `robotId` 字段。
 
 ### 出参示例
 
 ```json
 {
-  "WeAgentDetailsArray": [
+  "weAgentDetailsArray": [
     {
       "name": "员工助手",
       "icon": "http://www.test.com/xxx",
@@ -281,9 +287,12 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "appKey": "",
       "appSecret": "",
       "createdBy": "",
+      "creatorWorkId": "",
+      "creatorW3Account": "",
       "creatorName": "",
       "creatorNameEn": "",
       "ownerWelinkId": "",
+      "ownerW3Account": "",
       "ownerName": "",
       "ownerNameEn": "",
       "ownerDeptName": "",
@@ -291,6 +300,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "id": "78985451212",
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "employee_assistant",
+      "bizRobotTag": "",
       "bizRobotId": "",
       "weCodeUrl": "https://xxx"
     }
@@ -301,13 +311,390 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 ### 实现方法
 
 1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-2. SDK 解析返回 `data[]` 并组装为 `WeAgentDetailsArray`。
+2. SDK 解析返回 `data[]` 并组装为 `weAgentDetailsArray`。
 3. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
-4. SDK 返回 `Promise<WeAgentDetailsArray>`。
+4. SDK 返回 `Promise<weAgentDetailsArray>`。
 
 ---
 
-## 5. 获取当前 WeAgentUri 接口
+## 5. 更新个人助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+更新当前用户已创建的个人助理信息。
+
+### 接口名
+
+```typescript
+updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `name` | `string` | 是 | 助理名称 |
+| `icon` | `string` | 是 | 助理头像地址 |
+| `description` | `string` | 是 | 助理简介 |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "dig_001",
+  "name": "更新名称",
+  "icon": "/mocloud/xxx",
+  "description": "更新简介"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `updateResult` | `string` | 助理信息更新结果，成功时为 `success` |
+
+### 出参示例
+
+```json
+{
+  "updateResult": "success"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API：`PUT /v4-1/we-crew`。
+2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`；若两者同时传入，则两个参数都透传给服务端。
+3. SDK 从服务端响应中提取 `message`，并映射返回为 `updateResult`。
+
+---
+
+## 6. 删除个人助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+删除当前用户已创建的个人助理。
+
+### 接口名
+
+```typescript
+deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "dig_001"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `deleteResult` | `string` | 助理删除结果，成功时为 `success` |
+
+### 出参示例
+
+```json
+{
+  "deleteResult": "success"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
+2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并透传删除标识参数：
+   - 若仅传 `partnerAccount`，则透传 `partnerAccount`；
+   - 若仅传 `robotId`，则透传 `robotId`；
+   - 若两者同时传入，则两个参数都透传给服务端。
+3. SDK 从服务端响应中提取 `message`，并映射返回为 `deleteResult`。
+
+---
+
+## 7. 打开助理编辑页面接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+打开助理编辑页面，并注册详情更新回调。
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistantEditPageResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `onUpdated` | `function` | 是 | 监听详情更新回调，回调出参为 `AssistantDetailUpdatedPayload`；相同 ID（按入参标识生成，优先使用 `partnerAccount`，否则使用 `robotId`）重复注册时覆盖旧监听，一个 ID 仅对应一个监听函数 |
+
+### 入参示例
+
+```typescript
+{
+  partnerAccount: 'x00_1',
+  robotId: '78985451212',
+  onUpdated: (payload) => {
+    console.log(payload.name, payload.icon, payload.description)
+  }
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收 `partnerAccount`、`robotId` 与 `onUpdated` 回调，其中 `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
+2. SDK 按入参标识在本地注册回调监听，唯一 ID 生成规则为：优先使用 `partnerAccount`；当未传 `partnerAccount` 时，使用 `robotId`。
+3. 若相同 ID 已存在监听函数，则使用新的 `onUpdated` 覆盖旧监听；同一 ID 在任意时刻仅保留一个监听函数。
+4. SDK 将已有的标识参数拼接到 `h5://S008623/index.html#editAssistant`：
+   - 若传入 `partnerAccount`，则追加 query `partnerAccount={partnerAccount}`；
+   - 若未传 `partnerAccount` 但传入 `robotId`，则追加 query `robotId={robotId}`；
+   - 若两者均传入，则优先使用 `partnerAccount`。
+5. 拼接完成后的 uri 地址当前先记为 `todo`，待后续页面地址方案确认后补齐。
+6. SDK 拉起助理编辑页面。
+7. SDK 返回 `OpenAssistantEditPageResult`，其中 `status` 固定为 `success`。
+
+---
+
+## 8. 通知助理详情更新接口
+
+### 调用方
+
+助理编辑页面调用
+
+### 接口说明
+
+通知 SDK 当前助理详情已更新，并触发 `openAssistantEditPage` 注册的 `onUpdated` 回调。
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promise<NotifyAssistantDetailUpdatedResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `name` | `string` | 是 | 助理名称 |
+| `icon` | `string` | 是 | 助理头像地址 |
+| `description` | `string` | 是 | 助理简介 |
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+
+### 入参示例
+
+```json
+{
+  "name": "更新名称",
+  "icon": "/mocloud/xxx",
+  "description": "更新简介",
+  "partnerAccount": "x00_1",
+  "robotId": "78985451212"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收 `name`、`icon`、`description`、`partnerAccount` 与 `robotId`，其中 `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
+2. SDK 根据与 `openAssistantEditPage` 一致的唯一 ID 规则定位当前已注册的回调监听：优先使用 `partnerAccount`；当未传 `partnerAccount` 时，使用 `robotId`；若该 ID 发生过重复注册，则以最后一次注册覆盖后的监听函数为准。
+3. SDK 触发对应的 `onUpdated` 回调，并将以下对象作为回调参数传出：
+   - `name`
+   - `icon`
+   - `description`
+4. SDK 返回 `NotifyAssistantDetailUpdatedResult`，其中 `status` 固定为 `success`。
+
+---
+
+## 9. 查询二维码信息接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据二维码唯一标识查询二维码相关信息。
+
+### 接口名
+
+```typescript
+queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `qrcode` | `string` | 是 | 二维码唯一标识 |
+
+### 入参示例
+
+```json
+{
+  "qrcode": "qr_001"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `qrcode` | `string` | 二维码唯一标识 |
+| `weUrl` | `string` | We 侧地址 |
+| `pcUrl` | `string` | PC 侧地址 |
+| `expireTime` | `string` | 过期时间戳 |
+| `status` | `number` | 二维码状态 |
+| `expired` | `boolean` | 过期状态 |
+
+### 出参示例
+
+```json
+{
+  "qrcode": "qr_001",
+  "weUrl": "welink://xxx",
+  "pcUrl": "https://xxx",
+  "expireTime": "1713686400000",
+  "status": 1,
+  "expired": false
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`GET /nologin/we-crew/im-register/qrcode/{qrcode}`。
+2. 服务端响应结构为：
+   - `code: string`
+   - `message: string`
+   - `data: object`
+3. SDK 对外不透出服务端包装字段，直接透传 `data` 中的以下字段作为接口返回：
+   - `qrcode`
+   - `weUrl`
+   - `pcUrl`
+   - `expireTime`
+   - `status`
+   - `expired`
+
+---
+
+## 10. 更新二维码信息接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据二维码唯一标识更新二维码信息。
+
+### 接口名
+
+```typescript
+updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `qrcode` | `string` | 是 | 二维码唯一标识 |
+| `ak` | `string` | 否 | Access Key |
+| `status` | `number` | 是 | 二维码状态 |
+
+### 入参示例
+
+```json
+{
+  "qrcode": "qr_001",
+  "ak": "ak_xxx",
+  "status": 2
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 当服务端返回 `code=200` 时固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`PUT /v4-1/we-crew/im-register/qrcode`。
+2. SDK 透传入参 `qrcode`、`ak`、`status`。
+3. 服务端响应结构为：
+   - `code: string`
+   - `message: string`
+4. SDK 根据服务端 `code` 判断结果：
+   - 当 `code` 为 `200` 时，返回 `{ status: "success" }`。
+
+---
+
+## 11. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -418,6 +805,130 @@ type QueryWeAgentParams = {
 }
 ```
 
+### UpdateWeAgentParams
+
+```typescript
+type UpdateWeAgentParams = {
+  partnerAccount?: string
+  robotId?: string
+  name: string
+  icon: string
+  description: string
+}
+```
+
+### UpdateWeAgentResult
+
+```typescript
+type UpdateWeAgentResult = {
+  updateResult: string
+}
+```
+
+### DeleteWeAgentParams
+
+```typescript
+type DeleteWeAgentParams = {
+  partnerAccount?: string
+  robotId?: string
+}
+```
+
+### DeleteWeAgentResult
+
+```typescript
+type DeleteWeAgentResult = {
+  deleteResult: string
+}
+```
+
+### AssistantDetailUpdatedPayload
+
+```typescript
+type AssistantDetailUpdatedPayload = {
+  name: string
+  icon: string
+  description: string
+}
+```
+
+### OpenAssistantEditPageParams
+
+```typescript
+type OpenAssistantEditPageParams = {
+  partnerAccount?: string
+  robotId?: string
+  onUpdated: (payload: AssistantDetailUpdatedPayload) => void
+}
+```
+
+### OpenAssistantEditPageResult
+
+```typescript
+type OpenAssistantEditPageResult = {
+  status: string
+}
+```
+
+### NotifyAssistantDetailUpdatedParams
+
+```typescript
+type NotifyAssistantDetailUpdatedParams = {
+  name: string
+  icon: string
+  description: string
+  partnerAccount?: string
+  robotId?: string
+}
+```
+
+### NotifyAssistantDetailUpdatedResult
+
+```typescript
+type NotifyAssistantDetailUpdatedResult = {
+  status: string
+}
+```
+
+### QueryQrcodeInfoParams
+
+```typescript
+type QueryQrcodeInfoParams = {
+  qrcode: string
+}
+```
+
+### QrcodeInfo
+
+```typescript
+type QrcodeInfo = {
+  qrcode: string
+  weUrl: string
+  pcUrl: string
+  expireTime: string
+  status: number
+  expired: boolean
+}
+```
+
+### UpdateQrcodeInfoParams
+
+```typescript
+type UpdateQrcodeInfoParams = {
+  qrcode: string
+  ak?: string
+  status: number
+}
+```
+
+### UpdateQrcodeInfoResult
+
+```typescript
+type UpdateQrcodeInfoResult = {
+  status: string
+}
+```
+
 ### WeAgent
 
 ```typescript
@@ -452,9 +963,12 @@ type WeAgentDetails = {
   appSecret: string
   partnerAccount: string
   createdBy: string
+  creatorWorkId: string
+  creatorW3Account: string
   creatorName: string
   creatorNameEn: string
   ownerWelinkId: string
+  ownerW3Account: string
   ownerName: string
   ownerNameEn: string
   ownerDeptName: string
@@ -462,6 +976,7 @@ type WeAgentDetails = {
   id: string
   bizRobotName: string
   bizRobotNameEn: string
+  bizRobotTag: string
   bizRobotId: string
   weCodeUrl: string
 }
@@ -471,7 +986,7 @@ type WeAgentDetails = {
 
 ```typescript
 type WeAgentDetailsArray = {
-  WeAgentDetailsArray: WeAgentDetails[]
+  weAgentDetailsArray: WeAgentDetails[]
 }
 ```
 

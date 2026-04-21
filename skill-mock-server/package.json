@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js"
+    "start:opencode": "node opencode-bridge.js",
+    "check": "node --check server.js",
+    "check:opencode": "node --check opencode-bridge.js"
   },
   "dependencies": {
     "cookie": "^1.0.2",

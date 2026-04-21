@@ -280,16 +280,20 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _appSecret = WLAgentSkillsStringValue(dictionary[@"appSecret"], @"");
         _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
         _createdBy = WLAgentSkillsStringValue(dictionary[@"createdBy"], @"");
+        _creatorWorkId = WLAgentSkillsStringValue(dictionary[@"creatorWorkId"], @"");
+        _creatorW3Account = WLAgentSkillsStringValue(dictionary[@"creatorW3Account"], @"");
         _creatorName = WLAgentSkillsStringValue(dictionary[@"creatorName"], @"");
         _creatorNameEn = WLAgentSkillsStringValue(dictionary[@"creatorNameEn"], @"");
         _ownerWelinkId = WLAgentSkillsStringValue(dictionary[@"ownerWelinkId"], @"");
+        _ownerW3Account = WLAgentSkillsStringValue(dictionary[@"ownerW3Account"], @"");
         _ownerName = WLAgentSkillsStringValue(dictionary[@"ownerName"], @"");
         _ownerNameEn = WLAgentSkillsStringValue(dictionary[@"ownerNameEn"], @"");
         _ownerDeptName = WLAgentSkillsStringValue(dictionary[@"ownerDeptName"], @"");
         _ownerDeptNameEn = WLAgentSkillsStringValue(dictionary[@"ownerDeptNameEn"], @"");
-        _id = WLAgentSkillsStringValue(dictionary[@"id"], WLAgentSkillsStringValue(dictionary[@"robotId"], @""));
+        _id = WLAgentSkillsStringValue(dictionary[@"id"], @"");
         _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
+        _bizRobotTag = WLAgentSkillsStringValue(dictionary[@"bizRobotTag"], @"");
         _bizRobotId = WLAgentSkillsStringValue(dictionary[@"bizRobotId"], @"");
         _weCodeUrl = WLAgentSkillsStringValue(dictionary[@"weCodeUrl"], @"");
     }
@@ -306,9 +310,12 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"appSecret" : self.appSecret ?: @"",
         @"partnerAccount" : self.partnerAccount ?: @"",
         @"createdBy" : self.createdBy ?: @"",
+        @"creatorWorkId" : self.creatorWorkId ?: @"",
+        @"creatorW3Account" : self.creatorW3Account ?: @"",
         @"creatorName" : self.creatorName ?: @"",
         @"creatorNameEn" : self.creatorNameEn ?: @"",
         @"ownerWelinkId" : self.ownerWelinkId ?: @"",
+        @"ownerW3Account" : self.ownerW3Account ?: @"",
         @"ownerName" : self.ownerName ?: @"",
         @"ownerNameEn" : self.ownerNameEn ?: @"",
         @"ownerDeptName" : self.ownerDeptName ?: @"",
@@ -316,6 +323,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"id" : self.id ?: @"",
         @"bizRobotName" : self.bizRobotName ?: @"",
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
+        @"bizRobotTag" : self.bizRobotTag ?: @"",
         @"bizRobotId" : self.bizRobotId ?: @"",
         @"weCodeUrl" : self.weCodeUrl ?: @""
     };
@@ -966,14 +974,14 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _WeAgentDetailsArray = @[];
+        _weAgentDetailsArray = @[];
     }
     return self;
 }
 
 - (NSDictionary *)toDictionary {
     return @{
-        @"WeAgentDetailsArray" : WLAgentSkillsSerializeModelArray(self.WeAgentDetailsArray)
+        @"weAgentDetailsArray" : WLAgentSkillsSerializeModelArray(self.weAgentDetailsArray)
     };
 }
 

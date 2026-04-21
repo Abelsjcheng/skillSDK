@@ -44,6 +44,17 @@ function shouldInstallOpenCodeBridge(): boolean {
   return getQueryParam('opencodeBridge') === '1';
 }
 
+function resolveBridgeLanguage(): string {
+  const candidate = (
+    getQueryParam('language')
+    || getQueryParam('lang')
+    || (typeof navigator !== 'undefined' ? navigator.language : '')
+    || 'zh'
+  ).trim().toLowerCase();
+
+  return candidate.startsWith('en') ? 'en' : 'zh';
+}
+
 function ensureDefaultRoute(assistantAccount: string): void {
   if (typeof window === 'undefined') {
     return;
@@ -78,6 +89,10 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
 
   if (typeof window.HWH5.getDeviceInfo !== 'function') {
     window.HWH5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
+  }
+
+  if (typeof window.HWH5.getAppInfo !== 'function') {
+    window.HWH5.getAppInfo = async () => ({ language: resolveBridgeLanguage() });
   }
 
   if (typeof window.HWH5.getUserInfo !== 'function') {

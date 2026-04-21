@@ -37,8 +37,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
   pointer-events: auto;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .toast--mobile .toast__text {
@@ -65,32 +68,6 @@
   font-weight: 400;
   line-height: 20px;
   white-space: nowrap;
-}
-
-.toast--pc .toast__close-area {
-  height: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.toast--pc .toast__close-button {
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.toast--pc .toast__close-icon {
-  width: 8px;
-  height: 8px;
-  display: block;
 }
 
 .toast-hide {

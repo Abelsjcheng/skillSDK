@@ -1,8 +1,11 @@
 .app-container--we-agent-cui {
   padding: 8px 12px;
-  gap: 12px;
   box-shadow: none;
-  background: #ffffff url('../imgs/assistant-bg.svg') center / cover no-repeat;
+  background: #ffffff url('../imgs/assistant-bg.png') center / cover no-repeat;
+
+  > * + * {
+    margin-top: 12px;
+  }
 
   .header-wrapper,
   .content-wrapper,
@@ -21,7 +24,9 @@
   }
 
   .messages-container--we-agent-cui {
-    gap: 24px;
+    > * + * {
+      margin-top: 24px;
+    }
   }
 
   .message-we-agent {
@@ -41,13 +46,17 @@
 
     &.we-agent-message--assistant {
       align-items: flex-start;
+      width: 100%;
     }
   }
 
   .we-agent-message__meta {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+
+    > * + * {
+      margin-left: 4px;
+    }
 
     &.is-user {
       justify-content: flex-end;
@@ -82,6 +91,8 @@
     }
 
     &.is-assistant {
+      margin-top: 8px;
+      width: 100%;
       padding: 0;
       background: transparent;
       border: none;
@@ -118,7 +129,10 @@
   .we-agent-message__pending {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+
+    > * + * {
+      margin-left: 8px;
+    }
   }
 
   .we-agent-message__pending-icon {
@@ -140,8 +154,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
     text-align: center;
+
+    > * + * {
+      margin-top: 12px;
+    }
   }
 
   .we-agent-cui-welcome__avatar-wrap {
@@ -180,6 +197,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .we-agent-cui-chat-panel {
@@ -187,31 +205,45 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  gap: 12px;
   width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
+
+  > * + * {
+    margin-top: 12px;
+  }
 }
 
 .we-agent-cui-bottom {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  will-change: transform;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  > * + * {
+    margin-top: 12px;
+  }
 }
 
 .app-container--we-agent-cui.pc-mode {
   height: 100vh;
   padding: 0;
-  gap: 0;
+  background-image: url('../imgs/assistant-pc-bg.png');
+
+  > * + * {
+    margin-top: 0;
+  }
 
   .we-agent-cui-main {
     padding: 16px 0 30px;
-    transition: padding-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: padding-left 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: padding-left;
   }
 
   .we-agent-cui-chat-panel {
     padding: 0 150px;
-    transition: padding 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: padding 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: padding;
   }
 }
 
@@ -231,7 +263,10 @@
   align-items: center;
   width: 100%;
   height: 32px;
-  gap: 8px;
+
+  > * + * {
+    margin-left: 8px;
+  }
 }
 
 .we-agent-cui-actions__button {
@@ -273,7 +308,10 @@
 
 .we-agent-history-sidebar {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 20;
   display: flex;
   justify-content: flex-end;
@@ -282,7 +320,10 @@
 
 .we-agent-history-sidebar--mobile {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100vw;
   height: 100vh;
   justify-content: flex-start;
@@ -301,16 +342,27 @@
 }
 
 .we-agent-history-sidebar__mask {
-  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
   border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
   background: rgba(0, 0, 0, 0.25);
   cursor: pointer;
   opacity: 0;
+  border-radius: 0;
 }
 
 .we-agent-history-sidebar--mobile .we-agent-history-sidebar__mask {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  display: block;
   background: rgba(0, 0, 0, 0.4);
   transition: opacity 0.24s ease;
   will-change: opacity;
@@ -325,19 +377,19 @@
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
 .we-agent-history-sidebar--mobile .we-agent-history-sidebar__panel {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .we-agent-history-sidebar--pc .we-agent-history-sidebar__panel {
   border-radius: 0;
   box-shadow: none;
-  background: #ffffff url('../imgs/assistant-bg.svg') center / cover no-repeat;
+  background: transparent;
   border-right: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -366,7 +418,10 @@
   scrollbar-width: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+
+  > * + * {
+    margin-top: 10px;
+  }
 }
 
 .we-agent-history-sidebar__close-button {
@@ -387,18 +442,18 @@
   height: 22px;
   transform: translate(-284px, -50%);
   opacity: 0;
-  background: #ffffff url('../imgs/assistant-bg.svg') center / cover no-repeat;
+  background: transparent;
   border: none;
   border-radius: 0 8px 8px 0;
   box-sizing: border-box;
   z-index: 1;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
+  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
   will-change: transform, opacity;
 }
 
 .we-agent-history-sidebar__close-icon {
-  width: 8px;
-  height: 8px;
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
@@ -433,7 +488,10 @@
 .we-agent-history-sidebar__group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+
+  > * + * {
+    margin-top: 10px;
+  }
 }
 
 .we-agent-history-sidebar__group-items {
@@ -487,6 +545,48 @@
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__header {
+  padding: 6px 12px;
+  box-sizing: border-box;
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__header-title {
+  padding-left: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: rgba(51, 51, 51, 1);
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__group-title {
+  height: 32px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  color: rgba(153, 153, 153, 1);
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__session-item {
+  height: 32px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  color: rgba(51, 51, 51, 1);
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__session-item.is-selected {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 1);
+  color: rgba(51, 51, 51, 1);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
 .we-agent-history-sidebar.is-open {

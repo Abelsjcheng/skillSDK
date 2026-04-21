@@ -4,24 +4,30 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const {
   RESOLVE_EXTENSIONS,
+  WEBPACK_ES5_TARGET,
+  createEs5Output,
   createModuleRules,
 } = require('./webpack.shared');
 
-module.exports = (env = {}) => {
+module.exports = (env = {}, argv = {}) => {
+  const mode = argv.mode === 'production' ? 'production' : 'development';
+  const isDevelopment = mode === 'development';
   const rawIsProEnv = env.isProEnv;
   const isProEnv = rawIsProEnv === undefined
     ? env.appEnv !== 'uat'
     : String(rawIsProEnv).toLowerCase() === 'true';
 
   return {
-    target: ['web', 'es5'],
+    mode,
+    target: WEBPACK_ES5_TARGET,
     entry: './src/index.tsx',
-    output: {
+    output: createEs5Output({
       path: path.resolve(__dirname, 'dist'),
-      filename: 'js/bundle.[contenthash].js',
+      filename: isDevelopment ? 'js/[name].js' : 'js/bundle.[contenthash].js',
+      chunkFilename: isDevelopment ? 'js/[name].chunk.js' : 'js/[name].[contenthash].js',
       assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
       clean: true,
-    },
+    }),
     resolve: {
       extensions: RESOLVE_EXTENSIONS,
     },
@@ -53,7 +59,7 @@ module.exports = (env = {}) => {
       }),
     ],
     optimization: {
-      minimize: true,
+      minimize: !isDevelopment,
       usedExports: true,
       splitChunks: {
         chunks: 'all',
@@ -86,7 +92,7 @@ module.exports = (env = {}) => {
         },
       ],
     },
-    devtool: false,
+    devtool: isDevelopment ? 'eval-cheap-module-source-map' : false,
     performance: {
       hints: false,
     },

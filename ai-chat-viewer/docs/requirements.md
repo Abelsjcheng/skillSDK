@@ -12,7 +12,7 @@
 ## 2. 交付范围
 
 1. 新增一个独立页面打包入口（暂记为 `create-assistant-page`），产物包含可直接访问的 `index.html` 与对应脚本资源。
-2. 页面内部复用 `PersonalAssistantCreator` 实现 UI 与交互，但不通过 `src/lib/index.ts` 对外导出该组件。
+2. 页面内部通过两个路由页面容器承载创建助理流程：第一页基础信息页与第二页能力选择页；不再保留 `PersonalAssistantCreator` 作为统一步骤壳组件。
 3. 页面内部包含 2 个页面：
    - 页面 1：基础信息录入（头像、名称、简介）。
    - 页面 2：助理大脑类型选择（内部助手/自定义助手）。
@@ -25,7 +25,7 @@
 7. 状态职责拆分：
    - 页面 1 的状态变量在 `StepBasicInfo` 内部管理；
    - 页面 2 的状态变量在 `StepBrainSelect` 内部管理；
-   - `PersonalAssistantCreator` 仅保留跨页面公共方法与步骤切换控制。
+   - 跨页面共享的第一页草稿通过路由 `state` 在 `/createAssistant` 与 `/selectBrainAssistant` 两个路由页面之间传递与回填，不落本地存储。
 8. 新增“激活助理页面”，用于展示激活引导轮播与“立即启用”操作按钮。
 9. 新增“助理详情页面”，用于展示助理基础信息、简介、创建者与组织信息。
 10. 新增“切换助理页面”，用于展示可滚动助理列表并支持切换入口。
@@ -44,11 +44,11 @@
 ## 3. 页面流程
 
 1. 进入页面 1（基础信息页）。
-2. 当“名称 + 简介”均已填写时，“下一步”可点击；点击后进入页面 2。
+2. 当“名称 + 简介”均已填写时，“下一步”可点击；点击后通过路由跳转进入页面 2（`#/selectBrainAssistant`）。
 3. 页面 2 选择“大脑类型”并完成子项选择（如需）后，“确定”可点击。
 4. 任一页面点击右上角 `X` 或“取消”时，直接调用 `window.Pedestal.remote.getCurrentWindow().close()` 关闭当前窗口。
-5. 页面 2 点击“上一步”时返回页面 1。
-6. 页面 2 点击“上一步”返回页面 1 后，第一页中的头像选择、名称、简介需按返回前状态完整保留（包含自定义头像预览）。
+5. 页面 2 点击“上一步”时返回页面 1（`#/createAssistant`）。
+6. 页面 2 点击“上一步”返回页面 1 后，第一页中的头像选择、名称、简介需按返回前状态完整保留（包含自定义头像预览）；用户在页面 2 点击浏览器返回时，也需返回到页面 1。
 7. 页面 2 点击“确定”时调用 `window.createDigitalTwin()`，并按规则组装分身创建入参。
 
 ### 3.1 全局布局约束
@@ -62,7 +62,7 @@
 
 ### 3.2 页面入口渲染约束
 
-1. 页面入口需直接渲染 `PersonalAssistantCreator`，不额外包裹父容器。
+1. 主工程路由入口与 `create-assistant-page` 独立打包入口都需通过 Hash Router 承载创建助理相关页面，由两个路由页容器直接渲染创建助理 UI，不再保留 `PersonalAssistantCreator` 统一步骤壳组件。
 2. 页面根节点层级（`html`、`body`、`#root`）需设置宽高为 `100%`。
 3. 组件渲染后需占满整个页面可视区域。
 4. 页面入口不使用 `React.StrictMode` 包裹，避免开发环境下页面 2 的初始化 `useEffect` 重复触发。
@@ -114,7 +114,7 @@
    - 圆角 `12px`
    - 背景 `rgba(239,246,255,1)`
    - 选中后边框色：`rgba(13,148,255,1)`
-   - 右下角显示圆形 `√` 标记：`12px x 12px`，圆角 `16px`，颜色 `rgba(13,148,255,1)`
+   - 右下角显示 `src/imgs/selection_icon.png` 勾选图片：`12px x 12px`，圆角 `16px`
 3. 第 5 个为自定义上传入口（`+`）：
    - 尺寸 `40px x 40px`
    - 圆角 `12px`
@@ -138,9 +138,6 @@
      - 左侧为警告图标（从 `src/imgs` 导入），尺寸 `14px x 14px`；
      - 图标与文案间距：`8px`；
      - 右侧错误文案样式：`14px / 400`，颜色 `rgba(25,25,25,1)`。
-     - 弹窗右侧新增固定宽度 `40px` 的关闭操作区；
-     - 关闭操作区内为关闭按钮，按钮图标从 `src/imgs` 导入，尺寸 `8px x 8px`；
-     - 点击关闭按钮后需立即关闭当前 toast。
    - 移动端统一调用宿主已有 `HWH5.showToast()` 能力展示，不再渲染页面内自定义 toast；
    - `HWH5.showToast()` 入参仅传 `{ msg, type: 'w' }`，其中 `msg` 为提示文本。
 
@@ -151,7 +148,8 @@
    - 样式：`14px / 500 / 22px`，颜色默认黑色系（未单独指定）
 2. 下方间距 `8px` 为输入框：
    - 整体可见高度 `36px`（包含边框与上下内边距），宽 `100%`
-   - 内边距：`padding: 6px 12px`
+   - 圆角半径：`8px`
+   - 内边距：左右 `8px`、上下 `7px`
    - 盒模型：`box-sizing: border-box`
    - 边框：`1px solid rgba(0,0,0,0.08)`
    - placeholder：`例如：智能助手`
@@ -167,6 +165,8 @@
 2. 下方间距 `8px` 为简介输入框：
    - 简介块整体高度 `112px`（标题 `22px` + 间距 `8px` + 简介输入框 `82px`）
    - 整体可见高度 `82px`（包含边框与上下内边距），宽 `100%`
+   - 圆角半径：`8px`
+   - 内边距：`8px`
    - 盒模型：`box-sizing: border-box`
    - 边框：`1px solid rgba(0,0,0,0.08)`
    - placeholder：`介绍助理的功能和应用场景`
@@ -271,6 +271,7 @@
 2. 下方间距 `8px` 展示 3 行 2 列选项按钮组：
    - 数据来源：调用 `window.getAgentType()` 获取内部助手列表
    - 默认值规则：页面初始化时 `internalAssistants` 先使用内置常量 `INTERNAL_ASSISTANTS = [{ name: '助手', icon: '', bizRobotId: '1234' }]`
+   - 默认选中规则：当内部助手列表存在有效数据时，进入第二步后默认选中列表第一项；若用户从“自定义助手”切回“内部助手”且当前无选中项，也需自动回落为第一项
    - 数据写入规则：`window.getAgentType()` 返回值直接通过 `setInternalAssistants` 设置，不做额外归一化/结构兼容转换
    - 文案规则：不显示“内部助手加载中...”与“暂无可用内部助手”提示文案
    - 按钮文本：使用出参 `name`
@@ -302,6 +303,11 @@
 1. 作为内容区第三个容器显示一张插画。
 2. 尺寸：高度 `114px`，宽度自适应占满一行（`100%`）。
 3. 圆角半径：`12px`。
+4. 插画资源由 `StepBrainSelect` 组件内部直接从 `src/imgs` 导入使用，不再通过父组件 props 透传，也不再使用内联 SVG / data URI。
+5. 插画按当前国际化语言切换：
+   - 中文使用 `src/imgs/banner.png`
+   - 英文使用 `src/imgs/banner-en.png`
+6. 个人助理插画需要支持点击打开指导文档；插画本身直接使用单个 `img` 标签承载点击事件，不再额外包裹 `a` 或 `div` 容器。
 
 ### 5.4 操作按钮区
 
@@ -322,7 +328,7 @@
 2. 完成选择后，“确定”可点击，背景 `rgba(13,148,255,1)`。
 3. 选择规则：
    - 选择“自定义助手”后即可点击“确定”；
-   - 若选择“内部助手”，需再选择一个内部助手项后方可点击“确定”。
+   - 若选择“内部助手”，当列表存在数据时默认选中第一项并可直接点击“确定”；仅当内部助手列表为空时才保持不可点击。
 4. 点击“上一步”后返回页面 1，并保留页面 1 的头像选择、名称和简介。
 
 ## 6. 页面输入/输出（内部闭环）
@@ -337,8 +343,8 @@
    - `brainType`：`internal` 或 `custom`。
    - `agentTypeList`：由 `window.getAgentType()` 返回的内部助手列表（`name/icon/bizRobotId`）。
    - `selectedBizRobotId`：当 `brainType=internal` 时必填。
-3. `PersonalAssistantCreator` 内部状态：
-   - `step`：页面步骤切换状态（1/2）。
+3. 跨页面共享状态：
+   - 第一步草稿通过路由 `state` 在两个路由页之间传递与回填。
 
 ### 6.2 输出行为（页面内部）
 
@@ -349,6 +355,7 @@
    - 按钮文本显示 `name`；
    - 按钮图标显示 `icon`；
    - 选中项记录 `bizRobotId` 供确认提交。
+   - 列表有数据时默认选中第一项，并将其 `bizRobotId` 作为当前选中项。
    - 列表为空或接口失败时不展示“内部助手加载中...”与“暂无可用内部助手”文案。
 4. 点击“确定”时直接调用 `window.createDigitalTwin(params)`，入参规则如下：
    - `name`（string）：分身名称，取页面 1 “名称”输入框值。
@@ -363,7 +370,7 @@
 2. 插画背景资源：1 张（页面 2，需提供具体图源）。
 3. 内部助手选项资源：通过 `window.getAgentType()` 动态获取（每项包含 `name/icon/bizRobotId`）。
 4. 激活助理轮播图资源：`src/imgs/activate-guide-1.svg`、`src/imgs/activate-guide-2.svg`。
-5. 激活助理页面背景图资源：`src/imgs/assistant-bg.svg`（底色 `rgba(102,235,255,1)`）。
+5. 助理通用背景图资源：移动端 `src/imgs/assistant-bg.png`，PC 端 `src/imgs/assistant-pc-bg.png`。
 6. 助理详情/切换助理页面图标资源：`src/imgs/icon-back.svg`、`src/imgs/icon-service.svg`。
 7. 助理详情/切换助理页面 PC 标题区关闭图标资源：`src/imgs/icon-close.svg`。
 8. 助理详情/切换助理页面头像资源：`src/imgs/assistant-avatar.svg`、`src/imgs/switch-assistant-avatar.svg`。
@@ -371,7 +378,7 @@
 ## 8. 验收标准（功能）
 
 1. 个人助理功能可作为独立页面产物打包导出，并可直接访问页面入口运行。
-2. `src/lib/index.ts` 不再导出 `PersonalAssistantCreator`，避免以独立组件方式对外提供。
+2. `src/lib/index.ts` 不导出创建助理流程组件；创建助理仅以页面路由与独立打包页形式提供。
 3. 页面 1 与页面 2 的区域结构、布局关系、文案、尺寸和颜色符合需求。
 4. 页面 1 的“下一步”严格受“名称/简介必填”控制。
 5. 页面 2 的“确定”严格受选择状态控制。
@@ -379,7 +386,7 @@
 7. `X` 与取消点击会触发 `window.Pedestal.remote.getCurrentWindow().close()` 且不报错；页面 2 初始化会触发 `window.getAgentType()`；确定点击会触发 `window.createDigitalTwin()` 且入参符合本文件定义。
 8. 下一步行为正常可用，且符合本文件定义（无需对外事件）。
 9. 页面内部主容器以 `100%` 宽高自适应填充整个页面。
-10. 页面入口直接渲染组件，不存在额外父容器包裹层。
+10. 两个创建助理路由页都通过统一页面容器承载 `digital-twin-` 样式，不依赖旧的步骤壳组件间接挂载。
 11. 两个页面的底部操作区均完整显示在容器内，不出现底部溢出。
 12. 清理冗余样式属性后，页面视觉表现与交互行为保持不变。
 13. 在不改变视觉与交互验收结果的前提下，可提取页面 1 与页面 2 的重复代码为公共实现（如标题区、footer 操作区、主按钮状态 class 组装），以降低维护成本。
@@ -432,11 +439,12 @@
 
 ## 11. 路由页面划分（React Router）
 
-1. 主工程入口（`src/index.tsx`）需通过 `react-router` 管理页面路由。
-2. 路由模式使用 Hash 路由（`HashRouter`）。
-3. 当前保留六个页面路由：
+1. 主工程入口（`src/index.tsx`）需通过 `react-router-dom` 管理页面路由。
+2. 路由模式使用 `react-router-dom` 提供的 `HashRouter`。
+3. 当前保留七个页面路由：
    - `WeAgentCUI 对话页面`：哈希路径 `#/weAgentCUI`
-   - `创建个人助理页面`：哈希路径 `#/createAssistant`
+   - `创建个人助理第一页`：哈希路径 `#/createAssistant`
+   - `创建个人助理第二页`：哈希路径 `#/selectBrainAssistant`
    - `激活助理页面`：哈希路径 `#/activateAssistant`
    - `助理详情页面`：哈希路径 `#/assistantDetail`
    - `切换助理页面`：哈希路径 `#/switchAssistant`
@@ -456,14 +464,19 @@
 1. 内容区：
    - 内容区容器宽度为自适应 `100%`；
    - 内容区容器高度为内容自适应；
-   - 页面整体背景使用纯色：`rgba(244,247,253,1)`；
+   - 页面整体背景改为助理背景图：
+      - 移动端使用 `src/imgs/assistant-bg.png`；
+      - PC 端使用 `src/imgs/assistant-pc-bg.png`；
+   - 背景图按当前页面尺寸拉伸显示（`background-size: 100% 100%`），不再使用 `cover`；
    - 图片展示容器与“选择助理”按钮作为整体在页面中水平垂直居中；
    - 移动端（`isPcMiniApp === false`）图片容器尺寸为 `322px x 350px`；
    - PC 端（`isPcMiniApp === true`）图片容器尺寸为 `500px x 347px`；
    - 图片自适应容器大小展示；
-   - 激活引导图按端区分：
-      - `isPcMiniApp === true`（PC）使用 `src/imgs/activate-guide-pc.png`；
-      - `isPcMiniApp === false`（移动）使用 `src/imgs/activate-guide.png`；
+   - 激活引导图按端与语言共同区分：
+      - `isPcMiniApp === true`（PC）且当前语言为中文时，使用 `src/imgs/activate-guide-pc.png`；
+      - `isPcMiniApp === true`（PC）且当前语言为英文时，使用 `src/imgs/activate-guide-pc-en.png`；
+      - `isPcMiniApp === false`（移动）且当前语言为中文时，使用 `src/imgs/activate-guide.png`；
+      - `isPcMiniApp === false`（移动）且当前语言为英文时，使用 `src/imgs/activate-guide-en.png`；
    - 不展示轮播按钮区域。
 2. 操作区：
    - 移动端按钮距离图片 `63px`；
@@ -488,7 +501,8 @@
          - 中间标题：`助理详情`，水平垂直居中，字体 `16px/400/22px`；
          - 右侧控件尺寸 `90px x 44px`，无内容。
 2. 页面背景：
-   - 标题区以外的页面区域背景统一使用线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
+   - 标题区以外的页面区域背景统一使用助理背景图；
+   - 背景图按页面区域自定义尺寸拉伸显示（`background-size: 100% 100%`），不使用 `cover`。
 3. 内容区：
    - `padding-top: 12px; padding-left: 16px; padding-right: 16px;`
    - 包含 3 个容器：
@@ -501,24 +515,32 @@
       - 容器 2：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding: 12px 12px 0 12px`。
       - 容器 2 内助理简介标题：左对齐，文本 `助理简介`，字体 `14px/500/22px`，颜色 `rgba(51,51,51,1)`。
        - 容器 2 内助理简介内容：距离标题 `8px`，宽度占满，高度自适应，文本 `你的全能AI生活助理`，字体 `14px/400/22px`，颜色 `rgba(102,102,102,1)`。
-       - 容器 2 内创建者块：距离简介块 `12px`，高度 `48px`，宽度占满，左文案 `创建者`（`14px/500/22px`，`rgba(51,51,51,1)`），右文案展示 `creatorName + ' ' + createdBy`（`14px/400/22px`，`rgba(102,102,102,1)`）。
+       - 容器 2 内创建者块：距离简介块 `12px`，高度 `48px`，宽度占满，左文案 `创建者`（`14px/500/22px`，`rgba(51,51,51,1)`），右文案按当前语言展示：
+         - 中文：`creatorName + ' ' + createdBy`
+         - 英文：`creatorNameEn + ' ' + createdBy`
+         - 样式统一为 `14px/400/22px`，`rgba(102,102,102,1)`。
        - 助理简介块与创建者块之间增加描边：`1px solid rgba(0,0,0,0.05)`。
        - 容器 3：距离上个容器 `12px`，宽度占满，高度自适应，圆角 `8px`，背景白色，`padding-left: 12px; padding-right: 12px;`。
-      - 容器 3 内两个 item 样式与创建者块一致，按 `bizRobotId` 分支展示：
+      - 容器 3 内 item 样式与创建者块一致，按 `bizRobotId` 分支展示：
          - `bizRobotId` 有值（内部助理）：
-            - item 1：左侧 `部门`，右侧展示 `ownerDeptName`；
-            - item 2：左侧 `责任人`，右侧展示 `ownerName + ' ' + ownerWelinkId`。
+            - 仅展示 1 个 item：左侧 `能力提供方`，右侧展示 `displayTag`；
+            - 不再展示 `部门` 与 `责任人`。
          - `bizRobotId` 为空（外部助理）：
             - item 1：左侧 `APPID`，右侧展示 `appKey`；
             - item 2：左侧 `密钥`，右侧展示 `appSecret` 的掩码文本（`*`）；
             - 右侧密钥支持按压查看：按下显示明文，松手恢复 `*` 掩码。
-      - 容器 3 中 `部门`、`责任人`、`APPID`、`密钥` 对应右侧值显示块统一为固定宽度 `200px`。
-      - 值显示块内容超出时不允许溢出容器边界，需在值显示块内横向滚动查看（`overflow-x: auto`）。
-      - “部门”与“责任人”两个 item 之间增加描边：`1px solid rgba(0,0,0,0.05)`。
+      - 容器 3 中 `能力提供方`、`APPID`、`密钥` 对应右侧值显示块保持不溢出容器边界。
+      - 内部助理场景下，容器 3 不再渲染第二行组织信息，也不再展示“部门/责任人”之间的描边分割。
 4. 数据渲染约束：
    - 页面展示数据全部来自 `getWeAgentDetails` 接口返回；
-   - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、部门、责任人、头像）。
+   - 不再使用本地默认值/兜底文案/兜底图片（包含名称、标签、简介、创建者、能力提供方、头像）。
    - 助理类型判断规则：`bizRobotId` 有值视为内部助理，`bizRobotId` 为空视为外部助理。
+5. 客服按钮跳转规则：
+   - PC 端保持现有打开方式不变；
+   - 移动端点击客服时：
+      - 若当前 `weCodeUrl` 解析出的 host 等于 `APP_ID`，则直接调用 `openWebview({ uri: CUSTOMER_SERVICE_WEBVIEW_URI })`；
+      - 若当前 `weCodeUrl` 解析出的 host 不等于 `APP_ID`，则继续使用现有 `buildCustomerServiceWebviewUri(weCodeUrl)` 逻辑；
+      - 若 `weCodeUrl` 为空，则保持当前不可跳转提示。
 
 ## 15. 切换助理页面
 
@@ -527,7 +549,8 @@
    - PC 样式下使用左侧 `X` 关闭按钮（`32px` 容器、`20px` 图标）和右侧客服按钮（`32px` 容器、`20px` 图标）；
    - 中间标题建议为 `切换助理`，水平垂直居中，字体 `16px/400/22px`。
 2. 页面背景：
-   - 标题区以外的页面区域背景统一使用线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
+   - 标题区以外的页面区域背景统一使用助理背景图；
+   - 背景图按页面区域自定义尺寸拉伸显示（`background-size: 100% 100%`），不使用 `cover`。
 3. 内容区：
    - `padding: 12px 16px`（上下 `12px`、左右 `16px`）；
    - 内部为助理列表容器，超出区域可纵向滚动；
@@ -555,6 +578,9 @@
       - “取消选择”按钮：`156px x 44px`，圆角半径 `50px`，背景 `rgba(255,255,255,1)`；
       - “确认切换”按钮：`156px x 44px`，圆角半径 `50px`，背景 `rgba(13,148,255,1)`。
    - 两个按钮点击事件当前均为空实现（占位）。
+6. 客服按钮跳转规则：
+   - PC 端保持现有打开方式不变；
+   - 移动端点击客服时，直接调用 `openWebview({ uri: CUSTOMER_SERVICE_WEBVIEW_URI })`，不再拼接 `sourceURL`。
 
 ## 16. 启动助理页面
 
@@ -563,7 +589,8 @@
    - `isPcMiniApp === false`（移动）：保持当前页面样式与交互不变。
    - `isPcMiniApp === true`（PC）：使用本章节新增 PC 样式。
 3. 页面背景：
-   - 标题区以外的页面区域背景统一使用线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
+   - 页面背景统一使用助理背景图；
+   - 背景图按当前页面尺寸拉伸显示（`background-size: 100% 100%`），不使用 `cover`。
 4. PC 端整体布局：
    - `标题区 + 内容区 + 底部操作区` 整体宽度固定 `500px`；
    - 整体在页面内水平、垂直居中。
@@ -591,7 +618,8 @@
    - 页面根容器内边距：左右 `12px`、上下 `8px`（`padding: 8px 12px`）。
    - 页面分为 3 个区域：对话内容区、多功能按钮区、底部输入区。
    - 3 个区域垂直间距统一为 `12px`。
-   - 页面根容器背景统一使用线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+   - 页面根容器背景统一使用助理背景图；
+   - 背景图按当前页面尺寸拉伸显示（`background-size: 100% 100%`），不使用 `cover`。
 3. 对话内容区：
    - 宽度、高度自适应占满可用空间。
    - `padding-top: 7px; padding-bottom: 7px`。
@@ -601,7 +629,7 @@
    - 第一行为“对话人名+发送时间 + 头像”，二者间距 `4px`，整行靠右。
    - 文本样式：`12px / 400 / 20px`，颜色 `rgba(57,57,57,1)`，示例：`测试 2026-04-13 08:07`。
    - 头像尺寸：`24px x 24px`，圆角 `12px`。
-   - 用户名数据来源：`window.HWH5.getUserInfo()` 返回 `userNameZH`。
+   - 用户名数据来源：`window.HWH5.getUserInfo()` 返回的用户信息；当前语言为中文时取 `userNameZH`，当前语言为英文时取 `userNameEN`。
    - 发送后用户消息时间来源：`sendMessage` 返回结果中的 `createdAt`。
    - 用户头像来源：静态在线地址 `https://` 拼接 `getUserInfo` 返回的 `corpUserId`。
    - 消息内容块距第一行 `4px`，圆角 `24px 0 24px 24px`，`padding: 10px 20px`，背景 `linear-gradient(270deg, rgba(13,148,255,1), rgba(22,115,246,1) 100%)`，文字白色 `14px / 400 / 22px`。
@@ -613,7 +641,7 @@
    - AI 头像来源：助理详情 `icon` 字段，渲染前按 `host` 规则补全地址。
    - AI 助理名来源：助理详情 `name` 字段。
    - AI 消息时间来源：消息生成时间（当前消息对象的时间戳）。
-   - 消息内容块距第一行 `4px`，宽度按内容自适应；圆角 `8px`，边框 `1px solid #1890ff`；宽度不再强制占满当前消息容器。
+   - 消息内容块距第一行 `8px`，宽度占满当前消息容器整行；该规则适用于所有 AI 消息类型块，不再仅代码块独占整行。
    - 权限消息块（`PermissionCard`）宽度占满当前消息容器可用宽度，不再按内容宽度收缩。
    - AI 消息块内部涉及展开/收起的交互组件（如代码块、思考块、工具调用块）统一使用 `src/imgs/arrow_up_icon.svg` 作为箭头图标资源；展开状态箭头朝上，收缩状态箭头朝下。
    - AI 消息块内如果渲染代码组件块，则该代码组件块需作为块级内容单独占满一整行可用宽度；普通文本消息块仍保持按内容宽度自适应。
@@ -624,6 +652,7 @@
    - 两个按钮相邻排列，按钮间距 `8px`，按钮背景白色。
    - 按钮 1：新建会话，尺寸 `32px x 32px`，圆角 `20px`，图标 `16px x 16px`；当当前会话消息列表为空（`messages.length === 0`）时，点击后不新建会话，直接 toast 提示“当前是最新会话”。
    - 中间状态提示块：文案“输出中...”，高度 `32px`，圆角 `20px`，背景白色；文本样式 `12px / 400`，颜色 `rgba(38,159,255,1)`；位置固定在整行多功能按钮区的水平中点。
+   - “输出中...”仅在当前激活的 `welinkSessionId` 会话处于生成中时显示；若在 A 会话输出中切换到 B 会话，B 会话不显示该提示，且旧会话的晚到状态事件不得回写当前会话页面。
    - 按钮 2：历史会话，尺寸 `32px x 32px`，圆角 `20px`，图标 `16px x 16px`，点击事件空实现。
    - 图标资源在 `src/imgs` 文件夹中创建并通过 `import` 使用。
 7. 底部输入区：
@@ -631,11 +660,14 @@
    - 内部左侧输入框与右侧发送按钮间距 `8px`。
    - 输入框 placeholder：`有问题尽管问我~`。
    - 发送按钮尺寸 `24px x 24px`，发送图标尺寸 `20px x 20px`。
+   - iOS 端唤起软键盘后，不允许通过 `transform` 将底部输入区视觉上移；需改为根据键盘高度真实缩减 `WeAgentCUI` 主内容区高度，并保持页面外层不可滚动，仅消息区内部可滚动。
+   - `WeAgentCUI` 内容区滚动容器需隐藏滚动条：补充 `scrollbar-width: none`、`-ms-overflow-style: none`，并对 `::-webkit-scrollbar` 使用 `display: none; width: 0; height: 0;`，保持消息区可滚动但默认不显示滚动条。
 8. 当对话内容区消息为空时，显示欢迎块：
    - 欢迎块距离内容区顶部 `27px`；
    - 欢迎块内包含 3 个容器，容器间距 `12px`，内容均水平居中；
    - 容器 1：AI 头像图标，尺寸 `72px x 72px`，圆角 `124px`，边框 `2px solid rgba(255,255,255,1)`；
    - 容器 2：欢迎标题文本使用运行时用户信息动态展示（如存在 `weAgentUserName` 则展示 `早上好，${weAgentUserName}`），样式 `18px / 500 / 26px`，颜色 `rgba(25,25,25,1)`；
+   - 欢迎语国际化资源需使用 `i18next` 标准插值占位格式 `{{name}}`，不可使用字面量 `{name}`，避免页面直接显示占位符文本；
    - 容器 3：副标题文本使用运行时助理信息动态展示（`weAgentAssistantName` 与 `weAgentAssistantDescription` 组合），样式 `14px / 400 / 22px`，颜色 `rgba(89,89,89,1)`；
    - 当欢迎标题或副标题缺少对应动态数据时，不显示默认兜底文案，也不渲染对应空文本节点。
    - 页面进入时优先显示欢迎块，不展示“加载历史消息中”loading 文案；历史消息加载完成后若存在消息则切换为消息列表展示。
@@ -649,6 +681,7 @@
    - 移动端：侧边栏右侧显示蒙层，点击蒙层关闭侧边栏；
    - PC 端：点击“历史会话”图标后，历史会话列表在页面左侧弹出，并与右侧对话页面分栏显示，不再使用覆盖式右侧抽屉；
    - PC 端：历史会话列表宽度保持 `260px`，高度占满当前页面可用高度；
+   - PC 端：历史会话侧边栏弹窗容器需脱离按钮区定位，不得受多功能按钮区 `32px` 高度或局部相对定位容器裁剪；侧边栏定位应覆盖整个 `weAgentCUI` 页面左侧区域；
    - PC 端：`weAgentCUI` 页面外层去除 `padding`，页面按左右分栏布局；
    - PC 端：右侧 AI 对话容器包含内容区、按钮区、输入区，容器保留 `padding-top: 16px`、`padding-bottom: 30px`；
    - PC 端：默认状态下，右侧 AI 对话容器左右内边距固定为 `150px`，内容宽度占满右侧可用区域，不再限制 `max-width`；
@@ -657,7 +690,7 @@
    - PC 端：历史会话侧边栏在布局计算中仍只占 `260px` 宽度，关闭按钮不额外挤占右侧对话容器宽度；
    - 历史会话侧边栏弹出时需带过渡动画；
    - 历史会话侧边栏整体弹窗容器内边距统一为 `padding: 20px 18px`；
-   - 历史会话侧边栏顶部新增标题区：高度 `32px`，宽度占满；标题区位于上述弹窗容器内部；标题文本距离左侧 `12px`，内容为“历史对话”，样式 `12px / 500`、`rgba(51,51,51,1)`；
+   - 历史会话侧边栏顶部新增标题区：高度 `32px`，宽度占满；标题区位于上述弹窗容器内部；标题容器 `padding: 6px 12px`；标题文本内容为“历史对话”，样式 `12px / 500`、`rgba(51,51,51,1)`；
    - 侧边栏保持可滚动，但需隐藏可视滚动条。
 11. 历史会话数据获取：
    - 打开侧边栏时调用 `getHistorySessionsList`；
@@ -669,14 +702,14 @@
    - 渲染历史消息时，保持“优先按 `parts` 渲染、`parts` 为空时再回退到 `message.content`”的现有逻辑；仅当进入 `message.content` 回退分支且 `content === ''` 时，该条消息不渲染；
    - 获取历史消息（`getSessionMessageHistory`）接口失败时，页面需通过 toast 弹窗提示失败信息。
 12. 历史会话分组与展示：
-   - 按 `updatedAt` 将历史会话分为 3 组：`今天`、`昨天`、`7天前`；
+   - 按 `updatedAt` 将历史会话分为 3 组：`今天`、`昨天`、`3天前`；
    - 每个分组由“标题区 + 会话项列表”组成，分组内标题与列表间距 `10px`；
-   - 标题区：高度 `40px`，宽度自适应，`padding: 8px 14px`，左对齐，文本为对应分组标题，样式 `16px / 400 / 21px`，颜色 `rgba(153,153,153,1)`；
-   - 会话项：高度 `40px`，宽度自适应，`padding: 8px 14px`，左对齐，文本内容为会话标题 `title`，每个 item 标题超出显示 `...`，样式 `16px / 400 / 21px`，颜色 `rgba(51,51,51,1)`。
+   - PC 端分组标题容器：高度 `32px`，宽度自适应，`padding: 6px 12px`，左对齐，文本为对应分组标题，样式 `12px / 400`，颜色 `rgba(153,153,153,1)`；
+   - PC 端会话项：高度 `32px`，宽度自适应，`padding: 6px 12px`，左对齐，文本内容为会话标题 `title`，每个 item 标题超出显示 `...`，样式 `12px / 400`，颜色 `rgba(51,51,51,1)`。
    - 侧边栏请求历史会话时不再展示“加载中...”文字提示。
    - 无历史会话时，空态图片宽度固定 `100px`，高度自适应。
 13. 会话项选中态：
-   - 点击会话项后显示选中样式：圆角 `12px`，背景 `rgba(216,226,255,1)`；
+   - 点击会话项后显示选中样式：PC 端为圆角 `8px`、背景白色；
    - 选中文本样式：`16px / 500 / 24px`，颜色 `rgba(59,112,255,1)`；
    - 点击会话项后的会话切换事件当前为空实现（预留后续逻辑）。
 14. 组件化约束：
@@ -712,8 +745,12 @@
    - 每个问题选项块按行显示，一行仅展示一个选项块，不再并排换行布局；
    - 鼠标移入问题选项按钮时，选项主文案与说明文案的字体颜色保持默认展示颜色不变，不因 hover 态切换为白色或其他高亮文字色；
    - 用户提交问题回答成功后，原 AI `QuestionCard` 中仍需保留“已回答”状态和回答结果展示；
+   - 参考 `skill-miniapp` 的处理方式，`QuestionCard` 组件本身只负责展示和本地“已回答”状态维护，不在组件内部直接调用宿主 `sendMessage`；
+   - `QuestionCard` 提交回答时仅向页面上层上抛 `answer` 与 `toolCallId`，由页面上层统一复用现有发送链路调用 `sendMessage`；
    - 同时，用户本次回答内容还需插入为一条独立的用户消息气泡，进入正常消息流展示；
    - 用户回答后的 AI 后续回复继续按现有流式链路渲染为后续独立 AI 消息块，不并入原 `QuestionCard`；
+   - 问题回答消息在排序上需直接落到当前消息列表尾部，不得复用普通输入框发送场景中“插入到当前流式 AI 消息前”的特殊逻辑；
+   - 若后续收到 `question completed/error` 事件时，原 question 所在助手消息已经结束流式态，则只更新原 `QuestionCard` 的回答状态与结果，不重新创建新的 question 助手消息块；
    - 当同一条 `question` 同时存在顶层 `options` 与 `input.questions[0].options` / `input.options` 时，需优先使用带对象结构的 `input` 内选项数据，避免被仅含字符串的顶层 `options` 覆盖，导致 `description` 丢失；
    - 为兼容历史数据或简化结构，若后端仅返回字符串数组，也需按 `label` 兜底渲染。
 21. `WeAgentCUI` 中收到 AI 流式错误事件时：
@@ -722,6 +759,17 @@
    - 若当前存在进行中的 AI 回复消息，则错误块追加在该条 AI 消息内部；
    - 若当前不存在可复用的 AI 回复消息，则新建一条助手消息承载错误块；
    - 错误块文案优先展示事件中的 `error` 字段，无明确内容时使用场景兜底文案。
+22. `WeAgentCUI` 中 AI 流式回复的消息 ID 处理规则：
+   - “正在生成中，请稍等...”占位块不再作为 `Message` 插入 `messages`，而是改为独立的临时预览渲染态；
+   - `messages` 列表中仅保留真实消息，assistant 消息 `id` 只使用服务端真实 `messageId`；
+   - `streamingMsgIdRef` 仅保存当前真实 assistant 消息的 `messageId`，在尚未收到真正承载内容的 AI 事件前必须保持为空；
+   - 当收到真正承载内容的 AI 流式事件（如 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file`、`streaming`）时，直接使用事件中的真实 `messageId` 创建或更新 assistant 消息；
+   - 独立占位块仅允许由 `message.user` 事件拉起，不得在 `handleGenerate`、`step.start`、`session.status=busy` 等时机提前显示，也不得创建随机 `id` 的 fake assistant message；
+   - `snapshot`、历史消息恢复、`streaming` 补流到来时，需清理本地占位块，并继续只按真实 `messageId` 恢复 assistant 消息，避免重复渲染。
+23. 页面背景资源规则补充：
+   - 原 `assistant-bg.svg` 统一下线，移动端背景资源改为 `assistant-bg.png`；
+   - 新增 PC 端背景资源 `assistant-pc-bg.png`；
+   - 样式层以移动端背景为默认值，PC 端通过页面级 PC class 覆盖 `background-image`，不在业务组件内通过 JS 内联样式分流背景图。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）
 
@@ -744,8 +792,8 @@
          - 非空：调用 `window.HWH5.openWebview({ uri: 'h5://123456/html/index.html?from=weAgent#selectAssistant' })`。
 3. 启动助理页面（`/selectAssistant`）：
    - 页面初始化调用 `getWeAgentList`，并将返回的 `content` 助理信息填充到列表项；
-   - 点击“创建助理”：通过 `react-router` 导航到 `/createAssistant?from=weAgent`；
-   - 路由渲染约束：`AppRouter` 需使用 `useLocation` 获取当前路由，并通过 `<Routes location={location} key={pathname+search+hash}>` 驱动页面渲染，保证 HashRouter 下 hash/query 变化后组件正确重渲染；
+   - 点击“创建助理”：通过 `react-router-dom` 导航到 `/createAssistant?from=weAgent`；
+   - 路由渲染约束：统一使用 `react-router-dom` 的路由能力，不再维护自定义 `HashRouter` 实现；
    - 点击“创建助理”仅通过 `react-router` 导航处理，不再依赖手动改 `window.location.hash` 与 `window.location.reload()` 强刷页面；
    - 选中某个助理后点击“立即启用”：
       - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
@@ -757,7 +805,10 @@
       - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 4. 创建助理页面（`/createAssistant`）：
    - 页面初始化读取 query 参数 `from`；
-   - 进入第二步后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
+   - 第一页点击“下一步”时，将基础信息草稿写入路由 `state`，并通过路由跳转到 `/selectBrainAssistant`，同时保留当前 query 参数；
+   - 第二页（`/selectBrainAssistant`）初始化时先从路由 `state` 读取第一页草稿；若草稿缺失，则重定向回 `/createAssistant`；
+   - 第二页进入后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
+   - 第二页点击浏览器返回时，应回到 `/createAssistant`；
    - 点击“确定”调用 `createDigitalTwin`；
    - 若 `from=weAgent`：
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
@@ -775,7 +826,7 @@
          - PC 端（`isPcMiniApp === true`）：调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`。
 5. 助理详情页面（`/assistantDetail`）：
    - 读取 query 参数 `partnerAccount`；
-   - 调用 `getWeAgentDetails({ partnerAccount })` 获取详情并渲染 `WeAgentDetailsArray[0]`（封装层按端能力适配实际入参）。
+   - 调用 `getWeAgentDetails({ partnerAccount })` 获取详情并渲染 `weAgentDetailsArray[0]`（封装层按端能力适配实际入参）。
 6. 切换助理页面（`/switchAssistant`）：
    - 读取 query 参数 `partnerAccount`；
    - 调用 `getWeAgentList` 渲染 `content` 列表，并默认选中与 query 匹配的助理项；
@@ -814,7 +865,7 @@
 10. `WeAgentCUI` 历史会话侧边栏联动：
    - 点击“历史会话”图标时调用 `getHistorySessionsList`；
    - 查询参数使用页面入口解析得到的 `assistantAccount`；
-   - 接口返回列表按 `updatedAt` 分组展示为 `今天`、`昨天`、`7天前`。
+   - 接口返回列表按 `updatedAt` 分组展示为 `今天`、`昨天`、`3天前`。
    - 侧边栏选中态需与对话页当前 `welinkSessionId` 保持一致；
    - 点击会话项后需回传 `welinkSessionId` 到对话页并触发会话切换刷新逻辑。
 11. `WeAgentCUI` 会话初始化与新建逻辑：
@@ -914,6 +965,67 @@
    - 打开“历史会话”侧边栏可看到 mock 会话列表；
    - 输入约定的错误触发词后，可看到 AI 回复消息区渲染错误信息块；
    - 不影响真实 SDK 场景下的接口调用行为。
+
+## 22. 无用代码清理约束
+
+1. 本轮清理仅允许删除或收敛“已确认无业务价值”的无用代码，不得影响现有页面视觉、路由能力、库导出能力与宿主集成行为。
+2. 可清理范围包括：
+   - 未使用的 import、类型、常量、辅助函数；
+   - 已有公共实现可覆盖的重复工具逻辑；
+   - 与当前组件实现不一致、已失效的测试代码；
+   - 当前脚本声明存在但无法实际生效的工程配置噪音。
+3. 不可误删以下仍有真实用途的代码：
+   - `src/lib/index.ts` 中面向库构建的命名导出与挂载/卸载方法；
+   - `src/pages/createAssistant.tsx` 这类被独立 webpack 入口消费的页面入口文件；
+   - `example/` 中用于演示库产物消费方式的样例代码。
+4. `CodeBlock` 与助理详情页涉及复制能力时，项目内只保留一套公共剪贴板实现，避免重复维护。
+5. 数字人创建链路中，若头像校验当前只基于文件路径后缀生效，则历史遗留但未参与实际判断的大小/MIME 常量与对应过期测试应一并移除或更新，保证实现与测试口径一致。
+6. 清理完成后至少需满足：
+   - `npm run build` 通过；
+   - `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` 不再报本轮已确认的未使用项；
+   - 若仍存在失败测试，需要明确指出是历史测试基座问题还是本轮残留问题。
+
+## 23. plugin.json 构建前置改写脚本
+
+1. `ai-chat-viewer` 根目录需要提供一个可直接执行的 `build.js` 入口，支持命令：`node ./build.js ${appid}`。
+2. 实际脚本逻辑放在根目录的 `.build_config/build.js` 中；根目录 `build.js` 仅负责转发调用，兼容外部固定的执行方式。
+3. 脚本入参 `appid` 为必填；缺失时需以非 `0` 退出码结束，并输出明确错误信息。
+4. 脚本执行时需修改 [plugin.json](/F:/AIProject/skillSDK/ai-chat-viewer/plugin.json) 中两个字段：
+   - `appId`：直接替换为传入的 `appid`
+   - `indexURL`：仅替换 URL 的 host 值为传入的 `appid`，保留原协议、路径、query、hash 不变
+5. 当前 `plugin.json` 默认形态为 `h5://<host>/index.html`，脚本需兼容自定义 scheme 的解析，不允许通过简单字符串拼接破坏原有 URL 结构。
+6. 脚本应保持输出最小可读：成功时打印目标文件路径和最终写入的 `appid`，失败时打印明确原因。
+
+## 24. 国际化底座迁移需求
+
+1. `ai-chat-viewer` 当前自研国际化实现需迁移到 `react-i18next` 第三方方案，后续页面和组件统一基于标准 `i18next` 实例工作。
+2. 本轮迁移后不保留 [src/i18n/index.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/index.ts)；原先通过该文件导出的 `t`、`useI18n`、`setLanguage` 等能力全部移除。
+3. 国际化资源目录需调整为：
+   - [src/i18n/config.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/config.ts)
+   - [src/i18n/resources/zh.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/resources/zh.ts)
+   - [src/i18n/resources/en.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/resources/en.ts)
+   - [src/i18n/types.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/types.ts)
+4. 当前已有文案 key 不调整命名方式，继续沿用扁平 key 形式，避免页面改造时同时重命名资源 key。
+5. 组件内国际化调用统一使用 `useTranslation()`：
+   - 不再引入 `useI18n()`
+   - 不再使用项目自定义 hook 包装层
+6. 非 React 模块国际化调用统一直接引用 `i18n` 实例并使用 `i18n.t(...)`：
+   - 适用范围包括 toast、streaming、辅助工具模块
+   - 不再额外保留项目级 `t()` 包装函数
+7. 启动语言初始化仍以 `getAppInfo().language` 为准，语言来源兼容统一收口到 [src/utils/hwext.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/utils/hwext.ts) 的 `getAppInfo()` 函数内部：
+   - 通过 `isPcMiniApp()` 区分端类型；
+   - 移动端直接调用 `window.HWH5.getAppInfo()` 并读取返回值中的 `language`；
+   - PC 端直接调用 `window.localStorage?.getItem('language')` 读取语言值；
+   - `getAppInfo()` 最终统一返回 `{ language: 'zh' | 'en' }`，业务层与页面层不再区分 PC/移动语言来源。
+   - PC 端需新增运行时语言变化监听：应用初始化时注册宿主回调 `window.onReceive = (payload) => {}`，`payload='2052'` 表示中文、`payload='1033'` 表示英文；收到监听后直接更新 `i18next` 当前语言即可，不额外承担本地存储回写或其他桥接兼容逻辑。
+8. 前端 `normalizeLanguage` 继续保留为最后一道兜底兼容，兼容规则需覆盖：
+   - `en` / `en-US` / `en_US` / `1033` 统一归为 `en`
+   - `zh` / `zh-CN` / `zh_CN` / `2052` 统一归为 `zh`
+   - 其他值统一回退到 `zh`
+9. 页面入口需在应用启动时优先初始化国际化配置，确保根组件渲染前 `i18next` 已完成实例注册。
+10. 本轮迁移优先覆盖当前已经接入国际化的页面、组件和工具模块，要求迁移后展示文案与迁移前保持一致；其中 `activateAssistant` 页面、`createAssistant` 页面与 `assistantDetail` 页面需补齐接入现有 `react-i18next` 方案。
+11. 当前尚未接入国际化的硬编码中文文案不要求在本轮一并全部替换；但 `activateAssistant`、`createAssistant` 与 `assistantDetail` 不再归类为后续补齐页面，需在当前版本完成文案替换。
+12. 迁移完成后，旧 [src/i18n/messages.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/messages.ts) 不再保留为运行时入口，避免出现双套资源定义并存。
 
 
 

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MessagePart, QuestionAnswerSubmission } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
+import { WeLog } from '../utils/logger';
 
 interface QuestionCardProps {
   part: MessagePart;
@@ -17,6 +19,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   onAnswered,
   readonly = false,
 }) => {
+  const { t } = useTranslation();
   const [customInput, setCustomInput] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState(getAnswerText(part));
   const [answered, setAnswered] = useState(Boolean(part.answered || getAnswerText(part)));
@@ -53,7 +56,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       setSelectedAnswer(answer);
       setCustomInput(answer);
     } catch (err) {
-      console.error('Failed to submit answer:', err);
+      WeLog(`QuestionCard submit answer failed | extra=${JSON.stringify({
+        partId: part.partId,
+        toolCallId: part.toolCallId,
+      })} | error=${JSON.stringify(err)}`);
     } finally {
       setSubmitting(false);
     }
@@ -79,9 +85,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
       {part.options && part.options.length > 0 && (
         <div className="question-card__options">
-          {part.options.map((opt, i) => (
+          {part.options.map((opt, index) => (
             <button
-              key={`${opt.label}-${i}`}
+              key={`${opt.label}-${index}`}
               className="question-card__option"
               onClick={(event) => {
                 runButtonClickWithDebounce(event, () => {
@@ -104,10 +110,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           <input
             type="text"
             className="question-card__input"
-            placeholder="请输入自定义回答..."
+            placeholder={t('question.customPlaceholder')}
             value={customInput}
-            onChange={(e) => setCustomInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            onChange={(event) => setCustomInput(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && handleSubmit()}
             disabled={isLocked}
           />
           <button
@@ -119,14 +125,14 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             }}
             disabled={isLocked || !trimmedInput}
           >
-            提交
+            {t('common.submit')}
           </button>
         </div>
       )}
 
       {answered && selectedAnswer && (
         <div className="question-card__result">
-          <span className="question-card__result-label">已回答</span>
+          <span className="question-card__result-label">{t('question.answered')}</span>
           <div className="question-card__result-content">{selectedAnswer}</div>
         </div>
       )}

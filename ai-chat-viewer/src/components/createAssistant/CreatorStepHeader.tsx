@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
-import closeIcon from '../../imgs/close_icon.png';
+import { useTranslation } from 'react-i18next';
 import backIcon from '../../imgs/back_icon.svg';
+import closeIcon from '../../imgs/close_icon.png';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
 
@@ -19,14 +20,15 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   onClose,
   onMobileBack,
 }) => {
+  const { t } = useTranslation();
   const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
   const mobileHeaderStyle = !isPcMiniApp && statusBarHeight > 0
     ? {
-      paddingTop: `${statusBarHeight}px`,
-      height: `${44 + statusBarHeight}px`,
-      minHeight: `${44 + statusBarHeight}px`,
-      flexBasis: `${44 + statusBarHeight}px`,
-    }
+        paddingTop: `${statusBarHeight}px`,
+        height: `${44 + statusBarHeight}px`,
+        minHeight: `${44 + statusBarHeight}px`,
+        flexBasis: `${44 + statusBarHeight}px`,
+      }
     : undefined;
 
   const handleMobileBack = useCallback(() => {
@@ -41,11 +43,11 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
     <header className="digital-twin__header" style={mobileHeaderStyle}>
       {isPcMiniApp ? (
         <>
-          <span className="digital-twin__title">创建个人助理</span>
+          <span className="digital-twin__title">{t('createAssistant.title')}</span>
           <button
             type="button"
             className="digital-twin__close-btn"
-            aria-label="关闭创建个人助理"
+            aria-label={t('createAssistant.close')}
             onClick={(event) => {
               runButtonClickWithDebounce(event, () => {
                 onClose();
@@ -61,7 +63,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
             <button
               type="button"
               className="digital-twin__mobile-back-btn"
-              aria-label="返回上一页"
+              aria-label={t('createAssistant.back')}
               onClick={(event) => {
                 runButtonClickWithDebounce(event, () => {
                   handleMobileBack();
@@ -71,7 +73,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
               <img src={backIcon} alt="" className="digital-twin__mobile-back-icon" aria-hidden="true" />
             </button>
           </div>
-          <span className="digital-twin__mobile-title">创建个人助理</span>
+          <span className="digital-twin__mobile-title">{t('createAssistant.title')}</span>
           <div className="digital-twin__mobile-header-side" aria-hidden="true" />
         </>
       )}

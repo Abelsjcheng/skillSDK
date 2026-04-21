@@ -1,11 +1,17 @@
 import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import send_icon from '../../imgs/send_icon.svg';
-import stop_icon from '../../imgs/stop_icon.svg';
-import check_icon from '../../imgs/check.svg';
+import { useTranslation } from 'react-i18next';
+import checkIcon from '../../imgs/check.svg';
+import sendIcon from '../../imgs/send_icon.svg';
+import stopIcon from '../../imgs/stop_icon.svg';
 import '../../styles/WeAgentCUIFooter.less';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
 type SendShortcutMode = 'enter' | 'ctrlEnter';
+
+interface ShortcutOption {
+  mode: SendShortcutMode;
+  label: string;
+}
 
 interface WeAgentCUIFooterProps {
   isPcMiniApp?: boolean;
@@ -22,15 +28,31 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   onStop,
   leftActions,
 }) => {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
+  const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
+    { mode: 'enter', label: t('weAgent.shortcut.enterSend') },
+    { mode: 'ctrlEnter', label: t('weAgent.shortcut.ctrlEnterSend') },
+  ]), [t]);
   const shortcutModeLabel = useMemo(
-    () => (shortcutMode === 'enter' ? 'Enter发送' : 'Ctrl+Enter发送'),
-    [shortcutMode],
+    () => (shortcutMode === 'enter' ? t('weAgent.shortcut.enterAction') : t('weAgent.shortcut.ctrlEnterAction')),
+    [shortcutMode, t],
   );
+  const sendButtonClassName = useMemo(
+    () => ([
+      'we-agent-cui-footer__send-btn',
+      isGenerating ? 'we-agent-cui-footer__stop-btn' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')),
+    [isGenerating],
+  );
+  const sendButtonLabel = isGenerating ? t('common.stop') : t('common.send');
+  const sendButtonIcon = isGenerating ? stopIcon : sendIcon;
 
   useEffect(() => {
     if (!isPcMiniApp || !isShortcutPopupOpen) {
@@ -102,44 +124,41 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     setIsShortcutPopupOpen(false);
   };
 
+  const handleSendButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    runButtonClickWithDebounce(event, () => {
+      if (isGenerating) {
+        onStop();
+        return;
+      }
+
+      handleSend();
+    });
+  };
+
+  const renderSendButton = () => (
+    <button
+      type="button"
+      className={sendButtonClassName}
+      onClick={handleSendButtonClick}
+      disabled={isGenerating ? false : !value.trim()}
+      aria-label={sendButtonLabel}
+    >
+      <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" />
+    </button>
+  );
+
   if (!isPcMiniApp) {
     return (
       <div className="we-agent-cui-footer">
         <input
           type="text"
           className="we-agent-cui-footer__input"
-          placeholder="有问题尽管问我~"
+          placeholder={t('weAgent.inputPlaceholder')}
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={handleMobileKeyDown}
         />
-        <button
-          type="button"
-          className={[
-            'we-agent-cui-footer__send-btn',
-            isGenerating ? 'we-agent-cui-footer__stop-btn' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          onClick={(event) => {
-            runButtonClickWithDebounce(event, () => {
-              if (isGenerating) {
-                onStop();
-                return;
-              }
-
-              handleSend();
-            });
-          }}
-          disabled={isGenerating ? false : !value.trim()}
-          aria-label={isGenerating ? '停止' : '发送'}
-        >
-          <img
-            className="we-agent-cui-footer__send-icon"
-            src={isGenerating ? stop_icon : send_icon}
-            alt=""
-          />
-        </button>
+        {renderSendButton()}
       </div>
     );
   }
@@ -148,7 +167,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     <div className="we-agent-cui-footer we-agent-cui-footer--pc">
       <textarea
         className="we-agent-cui-footer__input"
-        placeholder="有问题尽管问我~"
+        placeholder={t('weAgent.inputPlaceholder')}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handlePcKeyDown}
@@ -159,80 +178,40 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         <div className="we-agent-cui-footer__toolbar-right">
           <div className="we-agent-cui-footer__send-wrap" ref={sendWrapRef}>
             {isShortcutPopupOpen ? (
-              <div className="we-agent-cui-footer__shortcut-popup" role="menu" aria-label="发送快捷键设置">
-                <button
-                  type="button"
-                  className={[
-                    'we-agent-cui-footer__shortcut-item',
-                    shortcutMode === 'enter' ? 'is-selected' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={(event) => {
-                    runButtonClickWithDebounce(event, () => {
-                      selectShortcutMode('enter');
-                    });
-                  }}
-                >
-                  <span className="we-agent-cui-footer__shortcut-check-slot">
-                    {shortcutMode === 'enter' ? (
-                      <img className="we-agent-cui-footer__shortcut-check-icon" src={check_icon} alt="" />
-                    ) : null}
-                  </span>
-                  <span className="we-agent-cui-footer__shortcut-text">Enter键发送消息</span>
-                </button>
-                <button
-                  type="button"
-                  className={[
-                    'we-agent-cui-footer__shortcut-item',
-                    shortcutMode === 'ctrlEnter' ? 'is-selected' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={(event) => {
-                    runButtonClickWithDebounce(event, () => {
-                      selectShortcutMode('ctrlEnter');
-                    });
-                  }}
-                >
-                  <span className="we-agent-cui-footer__shortcut-check-slot">
-                    {shortcutMode === 'ctrlEnter' ? (
-                      <img className="we-agent-cui-footer__shortcut-check-icon" src={check_icon} alt="" />
-                    ) : null}
-                  </span>
-                  <span className="we-agent-cui-footer__shortcut-text">Ctrl+Enter键发送消息</span>
-                </button>
+              <div
+                className="we-agent-cui-footer__shortcut-popup"
+                role="menu"
+                aria-label={t('weAgent.shortcut.settings')}
+              >
+                {shortcutOptions.map((option) => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    className={[
+                      'we-agent-cui-footer__shortcut-item',
+                      shortcutMode === option.mode ? 'is-selected' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={(event) => {
+                      runButtonClickWithDebounce(event, () => {
+                        selectShortcutMode(option.mode);
+                      });
+                    }}
+                  >
+                    <span className="we-agent-cui-footer__shortcut-check-slot">
+                      {shortcutMode === option.mode ? (
+                        <img className="we-agent-cui-footer__shortcut-check-icon" src={checkIcon} alt="" />
+                      ) : null}
+                    </span>
+                    <span className="we-agent-cui-footer__shortcut-text">{option.label}</span>
+                  </button>
+                ))}
               </div>
             ) : null}
 
             <div className="we-agent-cui-footer__send-control">
-              <button
-                type="button"
-                className={[
-                  'we-agent-cui-footer__send-btn',
-                  isGenerating ? 'we-agent-cui-footer__stop-btn' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={(event) => {
-                  runButtonClickWithDebounce(event, () => {
-                    if (isGenerating) {
-                      onStop();
-                      return;
-                    }
-
-                    handleSend();
-                  });
-                }}
-                disabled={isGenerating ? false : !value.trim()}
-                aria-label={isGenerating ? '停止' : '发送'}
-              >
-                <img
-                  className="we-agent-cui-footer__send-icon"
-                  src={isGenerating ? stop_icon : send_icon}
-                  alt=""
-                />
-              </button>
+              {renderSendButton()}
               <button
                 type="button"
                 className="we-agent-cui-footer__shortcut-arrow-btn"

@@ -21,11 +21,25 @@
     }
   }
 
+  .content--we-agent-cui {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+  }
+
   .messages-container {
     display: flex;
     flex-direction: column;
-    gap: 12px;
     padding: 0;
+
+    &:not(.messages-container--we-agent-cui) > * + * {
+      margin-top: 12px;
+    }
   }
 
   .history-status {
@@ -130,16 +144,18 @@
   .message-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
     margin-top: 12px;
     padding-top: 8px;
+
+    > * + * {
+      margin-left: 12px;
+    }
   }
 
   .action-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
     width: 60px;
     height: 24px;
     padding: 0;
@@ -149,6 +165,10 @@
     background: transparent;
     cursor: pointer;
     transition: all 0.2s;
+
+    > * + * {
+      margin-left: 4px;
+    }
 
     &:hover {
       background-color: rgba(0, 0, 0, 0.04);
@@ -177,7 +197,10 @@
     height: 100%;
     color: #999;
     font-size: 14px;
-    gap: 12px;
+
+    > * + * {
+      margin-top: 12px;
+    }
   }
 
   .loading-dot {
@@ -218,7 +241,10 @@
   .message-parts {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+
+    > * + * {
+      margin-top: 12px;
+    }
   }
 
   .text-part {
@@ -259,9 +285,12 @@
   .tool-card__header {
     display: flex;
     align-items: center;
-    gap: 8px;
     padding: 10px 12px;
     cursor: pointer;
+
+    > * + * {
+      margin-left: 8px;
+    }
 
     &:hover {
       background-color: #f0f0f0;
@@ -347,9 +376,12 @@
   .thinking-block__header {
     display: flex;
     align-items: center;
-    gap: 8px;
     padding: 10px 12px;
     cursor: pointer;
+
+    > * + * {
+      margin-left: 8px;
+    }
 
     &:hover {
       background-color: #f0f0f0;
@@ -414,10 +446,13 @@
   .question-card__question {
     display: flex;
     align-items: center;
-    gap: 8px;
     font-size: 14px;
     color: #333;
     margin-bottom: 12px;
+
+    > * + * {
+      margin-left: 8px;
+    }
   }
 
   .question-card__icon {
@@ -427,15 +462,17 @@
   .question-card__options {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     margin-bottom: 12px;
+
+    > * + * {
+      margin-top: 8px;
+    }
   }
 
   .question-card__option {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
     width: 100%;
     padding: 6px 12px;
     border: 1px solid #1890ff;
@@ -447,6 +484,10 @@
     text-align: left;
     transition: all 0.2s;
     box-sizing: border-box;
+
+    > * + * {
+      margin-top: 2px;
+    }
 
     &:hover:not(:disabled) {
       background-color: #1890ff;
@@ -477,7 +518,10 @@
 
   .question-card__input-group {
     display: flex;
-    gap: 8px;
+
+    > * + * {
+      margin-left: 8px;
+    }
   }
 
   .question-card__input {
@@ -565,8 +609,11 @@
   .permission-card__header {
     display: flex;
     align-items: center;
-    gap: 8px;
     margin-bottom: 8px;
+
+    > * + * {
+      margin-left: 8px;
+    }
   }
 
   .permission-card__icon {
@@ -594,8 +641,14 @@
 
   .permission-card__actions {
     display: flex;
-    gap: 8px;
     flex-wrap: wrap;
+    margin-top: -8px;
+    margin-left: -8px;
+
+    > * {
+      margin-top: 8px;
+      margin-left: 8px;
+    }
   }
 
   .permission-card__btn {
@@ -656,8 +709,11 @@
   .error-block__header {
     display: flex;
     align-items: center;
-    gap: 8px;
     margin-bottom: 6px;
+
+    > * + * {
+      margin-left: 8px;
+    }
   }
 
   .error-block__icon {
@@ -693,11 +749,14 @@
   .file-part {
     display: flex;
     align-items: center;
-    gap: 8px;
     padding: 8px 12px;
     background-color: #f5f5f5;
     border-radius: 6px;
     margin: 4px 0;
+
+    > * + * {
+      margin-left: 8px;
+    }
 
     a {
       color: #1890ff;

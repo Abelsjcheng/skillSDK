@@ -1,45 +1,74 @@
 const BASE_BROWSERS_TARGET = {
-  ie: '11',
+  chrome: '49',
+  edge: '15',
+  firefox: '45',
+  safari: '10',
+  ios: '10',
 };
 
-const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
-const TRANSPILE_NODE_MODULES = [
-  /node_modules[\\/]react-markdown[\\/]/,
-  /node_modules[\\/]remark-[^\\/]+[\\/]/,
-  /node_modules[\\/]rehype-[^\\/]+[\\/]/,
-  /node_modules[\\/]unified[\\/]/,
-  /node_modules[\\/]bail[\\/]/,
-  /node_modules[\\/]trough[\\/]/,
-  /node_modules[\\/]vfile[^\\/]*[\\/]/,
-  /node_modules[\\/]unist-[^\\/]+[\\/]/,
-  /node_modules[\\/]mdast-[^\\/]+[\\/]/,
-  /node_modules[\\/]hast-[^\\/]+[\\/]/,
-  /node_modules[\\/]micromark[^\\/]*[\\/]/,
-  /node_modules[\\/]decode-named-character-reference[\\/]/,
-  /node_modules[\\/]character-entities[^\\/]*[\\/]/,
-  /node_modules[\\/]property-information[\\/]/,
-  /node_modules[\\/]space-separated-tokens[\\/]/,
-  /node_modules[\\/]comma-separated-tokens[\\/]/,
+const WEBPACK_ES5_TARGET = ['web', 'es5'];
+
+const WEBPACK_ES5_OUTPUT_ENVIRONMENT = {
+  arrowFunction: false,
+  bigIntLiteral: false,
+  const: false,
+  destructuring: false,
+  dynamicImport: false,
+  forOf: false,
+  module: false,
+  optionalChaining: false,
+  templateLiteral: false,
+};
+
+const TRANSPILE_DEPENDENCIES = [
+  'hast-util-from-html-isomorphic',
+  'i18next',
+  'react-markdown',
+  'react-i18next',
+  'react-syntax-highlighter',
+  'remark-breaks',
+  'remark-gfm',
+  'remark-math',
+  'rehype-katex',
 ];
 
-function shouldExcludeFromBabel(filePath) {
-  if (!/node_modules/.test(filePath)) {
-    return false;
+const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
+
+function shouldTranspileDependency(filePath) {
+  const packageMatches = [...filePath.matchAll(/[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/g)];
+
+  if (packageMatches.length === 0) {
+    return true;
   }
 
-  return !TRANSPILE_NODE_MODULES.some((pattern) => pattern.test(filePath));
+  const packageName = packageMatches[packageMatches.length - 1][1];
+  return TRANSPILE_DEPENDENCIES.includes(packageName);
+}
+
+function createEs5Output(output) {
+  return {
+    ...output,
+    environment: {
+      ...WEBPACK_ES5_OUTPUT_ENVIRONMENT,
+      ...(output.environment || {}),
+    },
+  };
 }
 
 function createBabelRule({ includePolyfills = false } = {}) {
-  const presetEnvOptions = { targets: BASE_BROWSERS_TARGET };
+  const presetEnvOptions = {
+    bugfixes: true,
+    forceAllTransforms: true,
+    targets: BASE_BROWSERS_TARGET,
+  };
   if (includePolyfills) {
     presetEnvOptions.useBuiltIns = 'usage';
-    presetEnvOptions.corejs = '3.36';
+    presetEnvOptions.corejs = '3.44';
   }
 
   return {
     test: /\.(ts|tsx|js|jsx)$/,
-    exclude: shouldExcludeFromBabel,
+    exclude: (filePath) => !shouldTranspileDependency(filePath),
     use: {
       loader: 'babel-loader',
       options: {
@@ -48,7 +77,6 @@ function createBabelRule({ includePolyfills = false } = {}) {
           ['@babel/preset-react', { runtime: 'automatic' }],
           '@babel/preset-typescript',
         ],
-        plugins: ['@babel/plugin-proposal-optional-chaining'],
       },
     },
   };
@@ -100,5 +128,7 @@ function createModuleRules({ includePolyfills = false, singletonStyleTag = false
 
 module.exports = {
   RESOLVE_EXTENSIONS,
+  WEBPACK_ES5_TARGET,
+  createEs5Output,
   createModuleRules,
 };
