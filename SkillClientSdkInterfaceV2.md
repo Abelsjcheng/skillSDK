@@ -17,6 +17,7 @@
 | `getAgentType` | `GET /v4-1/we-crew/inner-assistant/list` | 查询可用助理类型 |
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
 | `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并按需持久化助理详情 |
+| `getAssistantDetails` | `GET /v1/robot-partners/{partnerAccount}` | 优先返回缓存助理详情，并异步刷新缓存 |
 | `updateWeAgent` | `PUT /v4-1/we-crew` | 更新个人助理信息 |
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
@@ -38,6 +39,7 @@
 5. 建议存储 key：
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
    - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
+   - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情（`WeAgentDetailsArray`）
 6. SP 持久化文档路径：待填写。
 
 ---
@@ -314,6 +316,97 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 2. SDK 解析返回 `data[]` 并组装为 `weAgentDetailsArray`。
 3. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
 4. SDK 返回 `Promise<weAgentDetailsArray>`。
+
+---
+
+## 4.1 获取助理缓存详情接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据 `partnerAccount` 获取指定助理的详情缓存。
+
+- 若本地已存在对应 `partnerAccount` 的助理详情缓存，则 SDK 先直接返回缓存内容；
+- 在返回缓存后，SDK 需异步调用服务端接口 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情，并更新本地缓存；
+- 若本地不存在对应缓存，则 SDK 调用服务端接口获取详情，返回结果并写入本地缓存。
+
+缓存存储方式与 `getWeAgentDetails` 一致，需按 `userId` 隔离；当前 `userId` 使用 mock 值：`mock_user_id`。
+
+### 接口名
+
+```typescript
+getAssistantDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "x00_1"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `weAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
+
+`WeAgentDetails` 对象字段定义与 `getWeAgentDetails` 返回保持一致。
+
+### 出参示例
+
+```json
+{
+  "weAgentDetailsArray": [
+    {
+      "name": "员工助手",
+      "icon": "http://www.test.com/xxx",
+      "desc": "我是xxx",
+      "moduleId": "M1000",
+      "partnerAccount": "x00_1",
+      "appKey": "",
+      "appSecret": "",
+      "createdBy": "",
+      "creatorWorkId": "",
+      "creatorW3Account": "",
+      "creatorName": "",
+      "creatorNameEn": "",
+      "ownerWelinkId": "",
+      "ownerW3Account": "",
+      "ownerName": "",
+      "ownerNameEn": "",
+      "ownerDeptName": "",
+      "ownerDeptNameEn": "",
+      "id": "78985451212",
+      "bizRobotName": "员工助手",
+      "bizRobotNameEn": "employee_assistant",
+      "bizRobotTag": "",
+      "bizRobotId": "",
+      "weCodeUrl": "https://xxx"
+    }
+  ]
+}
+```
+
+### 实现方法
+
+1. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`（`userId` 当前使用 mock 值：`mock_user_id`），并从中按 `partnerAccount` 读取对应助理详情缓存。
+2. 若读取到对应 `partnerAccount` 的缓存，则直接返回缓存内容。
+3. 在返回缓存后，SDK 异步调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
+4. SDK 解析服务端返回 `data[]` 并组装为 `weAgentDetailsArray`，再写回按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并覆盖更新缓存 key `we_agent_details`。
+5. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
+6. SDK 解析服务端返回 `data[]` 并组装为 `weAgentDetailsArray`，写入按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并更新缓存 key `we_agent_details`，再将该结果返回给调用方。
+7. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 可记录日志用于排查。
 
 ---
 
