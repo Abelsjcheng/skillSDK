@@ -148,11 +148,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsCreateDigitalTwinParams
-
-- (void)setDescription:(id)description {
-    self.descriptionValue = description;
-}
-
 @end
 
 @implementation WLAgentSkillsPageParams
@@ -169,6 +164,24 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsQueryWeAgentParams
+@end
+
+@implementation WLAgentSkillsUpdateWeAgentParams
+@end
+
+@implementation WLAgentSkillsDeleteWeAgentParams
+@end
+
+@implementation WLAgentSkillsOpenAssistantEditPageParams
+@end
+
+@implementation WLAgentSkillsNotifyAssistantDetailUpdatedParams
+@end
+
+@implementation WLAgentSkillsQueryQrcodeInfoParams
+@end
+
+@implementation WLAgentSkillsUpdateQrcodeInfoParams
 @end
 
 #pragma mark - Data Models
@@ -338,6 +351,62 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"weAgentUri" : self.weAgentUri ?: @"",
         @"assistantDetailUri" : self.assistantDetailUri ?: @"",
         @"switchAssistantUri" : self.switchAssistantUri ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsAssistantDetailUpdatedPayload
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
+        _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
+        _descriptionValue = WLAgentSkillsStringValue(dictionary[@"description"], @"");
+    }
+    return self;
+}
+
+- (NSString *)description {
+    return self.descriptionValue ?: @"";
+}
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"name" : self.name ?: @"",
+        @"icon" : self.icon ?: @"",
+        @"description" : self.descriptionValue ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsQrcodeInfo
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _qrcode = WLAgentSkillsStringValue(dictionary[@"qrcode"], @"");
+        _weUrl = WLAgentSkillsStringValue(dictionary[@"weUrl"], @"");
+        _pcUrl = WLAgentSkillsStringValue(dictionary[@"pcUrl"], @"");
+        _expireTime = WLAgentSkillsStringValue(dictionary[@"expireTime"], @"");
+        _status = WLAgentSkillsNumberValue(dictionary[@"status"], @0);
+        _expired = [dictionary[@"expired"] respondsToSelector:@selector(boolValue)]
+            ? [dictionary[@"expired"] boolValue]
+            : NO;
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"qrcode" : self.qrcode ?: @"",
+        @"weUrl" : self.weUrl ?: @"",
+        @"pcUrl" : self.pcUrl ?: @"",
+        @"expireTime" : self.expireTime ?: @"",
+        @"status" : self.status ?: @0,
+        @"expired" : @(self.expired)
     };
 }
 
@@ -982,6 +1051,56 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 - (NSDictionary *)toDictionary {
     return @{
         @"weAgentDetailsArray" : WLAgentSkillsSerializeModelArray(self.weAgentDetailsArray)
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsUpdateWeAgentResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"updateResult" : self.updateResult ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsDeleteWeAgentResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"deleteResult" : self.deleteResult ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsOpenAssistantEditPageResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"status" : self.status ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsNotifyAssistantDetailUpdatedResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"status" : self.status ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsUpdateQrcodeInfoResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"status" : self.status ?: @""
     };
 }
 

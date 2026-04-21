@@ -139,6 +139,82 @@
          failure:failure];
 }
 
+- (void)updateWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
+                                robotId:(nullable NSString *)robotId
+                                   name:(NSString *)name
+                                   icon:(NSString *)icon
+                            description:(NSString *)description
+                                success:(WLAgentSkillsHTTPSuccessBlock)success
+                                failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [@{
+        @"name" : name,
+        @"icon" : icon,
+        @"description" : description
+    } mutableCopy];
+    if (partnerAccount != nil && partnerAccount.length > 0) {
+        parameters[@"partnerAccount"] = partnerAccount;
+    }
+    if (robotId != nil && robotId.length > 0) {
+        parameters[@"robotId"] = robotId;
+    }
+
+    [self PUT:@"/v4-1/we-crew"
+    parameters:parameters
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
+}
+
+- (void)deleteWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
+                                robotId:(nullable NSString *)robotId
+                                success:(WLAgentSkillsHTTPSuccessBlock)success
+                                failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
+    if (partnerAccount != nil && partnerAccount.length > 0) {
+        parameters[@"partnerAccount"] = partnerAccount;
+    }
+    if (robotId != nil && robotId.length > 0) {
+        parameters[@"robotId"] = robotId;
+    }
+
+    [self DELETE:@"/v4-1/we-crew"
+     parameters:parameters
+  useAssistantBaseURL:YES
+        success:success
+        failure:failure];
+}
+
+- (void)queryQrcodeInfoWithQrcode:(NSString *)qrcode
+                          success:(WLAgentSkillsHTTPSuccessBlock)success
+                          failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSString *path = [NSString stringWithFormat:@"/nologin/we-crew/im-register/qrcode/%@", qrcode];
+    [self GET:path
+    parameters:nil
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
+}
+
+- (void)updateQrcodeInfoWithQrcode:(NSString *)qrcode
+                                 ak:(nullable NSString *)ak
+                             status:(NSNumber *)status
+                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                            failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [@{
+        @"qrcode" : qrcode,
+        @"status" : status
+    } mutableCopy];
+    if (ak != nil && ak.length > 0) {
+        parameters[@"ak"] = ak;
+    }
+
+    [self PUT:@"/v4-1/we-crew/im-register/qrcode"
+    parameters:parameters
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
+}
+
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak
                                                         status:(nullable NSString *)status
@@ -336,6 +412,42 @@
         [self handleResponseObject:responseObject success:success failure:failure];
     }
                                         failure:^(__unused NSURLSessionDataTask *task, NSError *error) {
+        [self handleFailureError:error failure:failure];
+    }];
+}
+
+- (void)PUT:(NSString *)path
+    parameters:(nullable NSDictionary *)parameters
+  useAssistantBaseURL:(BOOL)useAssistantBaseURL
+        success:(WLAgentSkillsHTTPSuccessBlock)success
+        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self ensureConfigurationUpToDate];
+    AFHTTPSessionManager *manager = useAssistantBaseURL ? self.assistantSessionManager : self.sessionManager;
+    [manager PUT:path
+                                   parameters:parameters
+                                      headers:nil
+                                      success:^(__unused NSURLSessionDataTask *task, id responseObject) {
+        [self handleResponseObject:responseObject success:success failure:failure];
+    }
+                                      failure:^(__unused NSURLSessionDataTask *task, NSError *error) {
+        [self handleFailureError:error failure:failure];
+    }];
+}
+
+- (void)DELETE:(NSString *)path
+     parameters:(nullable NSDictionary *)parameters
+  useAssistantBaseURL:(BOOL)useAssistantBaseURL
+       success:(WLAgentSkillsHTTPSuccessBlock)success
+       failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self ensureConfigurationUpToDate];
+    AFHTTPSessionManager *manager = useAssistantBaseURL ? self.assistantSessionManager : self.sessionManager;
+    [manager DELETE:path
+                                      parameters:parameters
+                                         headers:nil
+                                         success:^(__unused NSURLSessionDataTask *task, id responseObject) {
+        [self handleResponseObject:responseObject success:success failure:failure];
+    }
+                                         failure:^(__unused NSURLSessionDataTask *task, NSError *error) {
         [self handleFailureError:error failure:failure];
     }];
 }

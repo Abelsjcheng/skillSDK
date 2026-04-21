@@ -51,6 +51,29 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                      success:(WLAgentSkillsHTTPSuccessBlock)success
                                      failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
+- (void)updateWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
+                                robotId:(nullable NSString *)robotId
+                                   name:(NSString *)name
+                                   icon:(NSString *)icon
+                            description:(NSString *)description
+                                success:(WLAgentSkillsHTTPSuccessBlock)success
+                                failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)deleteWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
+                                robotId:(nullable NSString *)robotId
+                                success:(WLAgentSkillsHTTPSuccessBlock)success
+                                failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)queryQrcodeInfoWithQrcode:(NSString *)qrcode
+                          success:(WLAgentSkillsHTTPSuccessBlock)success
+                          failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)updateQrcodeInfoWithQrcode:(NSString *)qrcode
+                                 ak:(nullable NSString *)ak
+                             status:(NSNumber *)status
+                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                            failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak
                                                         status:(nullable NSString *)status

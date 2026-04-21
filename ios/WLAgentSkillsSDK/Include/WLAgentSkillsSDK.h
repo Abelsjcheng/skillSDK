@@ -117,6 +117,36 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - 20. getWeAgentUri
 - (WLAgentSkillsWeAgentUriResult *)getWeAgentUri;
 
+#pragma mark - 21. updateWeAgent
+- (void)updateWeAgent:(WLAgentSkillsUpdateWeAgentParams *)params
+              success:(void (^)(WLAgentSkillsUpdateWeAgentResult *result))success
+              failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 22. deleteWeAgent
+- (void)deleteWeAgent:(WLAgentSkillsDeleteWeAgentParams *)params
+              success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
+              failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 23. openAssistantEditPage
+- (void)openAssistantEditPage:(WLAgentSkillsOpenAssistantEditPageParams *)params
+                      success:(void (^)(WLAgentSkillsOpenAssistantEditPageResult *result))success
+                      failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 24. notifyAssistantDetailUpdated
+- (void)notifyAssistantDetailUpdated:(WLAgentSkillsNotifyAssistantDetailUpdatedParams *)params
+                             success:(void (^)(WLAgentSkillsNotifyAssistantDetailUpdatedResult *result))success
+                             failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 25. queryQrcodeInfo
+- (void)queryQrcodeInfo:(WLAgentSkillsQueryQrcodeInfoParams *)params
+                success:(void (^)(WLAgentSkillsQrcodeInfo *result))success
+                failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 26. updateQrcodeInfo
+- (void)updateQrcodeInfo:(WLAgentSkillsUpdateQrcodeInfoParams *)params
+                 success:(void (^)(WLAgentSkillsUpdateQrcodeInfoResult *result))success
+                 failure:(void (^)(NSError *error))failure;
+
 @end
 
 NS_ASSUME_NONNULL_END

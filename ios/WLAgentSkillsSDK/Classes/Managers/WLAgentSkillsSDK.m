@@ -10,6 +10,7 @@
 #import "WLAgentSkillsConfig.h"
 #import "WLAgentSkillsTypeConverter.h"
 #import "WLAgentSkillsWeAgentStore.h"
+@import UIKit;
 
 static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html";
@@ -21,6 +22,7 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *sendMessageTriggeredBySession;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *stopSkillHoldingBySession;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *lastSessionStatusBySession;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsAssistantDetailUpdatedCallback> *assistantDetailUpdatedCallbacks;
 @property (nonatomic, copy, nullable) WLAgentSkillsWecodeStatusCallback wecodeStatusCallback;
 
 @end
@@ -67,6 +69,7 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         _sendMessageTriggeredBySession = [NSMutableDictionary dictionary];
         _stopSkillHoldingBySession = [NSMutableDictionary dictionary];
         _lastSessionStatusBySession = [NSMutableDictionary dictionary];
+        _assistantDetailUpdatedCallbacks = [NSMutableDictionary dictionary];
         [WLAgentSkillsWebSocketManager sharedManager].delegate = self;
     }
     return self;
@@ -147,6 +150,7 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         [self.sendMessageTriggeredBySession removeAllObjects];
         [self.stopSkillHoldingBySession removeAllObjects];
         [self.lastSessionStatusBySession removeAllObjects];
+        [self.assistantDetailUpdatedCallbacks removeAllObjects];
     }
 
     WLAgentSkillsCloseSkillResult *result = [[WLAgentSkillsCloseSkillResult alloc] init];
@@ -793,8 +797,7 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    id descriptionCandidate = params.descriptionValue != nil ? params.descriptionValue : params.desc;
-    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:descriptionCandidate
+    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:params.description
                                                                  fieldName:@"description"
                                                               errorMessage:&errorMessage];
     if (desc == nil) {
@@ -1024,6 +1027,320 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
     return result;
 }
 
+#pragma mark - 21. updateWeAgent
+
+- (void)updateWeAgent:(WLAgentSkillsUpdateWeAgentParams *)params
+              success:(void (^)(WLAgentSkillsUpdateWeAgentResult *result))success
+              failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.partnerAccount];
+    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.robotId];
+    NSString *identityErrorMessage = nil;
+    [self assistantIdentityKeyWithPartnerAccount:partnerAccount
+                                         robotId:robotId
+                                    errorMessage:&identityErrorMessage];
+    if (identityErrorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:identityErrorMessage];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *name = [WLAgentSkillsTypeConverter requiredStringFromValue:params.name
+                                                               fieldName:@"name"
+                                                            errorMessage:&errorMessage];
+    if (name == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *icon = [WLAgentSkillsTypeConverter requiredStringFromValue:params.icon
+                                                               fieldName:@"icon"
+                                                            errorMessage:&errorMessage];
+    if (icon == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *description = [WLAgentSkillsTypeConverter requiredStringFromValue:params.description
+                                                                      fieldName:@"description"
+                                                                   errorMessage:&errorMessage];
+    if (description == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] updateWeAgentWithPartnerAccount:partnerAccount
+                                                                    robotId:robotId
+                                                                       name:name
+                                                                       icon:icon
+                                                                description:description
+                                                                    success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]];
+        if (message == nil) {
+            [weakSelf dispatchFailure:failure code:7000 message:@"Unexpected updateWeAgent response schema."];
+            return;
+        }
+        WLAgentSkillsUpdateWeAgentResult *result = [[WLAgentSkillsUpdateWeAgentResult alloc] init];
+        result.updateResult = message;
+        if (success) {
+            success(result);
+        }
+    }
+                                                                    failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 22. deleteWeAgent
+
+- (void)deleteWeAgent:(WLAgentSkillsDeleteWeAgentParams *)params
+              success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
+              failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.partnerAccount];
+    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.robotId];
+    NSString *identityErrorMessage = nil;
+    [self assistantIdentityKeyWithPartnerAccount:partnerAccount
+                                         robotId:robotId
+                                    errorMessage:&identityErrorMessage];
+    if (identityErrorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:identityErrorMessage];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] deleteWeAgentWithPartnerAccount:partnerAccount
+                                                                    robotId:robotId
+                                                                    success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]];
+        if (message == nil) {
+            [weakSelf dispatchFailure:failure code:7000 message:@"Unexpected deleteWeAgent response schema."];
+            return;
+        }
+        WLAgentSkillsDeleteWeAgentResult *result = [[WLAgentSkillsDeleteWeAgentResult alloc] init];
+        result.deleteResult = message;
+        if (success) {
+            success(result);
+        }
+    }
+                                                                    failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 23. openAssistantEditPage
+
+- (void)openAssistantEditPage:(WLAgentSkillsOpenAssistantEditPageParams *)params
+                      success:(void (^)(WLAgentSkillsOpenAssistantEditPageResult *result))success
+                      failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+    if (params.onUpdated == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: onUpdated is required."];
+        return;
+    }
+
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.partnerAccount];
+    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.robotId];
+    NSString *identityErrorMessage = nil;
+    NSString *identityKey = [self assistantIdentityKeyWithPartnerAccount:partnerAccount
+                                                                 robotId:robotId
+                                                            errorMessage:&identityErrorMessage];
+    if (identityKey == nil) {
+        [self dispatchFailure:failure code:1000 message:identityErrorMessage];
+        return;
+    }
+
+    NSString *uri = [self assistantEditPageUriWithPartnerAccount:partnerAccount robotId:robotId];
+    if (uri == nil || uri.length == 0) {
+        [self dispatchFailure:failure code:5000 message:@"Failed to build assistant edit page uri."];
+        return;
+    }
+
+    @synchronized(self) {
+        self.assistantDetailUpdatedCallbacks[identityKey] = [params.onUpdated copy];
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSURL *url = [NSURL URLWithString:uri];
+        if (url == nil) {
+            [self dispatchFailure:failure code:5000 message:@"Invalid assistant edit page uri."];
+            return;
+        }
+
+        [[UIApplication sharedApplication] openURL:url
+                                           options:@{}
+                                 completionHandler:^(BOOL successOpen) {
+            if (!successOpen) {
+                [self dispatchFailure:failure code:5000 message:@"Failed to open assistant edit page."];
+                return;
+            }
+            WLAgentSkillsOpenAssistantEditPageResult *result = [[WLAgentSkillsOpenAssistantEditPageResult alloc] init];
+            result.status = @"success";
+            if (success) {
+                success(result);
+            }
+        }];
+    });
+}
+
+#pragma mark - 24. notifyAssistantDetailUpdated
+
+- (void)notifyAssistantDetailUpdated:(WLAgentSkillsNotifyAssistantDetailUpdatedParams *)params
+                             success:(void (^)(WLAgentSkillsNotifyAssistantDetailUpdatedResult *result))success
+                             failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *name = [WLAgentSkillsTypeConverter requiredStringFromValue:params.name
+                                                               fieldName:@"name"
+                                                            errorMessage:&errorMessage];
+    if (name == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *icon = [WLAgentSkillsTypeConverter requiredStringFromValue:params.icon
+                                                               fieldName:@"icon"
+                                                            errorMessage:&errorMessage];
+    if (icon == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *description = [WLAgentSkillsTypeConverter requiredStringFromValue:params.description
+                                                                      fieldName:@"description"
+                                                                   errorMessage:&errorMessage];
+    if (description == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.partnerAccount];
+    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.robotId];
+    NSString *identityErrorMessage = nil;
+    NSString *identityKey = [self assistantIdentityKeyWithPartnerAccount:partnerAccount
+                                                                 robotId:robotId
+                                                            errorMessage:&identityErrorMessage];
+    if (identityKey == nil) {
+        [self dispatchFailure:failure code:1000 message:identityErrorMessage];
+        return;
+    }
+
+    WLAgentSkillsAssistantDetailUpdatedCallback callbackBlock = nil;
+    @synchronized(self) {
+        callbackBlock = self.assistantDetailUpdatedCallbacks[identityKey];
+    }
+    if (callbackBlock != nil) {
+        WLAgentSkillsAssistantDetailUpdatedPayload *payload = [[WLAgentSkillsAssistantDetailUpdatedPayload alloc] initWithDictionary:@{
+            @"name" : name,
+            @"icon" : icon,
+            @"description" : description
+        }];
+        callbackBlock(payload);
+    }
+
+    WLAgentSkillsNotifyAssistantDetailUpdatedResult *result = [[WLAgentSkillsNotifyAssistantDetailUpdatedResult alloc] init];
+    result.status = @"success";
+    if (success) {
+        success(result);
+    }
+}
+
+#pragma mark - 25. queryQrcodeInfo
+
+- (void)queryQrcodeInfo:(WLAgentSkillsQueryQrcodeInfoParams *)params
+                success:(void (^)(WLAgentSkillsQrcodeInfo *result))success
+                failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *qrcode = [WLAgentSkillsTypeConverter requiredStringFromValue:params.qrcode
+                                                                 fieldName:@"qrcode"
+                                                              errorMessage:&errorMessage];
+    if (qrcode == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] queryQrcodeInfoWithQrcode:qrcode
+                                                              success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsQrcodeInfo *result = [[WLAgentSkillsQrcodeInfo alloc] initWithDictionary:data];
+        if (success) {
+            success(result);
+        }
+    }
+                                                              failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 26. updateQrcodeInfo
+
+- (void)updateQrcodeInfo:(WLAgentSkillsUpdateQrcodeInfoParams *)params
+                 success:(void (^)(WLAgentSkillsUpdateQrcodeInfoResult *result))success
+                 failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *qrcode = [WLAgentSkillsTypeConverter requiredStringFromValue:params.qrcode
+                                                                 fieldName:@"qrcode"
+                                                              errorMessage:&errorMessage];
+    if (qrcode == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSInteger statusValue = [WLAgentSkillsTypeConverter requiredIntegerFromValue:params.status
+                                                                       fieldName:@"status"
+                                                                    errorMessage:&errorMessage];
+    if (errorMessage != nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] updateQrcodeInfoWithQrcode:qrcode
+                                                                   ak:ak
+                                                               status:@(statusValue)
+                                                              success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        NSString *codeString = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"code"]];
+        if (codeString == nil || ![codeString isEqualToString:@"200"]) {
+            [weakSelf dispatchFailure:failure code:7000 message:@"updateQrcodeInfo did not return code 200."];
+            return;
+        }
+        WLAgentSkillsUpdateQrcodeInfoResult *result = [[WLAgentSkillsUpdateQrcodeInfoResult alloc] init];
+        result.status = @"success";
+        if (success) {
+            success(result);
+        }
+    }
+                                                              failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
 #pragma mark - WLAgentSkillsWebSocketManagerDelegate
 
 - (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
@@ -1123,6 +1440,37 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
     }
     NSString *trimmed = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     return trimmed != nil && trimmed.length > 0 ? trimmed : nil;
+}
+
+- (nullable NSString *)assistantIdentityKeyWithPartnerAccount:(nullable NSString *)partnerAccount
+                                                      robotId:(nullable NSString *)robotId
+                                                 errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
+    if (normalizedPartnerAccount != nil) {
+        return normalizedPartnerAccount;
+    }
+    NSString *normalizedRobotId = [self normalizedOptionalString:robotId];
+    if (normalizedRobotId != nil) {
+        return normalizedRobotId;
+    }
+    if (errorMessage != NULL) {
+        *errorMessage = @"partnerAccount or robotId is required.";
+    }
+    return nil;
+}
+
+- (nullable NSString *)assistantEditPageUriWithPartnerAccount:(nullable NSString *)partnerAccount
+                                                      robotId:(nullable NSString *)robotId {
+    NSString *baseUri = [self appendHashToUri:WLAgentSkillsAssistantH5URI hash:@"editAssistant"];
+    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
+    if (normalizedPartnerAccount != nil) {
+        return [self appendQueryItemToUri:baseUri key:@"partnerAccount" value:normalizedPartnerAccount];
+    }
+    NSString *normalizedRobotId = [self normalizedOptionalString:robotId];
+    if (normalizedRobotId != nil) {
+        return [self appendQueryItemToUri:baseUri key:@"robotId" value:normalizedRobotId];
+    }
+    return nil;
 }
 
 - (WLAgentSkillsPageResult *)normalizedPageResultFromDictionary:(NSDictionary *)dictionary

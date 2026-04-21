@@ -30,6 +30,7 @@ typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeAction) {
 @class WLAgentSkillsSkillWecodeStatusResult;
 @class WLAgentSkillsSessionStatusResult;
 @class WLAgentSkillsStreamMessage;
+@class WLAgentSkillsAssistantDetailUpdatedPayload;
 
 #pragma mark - Callback Typedefs
 
@@ -38,6 +39,7 @@ typedef void (^WLAgentSkillsWecodeStatusCallback)(WLAgentSkillsSkillWecodeStatus
 typedef void (^WLAgentSkillsSessionMessageCallback)(WLAgentSkillsStreamMessage *message);
 typedef void (^WLAgentSkillsSessionErrorCallback)(WLAgentSkillsSessionError *error);
 typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
+typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssistantDetailUpdatedPayload *payload);
 
 #pragma mark - Param Models
 
@@ -132,8 +134,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @interface WLAgentSkillsCreateDigitalTwinParams : NSObject
 @property (nonatomic, strong, nullable) id name;
 @property (nonatomic, strong, nullable) id icon;
-@property (nonatomic, strong, nullable) id descriptionValue;
-@property (nonatomic, strong, nullable) id desc;
+@property (nonatomic, strong, nullable) id description;
 @property (nonatomic, strong, nullable) id weCrewType;
 @property (nonatomic, strong, nullable) id bizRobotId;
 @end
@@ -145,6 +146,43 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsQueryWeAgentParams : NSObject
 @property (nonatomic, strong, nullable) id partnerAccount;
+@end
+
+@interface WLAgentSkillsUpdateWeAgentParams : NSObject
+@property (nonatomic, strong, nullable) id partnerAccount;
+@property (nonatomic, strong, nullable) id robotId;
+@property (nonatomic, strong, nullable) id name;
+@property (nonatomic, strong, nullable) id icon;
+@property (nonatomic, strong, nullable) id description;
+@end
+
+@interface WLAgentSkillsDeleteWeAgentParams : NSObject
+@property (nonatomic, strong, nullable) id partnerAccount;
+@property (nonatomic, strong, nullable) id robotId;
+@end
+
+@interface WLAgentSkillsOpenAssistantEditPageParams : NSObject
+@property (nonatomic, strong, nullable) id partnerAccount;
+@property (nonatomic, strong, nullable) id robotId;
+@property (nonatomic, copy, nullable) WLAgentSkillsAssistantDetailUpdatedCallback onUpdated;
+@end
+
+@interface WLAgentSkillsNotifyAssistantDetailUpdatedParams : NSObject
+@property (nonatomic, strong, nullable) id name;
+@property (nonatomic, strong, nullable) id icon;
+@property (nonatomic, strong, nullable) id description;
+@property (nonatomic, strong, nullable) id partnerAccount;
+@property (nonatomic, strong, nullable) id robotId;
+@end
+
+@interface WLAgentSkillsQueryQrcodeInfoParams : NSObject
+@property (nonatomic, strong, nullable) id qrcode;
+@end
+
+@interface WLAgentSkillsUpdateQrcodeInfoParams : NSObject
+@property (nonatomic, strong, nullable) id qrcode;
+@property (nonatomic, strong, nullable) id ak;
+@property (nonatomic, strong, nullable) id status;
 @end
 
 #pragma mark - Data Models
@@ -309,6 +347,27 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 - (NSDictionary *)toDictionary;
 @end
 
+@interface WLAgentSkillsAssistantDetailUpdatedPayload : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *icon;
+@property (nonatomic, copy) NSString *descriptionValue;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsQrcodeInfo : NSObject
+@property (nonatomic, copy) NSString *qrcode;
+@property (nonatomic, copy) NSString *weUrl;
+@property (nonatomic, copy) NSString *pcUrl;
+@property (nonatomic, copy) NSString *expireTime;
+@property (nonatomic, strong) NSNumber *status;
+@property (nonatomic, assign) BOOL expired;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
 @interface WLAgentSkillsSessionError : NSObject
 @property (nonatomic, copy) NSString *code;
 @property (nonatomic, copy) NSString *message;
@@ -451,6 +510,36 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 
 @interface WLAgentSkillsWeAgentDetailsArrayResult : NSObject
 @property (nonatomic, strong) NSArray<WLAgentSkillsWeAgentDetails *> *weAgentDetailsArray;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsUpdateWeAgentResult : NSObject
+@property (nonatomic, copy) NSString *updateResult;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsDeleteWeAgentResult : NSObject
+@property (nonatomic, copy) NSString *deleteResult;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsOpenAssistantEditPageResult : NSObject
+@property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsNotifyAssistantDetailUpdatedResult : NSObject
+@property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsUpdateQrcodeInfoResult : NSObject
+@property (nonatomic, copy) NSString *status;
 
 - (NSDictionary *)toDictionary;
 @end
