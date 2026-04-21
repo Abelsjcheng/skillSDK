@@ -39,7 +39,7 @@
 5. 建议存储 key：
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
    - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
-   - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情（`WeAgentDetailsArray`）
+   - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情对象（`WeAgentDetails`）
 6. SP 持久化文档路径：待填写。
 
 ---
@@ -400,13 +400,14 @@ getAssistantDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ### 实现方法
 
-1. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`（`userId` 当前使用 mock 值：`mock_user_id`），并从中按 `partnerAccount` 读取对应助理详情缓存。
-2. 若读取到对应 `partnerAccount` 的缓存，则直接返回缓存内容。
+1. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`（`userId` 当前使用 mock 值：`mock_user_id`），并从中按 `partnerAccount` 读取对应助理详情对象缓存。
+2. 若读取到对应 `partnerAccount` 的助理详情对象缓存，则 SDK 将该对象组装为 `weAgentDetailsArray` 返回。
 3. 在返回缓存后，SDK 异步调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-4. SDK 解析服务端返回 `data[]` 并组装为 `weAgentDetailsArray`，再写回按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并覆盖更新缓存 key `we_agent_details`。
+4. SDK 解析服务端返回 `data[]`；若返回结果非空，则取首个助理详情对象写回按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并覆盖更新缓存 key `we_agent_details`。
 5. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-6. SDK 解析服务端返回 `data[]` 并组装为 `weAgentDetailsArray`，写入按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并更新缓存 key `we_agent_details`，再将该结果返回给调用方。
-7. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 可记录日志用于排查。
+6. SDK 解析服务端返回 `data[]`；若返回结果非空，则取首个助理详情对象写入按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并更新缓存 key `we_agent_details`；同时 SDK 仍按接口约定将完整结果组装为 `weAgentDetailsArray` 返回给调用方。
+7. 若服务端返回的助理详情为空，则 SDK 不设置新缓存，也不删除旧缓存。
+8. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 可记录日志用于排查。
 
 ---
 
@@ -517,7 +518,7 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 ### 实现方法
 
 1. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
-2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并透传删除标识参数：
+2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传删除标识参数：
    - 若仅传 `partnerAccount`，则透传 `partnerAccount`；
    - 若仅传 `robotId`，则透传 `robotId`；
    - 若两者同时传入，则两个参数都透传给服务端。
