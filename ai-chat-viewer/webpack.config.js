@@ -78,6 +78,19 @@ module.exports = (env = {}, argv = {}) => {
       port: 3000,
       hot: true,
       historyApiFallback: true,
+      proxy: [
+        {
+          context: ['/api'],
+          target: 'http://localhost:8082',
+          changeOrigin: true,
+        },
+        {
+          context: ['/ws'],
+          target: 'ws://localhost:8082',
+          ws: true,
+          changeOrigin: true,
+        },
+      ],
     },
     devtool: isDevelopment ? 'eval-cheap-module-source-map' : false,
     performance: {
