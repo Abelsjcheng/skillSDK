@@ -337,8 +337,8 @@ updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
-| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
 | `name` | `string` | 是 | 助理名称 |
 | `icon` | `string` | 是 | 助理头像地址 |
 | `description` | `string` | 是 | 助理简介 |
@@ -371,7 +371,7 @@ updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
 ### 实现方法
 
 1. 调用服务端 REST API：`PUT /v4-1/we-crew`。
-2. SDK 按原样透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`。
+2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`；若两者同时传入，则两个参数都透传给服务端。
 3. SDK 从服务端响应中提取 `message`，并映射返回为 `updateResult`。
 
 ---
@@ -396,8 +396,8 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
-| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
 
 ### 入参示例
 
@@ -424,9 +424,10 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 ### 实现方法
 
 1. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
-2. SDK 透传删除标识参数：
-   - `partnerAccount`：优先使用；
-   - `robotId`：当调用方未传 `partnerAccount` 时可作为补充删除标识。
+2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并透传删除标识参数：
+   - 若仅传 `partnerAccount`，则透传 `partnerAccount`；
+   - 若仅传 `robotId`，则透传 `robotId`；
+   - 若两者同时传入，则两个参数都透传给服务端。
 3. SDK 从服务端响应中提取 `message`，并映射返回为 `deleteResult`。
 
 ---
@@ -452,9 +453,9 @@ openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistan
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
-| `robotId` | `string` | 是 | 助理机器人 ID |
-| `onUpdated` | `function` | 是 | 监听详情更新回调，回调出参为 `AssistantDetailUpdatedPayload` |
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `onUpdated` | `function` | 是 | 监听详情更新回调，回调出参为 `AssistantDetailUpdatedPayload`；相同 ID（按入参标识生成，优先使用 `partnerAccount`，否则使用 `robotId`）重复注册时覆盖旧监听，一个 ID 仅对应一个监听函数 |
 
 ### 入参示例
 
@@ -484,11 +485,16 @@ openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistan
 
 ### 实现方法
 
-1. SDK 接收 `partnerAccount`、`robotId` 与 `onUpdated` 回调，并在本地注册该回调。
-2. SDK 将 `partnerAccount` 和 `robotId` 作为 query 项拼接到 `h5://S008623/index.html?partnerAccount={partnerAccount}&robotId={robotId}#editAssistant`。
-3. 拼接完成后的 uri 地址当前先记为 `todo`，待后续页面地址方案确认后补齐。
-4. SDK 拉起助理编辑页面。
-5. SDK 返回 `OpenAssistantEditPageResult`，其中 `status` 固定为 `success`。
+1. SDK 接收 `partnerAccount`、`robotId` 与 `onUpdated` 回调，其中 `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
+2. SDK 按入参标识在本地注册回调监听，唯一 ID 生成规则为：优先使用 `partnerAccount`；当未传 `partnerAccount` 时，使用 `robotId`。
+3. 若相同 ID 已存在监听函数，则使用新的 `onUpdated` 覆盖旧监听；同一 ID 在任意时刻仅保留一个监听函数。
+4. SDK 将已有的标识参数拼接到 `h5://S008623/index.html#editAssistant`：
+   - 若传入 `partnerAccount`，则追加 query `partnerAccount={partnerAccount}`；
+   - 若未传 `partnerAccount` 但传入 `robotId`，则追加 query `robotId={robotId}`；
+   - 若两者均传入，则优先使用 `partnerAccount`。
+5. 拼接完成后的 uri 地址当前先记为 `todo`，待后续页面地址方案确认后补齐。
+6. SDK 拉起助理编辑页面。
+7. SDK 返回 `OpenAssistantEditPageResult`，其中 `status` 固定为 `success`。
 
 ---
 
@@ -516,8 +522,8 @@ notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promis
 | `name` | `string` | 是 | 助理名称 |
 | `icon` | `string` | 是 | 助理头像地址 |
 | `description` | `string` | 是 | 助理简介 |
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
-| `robotId` | `string` | 是 | 助理机器人 ID |
+| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
 
 ### 入参示例
 
@@ -547,8 +553,8 @@ notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promis
 
 ### 实现方法
 
-1. SDK 接收 `name`、`icon`、`description`、`partnerAccount`、`robotId`。
-2. SDK 根据 `partnerAccount` 与 `robotId` 定位 `openAssistantEditPage` 已注册的回调监听。
+1. SDK 接收 `name`、`icon`、`description`、`partnerAccount` 与 `robotId`，其中 `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
+2. SDK 根据与 `openAssistantEditPage` 一致的唯一 ID 规则定位当前已注册的回调监听：优先使用 `partnerAccount`；当未传 `partnerAccount` 时，使用 `robotId`；若该 ID 发生过重复注册，则以最后一次注册覆盖后的监听函数为准。
 3. SDK 触发对应的 `onUpdated` 回调，并将以下对象作为回调参数传出：
    - `name`
    - `icon`
@@ -594,8 +600,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
 | `qrcode` | `string` | 二维码唯一标识 |
 | `weUrl` | `string` | We 侧地址 |
 | `pcUrl` | `string` | PC 侧地址 |
-| `ak` | `string` | Access Key |
-| `sk` | `string` | Secret Key |
+| `expireTime` | `string` | 过期时间戳 |
 | `status` | `number` | 二维码状态 |
 | `expired` | `boolean` | 过期状态 |
 
@@ -606,8 +611,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
   "qrcode": "qr_001",
   "weUrl": "welink://xxx",
   "pcUrl": "https://xxx",
-  "ak": "ak_xxx",
-  "sk": "sk_xxx",
+  "expireTime": "1713686400000",
   "status": 1,
   "expired": false
 }
@@ -624,8 +628,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
    - `qrcode`
    - `weUrl`
    - `pcUrl`
-   - `ak`
-   - `sk`
+   - `expireTime`
    - `status`
    - `expired`
 
@@ -806,7 +809,7 @@ type QueryWeAgentParams = {
 
 ```typescript
 type UpdateWeAgentParams = {
-  partnerAccount: string
+  partnerAccount?: string
   robotId?: string
   name: string
   icon: string
@@ -826,7 +829,7 @@ type UpdateWeAgentResult = {
 
 ```typescript
 type DeleteWeAgentParams = {
-  partnerAccount: string
+  partnerAccount?: string
   robotId?: string
 }
 ```
@@ -853,8 +856,8 @@ type AssistantDetailUpdatedPayload = {
 
 ```typescript
 type OpenAssistantEditPageParams = {
-  partnerAccount: string
-  robotId: string
+  partnerAccount?: string
+  robotId?: string
   onUpdated: (payload: AssistantDetailUpdatedPayload) => void
 }
 ```
@@ -874,8 +877,8 @@ type NotifyAssistantDetailUpdatedParams = {
   name: string
   icon: string
   description: string
-  partnerAccount: string
-  robotId: string
+  partnerAccount?: string
+  robotId?: string
 }
 ```
 
@@ -902,8 +905,7 @@ type QrcodeInfo = {
   qrcode: string
   weUrl: string
   pcUrl: string
-  ak: string
-  sk: string
+  expireTime: string
   status: number
   expired: boolean
 }

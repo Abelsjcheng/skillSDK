@@ -316,7 +316,7 @@ interface CreateDigitalTwinParams {
 1. 页面结构拆分为两段：
    - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
    - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
-   - 页面根容器背景统一使用纯色：`rgba(244,247,253,1)`。
+   - 页面根容器背景改为通用助理背景图，移动端使用 `assistant-bg.png`、PC 端使用 `assistant-pc-bg.png`，并统一按页面尺寸拉伸显示（`background-size: 100% 100%`）。
 2. 内容区仅展示本地引导图资源，不再保留轮播状态与指示器逻辑；图片选择规则统一按端类型与当前国际化语言确定：
    - PC 中文：`src/imgs/activate-guide-pc.png`
    - PC 英文：`src/imgs/activate-guide-pc-en.png`
@@ -332,7 +332,7 @@ interface CreateDigitalTwinParams {
 ## 14. 助理详情页面设计
 
 1. 页面采用“标题区 + 内容区”纵向结构，整体宽高自适应占满路由容器。
-2. 标题区以外的页面区域背景统一改为线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
+2. 标题区以外的页面区域背景统一改为助理背景图，并按页面区域尺寸拉伸显示（`background-size: 100% 100%`）。
 3. 标题区通过 `isPcMiniApp` 区分端样式：
    - `isPcMiniApp === true`（PC）：`height: 54px; padding: 11px 16px;`，左侧 `32x32` 关闭按钮（内含 `20x20` 关闭图标），右侧 `32x32` 客服按钮（内含 `20x20` 客服图标），中间标题居中。
    - `isPcMiniApp === false`（移动）：沿用现有 `44px` 高度与左侧返回+客服按钮布局。
@@ -349,7 +349,7 @@ interface CreateDigitalTwinParams {
 ## 15. 切换助理页面设计
 
 1. 页面结构采用“标题区 + 列表内容区”，整体宽高占满路由容器。
-2. 标题区以外的页面区域背景统一改为线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
+2. 标题区以外的页面区域背景统一改为助理背景图，并按页面区域尺寸拉伸显示（`background-size: 100% 100%`）。
 3. 标题区复用助理详情页的结构与样式规范（含 `isPcMiniApp` 的 PC/移动端分支），标题文案使用“切换助理”。
 4. 内容区使用 `padding: 12px 16px`，内部助理列表容器设置 `overflow-y: auto` 支持超出滚动，并隐藏可视滚动条。
 5. 助理列表项样式固定：
@@ -374,7 +374,7 @@ interface CreateDigitalTwinParams {
 ## 16. 启动助理页面设计
 
 1. 页面组件放在 `src/pages/selectAssistant.tsx`。
-2. 标题区以外的页面区域背景统一改为线性渐变：`linear-gradient(180deg, #f3f8ff, #ffffff 100%)`。
+2. 页面背景统一改为助理背景图，并按当前页面尺寸拉伸显示（`background-size: 100% 100%`）。
 3. 使用 `isPcMiniApp` 做双端分支：
    - `false`（移动）：继续复用 `AssistantSelectionPage` 的现有样式与交互，不做变更；
    - `true`（PC）：走独立 PC 布局渲染。
@@ -391,7 +391,7 @@ interface CreateDigitalTwinParams {
 
 1. `WeAgentCUI` 为当前唯一对话页，`App` 仅保留 `weAgentCUI` 数据流与会话能力（消息加载、发送、流式更新、停止、历史分页）。
 2. 页面结构为：`对话内容区 + 多功能按钮区 + 底部输入区`。
-4. `weAgentCUI` 页面根容器背景统一使用线性渐变：`linear-gradient(90deg, rgba(243,248,255,1), rgba(255,255,255,1) 100%)`。
+4. `weAgentCUI` 页面根容器背景统一使用助理背景图，并按当前页面尺寸拉伸显示（`background-size: 100% 100%`）；移动端默认 `assistant-bg.png`，PC 端继续通过页面级 class 覆盖为 `assistant-pc-bg.png`。
 5. 多功能按钮区高度固定为 `32px`，左侧提供相邻排列的“新建会话”“历史会话”两个 `32px x 32px` 的白底圆角按钮，按钮间距固定 `8px`，图标统一为 `16px x 16px`；其中“新建会话”按钮按最简规则直接使用 `messages.length === 0` 判断当前是否为空会话，满足时不重复创建会话，直接 toast 提示“当前是最新会话”；中间增加白底圆角状态提示块“输出中...”，高度 `32px`、圆角 `20px`、文本样式 `12px/400`、颜色 `rgba(38,159,255,1)`，仅在 AI 生成阶段显示，且位置固定在整行多功能按钮区的水平中点。该提示块必须与当前激活的 `welinkSessionId` 绑定，切换会话后不继承旧会话的生成态，旧会话晚到的 `busy/idle/error` 事件也不得影响当前会话的显示状态。
 6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
    - 用户消息右对齐，头部文案为“测试 + 时间”，右侧头像 `24x24`；
