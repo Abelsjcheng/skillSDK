@@ -1,14 +1,18 @@
 package com.opencode.skill;
 
+import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.opencode.skill.callback.AssistantDetailUpdatedCallback;
 import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SessionStatusCallback;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.callback.SkillWecodeStatusCallback;
+import com.opencode.skill.model.AssistantDetailUpdatedPayload;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.constant.SessionStatus;
 import com.opencode.skill.constant.SkillWecodeStatus;
@@ -21,14 +25,22 @@ import com.opencode.skill.model.CreateDigitalTwinResult;
 import com.opencode.skill.model.CreateNewSessionParams;
 import com.opencode.skill.model.CreateSessionParams;
 import com.opencode.skill.model.CursorResult;
+import com.opencode.skill.model.DeleteWeAgentParams;
+import com.opencode.skill.model.DeleteWeAgentResult;
 import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.HistorySessionsParams;
+import com.opencode.skill.model.NotifyAssistantDetailUpdatedParams;
+import com.opencode.skill.model.NotifyAssistantDetailUpdatedResult;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
+import com.opencode.skill.model.OpenAssistantEditPageParams;
+import com.opencode.skill.model.OpenAssistantEditPageResult;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.PageParams;
+import com.opencode.skill.model.QrcodeInfo;
 import com.opencode.skill.model.QueryWeAgentParams;
+import com.opencode.skill.model.QueryQrcodeInfoParams;
 import com.opencode.skill.model.RegisterSessionListenerParams;
 import com.opencode.skill.model.RegisterSessionListenerResult;
 import com.opencode.skill.model.ReplyPermissionParams;
@@ -49,6 +61,10 @@ import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.StreamMessage;
 import com.opencode.skill.model.UnregisterSessionListenerParams;
 import com.opencode.skill.model.UnregisterSessionListenerResult;
+import com.opencode.skill.model.UpdateQrcodeInfoParams;
+import com.opencode.skill.model.UpdateQrcodeInfoResult;
+import com.opencode.skill.model.UpdateWeAgentParams;
+import com.opencode.skill.model.UpdateWeAgentResult;
 import com.opencode.skill.model.WeAgentDetailsArrayResult;
 import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentListResult;
@@ -95,6 +111,8 @@ public final class SkillSDK {
     private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
     @NonNull
     private final Map<String, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
+    @NonNull
+    private final Map<String, AssistantDetailUpdatedCallback> assistantDetailUpdatedCallbacks = new ConcurrentHashMap<>();
     @NonNull
     private final Map<String, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
     @NonNull
@@ -1045,11 +1063,244 @@ public final class SkillSDK {
         );
     }
 
+    // 21. updateWeAgent
+    public void updateWeAgent(@NonNull UpdateWeAgentParams params,
+            @NonNull SkillCallback<UpdateWeAgentResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
+        final String robotId = normalizeOptionalString(params.getRobotId());
+        if (partnerAccount == null && robotId == null) {
+            callback.onError(error(1000, "partnerAccount or robotId is required"));
+            return;
+        }
+
+        final String name;
+        final String icon;
+        final String description;
+        try {
+            name = TypeConvertUtils.requireString(params.getName(), "name");
+            icon = TypeConvertUtils.requireString(params.getIcon(), "icon");
+            description = TypeConvertUtils.requireString(params.getDescription(), "description");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        apiClient.updateWeAgent(partnerAccount, robotId, name, icon, description, new SkillCallback<UpdateWeAgentResult>() {
+            @Override
+            public void onSuccess(@Nullable UpdateWeAgentResult result) {
+                callback.onSuccess(result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 22. deleteWeAgent
+    public void deleteWeAgent(@NonNull DeleteWeAgentParams params,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
+        final String robotId = normalizeOptionalString(params.getRobotId());
+        if (partnerAccount == null && robotId == null) {
+            callback.onError(error(1000, "partnerAccount or robotId is required"));
+            return;
+        }
+
+        apiClient.deleteWeAgent(partnerAccount, robotId, new SkillCallback<DeleteWeAgentResult>() {
+            @Override
+            public void onSuccess(@Nullable DeleteWeAgentResult result) {
+                callback.onSuccess(result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 23. openAssistantEditPage
+    public void openAssistantEditPage(@NonNull OpenAssistantEditPageParams params,
+            @NonNull SkillCallback<OpenAssistantEditPageResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
+        final String robotId = normalizeOptionalString(params.getRobotId());
+        final String identityKey;
+        try {
+            identityKey = resolveAssistantIdentityKey(partnerAccount, robotId);
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        Context context = config == null ? null : config.getContext();
+        if (context == null) {
+            callback.onError(error(5000, "context is required"));
+            return;
+        }
+
+        assistantDetailUpdatedCallbacks.put(identityKey, params.getOnUpdated());
+
+        try {
+            String uri = buildAssistantEditPageUri(partnerAccount, robotId);
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            callback.onSuccess(new OpenAssistantEditPageResult("success"));
+        } catch (Throwable throwable) {
+            callback.onError(wrapError(throwable));
+        }
+    }
+
+    // 24. notifyAssistantDetailUpdated
+    public void notifyAssistantDetailUpdated(@NonNull NotifyAssistantDetailUpdatedParams params,
+            @NonNull SkillCallback<NotifyAssistantDetailUpdatedResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String name;
+        final String icon;
+        final String description;
+        try {
+            name = TypeConvertUtils.requireString(params.getName(), "name");
+            icon = TypeConvertUtils.requireString(params.getIcon(), "icon");
+            description = TypeConvertUtils.requireString(params.getDescription(), "description");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
+        final String robotId = normalizeOptionalString(params.getRobotId());
+        final String identityKey;
+        try {
+            identityKey = resolveAssistantIdentityKey(partnerAccount, robotId);
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        AssistantDetailUpdatedCallback listener = assistantDetailUpdatedCallbacks.get(identityKey);
+        if (listener != null) {
+            try {
+                listener.onUpdated(new AssistantDetailUpdatedPayload(name, icon, description));
+            } catch (Throwable throwable) {
+                callback.onError(wrapError(throwable));
+                return;
+            }
+        }
+        callback.onSuccess(new NotifyAssistantDetailUpdatedResult("success"));
+    }
+
+    // 25. queryQrcodeInfo
+    public void queryQrcodeInfo(@NonNull QueryQrcodeInfoParams params,
+            @NonNull SkillCallback<QrcodeInfo> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String qrcode;
+        try {
+            qrcode = TypeConvertUtils.requireString(params.getQrcode(), "qrcode");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        apiClient.queryQrcodeInfo(qrcode, new SkillCallback<QrcodeInfo>() {
+            @Override
+            public void onSuccess(@Nullable QrcodeInfo result) {
+                callback.onSuccess(result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 26. updateQrcodeInfo
+    public void updateQrcodeInfo(@NonNull UpdateQrcodeInfoParams params,
+            @NonNull SkillCallback<UpdateQrcodeInfoResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String qrcode;
+        final String ak = normalizeOptionalString(params.getAk());
+        final int status;
+        try {
+            qrcode = TypeConvertUtils.requireString(params.getQrcode(), "qrcode");
+            status = TypeConvertUtils.requireInteger(params.getStatus(), "status");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        apiClient.updateQrcodeInfo(qrcode, ak, status, new SkillCallback<UpdateQrcodeInfoResult>() {
+            @Override
+            public void onSuccess(@Nullable UpdateQrcodeInfoResult result) {
+                callback.onSuccess(result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
     public synchronized void shutdown() {
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.shutdown();
         apiClient.shutdown();
         listenerBindings.clear();
+        assistantDetailUpdatedCallbacks.clear();
         sessionStatusCallbacks.clear();
         lastSessionStatusBySession.clear();
         wecodeStatusCallbacks.clear();
@@ -1292,6 +1543,34 @@ public final class SkillSDK {
         return "ACTIVE".equalsIgnoreCase(value)
                 || "IDLE".equalsIgnoreCase(value)
                 || "CLOSED".equalsIgnoreCase(value);
+    }
+
+    @NonNull
+    private String resolveAssistantIdentityKey(@Nullable String partnerAccount, @Nullable String robotId) {
+        if (!isBlank(partnerAccount)) {
+            return partnerAccount.trim();
+        }
+        if (!isBlank(robotId)) {
+            return robotId.trim();
+        }
+        throw error(1000, "partnerAccount or robotId is required");
+    }
+
+    @NonNull
+    private String buildAssistantEditPageUri(@Nullable String partnerAccount, @Nullable String robotId) {
+        String uri = appendHashFragment(ASSISTANT_H5_URI, "editAssistant");
+        if (!isBlank(partnerAccount)) {
+            String withPartnerAccount = appendQueryParameter(uri, "partnerAccount", partnerAccount.trim());
+            if (withPartnerAccount == null) {
+                throw error(5000, "Failed to build assistant edit page uri");
+            }
+            return withPartnerAccount;
+        }
+        String withRobotId = appendQueryParameter(uri, "robotId", robotId == null ? "" : robotId.trim());
+        if (withRobotId == null) {
+            throw error(5000, "Failed to build assistant edit page uri");
+        }
+        return withRobotId;
     }
 
     private static int clamp(int value, int min, int max) {

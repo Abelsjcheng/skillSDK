@@ -16,8 +16,10 @@ import com.opencode.skill.model.CreateNewSessionParams;
 import com.opencode.skill.model.CreateDigitalTwinResult;
 import com.opencode.skill.model.CreateSessionParams;
 import com.opencode.skill.model.CursorResult;
+import com.opencode.skill.model.DeleteWeAgentResult;
 import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.PageResult;
+import com.opencode.skill.model.QrcodeInfo;
 import com.opencode.skill.model.ReplyPermissionResult;
 import com.opencode.skill.model.SendMessageResult;
 import com.opencode.skill.model.SendMessageToIMResult;
@@ -25,6 +27,8 @@ import com.opencode.skill.model.SessionMessage;
 import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.SkillSession;
 import com.opencode.skill.model.StopSkillResult;
+import com.opencode.skill.model.UpdateQrcodeInfoResult;
+import com.opencode.skill.model.UpdateWeAgentResult;
 import com.opencode.skill.model.WeAgent;
 import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentDetailsArrayResult;
@@ -190,6 +194,117 @@ public class ApiClient {
                 WeAgentDetailsArrayResult payload = new WeAgentDetailsArrayResult();
                 payload.setWeAgentDetailsArray(parseWeAgentDetails(result));
                 callback.onSuccess(payload);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    public void updateWeAgent(
+            @Nullable String partnerAccount,
+            @Nullable String robotId,
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description,
+            @NonNull SkillCallback<UpdateWeAgentResult> callback
+    ) {
+        JsonObject body = new JsonObject();
+        if (partnerAccount != null && !partnerAccount.trim().isEmpty()) {
+            body.addProperty("partnerAccount", partnerAccount.trim());
+        }
+        if (robotId != null && !robotId.trim().isEmpty()) {
+            body.addProperty("robotId", robotId.trim());
+        }
+        body.addProperty("name", name);
+        body.addProperty("icon", icon);
+        body.addProperty("description", description);
+
+        Request request = newRequestBuilder("/v4-1/we-crew", true)
+                .put(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+                .build();
+        executeRaw(request, new SkillCallback<JsonElement>() {
+            @Override
+            public void onSuccess(@Nullable JsonElement result) {
+                try {
+                    callback.onSuccess(new UpdateWeAgentResult(resolveResponseMessage(result)));
+                } catch (SkillSdkException error) {
+                    callback.onError(error);
+                }
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    public void deleteWeAgent(
+            @Nullable String partnerAccount,
+            @Nullable String robotId,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    ) {
+        HttpUrl.Builder urlBuilder = urlBuilder("/v4-1/we-crew", true);
+        if (partnerAccount != null && !partnerAccount.trim().isEmpty()) {
+            urlBuilder.addQueryParameter("partnerAccount", partnerAccount.trim());
+        }
+        if (robotId != null && !robotId.trim().isEmpty()) {
+            urlBuilder.addQueryParameter("robotId", robotId.trim());
+        }
+        Request request = newRequestBuilder(urlBuilder.build())
+                .delete()
+                .build();
+        executeRaw(request, new SkillCallback<JsonElement>() {
+            @Override
+            public void onSuccess(@Nullable JsonElement result) {
+                try {
+                    callback.onSuccess(new DeleteWeAgentResult(resolveResponseMessage(result)));
+                } catch (SkillSdkException error) {
+                    callback.onError(error);
+                }
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    public void queryQrcodeInfo(@NonNull String qrcode, @NonNull SkillCallback<QrcodeInfo> callback) {
+        Request request = newRequestBuilder("/nologin/we-crew/im-register/qrcode/" + qrcode, true)
+                .get()
+                .build();
+        executeEnvelope(request, QrcodeInfo.class, callback);
+    }
+
+    public void updateQrcodeInfo(
+            @NonNull String qrcode,
+            @Nullable String ak,
+            int status,
+            @NonNull SkillCallback<UpdateQrcodeInfoResult> callback
+    ) {
+        JsonObject body = new JsonObject();
+        body.addProperty("qrcode", qrcode);
+        if (ak != null && !ak.trim().isEmpty()) {
+            body.addProperty("ak", ak.trim());
+        }
+        body.addProperty("status", status);
+
+        Request request = newRequestBuilder("/v4-1/we-crew/im-register/qrcode", true)
+                .put(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
+                .build();
+        executeRaw(request, new SkillCallback<JsonElement>() {
+            @Override
+            public void onSuccess(@Nullable JsonElement result) {
+                try {
+                    callback.onSuccess(resolveUpdateQrcodeInfoResult(result));
+                } catch (SkillSdkException error) {
+                    callback.onError(error);
+                }
             }
 
             @Override
@@ -402,6 +517,32 @@ public class ApiClient {
             return "success".equalsIgnoreCase(status);
         }
         return true;
+    }
+
+    @NonNull
+    private UpdateQrcodeInfoResult resolveUpdateQrcodeInfoResult(@Nullable JsonElement result) {
+        if (result == null || result.isJsonNull() || !result.isJsonObject()) {
+            throw new SkillSdkException(7000, "Unexpected updateQrcodeInfo response schema");
+        }
+        JsonObject rootObject = result.getAsJsonObject();
+        String code = getString(rootObject, "code", "");
+        if (!"200".equals(code) && !"200.0".equals(code)) {
+            throw new SkillSdkException(7000, "updateQrcodeInfo did not return code 200");
+        }
+        return new UpdateQrcodeInfoResult("success");
+    }
+
+    @NonNull
+    private String resolveResponseMessage(@Nullable JsonElement result) {
+        if (result == null || result.isJsonNull() || !result.isJsonObject()) {
+            throw new SkillSdkException(7000, "Unexpected response schema");
+        }
+        JsonObject rootObject = result.getAsJsonObject();
+        String message = getString(rootObject, "message", "");
+        if (message.isEmpty()) {
+            throw new SkillSdkException(7000, "Response message is empty");
+        }
+        return message;
     }
 
     public synchronized void shutdown() {

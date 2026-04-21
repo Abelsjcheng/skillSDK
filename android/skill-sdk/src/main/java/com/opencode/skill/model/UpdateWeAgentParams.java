@@ -1,0 +1,60 @@
+package com.opencode.skill.model;
+
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import java.util.Objects;
+
+@Keep
+public class UpdateWeAgentParams {
+    @Nullable
+    private final String partnerAccount;
+    @Nullable
+    private final String robotId;
+    @NonNull
+    private final String name;
+    @NonNull
+    private final String icon;
+    @NonNull
+    private final String description;
+
+    public UpdateWeAgentParams(
+            @Nullable String partnerAccount,
+            @Nullable String robotId,
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description
+    ) {
+        this.partnerAccount = partnerAccount;
+        this.robotId = robotId;
+        this.name = Objects.requireNonNull(name, "name == null");
+        this.icon = Objects.requireNonNull(icon, "icon == null");
+        this.description = Objects.requireNonNull(description, "description == null");
+    }
+
+    @Nullable
+    public String getPartnerAccount() {
+        return partnerAccount;
+    }
+
+    @Nullable
+    public String getRobotId() {
+        return robotId;
+    }
+
+    @NonNull
+    public String getName() {
+        return name;
+    }
+
+    @NonNull
+    public String getIcon() {
+        return icon;
+    }
+
+    @NonNull
+    public String getDescription() {
+        return description;
+    }
+}
