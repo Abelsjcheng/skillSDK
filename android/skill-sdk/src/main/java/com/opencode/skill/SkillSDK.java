@@ -946,10 +946,52 @@ public final class SkillSDK {
         apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
             @Override
             public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
-                WeAgentDetailsArrayResult resolved = result == null ? new WeAgentDetailsArrayResult() : result;
-                if (!resolved.getWeAgentDetailsArray().isEmpty()) {
-                    weAgentStorage.saveCurrentWeAgentDetail(resolved.getWeAgentDetailsArray().get(0));
-                }
+                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
+                cacheWeAgentDetailsResult(partnerAccount, resolved);
+                callback.onSuccess(resolved);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 19.1. getAssistantDetails
+    public void getAssistantDetails(@NonNull QueryWeAgentParams params,
+            @NonNull SkillCallback<WeAgentDetailsArrayResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        WeAgentDetails cached = weAgentStorage.getWeAgentDetails(partnerAccount);
+        if (cached != null) {
+            WeAgentDetailsArrayResult cachedResult = wrapWeAgentDetail(cached);
+            weAgentStorage.saveCurrentWeAgentDetail(cached);
+            callback.onSuccess(cachedResult);
+            refreshAssistantDetailsCache(partnerAccount);
+            return;
+        }
+
+        apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
+                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
+                cacheWeAgentDetailsResult(partnerAccount, resolved);
                 callback.onSuccess(resolved);
             }
 
@@ -1015,6 +1057,43 @@ public final class SkillSDK {
         stoppedHoldingBySession.clear();
         streamingMessageCache.clearAll();
         config = null;
+    }
+
+    @NonNull
+    private WeAgentDetailsArrayResult resolveWeAgentDetailsResult(@Nullable WeAgentDetailsArrayResult result) {
+        return result == null ? new WeAgentDetailsArrayResult() : result;
+    }
+
+    private void cacheWeAgentDetailsResult(@NonNull String partnerAccount, @NonNull WeAgentDetailsArrayResult result) {
+        if (result.getWeAgentDetailsArray().isEmpty()) {
+            return;
+        }
+        WeAgentDetails cachedDetail = result.getWeAgentDetailsArray().get(0);
+        weAgentStorage.saveWeAgentDetails(partnerAccount, cachedDetail);
+        weAgentStorage.saveCurrentWeAgentDetail(cachedDetail);
+    }
+
+    private void refreshAssistantDetailsCache(@NonNull String partnerAccount) {
+        apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
+                cacheWeAgentDetailsResult(partnerAccount, resolveWeAgentDetailsResult(result));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                // Ignore background refresh failures.
+            }
+        });
+    }
+
+    @NonNull
+    private WeAgentDetailsArrayResult wrapWeAgentDetail(@NonNull WeAgentDetails detail) {
+        WeAgentDetailsArrayResult result = new WeAgentDetailsArrayResult();
+        List<WeAgentDetails> list = new ArrayList<>();
+        list.add(detail);
+        result.setWeAgentDetailsArray(list);
+        return result;
     }
 
     private void sendMessageInternal(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,

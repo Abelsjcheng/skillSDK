@@ -28,6 +28,7 @@ public final class WeAgentStorage {
     private static final String PREFS_NAME_PREFIX = "skill_sdk_we_agent_";
     private static final String KEY_CURRENT_WE_AGENT_DETAIL = "current_we_agent_detail";
     private static final String KEY_WE_AGENT_LIST_CACHE = "we_agent_list_cache";
+    private static final String KEY_WE_AGENT_DETAILS = "we_agent_details";
 
     @NonNull
     private final Gson gson = new Gson();
@@ -85,6 +86,31 @@ public final class WeAgentStorage {
         } catch (Exception ignored) {
             return new ArrayList<>();
         }
+    }
+
+    public synchronized void saveWeAgentDetails(
+            @NonNull String partnerAccount,
+            @Nullable WeAgentDetails details
+    ) {
+        if (details == null) {
+            return;
+        }
+        SharedPreferences prefs = resolveSharedPreferencesIfNeeded();
+        Map<String, WeAgentDetails> cache = loadWeAgentDetailsCache();
+        cache.put(partnerAccount, details);
+        persistWeAgentDetailsCache(prefs, cache);
+    }
+
+    @Nullable
+    public synchronized WeAgentDetails getWeAgentDetails(
+            @NonNull String partnerAccount
+    ) {
+        Map<String, WeAgentDetails> cache = loadWeAgentDetailsCache();
+        WeAgentDetails details = cache.get(partnerAccount);
+        if (details == null) {
+            return null;
+        }
+        return details;
     }
 
     @Nullable
@@ -149,4 +175,35 @@ public final class WeAgentStorage {
         }
         return memoryFallback.get(key);
     }
+
+    @NonNull
+    private Map<String, WeAgentDetails> loadWeAgentDetailsCache() {
+        String raw = readValue(resolveSharedPreferencesIfNeeded(), KEY_WE_AGENT_DETAILS);
+        if (raw == null || raw.trim().isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            Type mapType = TypeToken.getParameterized(
+                    Map.class,
+                    String.class,
+                    WeAgentDetails.class
+            ).getType();
+            Map<String, WeAgentDetails> parsed = gson.fromJson(raw, mapType);
+            return parsed == null ? new HashMap<>() : new HashMap<>(parsed);
+        } catch (Exception ignored) {
+            return new HashMap<>();
+        }
+    }
+
+    private void persistWeAgentDetailsCache(
+            @Nullable SharedPreferences prefs,
+            @NonNull Map<String, WeAgentDetails> cache
+    ) {
+        if (cache.isEmpty()) {
+            removeValue(prefs, KEY_WE_AGENT_DETAILS);
+            return;
+        }
+        putValue(prefs, KEY_WE_AGENT_DETAILS, gson.toJson(cache));
+    }
+
 }
