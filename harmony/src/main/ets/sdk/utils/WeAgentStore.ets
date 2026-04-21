@@ -1,11 +1,12 @@
 import preferences from '@ohos.data.preferences';
 import common from '@ohos.app.ability.common';
-import { WeAgent, WeAgentDetails } from '../types';
+import { WeAgent, WeAgentDetails, WeAgentDetailsArray } from '../types';
 
 const MOCK_USER_ID = 'mock_user_id';
 const STORE_NAME_PREFIX = 'skill_sdk_we_agent_';
 const KEY_CURRENT_DETAIL = 'current_we_agent_detail';
 const KEY_LIST_CACHE = 'we_agent_list_cache';
+const KEY_DETAILS_CACHE = 'we_agent_details';
 
 /**
  * Preferences-backed store for V2 assistant cache.
@@ -60,7 +61,28 @@ export class WeAgentStore {
     }
   }
 
-  private putJson(key: string, value: WeAgentDetails | WeAgent[]): void {
+  saveDetailsByPartnerAccount(partnerAccount: string, detail: WeAgentDetails | null): void {
+    if (detail === null) {
+      return;
+    }
+    const cache = this.loadDetailsCache();
+    cache[partnerAccount] = detail;
+    this.putJson(KEY_DETAILS_CACHE, cache);
+  }
+
+  loadDetailsByPartnerAccount(partnerAccount: string): WeAgentDetails | null {
+    const cache = this.loadDetailsCache();
+    const value = cache[partnerAccount];
+    if (value === undefined) {
+      return null;
+    }
+    return value;
+  }
+
+  private putJson(
+    key: string,
+    value: WeAgentDetails | WeAgent[] | WeAgentDetailsArray | Record<string, WeAgentDetails>
+  ): void {
     const encoded = JSON.stringify(value);
     const pref = this.getPreferencesInstance();
     if (pref !== null) {
@@ -90,6 +112,29 @@ export class WeAgentStore {
       }
     }
     return this.fallback[key] ?? null;
+  }
+
+  private loadDetailsCache(): Record<string, WeAgentDetails> {
+    const raw = this.getString(KEY_DETAILS_CACHE);
+    if (raw === null || raw.trim() === '') {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+      }
+      const result: Record<string, WeAgentDetails> = {};
+      Object.keys(parsed as Record<string, Object>).forEach((key: string) => {
+        const value = (parsed as Record<string, Object>)[key];
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+          result[key] = value as WeAgentDetails;
+        }
+      });
+      return result;
+    } catch (_error) {
+      return {};
+    }
   }
 
   private getPreferencesInstance(): preferences.Preferences | null {
