@@ -8,7 +8,6 @@ import type { AssistantPageHeaderAction, AssistantPageHeaderProps } from '../../
 import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
-export type { AssistantPageHeaderAction } from '../../types/components';
 
 const noop = () => {};
 

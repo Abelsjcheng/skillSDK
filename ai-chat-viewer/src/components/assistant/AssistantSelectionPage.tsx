@@ -9,8 +9,8 @@ import {
 } from '../../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import AssistantCardList from './AssistantCardList';
-import AssistantPageHeader, { type AssistantPageHeaderAction } from './AssistantPageHeader';
-import type { AssistantSelectionPageProps } from '../../types/components';
+import AssistantPageHeader from './AssistantPageHeader';
+import type { AssistantPageHeaderAction, AssistantSelectionPageProps } from '../../types/components';
 import type { AssistantItem } from '../../types/assistant';
 
 const EMPTY_ASSISTANT_LIST: AssistantItem[] = [];

@@ -4,7 +4,7 @@ import AvatarImage from '../components/AvatarImage';
 import AssistantDetailActionSheet from '../components/assistant/AssistantDetailActionSheet';
 import AssistantDetailDeleteModal from '../components/assistant/AssistantDetailDeleteModal';
 import AssistantDetailPcMenu from '../components/assistant/AssistantDetailPcMenu';
-import AssistantPageHeader, { type AssistantPageHeaderAction } from '../components/assistant/AssistantPageHeader';
+import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
 import EditAssistantContent from '../components/assistant/EditAssistantContent';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import { APP_ID, isPcMiniApp } from '../constants';
@@ -16,6 +16,7 @@ import iconCopy from '../imgs/icon-copy.svg';
 import moreIcon from '../imgs/more_icon.png';
 import serviceIcon from '../imgs/icon-service.svg';
 import type { WeAgentDetails } from '../types/bridge';
+import type { AssistantPageHeaderAction } from '../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
 import type {
   AssistantDetailOverlay,
