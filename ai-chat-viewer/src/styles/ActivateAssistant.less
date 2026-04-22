@@ -61,6 +61,36 @@
   cursor: pointer;
 }
 
+.activate-assistant--mobile {
+  justify-content: flex-start;
+}
+
+.activate-assistant--mobile .activate-assistant__center {
+  flex: 1;
+  min-height: 0;
+  justify-content: flex-end;
+  padding-bottom: 16px;
+}
+
+.activate-assistant--mobile .activate-assistant__content {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  justify-content: flex-end;
+}
+
+.activate-assistant--mobile .activate-assistant__carousel {
+  width: min(322px, 100%);
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 322 / 350;
+}
+
+.activate-assistant--mobile .activate-assistant__actions {
+  margin-top: max(0px, min(63px, calc(100vh - 430px)));
+  flex-shrink: 0;
+}
+
 .activate-assistant--pc {
   background-image: url('../imgs/assistant-cui-pc-bg.png');
   background-size: cover;
