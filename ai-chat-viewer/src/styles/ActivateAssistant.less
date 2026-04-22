@@ -63,19 +63,22 @@
 
 .activate-assistant--mobile {
   justify-content: flex-start;
+  padding-bottom: clamp(16px, calc(100vh - 451px), 50px);
 }
 
 .activate-assistant--mobile .activate-assistant__center {
   flex: 1;
   min-height: 0;
   justify-content: flex-end;
-  padding-bottom: 16px;
+  box-sizing: border-box;
 }
 
 .activate-assistant--mobile .activate-assistant__content {
   width: 100%;
   flex: 1;
   min-height: 0;
+  flex-direction: column;
+  align-items: center;
   justify-content: flex-end;
 }
 
@@ -84,10 +87,11 @@
   height: auto;
   max-height: 100%;
   aspect-ratio: 322 / 350;
+  margin: 0 auto;
 }
 
 .activate-assistant--mobile .activate-assistant__actions {
-  margin-top: max(0px, min(63px, calc(100vh - 430px)));
+  margin-top: clamp(0px, calc(100vh - 404px), 63px);
   flex-shrink: 0;
 }
 
