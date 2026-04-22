@@ -17,6 +17,8 @@ import type {
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
+  NotifyAssistantDetailUpdatedParams,
+  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   RegisterSessionListenerParams,
@@ -26,6 +28,8 @@ import type {
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
+  UpdateWeAgentParams,
+  UpdateWeAgentResult,
   WeAgentDetails,
   WeAgentDetailsArrayResult,
   WeAgentListResult,
@@ -396,7 +400,7 @@ export function resolveOpenCodeBridgeConfig(): OpenCodeBridgeConfig {
 
 export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
   const socket = new SkillStreamSocket(config);
-  const assistantDetail = buildAssistantDetail(config);
+  let assistantDetail = buildAssistantDetail(config);
 
   return {
     async regenerateAnswer(params: { welinkSessionId: string }): Promise<RegenerateAnswerResponse> {
@@ -565,6 +569,26 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         .map(() => assistantDetail);
       return {
         weAgentDetailsArray: details.length > 0 ? details : [assistantDetail],
+      };
+    },
+
+    async updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {
+      assistantDetail = {
+        ...assistantDetail,
+        name: params.name,
+        icon: params.icon,
+        desc: params.description,
+      };
+      return {
+        updateResult: 'success',
+      };
+    },
+
+    async notifyAssistantDetailUpdated(
+      _params: NotifyAssistantDetailUpdatedParams,
+    ): Promise<NotifyAssistantDetailUpdatedResult> {
+      return {
+        status: 'success',
       };
     },
 

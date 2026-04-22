@@ -34,8 +34,8 @@
 9. `src/styles/ActivateAssistant.less`
 10. `src/imgs/activate-guide-1.svg`
 11. `src/imgs/activate-guide-2.svg`
-12. `src/imgs/assistant-bg.png`
-13. `src/imgs/assistant-pc-bg.png`
+12. `src/imgs/assistant-cui-bg.png`
+13. `src/imgs/assistant-cui-pc-bg.png`
 14. `src/styles/DigitalTwinCreator.less`
 15. `src/types/digitalTwin.ts`
 16. `src/pages/createAssistant.tsx`
@@ -316,7 +316,7 @@ interface CreateDigitalTwinParams {
 1. 页面结构拆分为两段：
    - 内容区：容器宽度自适应 `100%`、高度按内容自适应，图片容器按图片原始尺寸展示，顶部间距 `78px`；
    - 操作区：与内容区间距 `65px`，仅保留“立即启用”主按钮。
-   - 页面根容器背景改为通用助理背景图，移动端使用 `assistant-bg.png`、PC 端使用 `assistant-pc-bg.png`，并统一按页面尺寸拉伸显示（`background-size: 100% 100%`）。
+   - 页面根容器背景改为通用助理背景图，移动端使用 `assistant-cui-bg.png`、PC 端使用 `assistant-cui-pc-bg.png`，并统一按页面尺寸拉伸显示（`background-size: 100% 100%`）。
 2. 内容区仅展示本地引导图资源，不再保留轮播状态与指示器逻辑；图片选择规则统一按端类型与当前国际化语言确定：
    - PC 中文：`src/imgs/activate-guide-pc.png`
    - PC 英文：`src/imgs/activate-guide-pc-en.png`
@@ -335,7 +335,7 @@ interface CreateDigitalTwinParams {
 2. 标题区以外的页面区域背景统一改为助理背景图，并按页面区域尺寸拉伸显示（`background-size: 100% 100%`）。
 3. 标题区通过 `isPcMiniApp` 区分端样式：
    - `isPcMiniApp === true`（PC）：`height: 54px; padding: 11px 16px;`，左侧 `32x32` 关闭按钮（内含 `20x20` 关闭图标），右侧 `32x32` 客服按钮（内含 `20x20` 客服图标），中间标题居中。
-   - `isPcMiniApp === false`（移动）：沿用现有 `44px` 高度与左侧返回+客服按钮布局。
+   - `isPcMiniApp === false`（移动）：沿用 `44px` 高度与左侧返回+客服按钮布局，左侧首个按钮距离页面左边 `12px`，右侧编辑按钮距离页面右边 `12px`；右侧编辑按钮尺寸 `24x24`，图标资源使用 `src/imgs/edit_icon.png`。
 4. 内容区改为通过内边距控制与标题区间距，使用 `padding: 12px 16px 16px`（上 `12px`、左右 `16px`），包含三个白底圆角卡片（圆角 `8px`）：
    - 卡片 1：头像（`72x72`，圆角 `19px`）+ 名称“小咪”+ 标签“员工助手”；名称文本需独立水平居中，标签不参与名称居中计算；
    - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行；创建者右侧值按当前语言选择：中文使用 `creatorName + ' ' + createdBy`，英文使用 `creatorNameEn + ' ' + createdBy`；
@@ -345,6 +345,12 @@ interface CreateDigitalTwinParams {
    - 标题区与头像区域相关图标/图片均通过 `src/imgs` 静态资源导入，不再使用内联 SVG 或纯色块占位。
 5. 页面为静态展示页，当前版本不接入接口与状态管理；按钮点击仅保留空实现占位，后续按业务接入。
 6. 移动端客服按钮点击按 `weCodeUrl.host` 分支处理：若当前 `weCodeUrl` 的 host 与 `APP_ID` 一致，则直接打开固定 `CUSTOMER_SERVICE_WEBVIEW_URI`；若 host 与 `APP_ID` 不一致，则继续复用 `buildCustomerServiceWebviewUri(weCodeUrl)`；`weCodeUrl` 为空时维持现有提示逻辑。
+7. 助理详情页移动端新增两个覆盖层组件：
+   - 底部操作弹窗：由编辑按钮触发，采用独立组件 + `createPortal(document.body)` + 固定定位整页蒙层方案；面板高度改为按内容自适应、顶部圆角 `12px`、白底，内部依次展示“修改助理信息 / 删除助理 / 取消”三个 `48px` 高的文本操作项，并按需求保留 `336px` 分割线与 `8px` 灰色间隔区。
+   - 删除确认弹窗：点击“删除助理”后出现，使用独立组件 + `createPortal(document.body)` + 固定定位居中面板，宽度 `280px`、圆角 `8px`、白底；标题使用当前助理名称插值，样式调整为 `16px/400/24px` 且允许换行显示，内容说明文本保持居中对齐，底部通过两个文本按钮“取消 / 删除”组成操作区，中间有 `1px x 16px` 分割线。
+8. 两个覆盖层组件样式从 `AssistantDetail.less` 中拆出，分别维护独立 less 文件，避免继续受详情页主容器样式污染。
+9. 页面层不再用两个分散的布尔值控制弹窗，而是收口成单一 overlay 状态（如 `none / action-sheet / delete-modal`），减少切换时的样式与时序问题。
+10. 交互上仅“取消”和蒙层负责关闭对应弹窗；“修改助理信息”和最终“删除”按钮当前均保留空实现，不接入实际业务动作。
 
 ## 15. 切换助理页面设计
 
@@ -391,7 +397,7 @@ interface CreateDigitalTwinParams {
 
 1. `WeAgentCUI` 为当前唯一对话页，`App` 仅保留 `weAgentCUI` 数据流与会话能力（消息加载、发送、流式更新、停止、历史分页）。
 2. 页面结构为：`对话内容区 + 多功能按钮区 + 底部输入区`。
-4. `weAgentCUI` 页面根容器背景统一使用助理背景图，并按当前页面尺寸拉伸显示（`background-size: 100% 100%`）；移动端默认 `assistant-bg.png`，PC 端继续通过页面级 class 覆盖为 `assistant-pc-bg.png`。
+4. `weAgentCUI` 页面根容器背景统一使用助理背景图，并按当前页面尺寸拉伸显示（`background-size: 100% 100%`）；移动端默认 `assistant-cui-bg.png`，PC 端继续通过页面级 class 覆盖为 `assistant-cui-pc-bg.png`。
 5. 多功能按钮区高度固定为 `32px`，左侧提供相邻排列的“新建会话”“历史会话”两个 `32px x 32px` 的白底圆角按钮，按钮间距固定 `8px`，图标统一为 `16px x 16px`；其中“新建会话”按钮按最简规则直接使用 `messages.length === 0` 判断当前是否为空会话，满足时不重复创建会话，直接 toast 提示“当前是最新会话”；中间增加白底圆角状态提示块“输出中...”，高度 `32px`、圆角 `20px`、文本样式 `12px/400`、颜色 `rgba(38,159,255,1)`，仅在 AI 生成阶段显示，且位置固定在整行多功能按钮区的水平中点。该提示块必须与当前激活的 `welinkSessionId` 绑定，切换会话后不继承旧会话的生成态，旧会话晚到的 `busy/idle/error` 事件也不得影响当前会话的显示状态。
 6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
    - 用户消息右对齐，头部文案为“测试 + 时间”，右侧头像 `24x24`；
@@ -442,7 +448,7 @@ interface CreateDigitalTwinParams {
 27. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
 28. `WeAgentCUI` 对 AI 流式助手消息采用“独立占位预览 + 真实消息直写”的策略：页面显示“正在生成中，请稍等...”时，不把该占位块作为 `Message` 写入 `messages`；该独立占位预览仅由 `message.user` 事件拉起。真正承载内容的 AI 事件根据 SDK 文档保证都会携带真实 `messageId`，因此实时内容、`streaming` 补流、`snapshot`/历史恢复都直接按该真实 `messageId` 创建或更新 assistant 消息，不再做随机占位消息 ID 提权。
 29. `streamingMsgIdRef` 保持原命名，但语义收敛为“当前真实 assistant 消息的 `messageId` 引用”：在尚未收到真正内容前始终为 `null`；收到首个承载内容事件时写入真实 `messageId`；会话结束、停止、错误、切换会话、快照恢复时统一清空。
-30. 通用助理背景图分流继续留在样式层实现：移动端默认使用 `assistant-bg.png`，PC 端新增 `assistant-pc-bg.png` 并通过 `.pc-mode`、`--pc` 这类页面级 class 覆盖 `background-image`；不把背景图选择下沉到组件内的 `isPcMiniApp()` 运行时判断，避免同一视觉资源策略散落到 JSX 逻辑里。
+30. 通用助理背景图分流继续留在样式层实现：移动端默认使用 `assistant-cui-bg.png`，PC 端新增 `assistant-cui-pc-bg.png` 并通过 `.pc-mode`、`--pc` 这类页面级 class 覆盖 `background-image`；不把背景图选择下沉到组件内的 `isPcMiniApp()` 运行时判断，避免同一视觉资源策略散落到 JSX 逻辑里。
 21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 22. 本地 JSAPI mock 的目标扩展到全部业务页面：`activateAssistant`、`selectAssistant`、`switchAssistant`、`assistantDetail`、`createAssistant`、`weAgentCUI` 都应能在浏览器本地通过 mock 数据直接访问与联动。
 23. mock 环境不单独维护一套伪判端逻辑，端类型判断统一复用 `src/utils/hwext.ts` 中的 `isPcMiniApp`：仅当存在真实或 mock 的 `window.Pedestal.callMethod` 时视为 PC，否则按移动端处理，避免样式和 toast 分流与生产逻辑偏离。

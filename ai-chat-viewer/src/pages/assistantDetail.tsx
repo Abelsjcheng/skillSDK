@@ -1,12 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AvatarImage from '../components/AvatarImage';
-import AssistantPageHeader from '../components/assistant/AssistantPageHeader';
+import AssistantDetailActionSheet from '../components/assistant/AssistantDetailActionSheet';
+import AssistantDetailDeleteModal from '../components/assistant/AssistantDetailDeleteModal';
+import AssistantDetailPcMenu from '../components/assistant/AssistantDetailPcMenu';
+import AssistantPageHeader, { type AssistantPageHeaderAction } from '../components/assistant/AssistantPageHeader';
+import EditAssistantContent from '../components/assistant/EditAssistantContent';
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import { APP_ID, isPcMiniApp } from '../constants';
 import { ensureLanguageInitialized } from '../i18n/config';
+import closeIcon from '../imgs/close_icon.svg';
 import defaultAvatar from '../imgs/defaultAvatar.png';
+import editIcon from '../imgs/edit_icon.png';
 import iconCopy from '../imgs/icon-copy.svg';
+import moreIcon from '../imgs/more_icon.png';
+import serviceIcon from '../imgs/icon-service.svg';
+import type { DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
@@ -43,11 +52,20 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .filter(Boolean)
     .join(' ');
 
+type AssistantDetailOverlay = 'none' | 'action-sheet' | 'delete-modal';
+type AssistantDetailPcView = 'detail' | 'edit';
+
 const AssistantDetail: React.FC = () => {
   const { t, i18n } = useTranslation();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
   const [isSecretVisible, setIsSecretVisible] = useState<boolean>(false);
+  const [overlay, setOverlay] = useState<AssistantDetailOverlay>('none');
+  const [pcView, setPcView] = useState<AssistantDetailPcView>('detail');
+  const [isPcMenuOpen, setIsPcMenuOpen] = useState<boolean>(false);
+  const [pcMenuPosition, setPcMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
 
@@ -148,9 +166,146 @@ const AssistantDetail: React.FC = () => {
     dispatchAssistantCloseEvent();
   };
 
+  const handleOpenActionSheet = useCallback(() => {
+    if (isPc) {
+      return;
+    }
+    setOverlay('action-sheet');
+  }, [isPc]);
+
+  const handleCloseOverlay = useCallback(() => {
+    setOverlay('none');
+  }, []);
+
+  const handleEditAssistant = useCallback(() => {
+    setIsPcMenuOpen(false);
+
+    const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
+
+    if (isPc) {
+      setPcView('edit');
+      return;
+    }
+
+    setOverlay('none');
+    const nextSearch = new URLSearchParams();
+    if (targetPartnerAccount) {
+      nextSearch.set('partnerAccount', targetPartnerAccount);
+    }
+    nextSearch.set('source', 'assistantDetail');
+    window.location.hash = nextSearch.toString() ? `#/editAssistant?${nextSearch.toString()}` : '#/editAssistant';
+  }, [detail, isPc, partnerAccount]);
+
+  const handleRequestDeleteAssistant = useCallback(() => {
+    setIsPcMenuOpen(false);
+
+    if (isPc) {
+      // Reserved for future implementation.
+      return;
+    }
+
+    setOverlay('delete-modal');
+  }, [isPc]);
+
+  const handleConfirmDelete = useCallback(() => {
+    // Reserved for future implementation.
+  }, []);
+
+  const handleTogglePcMenu = useCallback(() => {
+    if (!pageRef.current || !moreButtonRef.current) {
+      return;
+    }
+
+    const pageRect = pageRef.current.getBoundingClientRect();
+    const buttonRect = moreButtonRef.current.getBoundingClientRect();
+
+    setPcMenuPosition({
+      top: buttonRect.bottom - pageRect.top + 4,
+      left: buttonRect.left - pageRect.left,
+    });
+    setIsPcMenuOpen((previous) => !previous);
+  }, []);
+
+  const handleClosePcMenu = useCallback(() => {
+    setIsPcMenuOpen(false);
+  }, []);
+
+  const handlePcEditSuccess = useCallback((payload: DigitalTwinBasicInfoPayload) => {
+    setDetail((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        name: payload.name,
+        icon: payload.icon,
+        desc: payload.description,
+      };
+    });
+  }, []);
+
+  const pcLeftActions = useMemo<AssistantPageHeaderAction[]>(
+    () => [
+      {
+        label: t('common.service'),
+        icon: serviceIcon,
+        onClick: handleServiceClick,
+      },
+      {
+        label: t('assistantDetail.editAction'),
+        icon: moreIcon,
+        onClick: handleTogglePcMenu,
+        buttonRef: moreButtonRef,
+      },
+    ],
+    [handleServiceClick, handleTogglePcMenu, t],
+  );
+
+  const pcRightActions = useMemo<AssistantPageHeaderAction[]>(
+    () => [
+      {
+        label: t('common.close'),
+        icon: closeIcon,
+        onClick: () => {
+          dispatchAssistantCloseEvent();
+        },
+      },
+    ],
+    [t],
+  );
+
+  if (isPc && pcView === 'edit') {
+    return (
+      <EditAssistantContent
+        isPcMiniApp
+        source="assistantDetail"
+        initialDetail={detail}
+        partnerAccount={partnerAccount}
+        onClose={() => {
+          setPcView('detail');
+        }}
+        onSuccess={handlePcEditSuccess}
+      />
+    );
+  }
+
   return (
-    <div className={`assistant-detail${isPc ? ' assistant-detail--pc' : ''}`} onClick={handleBackgroundClick}>
-      <AssistantPageHeader title={t('assistantDetail.title')} isPcMiniApp={isPc} onService={handleServiceClick} />
+    <div
+      ref={pageRef}
+      className={`assistant-detail${isPc ? ' assistant-detail--pc' : ''}`}
+      onClick={handleBackgroundClick}
+    >
+      <AssistantPageHeader
+        title={t('assistantDetail.title')}
+        isPcMiniApp={isPc}
+        onService={handleServiceClick}
+        mobileRightActionIcon={!isPc ? editIcon : undefined}
+        mobileRightActionLabel={!isPc ? t('assistantDetail.editAction') : undefined}
+        onMobileRightAction={handleOpenActionSheet}
+        pcLeftActions={isPc ? pcLeftActions : undefined}
+        pcRightActions={isPc ? pcRightActions : undefined}
+      />
 
       <main className="assistant-detail__content">
         <section className="assistant-detail__card assistant-detail__card--profile">
@@ -247,6 +402,34 @@ const AssistantDetail: React.FC = () => {
           ) : null}
         </section>
       </main>
+
+      {isPc ? (
+        <AssistantDetailPcMenu
+          open={isPcMenuOpen}
+          top={pcMenuPosition.top}
+          left={pcMenuPosition.left}
+          onClose={handleClosePcMenu}
+          onEdit={handleEditAssistant}
+          onDelete={handleRequestDeleteAssistant}
+          editLabel={t('assistantDetail.editInfo')}
+          deleteLabel={t('assistantDetail.deleteAssistant')}
+        />
+      ) : (
+        <>
+          <AssistantDetailActionSheet
+            open={overlay === 'action-sheet'}
+            onClose={handleCloseOverlay}
+            onEdit={handleEditAssistant}
+            onDelete={handleRequestDeleteAssistant}
+          />
+          <AssistantDetailDeleteModal
+            open={overlay === 'delete-modal'}
+            assistantName={displayName}
+            onClose={handleCloseOverlay}
+            onConfirm={handleConfirmDelete}
+          />
+        </>
+      )}
     </div>
   );
 };

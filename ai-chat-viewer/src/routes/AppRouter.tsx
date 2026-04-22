@@ -4,6 +4,7 @@ import { ensureLanguageInitialized } from '../i18n/config';
 import ActivateAssistant from '../pages/activateAssistant';
 import AssistantDetail from '../pages/assistantDetail';
 import CreateAssistantBasicPage from '../pages/createAssistantBasic';
+import EditAssistant from '../pages/editAssistant';
 import SelectAssistant from '../pages/selectAssistant';
 import SelectBrainAssistantPage from '../pages/selectBrainAssistant';
 import SwitchAssistant from '../pages/switchAssistant';
@@ -51,6 +52,14 @@ export const AppRouter: React.FC = () => {
         element={(
           <div style={FULL_PAGE_ROUTE_STYLE}>
             <AssistantDetail />
+          </div>
+        )}
+      />
+      <Route
+        path="/editAssistant"
+        element={(
+          <div style={FULL_PAGE_ROUTE_STYLE}>
+            <EditAssistant />
           </div>
         )}
       />

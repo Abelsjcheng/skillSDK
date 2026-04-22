@@ -18,6 +18,8 @@ import type {
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
+  NotifyAssistantDetailUpdatedParams,
+  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   RegenerateAnswerParams,
@@ -28,6 +30,8 @@ import type {
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
+  UpdateWeAgentParams,
+  UpdateWeAgentResult,
   WeAgentDetails,
   WeAgentDetailsArrayResult,
   WeAgentListResult,
@@ -160,6 +164,24 @@ let currentAssistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
 const assistantDetailsStore = new Map<string, WeAgentDetails>();
 const sessionStore = new Map<string, SessionRecord>();
 const listeners = new Map<string, SessionListener>();
+
+function cloneAssistantDetail(detail: WeAgentDetails): WeAgentDetails {
+  return { ...detail };
+}
+
+function findAssistantDetail(params: { partnerAccount?: string; robotId?: string }): WeAgentDetails | null {
+  const partnerAccount = params.partnerAccount?.trim() ?? '';
+  if (partnerAccount) {
+    return assistantDetailsStore.get(partnerAccount) ?? null;
+  }
+
+  const robotId = params.robotId?.trim() ?? '';
+  if (!robotId) {
+    return null;
+  }
+
+  return Array.from(assistantDetailsStore.values()).find((detail) => detail.id === robotId) ?? null;
+}
 
 function nextId(prefix: string): string {
   idCounter += 1;
@@ -1714,7 +1736,7 @@ function buildMockApi(): HWH5EXT {
       const details = partnerAccounts
         .map((partnerAccount) => assistantDetailsStore.get(partnerAccount))
         .filter((detail): detail is WeAgentDetails => Boolean(detail))
-        .map((detail) => ({ ...detail }));
+        .map((detail) => cloneAssistantDetail(detail));
 
       if (details[0]?.partnerAccount) {
         currentAssistantAccount = details[0].partnerAccount;
@@ -1722,6 +1744,36 @@ function buildMockApi(): HWH5EXT {
 
       return {
         weAgentDetailsArray: details,
+      };
+    },
+
+    updateWeAgent: async (params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> => {
+      const detail = findAssistantDetail(params);
+      if (!detail) {
+        throw new Error('Assistant detail not found.');
+      }
+
+      const nextDetail: WeAgentDetails = {
+        ...detail,
+        name: params.name,
+        icon: params.icon,
+        desc: params.description,
+      };
+
+      assistantDetailsStore.set(nextDetail.partnerAccount, nextDetail);
+      currentAssistantAccount = nextDetail.partnerAccount;
+
+      return {
+        updateResult: 'success',
+      };
+    },
+
+    notifyAssistantDetailUpdated: async (
+      params: NotifyAssistantDetailUpdatedParams,
+    ): Promise<NotifyAssistantDetailUpdatedResult> => {
+      window.dispatchEvent(new CustomEvent('assistant-detail-updated', { detail: { ...params } }));
+      return {
+        status: 'success',
       };
     },
 

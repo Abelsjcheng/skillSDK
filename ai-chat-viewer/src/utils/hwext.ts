@@ -142,6 +142,30 @@ export interface GetWeAgentDetailsPcParams {
 
 export type GetWeAgentDetailsParams = GetWeAgentDetailsMobileParams | GetWeAgentDetailsPcParams;
 
+export interface UpdateWeAgentParams {
+  partnerAccount?: string;
+  robotId?: string;
+  name: string;
+  icon: string;
+  description: string;
+}
+
+export interface UpdateWeAgentResult {
+  updateResult: string;
+}
+
+export interface NotifyAssistantDetailUpdatedParams {
+  name: string;
+  icon: string;
+  description: string;
+  partnerAccount?: string;
+  robotId?: string;
+}
+
+export interface NotifyAssistantDetailUpdatedResult {
+  status: string;
+}
+
 export interface WeAgentDetails {
   name: string;
   icon: string;
@@ -246,6 +270,10 @@ export interface HWH5EXT {
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
   getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> | WeAgentDetailsArrayResult;
+  updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> | UpdateWeAgentResult;
+  notifyAssistantDetailUpdated(
+    params: NotifyAssistantDetailUpdatedParams,
+  ): Promise<NotifyAssistantDetailUpdatedResult> | NotifyAssistantDetailUpdatedResult;
   getHistorySessionsList(params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> | HistorySessionsListResult;
   getWeAgentUri(): Promise<WeAgentUriResult> | WeAgentUriResult;
   openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<OpenWeAgentCUIResult> | OpenWeAgentCUIResult;
@@ -359,6 +387,8 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getAgentType: () => call<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => call<WeAgentListResult>('getWeAgentList', params),
     getWeAgentDetails: (params) => call<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
+    updateWeAgent: (params) => call<UpdateWeAgentResult>('updateWeAgent', params),
+    notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
     openWeAgentCUI: (params) => call<OpenWeAgentCUIResult>('openWeAgentCUI', params),
@@ -697,6 +727,16 @@ export async function getWeAgentList(params: GetWeAgentListParams): Promise<WeAg
 
 export async function getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> {
   return getJsApiOrThrow().getWeAgentDetails(normalizeGetWeAgentDetailsParams(params));
+}
+
+export async function updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {
+  return getJsApiOrThrow().updateWeAgent(params);
+}
+
+export async function notifyAssistantDetailUpdated(
+  params: NotifyAssistantDetailUpdatedParams,
+): Promise<NotifyAssistantDetailUpdatedResult> {
+  return getJsApiOrThrow().notifyAssistantDetailUpdated(params);
 }
 
 export async function getHistorySessionsList(

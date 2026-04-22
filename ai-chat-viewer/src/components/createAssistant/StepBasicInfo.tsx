@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import selectionIcon from '../../imgs/selection_icon.png';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
@@ -26,9 +26,12 @@ interface StepBasicInfoProps {
   isPcMiniApp?: boolean;
   defaultAvatars: DefaultAvatarOption[];
   initialValue?: DigitalTwinBasicInfoPayload | null;
+  className?: string;
+  showHeader?: boolean;
   onClose: () => void;
   onCancel: () => void;
   onNext: (payload: DigitalTwinBasicInfoPayload) => void;
+  submitLabel?: string;
 }
 
 function resolveInitialDefaultAvatarId(
@@ -54,9 +57,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   isPcMiniApp = true,
   defaultAvatars,
   initialValue,
+  className,
+  showHeader = true,
   onClose,
   onCancel,
   onNext,
+  submitLabel,
 }) => {
   const { t } = useTranslation();
   const [avatarType, setAvatarType] = useState<'default' | 'custom'>(initialValue?.avatarType ?? 'default');
@@ -68,6 +74,15 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   );
   const [name, setName] = useState(initialValue?.name ?? '');
   const [description, setDescription] = useState(initialValue?.description ?? '');
+  const resolvedSubmitLabel = submitLabel ?? t('createAssistant.next');
+
+  useEffect(() => {
+    setAvatarType(initialValue?.avatarType ?? 'default');
+    setAvatarId(resolveInitialDefaultAvatarId(defaultAvatars, initialValue));
+    setCustomAvatarPreview(initialValue?.avatarType === 'custom' ? initialValue.icon : undefined);
+    setName(initialValue?.name ?? '');
+    setDescription(initialValue?.description ?? '');
+  }, [defaultAvatars, initialValue]);
 
   const nameIsInvalid = useMemo(() => hasInvalidName(name), [name]);
   const descriptionIsInvalid = useMemo(() => hasInvalidDescription(description), [description]);
@@ -158,116 +173,122 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   }, [avatarId, avatarType, canNext, currentAvatarSrc, description, name, onNext]);
 
   return (
-    <section className={getStepClassName(isPcMiniApp)}>
-      <CreatorStepHeader
-        isPcMiniApp={isPcMiniApp}
-        onClose={onClose}
-        onMobileBack={() => {
-          window.HWH5.navigateBack();
-        }}
-      />
+    <section className={`${getStepClassName(isPcMiniApp)} ${className ?? ''}`.trim()}>
+      {showHeader ? (
+        <CreatorStepHeader
+          isPcMiniApp={isPcMiniApp}
+          onClose={onClose}
+          onMobileBack={() => {
+            window.HWH5.navigateBack();
+          }}
+        />
+      ) : null}
 
       <div className="digital-twin__content digital-twin__content--step1">
-        <div className="digital-twin__avatar-preview-wrap">
-          <div className="digital-twin__avatar-preview">
-            <AvatarImage
-              src={currentAvatarSrc}
-              fallbackSrc={defaultAvatar}
-              alt={t('createAssistant.avatarPreview')}
-              className="digital-twin__avatar-preview-img"
-              draggable="false"
+        <div className="digital-twin__avatar-section">
+          <div className="digital-twin__avatar-preview-wrap">
+            <div className="digital-twin__avatar-preview">
+              <AvatarImage
+                src={currentAvatarSrc}
+                fallbackSrc={defaultAvatar}
+                alt={t('createAssistant.avatarPreview')}
+                className="digital-twin__avatar-preview-img"
+                draggable="false"
+              />
+            </div>
+            <p className="digital-twin__avatar-tip">{t('createAssistant.avatarTip')}</p>
+          </div>
+
+          <div
+            className="digital-twin__avatar-options"
+            role="list"
+            aria-label={t('createAssistant.defaultAvatarList')}
+          >
+            {defaultAvatars.map((avatar) => {
+              const selected = avatarType === 'default' && avatarId === avatar.id;
+              return (
+                <button
+                  key={avatar.id}
+                  type="button"
+                  role="listitem"
+                  className={`digital-twin__avatar-option ${selected ? 'is-selected' : ''}`.trim()}
+                  aria-label={t('createAssistant.selectDefaultAvatar', { id: avatar.id })}
+                  onClick={(event) => {
+                    runButtonClickWithDebounce(event, () => {
+                      handleSelectDefaultAvatar(avatar.id);
+                    });
+                  }}
+                >
+                  <AvatarImage
+                    src={avatar.image}
+                    fallbackSrc={defaultAvatar}
+                    alt={t('createAssistant.defaultAvatarAlt', { id: avatar.id })}
+                    className="digital-twin__avatar-option-img"
+                    draggable="false"
+                  />
+                  {selected ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${avatarType === 'custom' ? 'is-selected' : ''
+                }`.trim()}
+              aria-label={t('createAssistant.uploadCustomAvatar')}
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  void handleChooseUpload();
+                });
+              }}
+            >
+              +
+              {avatarType === 'custom' ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
+            </button>
+          </div>
+        </div>
+
+        <div className="digital-twin__form-section">
+          <div className="digital-twin__field">
+            <span id="digital-twin-name-label" className="digital-twin__label">
+              {t('createAssistant.name')}
+            </span>
+            <input
+              id="digital-twin-name"
+              aria-labelledby="digital-twin-name-label"
+              className={`digital-twin__input ${nameIsInvalid ? 'is-invalid' : ''}`.trim()}
+              type="text"
+              value={name}
+              placeholder={t('createAssistant.namePlaceholder')}
+              onChange={(event) => setName(event.target.value)}
+              onTouchStart={handleMobileInputTouchStart}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+              }}
             />
           </div>
-          <p className="digital-twin__avatar-tip">{t('createAssistant.avatarTip')}</p>
-        </div>
 
-        <div
-          className="digital-twin__avatar-options"
-          role="list"
-          aria-label={t('createAssistant.defaultAvatarList')}
-        >
-          {defaultAvatars.map((avatar) => {
-            const selected = avatarType === 'default' && avatarId === avatar.id;
-            return (
-              <button
-                key={avatar.id}
-                type="button"
-                role="listitem"
-                className={`digital-twin__avatar-option ${selected ? 'is-selected' : ''}`.trim()}
-                aria-label={t('createAssistant.selectDefaultAvatar', { id: avatar.id })}
-                onClick={(event) => {
-                  runButtonClickWithDebounce(event, () => {
-                    handleSelectDefaultAvatar(avatar.id);
-                  });
-                }}
-              >
-                <AvatarImage
-                  src={avatar.image}
-                  fallbackSrc={defaultAvatar}
-                  alt={t('createAssistant.defaultAvatarAlt', { id: avatar.id })}
-                  className="digital-twin__avatar-option-img"
-                  draggable="false"
-                />
-                {selected ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
-              </button>
-            );
-          })}
-
-          <button
-            type="button"
-            className={`digital-twin__avatar-option digital-twin__avatar-option--upload ${avatarType === 'custom' ? 'is-selected' : ''
-              }`.trim()}
-            aria-label={t('createAssistant.uploadCustomAvatar')}
-            onClick={(event) => {
-              runButtonClickWithDebounce(event, () => {
-                void handleChooseUpload();
-              });
-            }}
-          >
-            +
-            {avatarType === 'custom' ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
-          </button>
-        </div>
-
-        <div className="digital-twin__field">
-          <span id="digital-twin-name-label" className="digital-twin__label">
-            {t('createAssistant.name')}
-          </span>
-          <input
-            id="digital-twin-name"
-            aria-labelledby="digital-twin-name-label"
-            className={`digital-twin__input ${nameIsInvalid ? 'is-invalid' : ''}`.trim()}
-            type="text"
-            value={name}
-            placeholder={t('createAssistant.namePlaceholder')}
-            onChange={(event) => setName(event.target.value)}
-            onTouchStart={handleMobileInputTouchStart}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              return false;
-            }}
-          />
-        </div>
-
-        <div className="digital-twin__field">
-          <span id="digital-twin-description-label" className="digital-twin__label">
-            {t('createAssistant.description')}
-          </span>
-          <textarea
-            id="digital-twin-description"
-            aria-labelledby="digital-twin-description-label"
-            className={`digital-twin__textarea ${descriptionIsInvalid ? 'is-invalid' : ''}`.trim()}
-            value={description}
-            placeholder={t('createAssistant.descriptionPlaceholder')}
-            onChange={(event) => setDescription(event.target.value)}
-            onTouchStart={handleMobileInputTouchStart}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              return false;
-            }}
-          />
+          <div className="digital-twin__field">
+            <span id="digital-twin-description-label" className="digital-twin__label">
+              {t('createAssistant.description')}
+            </span>
+            <textarea
+              id="digital-twin-description"
+              aria-labelledby="digital-twin-description-label"
+              className={`digital-twin__textarea ${descriptionIsInvalid ? 'is-invalid' : ''}`.trim()}
+              value={description}
+              placeholder={t('createAssistant.descriptionPlaceholder')}
+              onChange={(event) => setDescription(event.target.value)}
+              onTouchStart={handleMobileInputTouchStart}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -276,7 +297,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         pcButtons={[
           { label: t('createAssistant.cancel'), onClick: onCancel, variant: 'cancel' },
           {
-            label: t('createAssistant.next'),
+            label: resolvedSubmitLabel,
             onClick: handleNext,
             variant: 'next',
             enabled: canNext,
@@ -284,7 +305,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           },
         ]}
         mobileButton={{
-          label: t('createAssistant.next'),
+          label: resolvedSubmitLabel,
           onClick: handleNext,
           variant: 'next',
           enabled: canNext,

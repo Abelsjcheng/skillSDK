@@ -370,7 +370,7 @@
 2. 插画背景资源：1 张（页面 2，需提供具体图源）。
 3. 内部助手选项资源：通过 `window.getAgentType()` 动态获取（每项包含 `name/icon/bizRobotId`）。
 4. 激活助理轮播图资源：`src/imgs/activate-guide-1.svg`、`src/imgs/activate-guide-2.svg`。
-5. 助理通用背景图资源：移动端 `src/imgs/assistant-bg.png`，PC 端 `src/imgs/assistant-pc-bg.png`。
+5. 助理通用背景图资源：移动端 `src/imgs/assistant-cui-bg.png`，PC 端 `src/imgs/assistant-cui-pc-bg.png`。
 6. 助理详情/切换助理页面图标资源：`src/imgs/icon-back.svg`、`src/imgs/icon-service.svg`。
 7. 助理详情/切换助理页面 PC 标题区关闭图标资源：`src/imgs/icon-close.svg`。
 8. 助理详情/切换助理页面头像资源：`src/imgs/assistant-avatar.svg`、`src/imgs/switch-assistant-avatar.svg`。
@@ -465,8 +465,8 @@
    - 内容区容器宽度为自适应 `100%`；
    - 内容区容器高度为内容自适应；
    - 页面整体背景改为助理背景图：
-      - 移动端使用 `src/imgs/assistant-bg.png`；
-      - PC 端使用 `src/imgs/assistant-pc-bg.png`；
+      - 移动端使用 `src/imgs/assistant-cui-bg.png`；
+      - PC 端使用 `src/imgs/assistant-cui-pc-bg.png`；
    - 背景图按当前页面尺寸拉伸显示（`background-size: 100% 100%`），不再使用 `cover`；
    - 图片展示容器与“选择助理”按钮作为整体在页面中水平垂直居中；
    - 移动端（`isPcMiniApp === false`）图片容器尺寸为 `322px x 350px`；
@@ -497,9 +497,9 @@
          - 右侧为客服按钮区域：`32px x 32px`，内含客服图标 `20px x 20px`。
       - `isPcMiniApp === false`（移动）：
          - 高度 `44px`，背景白色；
-         - 左侧控件尺寸 `90px x 44px`，包含返回按钮（`24px x 24px`，左间距 `10px`）和客服按钮（`24px x 24px`，与返回按钮间距 `16px`）；
+         - 左侧控件尺寸 `90px x 44px`，包含返回按钮（`24px x 24px`，左间距 `12px`）和客服按钮（`24px x 24px`，与返回按钮间距 `16px`）；
          - 中间标题：`助理详情`，水平垂直居中，字体 `16px/400/22px`；
-         - 右侧控件尺寸 `90px x 44px`，无内容。
+         - 右侧控件尺寸 `90px x 44px`，新增编辑按钮，图标资源为 `src/imgs/edit_icon.png`，尺寸 `24px x 24px`，距离页面右侧 `12px`。
 2. 页面背景：
    - 标题区以外的页面区域背景统一使用助理背景图；
    - 背景图按页面区域自定义尺寸拉伸显示（`background-size: 100% 100%`），不使用 `cover`。
@@ -541,6 +541,32 @@
       - 若当前 `weCodeUrl` 解析出的 host 等于 `APP_ID`，则直接调用 `openWebview({ uri: CUSTOMER_SERVICE_WEBVIEW_URI })`；
       - 若当前 `weCodeUrl` 解析出的 host 不等于 `APP_ID`，则继续使用现有 `buildCustomerServiceWebviewUri(weCodeUrl)` 逻辑；
       - 若 `weCodeUrl` 为空，则保持当前不可跳转提示。
+6. 移动端编辑操作：
+   - 点击导航栏右侧编辑按钮后，弹出底部操作弹窗（独立组件）；
+   - 底部操作弹窗通过 `createPortal` 渲染到 `document.body`，避免受助理详情页面滚动区、背景图和层级影响；
+   - 弹窗容器固定在页面底部，宽度占满，高度按内容自适应，顶部圆角 `12px 12px 0 0`，背景白色，外层蒙层颜色 `rgba(0,0,0,0.4)`；
+   - 弹窗内从上到下展示 3 个操作块，每个高度 `48px`，文本水平垂直居中，字号 `16px`，字重 `400`：
+      - 操作 1：`修改助理信息`，颜色 `rgba(51,51,51,1)`；
+      - 操作 2：`删除助理`，颜色 `rgba(243,111,100,1)`；
+      - 操作 3：`取消`，颜色 `rgba(51,51,51,1)`；
+   - 操作 1 和操作 2 之间增加一条水平分割线：宽 `336px`、高 `0.5px`、水平居中、颜色 `rgba(238,238,238,1)`；
+   - 操作 2 与操作 3 之间增加 `8px` 间隔区，间隔区背景 `rgba(249,249,249,1)`；
+   - 点击“取消”块或蒙层时关闭底部操作弹窗；
+   - 点击“删除助理”后，关闭底部操作弹窗并弹出删除确认弹窗；
+   - 点击“修改助理信息”当前先保留空实现。
+7. 移动端删除确认弹窗：
+   - 删除确认弹窗使用独立容器组件，蒙层颜色 `rgba(0,0,0,0.4)`；
+   - 删除确认弹窗同样通过 `createPortal` 渲染到 `document.body`，不挂载在助理详情页内容区内部；
+   - 弹窗宽度固定 `280px`，在页面中水平垂直居中，高度自适应，圆角半径 `8px`，背景白色；
+   - 标题距离顶部 `24px`，水平居中，文案为：`确认删除个人助理"{name}"吗？`，其中 `{name}` 取当前助理详情中的助理名称；样式 `16px/400/24px`，颜色 `rgba(51,51,51,1)`，文本允许换行显示；
+   - 内容区距离标题 `12px`，`padding: 0 16px`，文案为：`删除后，该助理将从消息列表、群组及 WeAgent 菜单中同步移除，且不可恢复，请谨慎操作！`，样式 `14px/400`，颜色 `rgba(51,51,51,1)`，文本水平居中；
+   - 底部操作区距离内容区 `8px`，`padding: 14px 16px 15px`；
+   - 底部操作区包含两个文本按钮：
+      - 左侧“取消”，样式 `16px/400`，颜色 `rgba(51,51,51,1)`；
+      - 右侧“删除”，样式 `16px/400`，颜色 `rgba(243,111,100,1)`；
+   - 两个按钮之间增加一条分割线：宽 `1px`、高 `16px`、颜色 `rgba(238,238,238,1)`，与左右按钮各间隔 `4px`；
+   - 点击“取消”或蒙层关闭删除确认弹窗；
+   - 点击确认删除按钮当前先保留空实现。
 
 ## 15. 切换助理页面
 
@@ -767,8 +793,8 @@
    - 独立占位块仅允许由 `message.user` 事件拉起，不得在 `handleGenerate`、`step.start`、`session.status=busy` 等时机提前显示，也不得创建随机 `id` 的 fake assistant message；
    - `snapshot`、历史消息恢复、`streaming` 补流到来时，需清理本地占位块，并继续只按真实 `messageId` 恢复 assistant 消息，避免重复渲染。
 23. 页面背景资源规则补充：
-   - 原 `assistant-bg.svg` 统一下线，移动端背景资源改为 `assistant-bg.png`；
-   - 新增 PC 端背景资源 `assistant-pc-bg.png`；
+   - 原 `assistant-bg.svg` 统一下线，移动端背景资源改为 `assistant-cui-bg.png`；
+   - 新增 PC 端背景资源 `assistant-cui-pc-bg.png`；
    - 样式层以移动端背景为默认值，PC 端通过页面级 PC class 覆盖 `background-image`，不在业务组件内通过 JS 内联样式分流背景图。
 
 ## 18. 页面 JSAPI 联动补充（基于小程序JSAPI接口文档）

@@ -33,6 +33,11 @@ export interface CreateAssistantRouteState {
   draft?: DigitalTwinBasicInfoPayload;
 }
 
+export interface EditAssistantRouteState {
+  source?: 'assistantDetail' | 'external';
+  detail?: import('../utils/hwext').WeAgentDetails | null;
+}
+
 export interface DigitalTwinBrainPayload {
   digitalTwintype: BrainType;
   bizRobotId?: string;

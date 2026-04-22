@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import '../../styles/SwitchAssistant.less';
+import closeIcon from '../../imgs/close_icon.svg';
+import serviceIcon from '../../imgs/icon-service.svg';
 import {
   dispatchAssistantCloseEvent,
   dispatchSwitchAssistantSelectEvent,
 } from '../../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import AssistantCardList from './AssistantCardList';
-import AssistantPageHeader from './AssistantPageHeader';
+import AssistantPageHeader, { type AssistantPageHeaderAction } from './AssistantPageHeader';
 import type { AssistantItem } from '../../types/assistant';
 
 interface AssistantSelectionPageProps {
@@ -41,6 +44,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   onSelectAssistant,
   rightButtonDisabled = false,
 }) => {
+  const { t } = useTranslation();
   const assistantList = useMemo(() => assistants ?? EMPTY_ASSISTANT_LIST, [assistants]);
   const isSelectionControlled = selectedAssistantId !== undefined;
   const resolvedDefaultSelectedAssistantId = useMemo(
@@ -62,6 +66,30 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
 
   const currentSelectedAssistantId = isSelectionControlled ? (selectedAssistantId ?? '') : internalSelectedAssistantId;
 
+  const pcLeftActions = useMemo<AssistantPageHeaderAction[]>(
+    () => [
+      {
+        label: t('common.service'),
+        icon: serviceIcon,
+        onClick: onService,
+      },
+    ],
+    [onService, t],
+  );
+
+  const pcRightActions = useMemo<AssistantPageHeaderAction[]>(
+    () => [
+      {
+        label: t('common.close'),
+        icon: closeIcon,
+        onClick: () => {
+          dispatchAssistantCloseEvent();
+        },
+      },
+    ],
+    [t],
+  );
+
   const handleSelectAssistant = (assistantId: string) => {
     if (!isSelectionControlled) {
       setInternalSelectedAssistantId(assistantId);
@@ -79,7 +107,13 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         }
       }}
     >
-      <AssistantPageHeader title={title} isPcMiniApp={isPcMiniApp} onService={onService} />
+      <AssistantPageHeader
+        title={title}
+        isPcMiniApp={isPcMiniApp}
+        onService={onService}
+        pcLeftActions={isPcMiniApp ? pcLeftActions : undefined}
+        pcRightActions={isPcMiniApp ? pcRightActions : undefined}
+      />
 
       <main className="switch-assistant__content">
         <AssistantCardList

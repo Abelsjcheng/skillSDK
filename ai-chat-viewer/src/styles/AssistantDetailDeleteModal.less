@@ -1,0 +1,90 @@
+.assistant-detail-delete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.assistant-detail-delete-modal__mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.assistant-detail-delete-modal__wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.assistant-detail-delete-modal__panel {
+  width: 280px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 1);
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.assistant-detail-delete-modal__title {
+  margin: 0;
+  padding: 24px 16px 0;
+  color: rgba(51, 51, 51, 1);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  text-align: center;
+}
+
+.assistant-detail-delete-modal__description {
+  margin: 12px 0 0;
+  padding: 0 16px;
+  color: rgba(51, 51, 51, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  text-align: center;
+}
+
+.assistant-detail-delete-modal__actions {
+  margin-top: 8px;
+  padding: 14px 16px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.assistant-detail-delete-modal__action {
+  flex: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(51, 51, 51, 1);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 22px;
+  text-align: center;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.assistant-detail-delete-modal__action--danger {
+  color: rgba(243, 111, 100, 1);
+}
+
+.assistant-detail-delete-modal__action-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: rgba(238, 238, 238, 1);
+  flex-shrink: 0;
+}
