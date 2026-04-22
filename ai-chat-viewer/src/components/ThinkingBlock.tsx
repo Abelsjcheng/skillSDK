@@ -8,12 +8,8 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
-import type { MessagePart } from '../types';
+import type { ThinkingBlockProps } from '../types/components';
 import { createMarkdownComponents } from './markdownComponents';
-
-interface ThinkingBlockProps {
-  part: MessagePart;
-}
 
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
   const { t } = useTranslation();

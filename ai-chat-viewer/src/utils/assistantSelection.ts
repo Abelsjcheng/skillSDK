@@ -1,4 +1,5 @@
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
+import type { WeAgentListItem } from '../types/bridge';
 import type { AssistantItem } from '../types/assistant';
 import { resolveAssistantTag } from './assistantTag';
 import {
@@ -7,7 +8,6 @@ import {
   openWeAgentCUI,
   resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
-  type WeAgentListItem,
 } from './hwext';
 
 export const DEFAULT_ASSISTANT_LIST_QUERY = {

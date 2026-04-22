@@ -10,22 +10,8 @@ import {
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import AssistantCardList from './AssistantCardList';
 import AssistantPageHeader, { type AssistantPageHeaderAction } from './AssistantPageHeader';
+import type { AssistantSelectionPageProps } from '../../types/components';
 import type { AssistantItem } from '../../types/assistant';
-
-interface AssistantSelectionPageProps {
-  title: string;
-  isPcMiniApp?: boolean;
-  leftButtonText: string;
-  rightButtonText: string;
-  defaultSelectedAssistantId?: string;
-  onLeftButtonClick?: () => void;
-  onRightButtonClick?: () => void;
-  onService?: () => void;
-  assistants?: AssistantItem[];
-  selectedAssistantId?: string;
-  onSelectAssistant?: (assistantId: string) => void;
-  rightButtonDisabled?: boolean;
-}
 
 const EMPTY_ASSISTANT_LIST: AssistantItem[] = [];
 const noop = () => {};

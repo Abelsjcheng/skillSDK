@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import AssistantCardList from '../components/assistant/AssistantCardList';
 import { isPcMiniApp } from '../constants';
+import type { WeAgentListItem } from '../types/bridge';
 import type { AssistantItem } from '../types/assistant';
 import '../styles/StartAssistant.less';
 import '../styles/SwitchAssistant.less';
@@ -19,7 +20,6 @@ import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getWeAgentList,
   openH5Webview,
-  type WeAgentListItem,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 

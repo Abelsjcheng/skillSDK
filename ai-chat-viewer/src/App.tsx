@@ -6,6 +6,8 @@ import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
 import { resolveAssistantIconUrl } from './components/createAssistant/constants';
 import { StreamAssembler } from './protocol/StreamAssembler';
+import type { SkillSession, WeAgentDetails } from './types/bridge';
+import type { AppProps } from './types/components';
 import type {
   Message,
   MessagePart,
@@ -26,8 +28,6 @@ import {
   sendMessage as sendMessageApi,
   stopSkill,
   unregisterSessionListener,
-  type SkillSession,
-  type WeAgentDetails,
 } from './utils/hwext';
 import {
   collectUserMessageIds,
@@ -51,10 +51,6 @@ import { showToast } from './utils/toast';
 import createSession from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
-
-export interface AppProps {
-  assistantAccount?: string;
-}
 
 const HISTORY_PAGE_SIZE = 20;
 

@@ -1,4 +1,4 @@
-import type { WeAgentListItem } from './hwext';
+import type { WeAgentListItem } from '../types/bridge';
 
 export const CUSTOM_ASSISTANT_TAG = '自定义助理';
 

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import { isPcMiniApp } from '../constants';
 import { ensureLanguageInitialized } from '../i18n/config';
+import type { WeAgentListItem } from '../types/bridge';
+import type { SwitchAssistantProps } from '../types/pages';
 import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   DEFAULT_ASSISTANT_LIST_QUERY,
@@ -16,13 +18,8 @@ import {
   getQueryParam,
   getWeAgentList,
   openH5Webview,
-  type WeAgentListItem,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
-
-interface SwitchAssistantProps {
-  defaultSelectedAssistantId?: string;
-}
 
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();

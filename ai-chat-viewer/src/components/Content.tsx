@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import defaultAvatar from '../imgs/defaultAvatar.png';
-import type { Message, PendingAssistantPreview, QuestionAnswerSubmission } from '../types';
+import type { ContentProps } from '../types/components';
 import AvatarImage from './AvatarImage';
 import { MessageBubble } from './MessageBubble';
 import { PendingAssistantBubble } from './PendingAssistantBubble';
@@ -9,22 +9,6 @@ import '../styles/Content.less';
 
 const TOP_LOAD_THRESHOLD = 24;
 const BOTTOM_AUTO_SCROLL_THRESHOLD = 24;
-
-interface ContentProps {
-  messages: Message[];
-  pendingAssistantPreview: PendingAssistantPreview;
-  welinkSessionId: string;
-  scrollToBottomSignal?: number;
-  isLoadingHistory: boolean;
-  hasMoreHistory: boolean;
-  onLoadMoreHistory: () => void;
-  onQuestionAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
-  weAgentUserName?: string;
-  weAgentUserAvatar?: string;
-  weAgentAssistantName?: string;
-  weAgentAssistantDescription?: string;
-  weAgentAssistantAvatar?: string;
-}
 
 export const Content: React.FC<ContentProps> = ({
   messages,

@@ -4,22 +4,12 @@ import checkIcon from '../../imgs/check.svg';
 import sendIcon from '../../imgs/send_icon.svg';
 import stopIcon from '../../imgs/stop_icon.svg';
 import '../../styles/WeAgentCUIFooter.less';
+import type {
+  SendShortcutMode,
+  ShortcutOption,
+  WeAgentCUIFooterProps,
+} from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-
-type SendShortcutMode = 'enter' | 'ctrlEnter';
-
-interface ShortcutOption {
-  mode: SendShortcutMode;
-  label: string;
-}
-
-interface WeAgentCUIFooterProps {
-  isPcMiniApp?: boolean;
-  mode: 'generate' | 'generating' | 'regenerate';
-  onSend: (message: string) => void;
-  onStop: () => void;
-  leftActions?: React.ReactNode;
-}
 
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,

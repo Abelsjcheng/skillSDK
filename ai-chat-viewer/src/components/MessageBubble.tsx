@@ -13,20 +13,11 @@ import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
 import { createMarkdownComponents } from './markdownComponents';
-import type { Message, MessagePart, QuestionAnswerSubmission } from '../types';
+import type { Message, MessagePart } from '../types';
+import type { MessageBubbleProps } from '../types/components';
 import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
 import defaultAvatar from '../imgs/defaultAvatar.png';
 import 'katex/dist/katex.min.css';
-
-interface MessageBubbleProps {
-  message: Message;
-  welinkSessionId: string;
-  onQuestionAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
-  weAgentUserName?: string;
-  weAgentUserAvatar?: string;
-  weAgentAssistantName?: string;
-  weAgentAssistantAvatar?: string;
-}
 
 function formatMessageTime(timestamp: number): string {
   const date = new Date(timestamp);

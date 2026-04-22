@@ -5,6 +5,7 @@ import bannerEn from '../../imgs/banner-en.png';
 import banner from '../../imgs/banner.png';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
 import type { BrainType, DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
+import type { StepBrainSelectProps } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { canConfirm } from '../../utils/digitalTwinValidation';
 import { WeLog } from '../../utils/logger';
@@ -12,15 +13,6 @@ import { showToast } from '../../utils/toast';
 import { INTERNAL_ASSISTANTS } from './constants';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
-
-interface StepBrainSelectProps {
-  isPcMiniApp?: boolean;
-  onClose: () => void;
-  onCancel: () => void;
-  onPrev: () => void;
-  onConfirm: (payload: DigitalTwinBrainPayload) => void;
-  loadAgentTypes?: () => Promise<InternalAssistantOption[]>;
-}
 
 async function defaultLoadAgentTypes(): Promise<InternalAssistantOption[]> {
   if (typeof window === 'undefined') {

@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import type { AvatarImageProps } from '../types/components';
 import { isRemoteAvatarUrl } from '../utils/avatar';
-
-interface AvatarImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
-  src?: string | null;
-  fallbackSrc: string;
-}
 
 const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) => {
   const [resolvedSrc, setResolvedSrc] = useState(fallbackSrc);

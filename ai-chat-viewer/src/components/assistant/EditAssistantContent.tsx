@@ -4,6 +4,8 @@ import AssistantPageHeader from './AssistantPageHeader';
 import { StepBasicInfo } from '../createAssistant/StepBasicInfo';
 import { DEFAULT_AVATARS, resolveAssistantIconUrl } from '../createAssistant/constants';
 import { ensureLanguageInitialized } from '../../i18n/config';
+import type { WeAgentDetails } from '../../types/bridge';
+import type { EditAssistantContentProps } from '../../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
@@ -11,7 +13,6 @@ import {
   notifyAssistantDetailUpdated,
   openH5Webview,
   updateWeAgent,
-  type WeAgentDetails,
 } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
@@ -28,16 +29,6 @@ function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayloa
     icon,
     description: detail.desc ?? '',
   };
-}
-
-interface EditAssistantContentProps {
-  isPcMiniApp?: boolean;
-  source?: 'assistantDetail' | 'external';
-  initialDetail?: WeAgentDetails | null;
-  partnerAccount?: string;
-  robotId?: string;
-  onClose: () => void;
-  onSuccess?: (payload: DigitalTwinBasicInfoPayload) => void;
 }
 
 const noop = () => {};

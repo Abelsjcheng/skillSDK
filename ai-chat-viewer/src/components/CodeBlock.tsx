@@ -5,15 +5,11 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import copyIcon from '../imgs/icon-copy.svg';
 import '../styles/CodeBlock.less';
+import type { CodeBlockProps } from '../types/components';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
-
-interface CodeBlockProps {
-  code: string;
-  language?: string;
-}
 
 function normalizeLanguage(language?: string): string {
   if (!language) return 'text';

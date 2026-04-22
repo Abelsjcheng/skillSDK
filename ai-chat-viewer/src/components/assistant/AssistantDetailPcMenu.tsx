@@ -1,19 +1,9 @@
 import React from 'react';
 import deleteIcon from '../../imgs/delete_icon.png';
 import editIcon from '../../imgs/edit_icon.png';
+import type { AssistantDetailPcMenuProps } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import '../../styles/AssistantDetailPcMenu.less';
-
-interface AssistantDetailPcMenuProps {
-  open: boolean;
-  top: number;
-  left: number;
-  onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  editLabel: string;
-  deleteLabel: string;
-}
 
 const AssistantDetailPcMenu: React.FC<AssistantDetailPcMenuProps> = ({
   open,

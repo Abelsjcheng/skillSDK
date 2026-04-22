@@ -1,18 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isPcMiniApp } from '../constants';
+import type { PermissionCardProps } from '../types/components';
 import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { replyPermission } from '../utils/hwext';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
-
-interface PermissionCardProps {
-  part: MessagePart;
-  welinkSessionId: string;
-  onResolved?: () => void;
-  readonly?: boolean;
-}
 
 function getPermissionResponse(part: MessagePart): PermissionResponse | string | undefined {
   if (typeof part.response !== 'string') {

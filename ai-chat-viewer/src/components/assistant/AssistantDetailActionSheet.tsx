@@ -1,15 +1,9 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import type { AssistantDetailActionSheetProps } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import '../../styles/AssistantDetailActionSheet.less';
-
-interface AssistantDetailActionSheetProps {
-  open: boolean;
-  onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}
 
 const AssistantDetailActionSheet: React.FC<AssistantDetailActionSheetProps> = ({
   open,

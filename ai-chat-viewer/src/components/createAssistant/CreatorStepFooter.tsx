@@ -1,21 +1,10 @@
 import React from 'react';
+import type {
+  CreatorStepFooterButton,
+  CreatorStepFooterProps,
+  FooterButtonVariant,
+} from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-
-type FooterButtonVariant = 'cancel' | 'next' | 'confirm';
-
-interface CreatorStepFooterButton {
-  label: string;
-  onClick: () => void;
-  variant: FooterButtonVariant;
-  enabled?: boolean;
-  withStateClass?: boolean;
-}
-
-interface CreatorStepFooterProps {
-  isPcMiniApp: boolean;
-  pcButtons: CreatorStepFooterButton[];
-  mobileButton: CreatorStepFooterButton;
-}
 
 function getStateActionButtonClassName(
   baseClassName: string,

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EditAssistant from '../../pages/editAssistant';
 import i18n from '../../i18n/config';
-import type { WeAgentDetails } from '../../utils/hwext';
+import type { WeAgentDetails } from '../../types/bridge';
 
 const mockDetail: WeAgentDetails = {
   name: 'AssistantA',

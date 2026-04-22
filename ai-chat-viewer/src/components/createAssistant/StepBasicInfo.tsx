@@ -8,6 +8,7 @@ import type {
   GetFilePathResult,
   UploadTinyImageResult,
 } from '../../types/digitalTwin';
+import type { StepBasicInfoProps } from '../../types/components';
 import { chooseImage, uploadFile } from '../../utils/hwext';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import {
@@ -21,18 +22,6 @@ import { showToast } from '../../utils/toast';
 import AvatarImage from '../AvatarImage';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
-
-interface StepBasicInfoProps {
-  isPcMiniApp?: boolean;
-  defaultAvatars: DefaultAvatarOption[];
-  initialValue?: DigitalTwinBasicInfoPayload | null;
-  className?: string;
-  showHeader?: boolean;
-  onClose: () => void;
-  onCancel: () => void;
-  onNext: (payload: DigitalTwinBasicInfoPayload) => void;
-  submitLabel?: string;
-}
 
 function resolveInitialDefaultAvatarId(
   defaultAvatars: DefaultAvatarOption[],

@@ -1,15 +1,9 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import type { AssistantDetailDeleteModalProps } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import '../../styles/AssistantDetailDeleteModal.less';
-
-interface AssistantDetailDeleteModalProps {
-  open: boolean;
-  assistantName: string;
-  onClose: () => void;
-  onConfirm: () => void;
-}
 
 const AssistantDetailDeleteModal: React.FC<AssistantDetailDeleteModalProps> = ({
   open,

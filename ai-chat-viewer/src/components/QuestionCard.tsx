@@ -1,14 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { MessagePart, QuestionAnswerSubmission } from '../types';
+import type { QuestionCardProps } from '../types/components';
+import type { MessagePart } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { WeLog } from '../utils/logger';
-
-interface QuestionCardProps {
-  part: MessagePart;
-  onAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
-  readonly?: boolean;
-}
 
 function getAnswerText(part: MessagePart): string {
   return typeof part.output === 'string' ? part.output.trim() : '';

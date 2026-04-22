@@ -4,27 +4,16 @@ import { createPortal } from 'react-dom';
 import { isPcMiniApp } from '../../constants';
 import closeIcon from '../../imgs/close_icon.svg';
 import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
+import type { SkillSession } from '../../types/bridge';
+import type {
+  HistorySessionGroup,
+  HistorySessionGroupKey,
+  WeAgentHistorySidebarProps,
+} from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import { getHistorySessionsList, type SkillSession } from '../../utils/hwext';
+import { getHistorySessionsList } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
-
-type HistorySessionGroupKey = 'today' | 'yesterday' | 'threeDaysAgo';
-
-interface HistorySessionGroup {
-  key: HistorySessionGroupKey;
-  sessions: SkillSession[];
-}
-
-interface WeAgentHistorySidebarProps {
-  assistantAccount?: string;
-  currentWelinkSessionId?: string;
-  cachedSessions?: SkillSession[];
-  historyLoaded?: boolean;
-  onHistoryLoaded?: (sessions: SkillSession[]) => void;
-  onSessionSelect?: (welinkSessionId: string) => void;
-  onVisibilityChange?: (visible: boolean) => void;
-}
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;

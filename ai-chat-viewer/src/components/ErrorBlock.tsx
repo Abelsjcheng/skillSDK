@@ -1,9 +1,5 @@
 import React from 'react';
-import type { MessagePart } from '../types';
-
-interface ErrorBlockProps {
-  part: MessagePart;
-}
+import type { ErrorBlockProps } from '../types/components';
 
 export const ErrorBlock: React.FC<ErrorBlockProps> = ({ part }) => (
   <div className="error-block" role="alert">

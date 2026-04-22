@@ -1,8 +1,9 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import App, { type AppProps } from '../App';
+import App from '../App';
 import AssistantDetail from '../pages/assistantDetail';
 import SwitchAssistant from '../pages/switchAssistant';
+import type { AppProps } from '../types/components';
 import type {
   Message,
   MessagePart,

@@ -2,13 +2,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import defaultAvatar from '../imgs/defaultAvatar.png';
 import generatingIcon from '../imgs/generating_icon.png';
+import type { PendingAssistantBubbleProps } from '../types/components';
 import AvatarImage from './AvatarImage';
-
-interface PendingAssistantBubbleProps {
-  startedAt: number;
-  weAgentAssistantName?: string;
-  weAgentAssistantAvatar?: string;
-}
 
 function formatMessageTime(timestamp: number): string {
   const date = new Date(timestamp);

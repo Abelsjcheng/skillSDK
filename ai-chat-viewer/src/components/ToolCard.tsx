@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
-import type { MessagePart } from '../types';
-
-interface ToolCardProps {
-  part: MessagePart;
-}
+import type { ToolCardProps } from '../types/components';
 
 const statusLabels: Record<string, string> = {
   pending: 'Pending',

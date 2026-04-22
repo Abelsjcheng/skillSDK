@@ -15,7 +15,13 @@ import editIcon from '../imgs/edit_icon.png';
 import iconCopy from '../imgs/icon-copy.svg';
 import moreIcon from '../imgs/more_icon.png';
 import serviceIcon from '../imgs/icon-service.svg';
+import type { WeAgentDetails } from '../types/bridge';
 import type { DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
+import type {
+  AssistantDetailOverlay,
+  AssistantDetailPcView,
+  DetailInfoRowProps,
+} from '../types/pages';
 import { dispatchAssistantCloseEvent } from '../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { copyTextToClipboard } from '../utils/clipboard';
@@ -27,16 +33,9 @@ import {
   getUrlHost,
   getWeAgentDetails,
   openH5Webview,
-  type WeAgentDetails,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
-
-interface DetailInfoRowProps {
-  label: string;
-  value?: string;
-  valueNode?: React.ReactNode;
-}
 
 const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueNode }) => (
   <div className="assistant-detail__info-row">
@@ -51,9 +50,6 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .map((value) => (value ?? '').trim())
     .filter(Boolean)
     .join(' ');
-
-type AssistantDetailOverlay = 'none' | 'action-sheet' | 'delete-modal';
-type AssistantDetailPcView = 'detail' | 'edit';
 
 const AssistantDetail: React.FC = () => {
   const { t, i18n } = useTranslation();

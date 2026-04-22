@@ -1,12 +1,7 @@
 import warningIcon from '../imgs/warn_icon.svg';
 import { isPcMiniApp } from '../constants';
+import type { ToastOptions } from '../types/system';
 import '../styles/Toast.less';
-
-interface ToastOptions {
-  duration?: number;
-  toastClassName?: string;
-  hideClassName?: string;
-}
 
 const DEFAULT_DURATION = 2000;
 const DEFAULT_TOAST_CLASS_NAME = 'toast';

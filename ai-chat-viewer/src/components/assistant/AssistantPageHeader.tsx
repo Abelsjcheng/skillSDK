@@ -4,29 +4,11 @@ import backIcon from '../../imgs/back_icon.svg';
 import closeIcon from '../../imgs/close_icon.svg';
 import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
+import type { AssistantPageHeaderAction, AssistantPageHeaderProps } from '../../types/components';
 import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
-
-export interface AssistantPageHeaderAction {
-  label: string;
-  onClick: () => void;
-  icon?: string;
-  iconNode?: React.ReactNode;
-  buttonRef?: React.Ref<HTMLButtonElement>;
-}
-
-interface AssistantPageHeaderProps {
-  title: string;
-  isPcMiniApp?: boolean;
-  onClose?: () => void;
-  onService?: () => void;
-  mobileRightActionIcon?: string;
-  mobileRightActionLabel?: string;
-  onMobileRightAction?: () => void;
-  pcLeftActions?: AssistantPageHeaderAction[];
-  pcRightActions?: AssistantPageHeaderAction[];
-}
+export type { AssistantPageHeaderAction } from '../../types/components';
 
 const noop = () => {};
 

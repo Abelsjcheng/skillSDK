@@ -1,5 +1,5 @@
 import type { GetSessionMessageHistoryResponse } from '../types';
-import type { SkillSession } from './hwext';
+import type { SkillSession } from '../types/bridge';
 
 export function ensureSessionTimestamps(session: SkillSession): SkillSession {
   const now = new Date().toISOString();

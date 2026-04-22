@@ -1,13 +1,7 @@
 import React from 'react';
 import AvatarImage from '../AvatarImage';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
-import type { AssistantItem } from '../../types/assistant';
-
-interface AssistantCardListProps {
-  assistants: AssistantItem[];
-  selectedAssistantId: string;
-  onSelectAssistant: (assistantId: string) => void;
-}
+import type { AssistantCardListProps } from '../../types/components';
 
 const AssistantCardList: React.FC<AssistantCardListProps> = ({
   assistants,
