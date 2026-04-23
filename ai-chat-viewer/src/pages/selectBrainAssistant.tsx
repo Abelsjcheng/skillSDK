@@ -9,6 +9,7 @@ import type {
   DigitalTwinBasicInfoPayload,
   DigitalTwinBrainPayload,
 } from '../types/digitalTwin';
+import type { CreateDigitalTwinResult } from '../types/bridge';
 import {
   buildOpenWeAgentCUIParams,
   createDigitalTwin,
@@ -18,7 +19,6 @@ import {
   openWeAgentCUI,
   resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
-  type CreateDigitalTwinResult,
 } from '../utils/hwext';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';

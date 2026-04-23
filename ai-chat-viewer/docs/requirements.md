@@ -1053,6 +1053,14 @@
 11. 当前尚未接入国际化的硬编码中文文案不要求在本轮一并全部替换；但 `activateAssistant`、`createAssistant` 与 `assistantDetail` 不再归类为后续补齐页面，需在当前版本完成文案替换。
 12. 迁移完成后，旧 [src/i18n/messages.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/i18n/messages.ts) 不再保留为运行时入口，避免出现双套资源定义并存。
 
+## 28. 类型声明收口
+
+1. [src/utils/hwext.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/utils/hwext.ts) 只负责 JSAPI 调用适配、参数归一化与运行时工具方法，不再对外导出任何 interface/type。
+2. 所有桥接层相关接口与类型统一收口到 `src/types` 目录：
+   - JSAPI / HWH5EXT / WeAgent 相关类型放在 `src/types/bridge`
+   - 页面、组件、系统与业务领域类型继续分别放在 `src/types/pages`、`src/types/components`、`src/types/system`、`src/types/digitalTwin` 等目录
+3. 业务页面、组件、mock、opencode 适配层在使用接口/类型时，必须直接从 `src/types` 目录导入，不允许再通过 `src/utils/hwext.ts` 间接获取类型。
+
 
 
 

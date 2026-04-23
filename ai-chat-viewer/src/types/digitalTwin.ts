@@ -1,4 +1,6 @@
-﻿export type BrainType = 'internal' | 'custom';
+import type { WeAgentDetails } from './bridge';
+
+export type BrainType = 'internal' | 'custom';
 
 export interface InternalAssistantOption {
   name: string;
@@ -35,7 +37,7 @@ export interface CreateAssistantRouteState {
 
 export interface EditAssistantRouteState {
   source?: 'assistantDetail' | 'external';
-  detail?: import('../utils/hwext').WeAgentDetails | null;
+  detail?: WeAgentDetails | null;
 }
 
 export interface DigitalTwinBrainPayload {
@@ -62,5 +64,5 @@ export interface UploadTinyImageResult {
 }
 
 export interface GetFilePathResult {
-  filePath: string
+  filePath: string;
 }

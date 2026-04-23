@@ -34,7 +34,7 @@ import type {
   WeAgentDetailsArrayResult,
   WeAgentListResult,
   WeAgentUriResult,
-} from '../utils/hwext';
+} from '../types/bridge';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
 
 interface OpenCodeBridgeConfig {

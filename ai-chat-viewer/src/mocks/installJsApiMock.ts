@@ -36,7 +36,7 @@ import type {
   WeAgentDetailsArrayResult,
   WeAgentListResult,
   WeAgentUriResult,
-} from '../utils/hwext';
+} from '../types/bridge';
 import { HOST } from '../constants';
 import { WeLog } from '../utils/logger';
 

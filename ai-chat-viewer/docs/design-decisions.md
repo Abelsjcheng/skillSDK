@@ -501,6 +501,13 @@ interface CreateDigitalTwinParams {
 10. 旧的 `src/i18n/messages.ts` 不再作为运行时词典入口保留；原有资源内容拆分迁移到 `resources/zh.ts` 与 `resources/en.ts` 后，可直接删除旧文件，避免双套词典并存。
 11. 非 React 场景（如 toast、streaming、工具层辅助方法）禁止继续自定义包装 `t()`；统一直接依赖单例 `i18n`，减少额外抽象层。
 
+## 21. 类型收口设计
+
+1. `src/utils/hwext.ts` 仅保留运行时能力适配与辅助方法，不再承担类型中转导出职责。
+2. 桥接层相关类型统一以 `src/types/bridge` 为单一来源；业务层如果需要 `WeAgentDetails`、`GetWeAgentListParams`、`HWH5EXT`、`CreateDigitalTwinResult` 等类型，直接从 `src/types/bridge` 导入。
+3. 页面、组件、mock、opencode 适配层禁止再通过 `hwext.ts` 获取类型，避免出现“工具模块既导出函数又转导出类型”的双重职责。
+4. 此次收口不调整类型定义语义，只调整导入边界：类型定义位置保持稳定，`hwext.ts` 侧只删除 type re-export 和相关下游依赖。
+
 
 
 
