@@ -958,7 +958,6 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
     if ([cachedDictionary isKindOfClass:[NSDictionary class]] && cachedDictionary.count > 0) {
         WLAgentSkillsWeAgentDetailsArrayResult *cachedResult =
             [self weAgentDetailsArrayResultFromDetailDictionary:cachedDictionary];
-        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:cachedDictionary];
         if (success) {
             success(cachedResult);
         }
@@ -974,7 +973,9 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
             return;
         }
         WLAgentSkillsWeAgentDetailsArrayResult *result = [strongSelf weAgentDetailsArrayResultFromPayload:responseObject];
-        [strongSelf cacheWeAgentDetailsArrayResult:result partnerAccount:partnerAccount];
+        [strongSelf cacheWeAgentDetailsArrayResult:result
+                                    partnerAccount:partnerAccount
+                                 updateCurrentDetail:NO];
         if (success) {
             success(result);
         }
@@ -1282,6 +1283,14 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
 
 - (void)cacheWeAgentDetailsArrayResult:(WLAgentSkillsWeAgentDetailsArrayResult *)result
                         partnerAccount:(NSString *)partnerAccount {
+    [self cacheWeAgentDetailsArrayResult:result
+                          partnerAccount:partnerAccount
+                       updateCurrentDetail:YES];
+}
+
+- (void)cacheWeAgentDetailsArrayResult:(WLAgentSkillsWeAgentDetailsArrayResult *)result
+                        partnerAccount:(NSString *)partnerAccount
+                   updateCurrentDetail:(BOOL)updateCurrentDetail {
     if (result.weAgentDetailsArray.count == 0) {
         return;
     }
@@ -1289,7 +1298,9 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         NSDictionary *detailDictionary = [result.weAgentDetailsArray.firstObject toDictionary];
         [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentDetailDictionary:detailDictionary
                                                            forPartnerAccount:partnerAccount];
-        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:detailDictionary];
+        if (updateCurrentDetail) {
+            [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:detailDictionary];
+        }
     }
 }
 
@@ -1306,7 +1317,9 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
             return;
         }
         WLAgentSkillsWeAgentDetailsArrayResult *result = [strongSelf weAgentDetailsArrayResultFromPayload:responseObject];
-        [strongSelf cacheWeAgentDetailsArrayResult:result partnerAccount:partnerAccount];
+        [strongSelf cacheWeAgentDetailsArrayResult:result
+                                    partnerAccount:partnerAccount
+                                 updateCurrentDetail:NO];
     }
                                                                          failure:^(NSError * _Nonnull error) {
         // Ignore background refresh failures.
