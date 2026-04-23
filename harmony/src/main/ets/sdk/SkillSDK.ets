@@ -681,11 +681,10 @@ export class SkillSDK {
       const cached = this.weAgentStore.loadDetailsByPartnerAccount(partnerAccount);
       if (cached !== null) {
         const cachedResult = this.wrapWeAgentDetail(cached);
-        this.weAgentStore.saveCurrentDetail(cached);
         void this.refreshAssistantDetailsCache(partnerAccount);
         return cachedResult;
       }
-      return await this.fetchAndCacheWeAgentDetails(partnerAccount);
+      return await this.fetchAndCacheWeAgentDetails(partnerAccount, false);
     } catch (error) {
       throw this.normalizeError('getAssistantDetails', error);
     }
@@ -765,7 +764,10 @@ export class SkillSDK {
     };
   }
 
-  private async fetchAndCacheWeAgentDetails(partnerAccount: string): Promise<WeAgentDetailsArray> {
+  private async fetchAndCacheWeAgentDetails(
+    partnerAccount: string,
+    updateCurrentDetail: boolean = true
+  ): Promise<WeAgentDetailsArray> {
     const payload = await this.httpClient.get<Object>(
       `/v1/robot-partners/${partnerAccount}`,
       undefined,
@@ -774,22 +776,28 @@ export class SkillSDK {
     const result = {
       weAgentDetailsArray: this.parseWeAgentDetailsList(payload)
     };
-    this.cacheWeAgentDetailsResult(partnerAccount, result);
+    this.cacheWeAgentDetailsResult(partnerAccount, result, updateCurrentDetail);
     return result;
   }
 
-  private cacheWeAgentDetailsResult(partnerAccount: string, result: WeAgentDetailsArray): void {
+  private cacheWeAgentDetailsResult(
+    partnerAccount: string,
+    result: WeAgentDetailsArray,
+    updateCurrentDetail: boolean = true
+  ): void {
     if (result.weAgentDetailsArray.length === 0) {
       return;
     }
     const detail = result.weAgentDetailsArray[0];
     this.weAgentStore.saveDetailsByPartnerAccount(partnerAccount, detail);
-    this.weAgentStore.saveCurrentDetail(detail);
+    if (updateCurrentDetail) {
+      this.weAgentStore.saveCurrentDetail(detail);
+    }
   }
 
   private async refreshAssistantDetailsCache(partnerAccount: string): Promise<void> {
     try {
-      await this.fetchAndCacheWeAgentDetails(partnerAccount);
+      await this.fetchAndCacheWeAgentDetails(partnerAccount, false);
     } catch (error) {
       this.logger.warn('getAssistantDetails background refresh failed');
     }
