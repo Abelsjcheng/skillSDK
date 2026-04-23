@@ -6,7 +6,6 @@ import androidx.annotation.Nullable;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import com.opencode.skill.SkillSDKConfig;
 import com.opencode.skill.callback.SkillCallback;
@@ -33,6 +32,19 @@ import com.opencode.skill.model.WeAgent;
 import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentDetailsArrayResult;
 import com.opencode.skill.model.WeAgentListResult;
+import com.opencode.skill.network.retrofit.AssistantApiService;
+import com.opencode.skill.network.retrofit.DefaultHeadersInterceptor;
+import com.opencode.skill.network.retrofit.DirectExecutor;
+import com.opencode.skill.network.retrofit.SkillApiService;
+import com.opencode.skill.network.retrofit.body.CreateDigitalTwinBody;
+import com.opencode.skill.network.retrofit.body.CreateNewSessionBody;
+import com.opencode.skill.network.retrofit.body.CreateSessionBody;
+import com.opencode.skill.network.retrofit.body.EmptyBody;
+import com.opencode.skill.network.retrofit.body.ReplyPermissionBody;
+import com.opencode.skill.network.retrofit.body.SendMessageBody;
+import com.opencode.skill.network.retrofit.body.SendMessageToImBody;
+import com.opencode.skill.network.retrofit.body.UpdateQrcodeInfoBody;
+import com.opencode.skill.network.retrofit.body.UpdateWeAgentBody;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -43,24 +55,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import okhttp3.Call;
-import okhttp3.HttpUrl;
-import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 /**
  * HTTP client for skill server REST APIs.
  */
 public class ApiClient {
-    private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
-
     @NonNull
     private final Gson gson = new Gson();
     @Nullable
     private OkHttpClient okHttpClient;
+    @Nullable
+    private Retrofit skillRetrofit;
+    @Nullable
+    private SkillApiService skillApiService;
+    @Nullable
+    private Retrofit assistantRetrofit;
+    @Nullable
+    private AssistantApiService assistantApiService;
     @Nullable
     private String baseUrl;
     @Nullable
@@ -73,46 +87,46 @@ public class ApiClient {
         this.assistantBaseUrl = trimTrailingSlash(config.getAssistantBaseUrl());
         this.defaultHeaders = new HashMap<>(config.getDefaultHeaders());
         this.okHttpClient = new OkHttpClient.Builder()
+                .addInterceptor(new DefaultHeadersInterceptor(defaultHeaders))
                 .connectTimeout(config.getConnectTimeout(), TimeUnit.MILLISECONDS)
                 .readTimeout(config.getReadTimeout(), TimeUnit.MILLISECONDS)
                 .writeTimeout(config.getWriteTimeout(), TimeUnit.MILLISECONDS)
                 .build();
+        this.skillRetrofit = new Retrofit.Builder()
+                .baseUrl(ensureTrailingSlash(requireBaseUrl()))
+                .client(requireClient())
+                .callbackExecutor(new DirectExecutor())
+                .addConverterFactory(GsonConverterFactory.create(gson))
+                .build();
+        this.assistantRetrofit = new Retrofit.Builder()
+                .baseUrl(ensureTrailingSlash(requireAssistantBaseUrl()))
+                .client(requireClient())
+                .callbackExecutor(new DirectExecutor())
+                .addConverterFactory(GsonConverterFactory.create(gson))
+                .build();
+        this.skillApiService = skillRetrofit.create(SkillApiService.class);
+        this.assistantApiService = assistantRetrofit.create(AssistantApiService.class);
     }
 
     public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
-        JsonObject body = new JsonObject();
-        if (params.getAk() != null && !params.getAk().trim().isEmpty()) {
-            body.addProperty("ak", params.getAk().trim());
-        }
-        if (params.getTitle() != null && !params.getTitle().trim().isEmpty()) {
-            body.addProperty("title", params.getTitle().trim());
-        }
-        if (params.getImGroupId() != null && !params.getImGroupId().trim().isEmpty()) {
-            body.addProperty("imGroupId", params.getImGroupId().trim());
-        }
-
-        Request request = newRequestBuilder("/api/skill/sessions")
-                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeEnvelope(request, SkillSession.class, callback);
+        SkillApiService service = requireSkillApiService();
+        enqueueEnvelope(service.createSession(new CreateSessionBody(
+                normalizeNonBlank(params.getAk()),
+                normalizeNonBlank(params.getTitle()),
+                normalizeNonBlank(params.getImGroupId())
+        )), SkillSession.class, callback);
     }
 
     public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
-        JsonObject body = new JsonObject();
-        body.addProperty("ak", params.getAk().trim());
-        body.addProperty("bussinessDomain", params.getBussinessDomain().trim());
-        body.addProperty("bussinessType", params.getBussinessType().trim());
-        body.addProperty("bussinessId", params.getBussinessId().trim());
-        body.addProperty("assistantAccount", params.getAssistantAccount().trim());
-
-        if (params.getTitle() != null && !params.getTitle().trim().isEmpty()) {
-            body.addProperty("title", params.getTitle().trim());
-        }
-
-        Request request = newRequestBuilder("/api/skill/sessions")
-                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeEnvelope(request, SkillSession.class, callback);
+        SkillApiService service = requireSkillApiService();
+        enqueueEnvelope(service.createNewSession(new CreateNewSessionBody(
+                params.getAk().trim(),
+                params.getBussinessDomain().trim(),
+                params.getBussinessType().trim(),
+                params.getBussinessId().trim(),
+                params.getAssistantAccount().trim(),
+                normalizeNonBlank(params.getTitle())
+        )), SkillSession.class, callback);
     }
 
     public void createDigitalTwin(
@@ -123,27 +137,18 @@ public class ApiClient {
             @Nullable String bizRobotId,
             @NonNull SkillCallback<CreateDigitalTwinResult> callback
     ) {
-        JsonObject body = new JsonObject();
-        body.addProperty("name", name);
-        body.addProperty("icon", icon);
-        body.addProperty("description", description);
-        body.addProperty("weCrewType", weCrewType);
-        if (bizRobotId != null && !bizRobotId.trim().isEmpty()) {
-            body.addProperty("bizRobotId", bizRobotId.trim());
-        }
-
-        Request request = newRequestBuilder("/v4-1/we-crew/im-register", true)
-                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeEnvelope(request, CreateDigitalTwinResult.class, callback);
+        AssistantApiService service = requireAssistantApiService();
+        enqueueEnvelope(
+                service.createDigitalTwin(new CreateDigitalTwinBody(name, icon, description, weCrewType, bizRobotId)),
+                CreateDigitalTwinResult.class,
+                callback
+        );
     }
 
     public void getAgentType(@NonNull SkillCallback<AgentTypeListResult> callback) {
-        Request request = newRequestBuilder("/v4-1/we-crew/inner-assistant/list", true)
-                .get()
-                .build();
+        AssistantApiService service = requireAssistantApiService();
         Type type = TypeToken.getParameterized(List.class, AgentType.class).getType();
-        executeEnvelope(request, type, new SkillCallback<List<AgentType>>() {
+        enqueueEnvelope(service.getAgentType(), type, new SkillCallback<List<AgentType>>() {
             @Override
             public void onSuccess(@Nullable List<AgentType> result) {
                 AgentTypeListResult payload = new AgentTypeListResult();
@@ -159,14 +164,9 @@ public class ApiClient {
     }
 
     public void getWeAgentList(int pageSize, int pageNumber, @NonNull SkillCallback<WeAgentListResult> callback) {
-        Request request = newRequestBuilder(urlBuilder("/v4-1/we-crew/list", true)
-                        .addQueryParameter("pageSize", String.valueOf(pageSize))
-                        .addQueryParameter("pageNumber", String.valueOf(pageNumber))
-                        .build())
-                .get()
-                .build();
+        AssistantApiService service = requireAssistantApiService();
         Type type = TypeToken.getParameterized(List.class, WeAgent.class).getType();
-        executeEnvelope(request, type, new SkillCallback<List<WeAgent>>() {
+        enqueueEnvelope(service.getWeAgentList(pageSize, pageNumber), type, new SkillCallback<List<WeAgent>>() {
             @Override
             public void onSuccess(@Nullable List<WeAgent> result) {
                 WeAgentListResult payload = new WeAgentListResult();
@@ -185,10 +185,8 @@ public class ApiClient {
             @NonNull String partnerAccount,
             @NonNull SkillCallback<WeAgentDetailsArrayResult> callback
     ) {
-        Request request = newRequestBuilder("/v1/robot-partners/" + partnerAccount, true)
-                .get()
-                .build();
-        executeEnvelope(request, JsonElement.class, new SkillCallback<JsonElement>() {
+        AssistantApiService service = requireAssistantApiService();
+        enqueueEnvelope(service.getWeAgentDetails(partnerAccount), JsonElement.class, new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 WeAgentDetailsArrayResult payload = new WeAgentDetailsArrayResult();
@@ -211,21 +209,9 @@ public class ApiClient {
             @NonNull String description,
             @NonNull SkillCallback<UpdateWeAgentResult> callback
     ) {
-        JsonObject body = new JsonObject();
-        if (partnerAccount != null && !partnerAccount.trim().isEmpty()) {
-            body.addProperty("partnerAccount", partnerAccount.trim());
-        }
-        if (robotId != null && !robotId.trim().isEmpty()) {
-            body.addProperty("robotId", robotId.trim());
-        }
-        body.addProperty("name", name);
-        body.addProperty("icon", icon);
-        body.addProperty("description", description);
-
-        Request request = newRequestBuilder("/v4-1/we-crew", true)
-                .put(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeRaw(request, new SkillCallback<JsonElement>() {
+        AssistantApiService service = requireAssistantApiService();
+        enqueueJson(service.updateWeAgent(new UpdateWeAgentBody(partnerAccount, robotId, name, icon, description)),
+                new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
@@ -247,17 +233,13 @@ public class ApiClient {
             @Nullable String robotId,
             @NonNull SkillCallback<DeleteWeAgentResult> callback
     ) {
-        HttpUrl.Builder urlBuilder = urlBuilder("/v4-1/we-crew", true);
-        if (partnerAccount != null && !partnerAccount.trim().isEmpty()) {
-            urlBuilder.addQueryParameter("partnerAccount", partnerAccount.trim());
-        }
-        if (robotId != null && !robotId.trim().isEmpty()) {
-            urlBuilder.addQueryParameter("robotId", robotId.trim());
-        }
-        Request request = newRequestBuilder(urlBuilder.build())
-                .delete()
-                .build();
-        executeRaw(request, new SkillCallback<JsonElement>() {
+        AssistantApiService service = requireAssistantApiService();
+        String normalizedPartnerAccount = partnerAccount == null ? null : partnerAccount.trim();
+        String normalizedRobotId = robotId == null ? null : robotId.trim();
+        enqueueJson(service.deleteWeAgent(
+                normalizedPartnerAccount == null || normalizedPartnerAccount.isEmpty() ? null : normalizedPartnerAccount,
+                normalizedRobotId == null || normalizedRobotId.isEmpty() ? null : normalizedRobotId
+        ), new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
@@ -275,10 +257,8 @@ public class ApiClient {
     }
 
     public void queryQrcodeInfo(@NonNull String qrcode, @NonNull SkillCallback<QrcodeInfo> callback) {
-        Request request = newRequestBuilder("/nologin/we-crew/im-register/qrcode/" + qrcode, true)
-                .get()
-                .build();
-        executeEnvelope(request, QrcodeInfo.class, callback);
+        AssistantApiService service = requireAssistantApiService();
+        enqueueEnvelope(service.queryQrcodeInfo(qrcode), QrcodeInfo.class, callback);
     }
 
     public void updateQrcodeInfo(
@@ -287,17 +267,8 @@ public class ApiClient {
             int status,
             @NonNull SkillCallback<UpdateQrcodeInfoResult> callback
     ) {
-        JsonObject body = new JsonObject();
-        body.addProperty("qrcode", qrcode);
-        if (ak != null && !ak.trim().isEmpty()) {
-            body.addProperty("ak", ak.trim());
-        }
-        body.addProperty("status", status);
-
-        Request request = newRequestBuilder("/v4-1/we-crew/im-register/qrcode", true)
-                .put(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeRaw(request, new SkillCallback<JsonElement>() {
+        AssistantApiService service = requireAssistantApiService();
+        enqueueJson(service.updateQrcodeInfo(new UpdateQrcodeInfoBody(qrcode, ak, status)), new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
@@ -337,93 +308,56 @@ public class ApiClient {
 
     public void listSessions(@Nullable String imGroupId, @Nullable String ak, @Nullable String status, int page, int size,
             @NonNull SkillCallback<PageResult<SkillSession>> callback) {
-        HttpUrl.Builder builder = urlBuilder("/api/skill/sessions");
-        if (imGroupId != null && !imGroupId.isEmpty()) {
-            builder.addQueryParameter("imGroupId", imGroupId);
-        }
-        if (ak != null && !ak.isEmpty()) {
-            builder.addQueryParameter("ak", ak);
-        }
-        if (status != null && !status.isEmpty()) {
-            builder.addQueryParameter("status", status);
-        }
-        builder.addQueryParameter("page", String.valueOf(page));
-        builder.addQueryParameter("size", String.valueOf(size));
-
-        Request request = newRequestBuilder(builder.build())
-                .get()
-                .build();
-
+        SkillApiService service = requireSkillApiService();
         Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
-        executeEnvelope(request, type, callback);
+        enqueueEnvelope(service.listSessions(
+                normalizeNonBlank(imGroupId),
+                normalizeNonBlank(ak),
+                normalizeNonBlank(status),
+                page,
+                size
+        ), type, callback);
     }
 
     public void getHistorySessionsList(@NonNull HistorySessionsParams params,
             @NonNull SkillCallback<PageResult<SkillSession>> callback) {
-        HttpUrl.Builder builder = urlBuilder("/api/skill/sessions")
-                .addQueryParameter("page", String.valueOf(params.getPage()))
-                .addQueryParameter("size", String.valueOf(params.getSize()));
-
-        if (params.getStatus() != null && !params.getStatus().isEmpty()) {
-            builder.addQueryParameter("status", params.getStatus());
-        }
-        if (params.getAk() != null && !params.getAk().isEmpty()) {
-            builder.addQueryParameter("ak", params.getAk());
-        }
-        if (params.getBussinessId() != null && !params.getBussinessId().isEmpty()) {
-            builder.addQueryParameter("bussinessId", params.getBussinessId());
-        }
-        if (params.getAssistantAccount() != null && !params.getAssistantAccount().isEmpty()) {
-            builder.addQueryParameter("assistantAccount", params.getAssistantAccount());
-        }
-        if (params.getBusinessSessionDomain() != null && !params.getBusinessSessionDomain().isEmpty()) {
-            builder.addQueryParameter("businessSessionDomain", params.getBusinessSessionDomain());
-        }
-
-        Request request = newRequestBuilder(builder.build())
-                .get()
-                .build();
+        SkillApiService service = requireSkillApiService();
         Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
-        executeEnvelope(request, type, callback);
+        enqueueEnvelope(service.getHistorySessionsList(
+                params.getPage(),
+                params.getSize(),
+                normalizeNonBlank(params.getStatus()),
+                normalizeNonBlank(params.getAk()),
+                normalizeNonBlank(params.getBussinessId()),
+                normalizeNonBlank(params.getAssistantAccount()),
+                normalizeNonBlank(params.getBusinessSessionDomain())
+        ), type, callback);
     }
 
     public void getSession(@NonNull String welinkSessionId, @NonNull SkillCallback<SkillSession> callback) {
-        Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId)
-                .get()
-                .build();
-        executeEnvelope(request, SkillSession.class, callback);
+        enqueueEnvelope(requireSkillApiService().getSession(welinkSessionId), SkillSession.class, callback);
     }
 
     public void sendMessage(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,
             @NonNull SkillCallback<SendMessageResult> callback) {
-        JsonObject body = new JsonObject();
-        body.addProperty("content", content);
-        if (toolCallId != null && !toolCallId.trim().isEmpty()) {
-            body.addProperty("toolCallId", toolCallId.trim());
-        }
-
-        Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
-                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeEnvelope(request, SendMessageResult.class, callback);
+        enqueueEnvelope(requireSkillApiService().sendMessage(
+                welinkSessionId,
+                new SendMessageBody(content, normalizeNonBlank(toolCallId))
+        ), SendMessageResult.class, callback);
     }
 
     public void abortSession(@NonNull String welinkSessionId, @NonNull SkillCallback<StopSkillResult> callback) {
-        Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/abort")
-                .post(RequestBody.create("{}", JSON_MEDIA_TYPE))
-                .build();
-        executeEnvelope(request, StopSkillResult.class, callback);
+        enqueueEnvelope(
+                requireSkillApiService().abortSession(welinkSessionId, new EmptyBody()),
+                StopSkillResult.class,
+                callback
+        );
     }
 
     public void getMessages(@NonNull String welinkSessionId, int page, int size,
             @NonNull SkillCallback<PageResult<SessionMessage>> callback) {
-        HttpUrl url = urlBuilder("/api/skill/sessions/" + welinkSessionId + "/messages")
-                .addQueryParameter("page", String.valueOf(page))
-                .addQueryParameter("size", String.valueOf(size))
-                .build();
-        Request request = newRequestBuilder(url).get().build();
         Type type = TypeToken.getParameterized(PageResult.class, SessionMessage.class).getType();
-        executeEnvelope(request, type, callback);
+        enqueueEnvelope(requireSkillApiService().getMessages(welinkSessionId, page, size), type, callback);
     }
 
     public void getMessagesHistory(
@@ -432,40 +366,25 @@ public class ApiClient {
             int size,
             @NonNull SkillCallback<CursorResult<SessionMessage>> callback
     ) {
-        HttpUrl.Builder urlBuilder = urlBuilder("/api/skill/sessions/" + welinkSessionId + "/messages/history")
-                .addQueryParameter("size", String.valueOf(size));
-        if (beforeSeq != null) {
-            urlBuilder.addQueryParameter("beforeSeq", String.valueOf(beforeSeq));
-        }
-        Request request = newRequestBuilder(urlBuilder.build()).get().build();
         Type type = TypeToken.getParameterized(CursorResult.class, SessionMessage.class).getType();
-        executeEnvelope(request, type, callback);
+        enqueueEnvelope(requireSkillApiService().getMessagesHistory(welinkSessionId, beforeSeq, size), type, callback);
     }
 
     public void replyPermission(@NonNull String welinkSessionId, @NonNull String permId, @NonNull String response,
             @NonNull SkillCallback<ReplyPermissionResult> callback) {
-        JsonObject body = new JsonObject();
-        body.addProperty("response", response);
-
-        Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/permissions/" + permId)
-                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-        executeEnvelope(request, ReplyPermissionResult.class, callback);
+        enqueueEnvelope(requireSkillApiService().replyPermission(
+                welinkSessionId,
+                permId,
+                new ReplyPermissionBody(response)
+        ), ReplyPermissionResult.class, callback);
     }
 
     public void sendMessageToIM(@NonNull String welinkSessionId, @NonNull String content, @Nullable String chatId,
             @NonNull SkillCallback<SendMessageToIMResult> callback) {
-        JsonObject body = new JsonObject();
-        body.addProperty("content", content);
-        if (chatId != null && !chatId.trim().isEmpty()) {
-            body.addProperty("chatId", chatId.trim());
-        }
-
-        Request request = newRequestBuilder("/api/skill/sessions/" + welinkSessionId + "/send-to-im")
-                .post(RequestBody.create(body.toString(), JSON_MEDIA_TYPE))
-                .build();
-
-        executeRaw(request, new SkillCallback<JsonElement>() {
+        enqueueJson(requireSkillApiService().sendMessageToIm(
+                welinkSessionId,
+                new SendMessageToImBody(content, normalizeNonBlank(chatId))
+        ), new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
@@ -550,114 +469,10 @@ public class ApiClient {
             okHttpClient.dispatcher().executorService().shutdown();
             okHttpClient.connectionPool().evictAll();
         }
-    }
-
-    private <T> void executeEnvelope(@NonNull Request request, @NonNull Type type, @NonNull SkillCallback<T> callback) {
-        executeRaw(request, new SkillCallback<JsonElement>() {
-            @Override
-            public void onSuccess(@Nullable JsonElement root) {
-                if (root == null || root.isJsonNull()) {
-                    callback.onSuccess(null);
-                    return;
-                }
-
-                JsonElement payload = root;
-                if (root.isJsonObject()) {
-                    JsonObject rootObject = root.getAsJsonObject();
-                    if (rootObject.has("data")) {
-                        payload = rootObject.get("data");
-                    }
-                }
-
-                if (payload == null || payload.isJsonNull()) {
-                    callback.onSuccess(null);
-                    return;
-                }
-                callback.onSuccess(gson.fromJson(payload, type));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    private void executeRaw(@NonNull Request request, @NonNull SkillCallback<JsonElement> callback) {
-        OkHttpClient client = requireClient();
-        client.newCall(request).enqueue(new okhttp3.Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                callback.onError(new SkillSdkException(6000, "Network error: " + e.getMessage(), e));
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) {
-                try {
-                    if (!response.isSuccessful()) {
-                        callback.onError(new SkillSdkException(7000, "HTTP " + response.code() + ": " + response.message()));
-                        return;
-                    }
-                    if (response.body() == null) {
-                        callback.onSuccess(null);
-                        return;
-                    }
-                    String responseBody = response.body().string();
-                    if (responseBody.trim().isEmpty()) {
-                        callback.onSuccess(null);
-                        return;
-                    }
-                    JsonElement root = JsonParser.parseString(responseBody);
-                    callback.onSuccess(root);
-                } catch (Exception e) {
-                    callback.onError(new SkillSdkException(5000, "Parse response failed: " + e.getMessage(), e));
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
-
-    @NonNull
-    private Request.Builder newRequestBuilder(@NonNull String path) {
-        return newRequestBuilder(urlBuilder(path).build());
-    }
-
-    @NonNull
-    private Request.Builder newRequestBuilder(@NonNull String path, boolean useAssistantBaseUrl) {
-        return newRequestBuilder(urlBuilder(path, useAssistantBaseUrl).build());
-    }
-
-    @NonNull
-    private Request.Builder newRequestBuilder(@NonNull HttpUrl url) {
-        Request.Builder builder = new Request.Builder().url(url);
-        for (Map.Entry<String, String> entry : defaultHeaders.entrySet()) {
-            builder.addHeader(entry.getKey(), entry.getValue());
-        }
-        return builder;
-    }
-
-    @NonNull
-    private HttpUrl.Builder urlBuilder(@NonNull String path) {
-        String base = requireBaseUrl();
-        HttpUrl parsed = HttpUrl.parse(base + path);
-        if (parsed == null) {
-            throw new IllegalStateException("Invalid URL: " + base + path);
-        }
-        return parsed.newBuilder();
-    }
-
-    @NonNull
-    private HttpUrl.Builder urlBuilder(@NonNull String path, boolean useAssistantBaseUrl) {
-        if (!useAssistantBaseUrl) {
-            return urlBuilder(path);
-        }
-        String base = requireAssistantBaseUrl();
-        HttpUrl parsed = HttpUrl.parse(base + path);
-        if (parsed == null) {
-            throw new IllegalStateException("Invalid URL: " + base + path);
-        }
-        return parsed.newBuilder();
+        skillApiService = null;
+        skillRetrofit = null;
+        assistantApiService = null;
+        assistantRetrofit = null;
     }
 
     @NonNull
@@ -685,11 +500,131 @@ public class ApiClient {
     }
 
     @NonNull
+    private synchronized AssistantApiService requireAssistantApiService() {
+        if (assistantApiService == null) {
+            throw new IllegalStateException("AssistantApiService is not configured");
+        }
+        return assistantApiService;
+    }
+
+    @NonNull
+    private synchronized SkillApiService requireSkillApiService() {
+        if (skillApiService == null) {
+            throw new IllegalStateException("SkillApiService is not configured");
+        }
+        return skillApiService;
+    }
+
+    @NonNull
     private static String trimTrailingSlash(@NonNull String value) {
         if (value.endsWith("/")) {
             return value.substring(0, value.length() - 1);
         }
         return value;
+    }
+
+    @NonNull
+    private static String ensureTrailingSlash(@NonNull String value) {
+        return value.endsWith("/") ? value : value + "/";
+    }
+
+    @Nullable
+    private static String normalizeNonBlank(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private <T> void enqueueEnvelope(
+            @NonNull retrofit2.Call<JsonElement> call,
+            @NonNull Type type,
+            @NonNull SkillCallback<T> callback
+    ) {
+        call.enqueue(new retrofit2.Callback<JsonElement>() {
+            @Override
+            public void onResponse(
+                    @NonNull retrofit2.Call<JsonElement> call,
+                    @NonNull retrofit2.Response<JsonElement> response
+            ) {
+                if (!response.isSuccessful()) {
+                    callback.onError(new SkillSdkException(
+                            7000,
+                            "HTTP " + response.code() + ": " + response.message()
+                    ));
+                    return;
+                }
+                JsonElement root = response.body();
+                if (root == null || root.isJsonNull()) {
+                    callback.onSuccess(null);
+                    return;
+                }
+
+                JsonElement payload = root;
+                if (root.isJsonObject()) {
+                    JsonObject rootObject = root.getAsJsonObject();
+                    if (rootObject.has("data")) {
+                        payload = rootObject.get("data");
+                    }
+                }
+
+                if (payload == null || payload.isJsonNull()) {
+                    callback.onSuccess(null);
+                    return;
+                }
+
+                try {
+                    callback.onSuccess(gson.fromJson(payload, type));
+                } catch (Exception exception) {
+                    callback.onError(new SkillSdkException(
+                            5000,
+                            "Parse response failed: " + exception.getMessage(),
+                            exception
+                    ));
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull retrofit2.Call<JsonElement> call, @NonNull Throwable throwable) {
+                callback.onError(wrapRetrofitFailure(throwable));
+            }
+        });
+    }
+
+    private void enqueueJson(
+            @NonNull retrofit2.Call<JsonElement> call,
+            @NonNull SkillCallback<JsonElement> callback
+    ) {
+        call.enqueue(new retrofit2.Callback<JsonElement>() {
+            @Override
+            public void onResponse(
+                    @NonNull retrofit2.Call<JsonElement> call,
+                    @NonNull retrofit2.Response<JsonElement> response
+            ) {
+                if (!response.isSuccessful()) {
+                    callback.onError(new SkillSdkException(
+                            7000,
+                            "HTTP " + response.code() + ": " + response.message()
+                    ));
+                    return;
+                }
+                callback.onSuccess(response.body());
+            }
+
+            @Override
+            public void onFailure(@NonNull retrofit2.Call<JsonElement> call, @NonNull Throwable throwable) {
+                callback.onError(wrapRetrofitFailure(throwable));
+            }
+        });
+    }
+
+    @NonNull
+    private SkillSdkException wrapRetrofitFailure(@NonNull Throwable throwable) {
+        if (throwable instanceof IOException) {
+            return new SkillSdkException(6000, "Network error: " + throwable.getMessage(), throwable);
+        }
+        return new SkillSdkException(5000, "Parse response failed: " + throwable.getMessage(), throwable);
     }
 
     @Nullable
