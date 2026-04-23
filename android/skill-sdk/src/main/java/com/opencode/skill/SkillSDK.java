@@ -999,7 +999,6 @@ public final class SkillSDK {
         WeAgentDetails cached = weAgentStorage.getWeAgentDetails(partnerAccount);
         if (cached != null) {
             WeAgentDetailsArrayResult cachedResult = wrapWeAgentDetail(cached);
-            weAgentStorage.saveCurrentWeAgentDetail(cached);
             callback.onSuccess(cachedResult);
             refreshAssistantDetailsCache(partnerAccount);
             return;
@@ -1009,7 +1008,7 @@ public final class SkillSDK {
             @Override
             public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
                 WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
-                cacheWeAgentDetailsResult(partnerAccount, resolved);
+                cacheWeAgentDetailsResult(partnerAccount, resolved, false);
                 callback.onSuccess(resolved);
             }
 
@@ -1315,20 +1314,33 @@ public final class SkillSDK {
         return result == null ? new WeAgentDetailsArrayResult() : result;
     }
 
-    private void cacheWeAgentDetailsResult(@NonNull String partnerAccount, @NonNull WeAgentDetailsArrayResult result) {
+    private void cacheWeAgentDetailsResult(
+            @NonNull String partnerAccount,
+            @NonNull WeAgentDetailsArrayResult result
+    ) {
+        cacheWeAgentDetailsResult(partnerAccount, result, true);
+    }
+
+    private void cacheWeAgentDetailsResult(
+            @NonNull String partnerAccount,
+            @NonNull WeAgentDetailsArrayResult result,
+            boolean saveCurrentDetail
+    ) {
         if (result.getWeAgentDetailsArray().isEmpty()) {
             return;
         }
         WeAgentDetails cachedDetail = result.getWeAgentDetailsArray().get(0);
         weAgentStorage.saveWeAgentDetails(partnerAccount, cachedDetail);
-        weAgentStorage.saveCurrentWeAgentDetail(cachedDetail);
+        if (saveCurrentDetail) {
+            weAgentStorage.saveCurrentWeAgentDetail(cachedDetail);
+        }
     }
 
     private void refreshAssistantDetailsCache(@NonNull String partnerAccount) {
         apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
             @Override
             public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
-                cacheWeAgentDetailsResult(partnerAccount, resolveWeAgentDetailsResult(result));
+                cacheWeAgentDetailsResult(partnerAccount, resolveWeAgentDetailsResult(result), false);
             }
 
             @Override
