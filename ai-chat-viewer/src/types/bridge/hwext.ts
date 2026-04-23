@@ -152,6 +152,15 @@ export interface UpdateWeAgentResult {
   updateResult: string;
 }
 
+export interface DeleteWeAgentParams {
+  partnerAccount?: string;
+  robotId?: string;
+}
+
+export interface DeleteWeAgentResult {
+  deleteResult: string;
+}
+
 export interface NotifyAssistantDetailUpdatedParams {
   name: string;
   icon: string;
@@ -257,6 +266,7 @@ export interface HWH5EXT {
   sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResponse>;
   getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse>;
   getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<GetSessionMessageHistoryResponse>;
+  onTabForUpdate?: (callback: () => void) => void;
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
@@ -269,6 +279,7 @@ export interface HWH5EXT {
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
   getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> | WeAgentDetailsArrayResult;
   updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> | UpdateWeAgentResult;
+  deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> | DeleteWeAgentResult;
   notifyAssistantDetailUpdated(
     params: NotifyAssistantDetailUpdatedParams,
   ): Promise<NotifyAssistantDetailUpdatedResult> | NotifyAssistantDetailUpdatedResult;
@@ -286,6 +297,7 @@ export interface HWH5Bridge {
   log?: (payload: { content: string; type: 'i' }) => Promise<unknown> | unknown;
   openIMChat?: (payload: { chatId: string }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
+  reboot?: () => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;

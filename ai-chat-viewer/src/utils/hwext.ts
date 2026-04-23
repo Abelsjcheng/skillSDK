@@ -16,6 +16,8 @@ import type {
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteWeAgentParams,
+  DeleteWeAgentResult,
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
@@ -81,6 +83,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     sendMessageToIM: (params) => call<SendMessageToIMResponse>('sendMessageToIM', params),
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
+    onTabForUpdate: () => undefined,
     registerSessionListener: (params) => {
       window.addEventListener('agentSkills_registerSessionListener_onMessage', (e: any) => {
         const msg = e.detail.msg;
@@ -110,6 +113,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getWeAgentList: (params) => call<WeAgentListResult>('getWeAgentList', params),
     getWeAgentDetails: (params) => call<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
     updateWeAgent: (params) => call<UpdateWeAgentResult>('updateWeAgent', params),
+    deleteWeAgent: (params) => call<DeleteWeAgentResult>('deleteWeAgent', params),
     notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
@@ -363,6 +367,22 @@ export function registerAppLanguageListener(listener: (language: 'zh' | 'en') =>
   }
 }
 
+export function registerTabForUpdate(listener: () => void): void {
+  if (isPcMiniApp()) {
+    return;
+  }
+
+  window.HWH5EXT?.onTabForUpdate?.(listener);
+}
+
+export async function rebootApp(): Promise<void> {
+  if (typeof window === 'undefined' || typeof window.HWH5?.reboot !== 'function') {
+    throw new Error('HWH5.reboot is not available.');
+  }
+
+  await Promise.resolve(window.HWH5.reboot());
+}
+
 export async function getUserInfo(): Promise<HWH5UserInfo> {
   if (isPcMiniApp()) {
     return {
@@ -453,6 +473,10 @@ export async function getWeAgentDetails(params: GetWeAgentDetailsParams): Promis
 
 export async function updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {
   return getJsApiOrThrow().updateWeAgent(params);
+}
+
+export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
+  return getJsApiOrThrow().deleteWeAgent(params);
 }
 
 export async function notifyAssistantDetailUpdated(

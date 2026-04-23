@@ -10,6 +10,17 @@ export interface AssistantDetailDeleteModalProps {
   onConfirm: () => void;
 }
 
+export interface ConfirmModalProps {
+  open: boolean;
+  title: string;
+  description: string;
+  cancelText: string;
+  confirmText: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  confirmTextColor?: string;
+}
+
 export interface AssistantDetailActionSheetProps {
   open: boolean;
   onClose: () => void;

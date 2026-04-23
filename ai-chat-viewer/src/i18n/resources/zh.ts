@@ -127,4 +127,10 @@ export const zh = {
   'switchAssistant.title': '切换助理',
   'switchAssistant.cancelSelect': '取消选择',
   'switchAssistant.confirmSwitch': '确认切换',
+  'common.cancel': '取消',
+  'common.confirm': '确认',
+  'appUpdate.title': '更新提示',
+  'appUpdate.description': '新版本已经准备好，是否重启应用？',
+  'appUpdate.rebootFailed': '重启应用失败',
+  'assistantDetail.deleteFailed': '删除助理失败',
 } as const;

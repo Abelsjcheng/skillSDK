@@ -20,7 +20,7 @@ import '../../styles/DigitalTwinCreator.less';
 
 function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayload {
   const icon = resolveAssistantIconUrl(detail.icon);
-  const matchedDefaultAvatar = DEFAULT_AVATARS.find((avatar) => avatar.image === icon);
+  const matchedDefaultAvatar = DEFAULT_AVATARS.find((avatar) => avatar.image === detail.icon);
 
   return {
     avatarType: matchedDefaultAvatar ? 'default' : 'custom',

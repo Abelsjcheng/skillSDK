@@ -11,6 +11,8 @@ import type {
   AgentTypeListResult,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteWeAgentParams,
+  DeleteWeAgentResult,
   GetSessionMessageHistoryParams,
   GetHistorySessionsListParams,
   GetSessionMessageParams,
@@ -43,6 +45,7 @@ import { WeLog } from '../utils/logger';
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
+  reboot?: () => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<{ statusBarHeight: number }>;
   getAppInfo?: () => Promise<{ language: string }>;
   getUserInfo?: () => Promise<{
@@ -1470,6 +1473,10 @@ function ensureMockHWH5Bridge(): void {
     };
   }
 
+  if (typeof hwh5.reboot !== 'function') {
+    hwh5.reboot = async () => undefined;
+  }
+
   if (typeof hwh5.getDeviceInfo !== 'function') {
     hwh5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
   }
@@ -1516,6 +1523,7 @@ function buildMockAgentTypes(): InternalAssistantOption[] {
 
 function buildMockApi(): HWH5EXT {
   return {
+    onTabForUpdate: (_callback: () => void) => undefined,
     regenerateAnswer: async (params: RegenerateAnswerParams): Promise<RegenerateAnswerResponse> => {
       const record = getSessionRecordOrThrow(params.welinkSessionId);
       const latestUser = [...record.messages].reverse().find((message) => message.role === 'user');
@@ -1765,6 +1773,19 @@ function buildMockApi(): HWH5EXT {
 
       return {
         updateResult: 'success',
+      };
+    },
+
+    deleteWeAgent: async (params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> => {
+      const detail = findAssistantDetail(params);
+      if (!detail) {
+        throw new Error('Assistant detail not found.');
+      }
+
+      assistantDetailsStore.delete(detail.partnerAccount);
+
+      return {
+        deleteResult: 'success',
       };
     },
 

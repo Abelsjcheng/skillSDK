@@ -30,6 +30,7 @@ import { WeLog } from '../utils/logger';
 import {
   buildCustomerServiceWebviewUri,
   CUSTOMER_SERVICE_WEBVIEW_URI,
+  deleteWeAgent,
   getQueryParam,
   getUrlHost,
   getWeAgentDetails,
@@ -204,9 +205,30 @@ const AssistantDetail: React.FC = () => {
     setOverlay('delete-modal');
   }, [isPc]);
 
-  const handleConfirmDelete = useCallback(() => {
-    // Reserved for future implementation.
-  }, []);
+  const handleConfirmDelete = useCallback(async () => {
+    const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
+    const targetRobotId = (detail?.id ?? '').trim();
+
+    if (!targetPartnerAccount && !targetRobotId) {
+      showToast(t('assistantDetail.deleteFailed'));
+      return;
+    }
+
+    try {
+      await deleteWeAgent({
+        ...(targetPartnerAccount ? { partnerAccount: targetPartnerAccount } : {}),
+        ...(targetRobotId ? { robotId: targetRobotId } : {}),
+      });
+      setOverlay('none');
+      window.HWH5.close();
+    } catch (error) {
+      WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
+        partnerAccount: targetPartnerAccount,
+        robotId: targetRobotId,
+      })} | error=${JSON.stringify(error)}`);
+      showToast(t('assistantDetail.deleteFailed'));
+    }
+  }, [detail?.id, detail?.partnerAccount, partnerAccount, t]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {

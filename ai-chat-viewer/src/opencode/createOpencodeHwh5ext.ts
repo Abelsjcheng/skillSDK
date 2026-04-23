@@ -10,6 +10,7 @@ import type {
   AgentTypeListResult,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteWeAgentResult,
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
@@ -403,6 +404,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
   let assistantDetail = buildAssistantDetail(config);
 
   return {
+    onTabForUpdate: (_callback: () => void) => undefined,
     async regenerateAnswer(params: { welinkSessionId: string }): Promise<RegenerateAnswerResponse> {
       return requestJson<RegenerateAnswerResponse>(
         config,
@@ -581,6 +583,12 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
       };
       return {
         updateResult: 'success',
+      };
+    },
+
+    async deleteWeAgent(): Promise<DeleteWeAgentResult> {
+      return {
+        deleteResult: 'success',
       };
     },
 
