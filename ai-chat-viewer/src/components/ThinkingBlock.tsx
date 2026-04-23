@@ -45,6 +45,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
           src={arrowUpIcon}
           alt=""
           aria-hidden="true"
+          draggable="false"
         />
       </div>
 

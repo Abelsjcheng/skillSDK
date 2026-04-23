@@ -33,9 +33,12 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
     }
     window.HWH5.navigateBack();
   }, [onMobileBack]);
-
+  window.document.title =t('createAssistant.title')
   return (
-    <header className="digital-twin__header" style={mobileHeaderStyle}>
+    <header className={[
+      "digital-twin__header",
+      isPcMiniApp ? 'welink-pc-navigation-bar--dragging':''
+    ].filter(Boolean).join(' ')} style={mobileHeaderStyle}>
       {isPcMiniApp ? (
         <>
           <span className="digital-twin__title">{t('createAssistant.title')}</span>
@@ -49,7 +52,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
               });
             }}
           >
-            <img src={closeIcon} alt="" className="digital-twin__close-icon" aria-hidden="true" />
+            <img src={closeIcon} alt="" className="digital-twin__close-icon" aria-hidden="true" draggable="false" />
           </button>
         </>
       ) : (
@@ -65,7 +68,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
                 });
               }}
             >
-              <img src={backIcon} alt="" className="digital-twin__mobile-back-icon" aria-hidden="true" />
+              <img src={backIcon} alt="" className="digital-twin__mobile-back-icon" aria-hidden="true" draggable="false" />
             </button>
           </div>
           <span className="digital-twin__mobile-title">{t('createAssistant.title')}</span>

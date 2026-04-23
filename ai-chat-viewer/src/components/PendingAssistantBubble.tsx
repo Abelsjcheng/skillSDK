@@ -39,7 +39,7 @@ export const PendingAssistantBubble: React.FC<PendingAssistantBubbleProps> = ({
         <div className="we-agent-message__bubble is-assistant is-pending">
           <div className="message-content">
             <div className="we-agent-message__pending">
-              <img className="we-agent-message__pending-icon" src={generatingIcon} alt="" />
+              <img className="we-agent-message__pending-icon" src={generatingIcon} alt="" draggable="false" />
               <span className="we-agent-message__pending-text">{t('pending.generating')}</span>
             </div>
           </div>

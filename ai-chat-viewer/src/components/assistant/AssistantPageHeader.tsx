@@ -122,7 +122,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
             });
           }}
         >
-          <img src={backIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
+          <img src={backIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" draggable="false" />
         </button>
         <button
           type="button"
@@ -134,7 +134,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
             });
           }}
         >
-          <img src={serviceIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
+          <img src={serviceIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" draggable="false" />
         </button>
       </div>
       <span className="assistant-page-header__title">{title}</span>

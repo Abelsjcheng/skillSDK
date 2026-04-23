@@ -1,6 +1,8 @@
 import { resolveAssistantIconUrl } from '../components/createAssistant/constants';
 import type { WeAgentListItem } from '../types/bridge';
+import { isPcMiniApp } from '../constants';
 import type { AssistantItem } from '../types/assistant';
+import { handleWeAgentOpenInitPc } from './assistantPcHandle';
 import { resolveAssistantTag } from './assistantTag';
 import {
   buildOpenWeAgentCUIParams,
@@ -57,21 +59,29 @@ export async function openAssistantByPartnerAccount(
     (assistant) => assistant.partnerAccount === partnerAccount,
   );
   const detailResult = await getWeAgentDetails({ partnerAccount });
+
   const detail = detailResult?.weAgentDetailsArray?.[0];
   if (!detail) {
-    console.warn('No we-agent detail found for partnerAccount:', partnerAccount);
+    console.warn(
+      "No we-agent detail found for partnerAccount:",
+      partnerAccount,
+    );
     return false;
   }
-
-  const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
-  const robotId = resolveRobotIdForOpenWeAgentCUI({
-    detailId: detail.id,
-    listRobotId: selectedAssistant?.robotId,
-  });
-  const params = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
-    bizRobotId: detail.bizRobotId,
-    robotId,
-  });
-  await openWeAgentCUI(params);
-  return true;
+  if (isPcMiniApp()) {
+    handleWeAgentOpenInitPc(detail);
+  } else {
+    const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
+    const robotId = resolveRobotIdForOpenWeAgentCUI({
+      detailId: detail.id,
+      listRobotId: selectedAssistant?.robotId,
+    });
+    const params = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
+      bizRobotId: detail.bizRobotId,
+      robotId,
+    });
+    await openWeAgentCUI(params);
+    return true;
+  }
+  return false;
 }

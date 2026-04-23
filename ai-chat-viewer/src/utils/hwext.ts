@@ -52,8 +52,8 @@ import { APP_ID, isPcMiniApp } from '../constants';
 import { WeLog } from './logger';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
-export const WE_AGENT_BASE_URI = `h5://${APP_ID}/index.html#weAgentCUI`;
-export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
+export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
+export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
 export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
@@ -72,25 +72,53 @@ function getPedestalOrThrow(): Pedestal {
   throw new Error('Pedestal.callMethod is not available. This code must run in PC miniapp environment.');
 }
 
+let listenerParams: RegisterSessionListenerParams;
+const addEventListenerOnMessage = (e: any) => {
+  const msg = e.detail.msg;
+  listenerParams?.onMessage(msg);
+}
+   
 function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
-  const call = <T>(funName: string, params: unknown) =>
-    Promise.resolve(pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T);
+  const call = async <T>(funName: string, params: unknown) => {
+    const result = await pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T;
+    if ((result as any)?.errorMessage) {
+     return Promise.reject(result)
+    } else {
+     return Promise.resolve(result)
+    }
+  }
 
+  const assistantCall = async <T>(funName: string, params: unknown) => {
+    const result = await pedestal.callMethod(`method://agentSkillsDialog/${funName}`, { funName, params }) as T;
+    if ((result as any)?.errorMessage) {
+     return Promise.reject(result)
+    } else {
+     return Promise.resolve(result)
+    }
+  }
   return {
     regenerateAnswer: (params) => call<RegenerateAnswerResponse>('regenerateAnswer', params),
     sendMessageToIM: (params) => call<SendMessageToIMResponse>('sendMessageToIM', params),
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     registerSessionListener: (params) => {
-      window.addEventListener('agentSkills_registerSessionListener_onMessage', (e: any) => {
+      if (isPcMiniApp()) {
+        listenerParams = params;
+        window.addEventListener('agentSkills_registerSessionListener_onMessage', addEventListenerOnMessage);
+      } else {
+        window.addEventListener('agentSkills_registerSessionListener_onMessage', (e: any) => {
         const msg = e.detail.msg;
         params.onMessage(msg);
       });
+      }
       void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
         WeLog(`hwext registerSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
       });
     },
     unregisterSessionListener: (params) => {
+      if (isPcMiniApp()) {
+        window.removeEventListener('agentSkills_registerSessionListener_onMessage', addEventListenerOnMessage);
+      }
       void call<void>('unregisterSessionListener', params).catch((err) => {
         WeLog(`hwext unregisterSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
       });
@@ -105,10 +133,10 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       return call<ControlSkillWeCodeResponse>('controlSkillWeCode', params);
     },
     createNewSession: (params) => call<SkillSession>('createNewSession', params),
-    createDigitalTwin: (params) => call<CreateDigitalTwinResult>('createDigitalTwin', params),
-    getAgentType: () => call<AgentTypeListResult>('getAgentType', {}),
-    getWeAgentList: (params) => call<WeAgentListResult>('getWeAgentList', params),
-    getWeAgentDetails: (params) => call<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
+    createDigitalTwin: (params) => assistantCall<CreateDigitalTwinResult>('createDigitalTwin', params),
+    getAgentType: () => assistantCall<AgentTypeListResult>('getAgentType', {}),
+    getWeAgentList: (params) => assistantCall<WeAgentListResult>('getWeAgentList', params),
+    getWeAgentDetails: (params) => assistantCall<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
     updateWeAgent: (params) => call<UpdateWeAgentResult>('updateWeAgent', params),
     notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
@@ -260,7 +288,7 @@ export function buildOpenWeAgentCUIParams(
   const normalizedPartnerAccount = partnerAccount?.trim() ?? '';
   const normalizedWeCodeUrl = normalizeString(weCodeUrl) || WE_AGENT_BASE_URI;
   const weCodeUrlHost = getUrlHost(normalizedWeCodeUrl);
-  const isSameAppIdHost = weCodeUrlHost === APP_ID;
+  const isSameAppIdHost = weCodeUrlHost === APP_ID();
   const normalizedRobotId = normalizeString(options?.robotId);
   let weAgentUri = appendQueryParam(normalizedWeCodeUrl, 'wecodePlace', 'weAgent');
 
@@ -350,16 +378,14 @@ export async function getAppInfo(): Promise<HWH5AppInfo> {
 
 export function registerAppLanguageListener(listener: (language: 'zh' | 'en') => void): void {
   if (isPcMiniApp()) {
-    window.onReceive = (schema: string, payload: string) => {
-      if (schema === '') {
-        const language = toAppLanguage(payload);
-        if (!language) {
-          return;
-        }
-        listener(language);
+    window.addEventListener(`agentSkills_registerSessionListener_languageChange`, (e: any) => {
+      const payload = e.detail.language
+      const language = toAppLanguage(payload);
+      if (!language) {
+        return;
       }
-    };
-    return;
+      listener(language);
+    })
   }
 }
 

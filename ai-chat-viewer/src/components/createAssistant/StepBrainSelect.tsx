@@ -199,6 +199,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
             onClick={() => {
               handleOpenGuideDocument('');
             }}
+            draggable="false"
           />
         ) : null}
       </div>

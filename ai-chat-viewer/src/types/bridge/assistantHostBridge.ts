@@ -1,3 +1,5 @@
 export interface SwitchAssistantEventDetail {
-  id: string;
+  partnerAccount?: string;
+  assistantItems?: any;
+  detail?: any;
 }

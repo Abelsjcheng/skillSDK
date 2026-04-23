@@ -133,7 +133,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       disabled={isGenerating ? false : !value.trim()}
       aria-label={sendButtonLabel}
     >
-      <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" />
+      <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" draggable="false" />
     </button>
   );
 
@@ -147,6 +147,11 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={handleMobileKeyDown}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }}
         />
         {renderSendButton()}
       </div>
@@ -191,7 +196,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
                   >
                     <span className="we-agent-cui-footer__shortcut-check-slot">
                       {shortcutMode === option.mode ? (
-                        <img className="we-agent-cui-footer__shortcut-check-icon" src={checkIcon} alt="" />
+                        <img className="we-agent-cui-footer__shortcut-check-icon" src={checkIcon} alt="" draggable="false" />
                       ) : null}
                     </span>
                     <span className="we-agent-cui-footer__shortcut-text">{option.label}</span>

@@ -153,7 +153,7 @@ declare global {
 }
 
 const URL_BASE = 'https://ai-chat-viewer.mock.local';
-const BASE_PAGE_URI = `${HOST}/index.html`;
+const BASE_PAGE_URI = `${HOST()}/index.html`;
 const DEFAULT_ASSISTANT_ACCOUNT = 'mock_assistant_001';
 const MOCK_UID = 'mock_uid_10001';
 const DEFAULT_PAGE_SIZE = 50;

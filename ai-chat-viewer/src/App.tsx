@@ -989,6 +989,7 @@ function App({ assistantAccount = '' }: AppProps) {
                   className="we-agent-cui-actions__icon"
                   src={createSession}
                   alt=""
+                  draggable="false"
                 />
               </button>
               {isOutputting ? (

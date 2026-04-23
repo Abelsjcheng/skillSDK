@@ -37,6 +37,7 @@ import {
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
+import { handleServiceClickPc } from '../utils/assistantPcHandle';
 
 const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueNode }) => (
   <div className="assistant-detail__info-row">
@@ -51,8 +52,10 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .map((value) => (value ?? '').trim())
     .filter(Boolean)
     .join(' ');
-
-const AssistantDetail: React.FC = () => {
+export interface AssistantDetailProps {
+  partnerAccount?: string;
+}
+const AssistantDetail: React.FC<AssistantDetailProps> = ({partnerAccount}) => {
   const { t, i18n } = useTranslation();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
@@ -64,14 +67,16 @@ const AssistantDetail: React.FC = () => {
   const pageRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+  const resolvedPartnerAccount = isPc
+    ? (partnerAccount?.trim() ?? "")
+    : useMemo(() => getQueryParam("partnerAccount") ?? "", []);
 
   useEffect(() => {
     void ensureLanguageInitialized();
   }, []);
 
   useEffect(() => {
-    if (!partnerAccount) {
+    if (!resolvedPartnerAccount) {
       setDetail(null);
       return;
     }
@@ -80,14 +85,16 @@ const AssistantDetail: React.FC = () => {
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getWeAgentDetails({ partnerAccount });
+        const result = await getWeAgentDetails({partnerAccount: resolvedPartnerAccount });
         const nextDetail = result?.weAgentDetailsArray?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);
         }
       } catch (error) {
-        WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ partnerAccount })} | error=${JSON.stringify(error)}`);
-        showToast(t('assistantDetail.loadFailed'));
+        WeLog(
+          `AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ resolvedPartnerAccount })} | error=${JSON.stringify(error)}`,
+        );
+        showToast(t("assistantDetail.loadFailed"));
         if (!cancelled) {
           setDetail(null);
         }
@@ -99,24 +106,30 @@ const AssistantDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [partnerAccount, t]);
+  }, [resolvedPartnerAccount, t]);
 
-  const displayName = detail?.name ?? '';
+  const displayName = detail?.name ?? "";
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
-  const displayTag = detail?.bizRobotName || detail?.bizRobotNameEn || '';
-  const displayDescription = detail?.desc ?? '';
-  const creatorDisplayName = (i18n.resolvedLanguage ?? i18n.language) === 'en'
-    ? detail?.creatorNameEn
-    : detail?.creatorName;
-  const displayCreator = joinDisplayValue(creatorDisplayName, detail?.createdBy);
+  const displayTag = detail?.bizRobotName || detail?.bizRobotNameEn || "";
+  const displayDescription = detail?.desc ?? "";
+  const creatorDisplayName =
+    (i18n.resolvedLanguage ?? i18n.language) === "en"
+      ? detail?.creatorNameEn
+      : detail?.creatorName;
+  const displayCreator = joinDisplayValue(
+    creatorDisplayName,
+    detail?.createdBy,
+  );
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
-  const secret = detail?.appSecret ?? '';
+  const secret = detail?.appSecret ?? "";
   const displaySecret = isSecretVisible ? secret : maskSecret(secret);
 
-  const orgLabel = isInternalAssistant ? t('assistantDetail.capabilityProvider') : t('assistantDetail.appId');
-  const orgValue = isInternalAssistant ? displayTag : (detail?.appKey ?? '');
-  const ownerLabel = t('assistantDetail.secret');
+  const orgLabel = isInternalAssistant
+    ? t("assistantDetail.capabilityProvider")
+    : t("assistantDetail.appId");
+  const orgValue = isInternalAssistant ? displayTag : (detail?.appKey ?? "");
+  const ownerLabel = t("assistantDetail.secret");
   const ownerValue = displaySecret;
 
   const toggleSecretVisible = () => {
@@ -132,8 +145,10 @@ const AssistantDetail: React.FC = () => {
       await copyTextToClipboard(content);
       showToast(successMessage);
     } catch (error) {
-      WeLog(`AssistantDetail copyTextToClipboard failed | error=${JSON.stringify(error)}`);
-      showToast(t('assistantDetail.copyFailed'));
+      WeLog(
+        `AssistantDetail copyTextToClipboard failed | error=${JSON.stringify(error)}`,
+      );
+      showToast(t("assistantDetail.copyFailed"));
     }
   };
 
@@ -142,20 +157,27 @@ const AssistantDetail: React.FC = () => {
   }, [isInternalAssistant, detail?.partnerAccount]);
 
   const handleServiceClick = useCallback(() => {
-    const sourceUrl = detail?.weCodeUrl?.trim() ?? '';
+    if (isPc) {
+      handleServiceClickPc(detail);
+      return;
+    }
+    const sourceUrl = detail?.weCodeUrl?.trim() ?? "";
     if (!sourceUrl) {
-      showToast(t('assistantDetail.customerServiceUnavailable'));
+      showToast(t("assistantDetail.customerServiceUnavailable"));
       return;
     }
 
     openH5Webview({
-      uri: getUrlHost(sourceUrl) === APP_ID
-        ? CUSTOMER_SERVICE_WEBVIEW_URI
-        : buildCustomerServiceWebviewUri(sourceUrl),
+      uri:
+        getUrlHost(sourceUrl) === APP_ID()
+          ? CUSTOMER_SERVICE_WEBVIEW_URI
+          : buildCustomerServiceWebviewUri(sourceUrl),
     });
   }, [detail?.weCodeUrl, t]);
 
-  const handleBackgroundClick = (event: React.MouseEvent<HTMLDivElement>): void => {
+  const handleBackgroundClick = (
+    event: React.MouseEvent<HTMLDivElement>,
+  ): void => {
     if (event.target !== event.currentTarget) {
       return;
     }
@@ -177,21 +199,25 @@ const AssistantDetail: React.FC = () => {
   const handleEditAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
 
-    const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
+    const targetPartnerAccount = (
+      detail?.partnerAccount ?? resolvedPartnerAccount
+    ).trim();
 
     if (isPc) {
-      setPcView('edit');
+      setPcView("edit");
       return;
     }
 
-    setOverlay('none');
+    setOverlay("none");
     const nextSearch = new URLSearchParams();
     if (targetPartnerAccount) {
-      nextSearch.set('partnerAccount', targetPartnerAccount);
+      nextSearch.set("partnerAccount", targetPartnerAccount);
     }
-    nextSearch.set('source', 'assistantDetail');
-    window.location.hash = nextSearch.toString() ? `#/editAssistant?${nextSearch.toString()}` : '#/editAssistant';
-  }, [detail, isPc, partnerAccount]);
+    nextSearch.set("source", "assistantDetail");
+    window.location.hash = nextSearch.toString()
+      ? `#/editAssistant?${nextSearch.toString()}`
+      : "#/editAssistant";
+  }, [detail, isPc, resolvedPartnerAccount]);
 
   const handleRequestDeleteAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
@@ -278,9 +304,9 @@ const AssistantDetail: React.FC = () => {
         isPcMiniApp
         source="assistantDetail"
         initialDetail={detail}
-        partnerAccount={partnerAccount}
+        partnerAccount={resolvedPartnerAccount}
         onClose={() => {
-          setPcView('detail');
+          setPcView("detail");
         }}
         onSuccess={handlePcEditSuccess}
       />
@@ -310,22 +336,30 @@ const AssistantDetail: React.FC = () => {
             <AvatarImage
               src={displayIcon}
               fallbackSrc={defaultAvatar}
-              alt={t('assistantDetail.avatarAlt')}
+              alt={t("assistantDetail.avatarAlt")}
               className="assistant-detail__avatar-img"
             />
           </div>
           <div className="assistant-detail__name-row">
             <span className="assistant-detail__name">{displayName}</span>
-            {isInternalAssistant && displayTag ? <span className="assistant-detail__tag">{displayTag}</span> : null}
+            {isInternalAssistant && displayTag ? (
+              <span className="assistant-detail__tag">{displayTag}</span>
+            ) : null}
           </div>
         </section>
 
         <section className="assistant-detail__card assistant-detail__card--intro">
-          <h3 className="assistant-detail__section-title">{t('assistantDetail.introTitle')}</h3>
+          <h3 className="assistant-detail__section-title">
+            {t("assistantDetail.introTitle")}
+          </h3>
           <p className="assistant-detail__section-desc">{displayDescription}</p>
           <DetailInfoRow
-            label={t('assistantDetail.creator')}
-            valueNode={<span className="assistant-detail__org-value">{displayCreator}</span>}
+            label={t("assistantDetail.creator")}
+            valueNode={
+              <span className="assistant-detail__org-value">
+                {displayCreator}
+              </span>
+            }
           />
         </section>
 
@@ -339,18 +373,28 @@ const AssistantDetail: React.FC = () => {
                 <span className="assistant-detail__org-value">{orgValue}</span>
               ) : (
                 <div className="assistant-detail__value-with-actions">
-                  <span className="assistant-detail__org-value">{orgValue}</span>
+                  <span className="assistant-detail__org-value">
+                    {orgValue}
+                  </span>
                   <button
                     type="button"
                     className="assistant-detail__icon-btn"
                     onClick={(event) => {
                       runButtonClickWithDebounce(event, () => {
-                        void handleCopy(orgValue, t('assistantDetail.appIdCopied'));
+                        void handleCopy(
+                          orgValue,
+                          t("assistantDetail.appIdCopied"),
+                        );
                       });
                     }}
-                    aria-label={t('assistantDetail.copyAppId')}
+                    aria-label={t("assistantDetail.copyAppId")}
                   >
-                    <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                    <img
+                      src={iconCopy}
+                      alt=""
+                      className="assistant-detail__icon"
+                      draggable="false"
+                    />
                   </button>
                 </div>
               )
@@ -359,14 +403,20 @@ const AssistantDetail: React.FC = () => {
           {!isInternalAssistant && !isPc ? (
             <DetailInfoRow
               label={ownerLabel}
-              valueNode={<span className="assistant-detail__org-value">{ownerValue}</span>}
+              valueNode={
+                <span className="assistant-detail__org-value">
+                  {ownerValue}
+                </span>
+              }
             />
           ) : !isInternalAssistant ? (
             <DetailInfoRow
               label={ownerLabel}
               valueNode={
                 <div className="assistant-detail__value-with-actions">
-                  <span className="assistant-detail__org-value">{ownerValue}</span>
+                  <span className="assistant-detail__org-value">
+                    {ownerValue}
+                  </span>
                   <div className="assistant-detail__action-group">
                     <button
                       type="button"
@@ -376,21 +426,38 @@ const AssistantDetail: React.FC = () => {
                           toggleSecretVisible();
                         });
                       }}
-                      aria-label={isSecretVisible ? t('assistantDetail.hideSecret') : t('assistantDetail.showSecret')}
+                      aria-label={
+                        isSecretVisible
+                          ? t("assistantDetail.hideSecret")
+                          : t("assistantDetail.showSecret")
+                      }
                     >
-                      <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                      <img
+                        src={iconCopy}
+                        alt=""
+                        className="assistant-detail__icon"
+                        draggable="false"
+                      />
                     </button>
                     <button
                       type="button"
                       className="assistant-detail__icon-btn"
                       onClick={(event) => {
                         runButtonClickWithDebounce(event, () => {
-                          void handleCopy(secret, t('assistantDetail.secretCopied'));
+                          void handleCopy(
+                            secret,
+                            t("assistantDetail.secretCopied"),
+                          );
                         });
                       }}
-                      aria-label={t('assistantDetail.copySecret')}
+                      aria-label={t("assistantDetail.copySecret")}
                     >
-                      <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                      <img
+                        src={iconCopy}
+                        alt=""
+                        className="assistant-detail__icon"
+                        draggable="false"
+                      />
                     </button>
                   </div>
                 </div>

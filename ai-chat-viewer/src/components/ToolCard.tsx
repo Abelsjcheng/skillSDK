@@ -44,6 +44,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
           src={arrowUpIcon}
           alt=""
           aria-hidden="true"
+          draggable="false"
         />
       </div>
 

@@ -13,8 +13,8 @@ import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
 
-const CREATE_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#createAssistant`;
-const SELECT_ASSISTANT_URI = `h5://${APP_ID}/index.html?from=weAgent#selectAssistant`;
+const CREATE_ASSISTANT_URI = `h5://${APP_ID()}/index.html?from=weAgent#createAssistant`;
+const SELECT_ASSISTANT_URI = `h5://${APP_ID()}/index.html?from=weAgent#selectAssistant`;
 const DEFAULT_LIST_QUERY = {
   pageSize: 20,
   pageNumber: 1,

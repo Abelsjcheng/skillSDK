@@ -23,6 +23,7 @@ import {
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
+import { handleCreateForOtherScenePc } from '../utils/assistantPcHandle';
 
 function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
   const value = result?.partnerAccount;
@@ -83,7 +84,20 @@ const SelectBrainAssistantPage: React.FC = () => {
       },
     );
   }, [draft, location.search, navigate]);
-
+  const handleCreateForOtherScene = useCallback(
+    async (_result: CreateDigitalTwinResult) => {
+      if (isPc) {
+        handleCreateForOtherScenePc(_result);
+      } else {
+        if (typeof window.HWH5.openIMChat === "function") {
+          await window.HWH5.openIMChat({ chatId: _result?.partnerAccount || '' });
+        } else {
+          window.HWH5.close();
+        }
+      }
+    },[]
+  );
+  
   const handleConfirm = useCallback(
     async (payload: DigitalTwinBrainPayload) => {
       const basicInfo = draft;
@@ -112,7 +126,6 @@ const SelectBrainAssistantPage: React.FC = () => {
       try {
         const createResult = await createDigitalTwin(params);
         const partnerAccount = resolvePartnerAccount(createResult);
-
         if (!partnerAccount) {
           WeLog(`SelectBrainAssistantPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
             createResult,
@@ -120,18 +133,9 @@ const SelectBrainAssistantPage: React.FC = () => {
           showToast(t('createAssistant.createFailed'));
           return;
         }
-
+        createResult.weCrewType = payload.digitalTwintype === 'internal' ? 1 : 0;
         if (from !== 'weAgent') {
-          if (!isPc) {
-            if (typeof window.HWH5.openIMChat === 'function') {
-              await window.HWH5.openIMChat({ chatId: partnerAccount });
-            } else {
-              window.HWH5.close();
-            }
-          } else if (typeof window !== 'undefined' && window.Pedestal?.callMethod) {
-            await window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount });
-          }
-          return;
+          handleCreateForOtherScene(createResult)
         }
 
         const detailResult = await getWeAgentDetails({ partnerAccount });
