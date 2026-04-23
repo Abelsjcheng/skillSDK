@@ -32,6 +32,10 @@ export class WeAgentStore {
     this.putJson(KEY_CURRENT_DETAIL, detail);
   }
 
+  clearCurrentDetail(): void {
+    this.removeValue(KEY_CURRENT_DETAIL);
+  }
+
   loadCurrentDetail(): WeAgentDetails | null {
     const raw = this.getString(KEY_CURRENT_DETAIL);
     if (raw === null || raw.trim() === '') {
@@ -79,6 +83,50 @@ export class WeAgentStore {
     return value;
   }
 
+  updateCachedDetails(
+    partnerAccount: string | undefined,
+    robotId: string | undefined,
+    name: string,
+    icon: string,
+    description: string
+  ): void {
+    const currentDetail = this.loadCurrentDetail();
+    if (currentDetail !== null && this.matchesDetail(currentDetail, partnerAccount, robotId)) {
+      currentDetail.name = name;
+      currentDetail.icon = icon;
+      currentDetail.desc = description;
+      this.saveCurrentDetail(currentDetail);
+    }
+
+    const cache = this.loadDetailsCache();
+    let updated = false;
+    if (partnerAccount !== undefined) {
+      const cachedDetail = cache[partnerAccount];
+      if (cachedDetail !== undefined && this.matchesDetail(cachedDetail, partnerAccount, undefined)) {
+        cachedDetail.name = name;
+        cachedDetail.icon = icon;
+        cachedDetail.desc = description;
+        updated = true;
+      }
+    } else if (robotId !== undefined) {
+      Object.keys(cache).some((key: string): boolean => {
+        const cachedDetail = cache[key];
+        if (!this.matchesDetail(cachedDetail, undefined, robotId)) {
+          return false;
+        }
+        cachedDetail.name = name;
+        cachedDetail.icon = icon;
+        cachedDetail.desc = description;
+        updated = true;
+        return true;
+      });
+    }
+
+    if (updated) {
+      this.putJson(KEY_DETAILS_CACHE, cache);
+    }
+  }
+
   private putJson(
     key: string,
     value: WeAgentDetails | WeAgent[] | WeAgentDetailsArray | Record<string, WeAgentDetails>
@@ -94,6 +142,19 @@ export class WeAgentStore {
       }
     }
     this.fallback[key] = encoded;
+  }
+
+  private removeValue(key: string): void {
+    const pref = this.getPreferencesInstance();
+    if (pref !== null) {
+      try {
+        pref.deleteSync(key);
+        pref.flushSync();
+      } catch (_error) {
+        // Fall back to in-memory cache.
+      }
+    }
+    delete this.fallback[key];
   }
 
   private getString(key: string): string | null {
@@ -135,6 +196,28 @@ export class WeAgentStore {
     } catch (_error) {
       return {};
     }
+  }
+
+  private matchesDetail(
+    detail: WeAgentDetails | null | undefined,
+    partnerAccount: string | undefined,
+    robotId: string | undefined
+  ): boolean {
+    if (detail === null || detail === undefined) {
+      return false;
+    }
+    if (partnerAccount !== undefined) {
+      return this.normalize(detail.partnerAccount) === partnerAccount;
+    }
+    return robotId !== undefined && this.normalize(detail.id) === robotId;
+  }
+
+  private normalize(value: string | undefined): string | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private getPreferencesInstance(): preferences.Preferences | null {

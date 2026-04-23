@@ -511,7 +511,7 @@ export interface QrcodeInfo {
 
 export interface UpdateQrcodeInfoParams {
   qrcode: string;
-  ak?: string;
+  robotId?: string;
   status: number;
 }
 
