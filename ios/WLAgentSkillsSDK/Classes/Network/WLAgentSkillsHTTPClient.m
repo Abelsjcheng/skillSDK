@@ -187,7 +187,7 @@
 - (void)queryQrcodeInfoWithQrcode:(NSString *)qrcode
                           success:(WLAgentSkillsHTTPSuccessBlock)success
                           failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSString *path = [NSString stringWithFormat:@"/nologin/we-crew/im-register/qrcode/%@", qrcode];
+    NSString *path = [NSString stringWithFormat:@"/v4-1/we-crew/im-register/qrcode/%@", qrcode];
     [self GET:path
     parameters:nil
   useAssistantBaseURL:YES
@@ -196,7 +196,7 @@
 }
 
 - (void)updateQrcodeInfoWithQrcode:(NSString *)qrcode
-                                 ak:(nullable NSString *)ak
+                             robotId:(nullable NSString *)robotId
                              status:(NSNumber *)status
                             success:(WLAgentSkillsHTTPSuccessBlock)success
                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
@@ -204,8 +204,8 @@
         @"qrcode" : qrcode,
         @"status" : status
     } mutableCopy];
-    if (ak != nil && ak.length > 0) {
-        parameters[@"ak"] = ak;
+    if (robotId != nil && robotId.length > 0) {
+        parameters[@"robotId"] = robotId;
     }
 
     [self PUT:@"/v4-1/we-crew/im-register/qrcode"

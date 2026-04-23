@@ -181,7 +181,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 
 @interface WLAgentSkillsUpdateQrcodeInfoParams : NSObject
 @property (nonatomic, strong, nullable) id qrcode;
-@property (nonatomic, strong, nullable) id ak;
+@property (nonatomic, strong, nullable) id robotId;
 @property (nonatomic, strong, nullable) id status;
 @end
 

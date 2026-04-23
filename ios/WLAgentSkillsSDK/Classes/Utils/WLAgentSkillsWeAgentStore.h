@@ -20,6 +20,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)saveWeAgentDetailDictionary:(nullable NSDictionary *)dictionary
                   forPartnerAccount:(NSString *)partnerAccount;
 - (nullable NSDictionary *)loadWeAgentDetailDictionaryForPartnerAccount:(NSString *)partnerAccount;
+- (void)updateCachedWeAgentDetailsWithPartnerAccount:(nullable NSString *)partnerAccount
+                                             robotId:(nullable NSString *)robotId
+                                                name:(NSString *)name
+                                                icon:(NSString *)icon
+                                         description:(NSString *)description;
 
 @end
 

@@ -69,7 +69,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                           failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)updateQrcodeInfoWithQrcode:(NSString *)qrcode
-                                 ak:(nullable NSString *)ak
+                             robotId:(nullable NSString *)robotId
                              status:(NSNumber *)status
                             success:(WLAgentSkillsHTTPSuccessBlock)success
                             failure:(WLAgentSkillsHTTPFailureBlock)failure;

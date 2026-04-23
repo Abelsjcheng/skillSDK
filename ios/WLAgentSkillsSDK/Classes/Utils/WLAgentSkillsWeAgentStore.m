@@ -116,6 +116,68 @@ static NSString * const WLAgentSkillsDetailsCacheKey = @"we_agent_details";
     return (NSDictionary *)value;
 }
 
+- (void)updateCachedWeAgentDetailsWithPartnerAccount:(nullable NSString *)partnerAccount
+                                             robotId:(nullable NSString *)robotId
+                                                name:(NSString *)name
+                                                icon:(NSString *)icon
+                                         description:(NSString *)description {
+    NSDictionary *currentDetail = [self loadCurrentWeAgentDetailDictionary];
+    NSDictionary *updatedCurrentDetail = [self updatedDetailDictionaryIfMatched:currentDetail
+                                                                 partnerAccount:partnerAccount
+                                                                        robotId:robotId
+                                                                           name:name
+                                                                           icon:icon
+                                                                    description:description];
+    if (updatedCurrentDetail != nil) {
+        [self saveCurrentWeAgentDetailDictionary:updatedCurrentDetail];
+    }
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsDetailsCacheKey];
+    NSMutableDictionary<NSString *, NSDictionary *> *cache =
+        [[self loadWeAgentDetailsCacheDictionary] mutableCopy];
+    if (cache == nil || cache.count == 0) {
+        return;
+    }
+
+    BOOL updated = NO;
+    if (partnerAccount.length > 0) {
+        NSDictionary *cachedDetail = cache[partnerAccount];
+        NSDictionary *updatedDetail = [self updatedDetailDictionaryIfMatched:cachedDetail
+                                                              partnerAccount:partnerAccount
+                                                                     robotId:nil
+                                                                        name:name
+                                                                        icon:icon
+                                                                 description:description];
+        if (updatedDetail != nil) {
+            cache[partnerAccount] = updatedDetail;
+            updated = YES;
+        }
+    } else if (robotId.length > 0) {
+        for (NSString *cacheKey in cache.allKeys) {
+            NSDictionary *cachedDetail = cache[cacheKey];
+            NSDictionary *updatedDetail = [self updatedDetailDictionaryIfMatched:cachedDetail
+                                                                  partnerAccount:nil
+                                                                         robotId:robotId
+                                                                            name:name
+                                                                            icon:icon
+                                                                     description:description];
+            if (updatedDetail == nil) {
+                continue;
+            }
+            cache[cacheKey] = updatedDetail;
+            updated = YES;
+            break;
+        }
+    }
+
+    if (!updated) {
+        return;
+    }
+    [defaults setObject:cache forKey:key];
+    [defaults synchronize];
+}
+
 - (NSDictionary<NSString *, NSDictionary *> *)loadWeAgentDetailsCacheDictionary {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsDetailsCacheKey];
@@ -136,6 +198,48 @@ static NSString * const WLAgentSkillsDetailsCacheKey = @"we_agent_details";
         }
     }
     return [result copy];
+}
+
+- (nullable NSDictionary *)updatedDetailDictionaryIfMatched:(nullable NSDictionary *)dictionary
+                                             partnerAccount:(nullable NSString *)partnerAccount
+                                                    robotId:(nullable NSString *)robotId
+                                                       name:(NSString *)name
+                                                       icon:(NSString *)icon
+                                                description:(NSString *)description {
+    if (![dictionary isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSString *normalizedPartnerAccount = [self normalizedStringValue:partnerAccount];
+    NSString *normalizedRobotId = [self normalizedStringValue:robotId];
+    if (normalizedPartnerAccount != nil) {
+        NSString *cachedPartnerAccount = [self normalizedStringValue:dictionary[@"partnerAccount"]];
+        if (![normalizedPartnerAccount isEqualToString:cachedPartnerAccount]) {
+            return nil;
+        }
+    } else if (normalizedRobotId != nil) {
+        NSString *cachedRobotId = [self normalizedStringValue:dictionary[@"id"]];
+        if (![normalizedRobotId isEqualToString:cachedRobotId]) {
+            return nil;
+        }
+    } else {
+        return nil;
+    }
+
+    NSMutableDictionary *updatedDictionary = [dictionary mutableCopy];
+    updatedDictionary[@"name"] = name;
+    updatedDictionary[@"icon"] = icon;
+    updatedDictionary[@"desc"] = description;
+    updatedDictionary[@"description"] = description;
+    return [updatedDictionary copy];
+}
+
+- (nullable NSString *)normalizedStringValue:(nullable id)value {
+    if (![value isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    NSString *trimmed = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return trimmed.length > 0 ? trimmed : nil;
 }
 
 @end

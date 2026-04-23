@@ -15,6 +15,18 @@
 static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html";
 static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
+static NSInteger const WLAgentSkillsDefaultWeAgentListPageSize = 100;
+static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
+
+@interface WLAgentSkillsDeleteTransitionPlan : NSObject
+
+@property (nonatomic, copy) NSArray<WLAgentSkillsWeAgent *> *updatedList;
+@property (nonatomic, copy, nullable) NSString *nextPartnerAccount;
+
+@end
+
+@implementation WLAgentSkillsDeleteTransitionPlan
+@end
 
 @interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
 
@@ -992,40 +1004,11 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
 
 - (WLAgentSkillsWeAgentUriResult *)getWeAgentUri {
     NSDictionary *detailDictionary = [[WLAgentSkillsWeAgentStore sharedStore] loadCurrentWeAgentDetailDictionary];
-    WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
-    if (detailDictionary == nil || detailDictionary.count == 0) {
-        NSString *fallbackWeAgentUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                              key:@"wecodePlace"
-                                                            value:@"weAgent"];
-        result.weAgentUri = [self appendHashToUri:fallbackWeAgentUri hash:@"activateAssistant"] ?: @"";
-        result.assistantDetailUri = @"";
-        result.switchAssistantUri = @"";
-        return result;
+    WLAgentSkillsWeAgentDetails *details = nil;
+    if ([detailDictionary isKindOfClass:[NSDictionary class]] && detailDictionary.count > 0) {
+        details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary];
     }
-
-    WLAgentSkillsWeAgentDetails *details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary];
-    NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
-    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
-    NSString *detailId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.id];
-    NSString *weCodeUrlHost = [self hostFromUri:weCodeUrl];
-
-    NSString *baseWeAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"];
-    if (weCodeUrlHost != nil && [weCodeUrlHost caseInsensitiveCompare:WLAgentSkillsWeAgentCUIAppId] == NSOrderedSame) {
-        result.weAgentUri = [self appendQueryItemToUri:baseWeAgentUri key:@"assistantAccount" value:partnerAccount] ?: @"";
-    } else {
-        result.weAgentUri = [self appendQueryItemToUri:baseWeAgentUri key:@"robotId" value:detailId] ?: @"";
-    }
-
-    NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                          key:@"partnerAccount"
-                                                        value:partnerAccount];
-    result.assistantDetailUri = [self appendHashToUri:assistantDetailUri hash:@"assistantDetail"] ?: @"";
-
-    NSString *switchAssistantUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                          key:@"partnerAccount"
-                                                        value:partnerAccount];
-    result.switchAssistantUri = [self appendHashToUri:switchAssistantUri hash:@"switchAssistant"] ?: @"";
-    return result;
+    return [self weAgentUriResultFromDetails:details];
 }
 
 #pragma mark - 21. updateWeAgent
@@ -1087,6 +1070,11 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         }
         WLAgentSkillsUpdateWeAgentResult *result = [[WLAgentSkillsUpdateWeAgentResult alloc] init];
         result.updateResult = message;
+        [[WLAgentSkillsWeAgentStore sharedStore] updateCachedWeAgentDetailsWithPartnerAccount:partnerAccount
+                                                                                      robotId:robotId
+                                                                                         name:name
+                                                                                         icon:icon
+                                                                                  description:description];
         if (success) {
             success(result);
         }
@@ -1118,23 +1106,36 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
     }
 
     __weak typeof(self) weakSelf = self;
-    [[WLAgentSkillsHTTPClient sharedClient] deleteWeAgentWithPartnerAccount:partnerAccount
-                                                                    robotId:robotId
-                                                                    success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]];
-        if (message == nil) {
-            [weakSelf dispatchFailure:failure code:7000 message:@"Unexpected deleteWeAgent response schema."];
-            return;
+    [self prepareDeleteWeAgentTransitionWithPartnerAccount:partnerAccount
+                                                   robotId:robotId
+                                                   success:^(WLAgentSkillsDeleteTransitionPlan *plan) {
+        [[WLAgentSkillsHTTPClient sharedClient] deleteWeAgentWithPartnerAccount:partnerAccount
+                                                                        robotId:robotId
+                                                                        success:^(id  _Nullable responseObject) {
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (strongSelf == nil) {
+                return;
+            }
+            NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+            NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]];
+            if (message == nil) {
+                [strongSelf dispatchFailure:failure code:7000 message:@"Unexpected deleteWeAgent response schema."];
+                return;
+            }
+            WLAgentSkillsDeleteWeAgentResult *result = [[WLAgentSkillsDeleteWeAgentResult alloc] init];
+            result.deleteResult = message;
+            [strongSelf handleDeleteWeAgentSuccessWithPlan:plan
+                                              deleteResult:result
+                                                   success:success];
         }
-        WLAgentSkillsDeleteWeAgentResult *result = [[WLAgentSkillsDeleteWeAgentResult alloc] init];
-        result.deleteResult = message;
-        if (success) {
-            success(result);
-        }
+                                                                        failure:^(NSError * _Nonnull error) {
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            [strongSelf dispatchFailureObject:failure error:error];
+        }];
     }
-                                                                    failure:^(NSError * _Nonnull error) {
-        [weakSelf dispatchFailureObject:failure error:error];
+                                                   failure:^(NSError *error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf dispatchFailureObject:failure error:error];
     }];
 }
 
@@ -1318,11 +1319,11 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
+    NSString *robotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.robotId];
 
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] updateQrcodeInfoWithQrcode:qrcode
-                                                                   ak:ak
+                                                               robotId:robotId
                                                                status:@(statusValue)
                                                               success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
@@ -1692,6 +1693,200 @@ static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
         [result addObject:[item toDictionary]];
     }
     return [result copy];
+}
+
+- (NSArray<WLAgentSkillsWeAgent *> *)weAgentListFromDictionaries:(NSArray<NSDictionary *> *)dictionaries {
+    NSMutableArray<WLAgentSkillsWeAgent *> *result = [NSMutableArray arrayWithCapacity:dictionaries.count];
+    for (id item in dictionaries) {
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        [result addObject:[[WLAgentSkillsWeAgent alloc] initWithDictionary:(NSDictionary *)item]];
+    }
+    return [result copy];
+}
+
+- (void)prepareDeleteWeAgentTransitionWithPartnerAccount:(nullable NSString *)partnerAccount
+                                                 robotId:(nullable NSString *)robotId
+                                                 success:(void (^)(WLAgentSkillsDeleteTransitionPlan *plan))success
+                                                 failure:(void (^)(NSError *error))failure {
+    NSArray<NSDictionary *> *cachedDictionaries = [[WLAgentSkillsWeAgentStore sharedStore] loadWeAgentListDictionaries];
+    NSArray<WLAgentSkillsWeAgent *> *cachedList = [self weAgentListFromDictionaries:cachedDictionaries];
+    if (cachedList.count > 0) {
+        if (success) {
+            success([self deleteTransitionPlanFromSnapshot:cachedList
+                                            partnerAccount:partnerAccount
+                                                   robotId:robotId]);
+        }
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentListWithPageSize:@(WLAgentSkillsDefaultWeAgentListPageSize)
+                                                             pageNumber:@(WLAgentSkillsDefaultWeAgentListPageNumber)
+                                                                success:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        NSArray<WLAgentSkillsWeAgent *> *remoteList = [strongSelf parseWeAgentListFromResponse:responseObject];
+        [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentListDictionaries:[strongSelf dictionariesFromWeAgentList:remoteList]];
+        if (success) {
+            success([strongSelf deleteTransitionPlanFromSnapshot:remoteList
+                                                  partnerAccount:partnerAccount
+                                                         robotId:robotId]);
+        }
+    }
+                                                                failure:^(NSError * _Nonnull error) {
+        if (failure) {
+            failure(error);
+        }
+    }];
+}
+
+- (WLAgentSkillsDeleteTransitionPlan *)deleteTransitionPlanFromSnapshot:(NSArray<WLAgentSkillsWeAgent *> *)snapshot
+                                                         partnerAccount:(nullable NSString *)partnerAccount
+                                                                robotId:(nullable NSString *)robotId {
+    NSMutableArray<WLAgentSkillsWeAgent *> *updatedList = [snapshot mutableCopy];
+    NSInteger deletedIndex = [self indexOfWeAgentInList:updatedList
+                                         partnerAccount:partnerAccount
+                                                robotId:robotId];
+    WLAgentSkillsDeleteTransitionPlan *plan = [[WLAgentSkillsDeleteTransitionPlan alloc] init];
+    if (deletedIndex == NSNotFound) {
+        plan.updatedList = [updatedList copy];
+        plan.nextPartnerAccount = nil;
+        return plan;
+    }
+
+    [updatedList removeObjectAtIndex:deletedIndex];
+    plan.updatedList = [updatedList copy];
+    if (updatedList.count == 0) {
+        plan.nextPartnerAccount = nil;
+        return plan;
+    }
+
+    NSUInteger nextIndex = deletedIndex < updatedList.count ? (NSUInteger)deletedIndex : 0;
+    plan.nextPartnerAccount = [self normalizedOptionalString:updatedList[nextIndex].partnerAccount];
+    return plan;
+}
+
+- (NSInteger)indexOfWeAgentInList:(NSArray<WLAgentSkillsWeAgent *> *)list
+                   partnerAccount:(nullable NSString *)partnerAccount
+                          robotId:(nullable NSString *)robotId {
+    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
+    NSString *normalizedRobotId = [self normalizedOptionalString:robotId];
+    for (NSUInteger index = 0; index < list.count; index++) {
+        WLAgentSkillsWeAgent *item = list[index];
+        if (normalizedPartnerAccount != nil
+            && [normalizedPartnerAccount isEqualToString:[self normalizedOptionalString:item.partnerAccount]]) {
+            return (NSInteger)index;
+        }
+        if (normalizedPartnerAccount == nil
+            && normalizedRobotId != nil
+            && [normalizedRobotId isEqualToString:[self normalizedOptionalString:item.robotId]]) {
+            return (NSInteger)index;
+        }
+    }
+    return NSNotFound;
+}
+
+- (void)handleDeleteWeAgentSuccessWithPlan:(WLAgentSkillsDeleteTransitionPlan *)plan
+                              deleteResult:(WLAgentSkillsDeleteWeAgentResult *)deleteResult
+                                   success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success {
+    [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentListDictionaries:[self dictionariesFromWeAgentList:plan.updatedList]];
+    if (plan.nextPartnerAccount.length == 0) {
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:nil];
+        if (success) {
+            success(deleteResult);
+        }
+        return;
+    }
+
+    NSDictionary *cachedDetail = [[WLAgentSkillsWeAgentStore sharedStore]
+        loadWeAgentDetailDictionaryForPartnerAccount:plan.nextPartnerAccount];
+    if ([cachedDetail isKindOfClass:[NSDictionary class]] && cachedDetail.count > 0) {
+        [self finalizeDeleteWeAgentTransitionWithDetail:[[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:cachedDetail]
+                                           deleteResult:deleteResult
+                                                success:success];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:plan.nextPartnerAccount
+                                                                         success:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        WLAgentSkillsWeAgentDetailsArrayResult *result = [strongSelf weAgentDetailsArrayResultFromPayload:responseObject];
+        [strongSelf cacheWeAgentDetailsArrayResult:result
+                                    partnerAccount:plan.nextPartnerAccount
+                                 updateCurrentDetail:NO];
+        WLAgentSkillsWeAgentDetails *nextDetail = result.weAgentDetailsArray.firstObject;
+        [strongSelf finalizeDeleteWeAgentTransitionWithDetail:nextDetail
+                                                 deleteResult:deleteResult
+                                                      success:success];
+    }
+                                                                         failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf finalizeDeleteWeAgentTransitionWithDetail:nil
+                                                 deleteResult:deleteResult
+                                                      success:success];
+    }];
+}
+
+- (void)finalizeDeleteWeAgentTransitionWithDetail:(nullable WLAgentSkillsWeAgentDetails *)nextDetail
+                                     deleteResult:(WLAgentSkillsDeleteWeAgentResult *)deleteResult
+                                          success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success {
+    WLAgentSkillsWeAgentUriResult *nextUris = nil;
+    if (nextDetail == nil) {
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:nil];
+        nextUris = [self weAgentUriResultFromDetails:nil];
+    } else {
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[nextDetail toDictionary]];
+        nextUris = [self weAgentUriResultFromDetails:nextDetail];
+    }
+    (void)nextUris;
+    // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+    if (success) {
+        success(deleteResult);
+    }
+}
+
+- (WLAgentSkillsWeAgentUriResult *)weAgentUriResultFromDetails:(nullable WLAgentSkillsWeAgentDetails *)details {
+    WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
+    if (details == nil) {
+        NSString *fallbackWeAgentUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                              key:@"wecodePlace"
+                                                            value:@"weAgent"];
+        result.weAgentUri = [self appendHashToUri:fallbackWeAgentUri hash:@"activateAssistant"] ?: @"";
+        result.assistantDetailUri = @"";
+        result.switchAssistantUri = @"";
+        return result;
+    }
+
+    NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl];
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
+    NSString *detailId = [WLAgentSkillsTypeConverter optionalStringFromValue:details.id];
+    NSString *weCodeUrlHost = [self hostFromUri:weCodeUrl];
+
+    NSString *baseWeAgentUri = [self appendQueryItemToUri:weCodeUrl key:@"wecodePlace" value:@"weAgent"];
+    if (weCodeUrlHost != nil && [weCodeUrlHost caseInsensitiveCompare:WLAgentSkillsWeAgentCUIAppId] == NSOrderedSame) {
+        result.weAgentUri = [self appendQueryItemToUri:baseWeAgentUri key:@"assistantAccount" value:partnerAccount] ?: @"";
+    } else {
+        result.weAgentUri = [self appendQueryItemToUri:baseWeAgentUri key:@"robotId" value:detailId] ?: @"";
+    }
+
+    NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                          key:@"partnerAccount"
+                                                        value:partnerAccount];
+    result.assistantDetailUri = [self appendHashToUri:assistantDetailUri hash:@"assistantDetail"] ?: @"";
+
+    NSString *switchAssistantUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
+                                                          key:@"partnerAccount"
+                                                        value:partnerAccount];
+    result.switchAssistantUri = [self appendHashToUri:switchAssistantUri hash:@"switchAssistant"] ?: @"";
+    return result;
 }
 
 - (NSInteger)clampInteger:(NSInteger)value min:(NSInteger)minValue max:(NSInteger)maxValue {
