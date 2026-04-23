@@ -871,8 +871,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createDigi
 | name | string | 是 | 分身名称 |
 | icon | string | 是 | 分身头像地址 |
 | description | string | 是 | 分身简介 |
-| weCrewType | number | 是 | 分身类型：`1` 内部分身，`0` 自定义分身 |
+| weCrewType | number | 否 | 分身类型：`1` 内部分身，`0` 自定义分身 |
 | bizRobotId | string | 否 | 内部助手业务机器人 ID（`weCrewType=1` 时建议传入） |
+| qrcode | string | 否 | 二维码编码 |
 
 ### 返回值
 
@@ -904,7 +905,8 @@ window.HWH5EXT.createDigitalTwin({
   icon: '/mcloud/xxx',
   description: '数字分身小白能做...',
   weCrewType: 1,
-  bizRobotId: '8041241'
+  bizRobotId: '8041241',
+  qrcode: 'qr_001'
 }).then((result) => {
   console.log('创建成功:', result.partnerAccount);
 }).catch((error) => {
@@ -1362,7 +1364,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'queryQrcod
 ### 行为说明
 
 1. JSAPI 调用 SDK `queryQrcodeInfo` 接口。
-2. SDK 调用服务端 `GET /nologin/we-crew/im-register/qrcode/{qrcode}`。
+2. SDK 调用服务端 `GET /v4-1/we-crew/im-register/qrcode/{qrcode}`。
 3. SDK 不透出服务端包装字段，直接透传响应 `data` 中的 `qrcode`、`weUrl`、`pcUrl`、`expireTime`、`status`、`expired`。
 
 ### 调用示例
@@ -1402,7 +1404,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateQrco
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | qrcode | string | 是 | 二维码唯一标识 |
-| ak | string | 否 | Access Key |
+| robotId | string | 否 | 分身机器人 ID |
 | status | number | 是 | 二维码状态 |
 
 ### 返回值
@@ -1417,7 +1419,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateQrco
 
 1. JSAPI 调用 SDK `updateQrcodeInfo` 接口。
 2. SDK 调用服务端 `PUT /v4-1/we-crew/im-register/qrcode`。
-3. SDK 透传 `qrcode`、`ak`、`status`。
+3. SDK 透传 `qrcode`、`robotId`、`status`。
 4. SDK 根据服务端返回 `code=200`，映射返回 `{ status: 'success' }`。
 
 ### 调用示例
@@ -1425,7 +1427,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateQrco
 ```javascript
 window.HWH5EXT.updateQrcodeInfo({
   qrcode: 'qr_001',
-  ak: 'ak_xxx',
+  robotId: '860306',
   status: 2
 }).then((result) => {
   console.log('更新二维码结果:', result.status);

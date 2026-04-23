@@ -67,8 +67,9 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 | `name` | `string` | 是 | 分身名称 |
 | `icon` | `string` | 是 | 分身头像地址 |
 | `description` | `string` | 是 | 分身简介 |
-| `weCrewType` | `number` | 是 | 分身类型：`1` 内部分身，`0` 自定义分身 |
+| `weCrewType` | `number` | 否 | 分身类型：`1` 内部分身，`0` 自定义分身 |
 | `bizRobotId` | `string` | 否 | 内部助手业务机器人 ID（`weCrewType=1` 时建议传入） |
+| `qrcode` | `string` | 否 | 二维码编码 |
 
 ### 入参示例
 
@@ -78,7 +79,8 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
   "icon": "/mcloud/xxx",
   "description": "数字分身小白能做...",
   "weCrewType": 1,
-  "bizRobotId": "员工助手"
+  "bizRobotId": "员工助手",
+  "qrcode": "qr_001"
 }
 ```
 
@@ -103,8 +105,9 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 ### 实现方法
 
 1. 调用服务端 REST API：`POST /v4-1/we-crew/im-register`
-2. SDK 解析返回 `data.robotId`、`data.partnerAccount`
-3. SDK 统一返回 `CreateResult`
+2. SDK 透传入参 `name`、`icon`、`description`、`weCrewType`、`bizRobotId`、`qrcode`
+3. SDK 解析返回 `data.robotId`、`data.partnerAccount`
+4. SDK 统一返回 `CreateResult`
 
 ### 错误码（参考）
 
@@ -865,8 +868,9 @@ type CreateDigitalTwinParams = {
   name: string
   icon: string
   description: string
-  weCrewType: number
+  weCrewType?: number
   bizRobotId?: string
+  qrcode?: string
 }
 ```
 
