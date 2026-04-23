@@ -350,7 +350,8 @@ interface CreateDigitalTwinParams {
    - 删除确认弹窗：点击“删除助理”后出现，使用独立组件 + `createPortal(document.body)` + 固定定位居中面板，宽度 `280px`、圆角 `8px`、白底；标题使用当前助理名称插值，样式调整为 `16px/400/24px` 且允许换行显示，内容说明文本保持居中对齐，底部通过两个文本按钮“取消 / 删除”组成操作区，中间有 `1px x 16px` 分割线。
 8. 两个覆盖层组件样式从 `AssistantDetail.less` 中拆出，分别维护独立 less 文件，避免继续受详情页主容器样式污染。
 9. 页面层不再用两个分散的布尔值控制弹窗，而是收口成单一 overlay 状态（如 `none / action-sheet / delete-modal`），减少切换时的样式与时序问题。
-10. 交互上仅“取消”和蒙层负责关闭对应弹窗；“修改助理信息”和最终“删除”按钮当前均保留空实现，不接入实际业务动作。
+10. 交互上“取消”和蒙层负责关闭对应弹窗；“修改助理信息”继续保留空实现；移动端最终“删除”按钮接入真实删除链路：调用 `deleteWeAgent({ partnerAccount, robotId? })`，成功后直接执行 `window.HWH5.close()`，失败则按既有规范 `showToast(固定错误文案)`。
+11. 编辑助理页回填头像时，默认头像识别与头像显示分开处理：默认头像判断阶段直接使用原始 `detail.icon` 与 `DEFAULT_AVATARS.image` 做严格相等比较，不走 `resolveAssistantIconUrl`；真正回填给表单展示的 `icon` 则统一使用 `resolveAssistantIconUrl(detail.icon)`，保证非默认头像与默认头像回显都使用同一显示规范化结果。
 
 ## 15. 切换助理页面设计
 
@@ -507,6 +508,19 @@ interface CreateDigitalTwinParams {
 2. 桥接层相关类型统一以 `src/types/bridge` 为单一来源；业务层如果需要 `WeAgentDetails`、`GetWeAgentListParams`、`HWH5EXT`、`CreateDigitalTwinResult` 等类型，直接从 `src/types/bridge` 导入。
 3. 页面、组件、mock、opencode 适配层禁止再通过 `hwext.ts` 获取类型，避免出现“工具模块既导出函数又转导出类型”的双重职责。
 4. 此次收口不调整类型定义语义，只调整导入边界：类型定义位置保持稳定，`hwext.ts` 侧只删除 type re-export 和相关下游依赖。
+
+## 22. 全局版本更新弹窗设计
+
+1. 全局版本更新能力挂在应用根路由层实现，由 `AppRouter` 负责注册一次 `onTabForUpdate` 监听并渲染弹窗容器，避免多个页面重复监听导致重复弹窗。
+2. 监听注册通过 `src/utils/hwext.ts` 新增运行时封装方法完成，业务层不直接访问 `window.HWH5EXT.onTabForUpdate`。
+3. 版本更新确认框与助理详情页删除确认框统一抽象为通用确认弹窗组件，保留相同的蒙层、Portal 和底部双按钮结构，仅通过入参区分标题、描述和确认按钮颜色。
+4. 通用确认弹窗默认沿用当前删除弹窗的视觉骨架：居中展示、白底圆角 `8px`、标题/正文居中、底部双按钮与中间竖分割线。
+5. 更新弹窗确认按钮颜色单独配置为 `#0D94FF`；删除助理场景继续通过入参覆盖为红色 `rgba(243, 111, 100, 1)`，保证删除交互视觉不回退。
+6. `AppRouter` 中收到版本更新回调后，仅更新本地弹窗显隐状态，不立即调用重启。
+7. 用户点击取消按钮或蒙层时只关闭弹窗；点击确认按钮时调用 `src/utils/hwext.ts` 中封装的 `rebootApp()`，内部转发到 `window.HWH5.reboot()`。
+8. `rebootApp()` 调用失败时，`AppRouter` 捕获异常并按现有规范直接执行 `showToast(固定错误文案)`；不解析宿主错误对象。
+9. 为保持本地调试与 OpenCode 适配编译通过，`HWH5EXT` mock / opencode 适配层需要补齐 `onTabForUpdate` 空实现，`HWH5` mock 需要补齐 `reboot` 空实现。
+10. 更新弹窗文案纳入现有 `react-i18next` 资源，统一由 `useTranslation()` 读取，避免全局组件引入新的文案常量来源。
 
 
 

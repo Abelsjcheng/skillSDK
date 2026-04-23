@@ -566,7 +566,15 @@
       - 右侧“删除”，样式 `16px/400`，颜色 `rgba(243,111,100,1)`；
    - 两个按钮之间增加一条分割线：宽 `1px`、高 `16px`、颜色 `rgba(238,238,238,1)`，与左右按钮各间隔 `4px`；
    - 点击“取消”或蒙层关闭删除确认弹窗；
-   - 点击确认删除按钮当前先保留空实现。
+   - 点击确认删除按钮时，根据 `小程序JSAPI接口文档.md` 调用 `deleteWeAgent`；
+   - `deleteWeAgent` 入参按当前详情数据透传：优先传 `partnerAccount`，若当前详情存在 `id`，则同时传 `robotId=id`；
+   - `deleteWeAgent` 调用成功后，直接调用 `window.HWH5.close();` 关闭当前页面；
+   - `deleteWeAgent` 调用失败时，按全局错误提示规范通过 toast 展示固定错误文案，不关闭页面。
+8. 编辑助理页面头像回填规则：
+   - 打开编辑助理页面时，先使用助理详情中的原始 `detail.icon` 与 `DEFAULT_AVATARS` 中的 `avatar.image` 直接做严格相等比较，不对比较值做 `resolveAssistantIconUrl` 规范化；
+   - 若原始 `detail.icon` 命中 4 个默认头像之一，则默认选中该默认头像；
+   - 若未命中，则选中自定义头像入口；
+   - 无论是否命中默认头像，回填到表单中用于显示的头像地址统一使用 `resolveAssistantIconUrl(detail.icon)` 规范化结果。
 
 ## 15. 切换助理页面
 
@@ -1060,6 +1068,24 @@
    - JSAPI / HWH5EXT / WeAgent 相关类型放在 `src/types/bridge`
    - 页面、组件、系统与业务领域类型继续分别放在 `src/types/pages`、`src/types/components`、`src/types/system`、`src/types/digitalTwin` 等目录
 3. 业务页面、组件、mock、opencode 适配层在使用接口/类型时，必须直接从 `src/types` 目录导入，不允许再通过 `src/utils/hwext.ts` 间接获取类型。
+
+## 29. 全局版本更新弹窗
+
+1. `ai-chat-viewer` 需要在应用全局入口注册移动端版本更新监听，不在单个业务页面重复注册。
+2. 全局更新监听统一在 `AppRouter` 层初始化，并在应用生命周期内只注册一次。
+3. 监听能力来源于 `hwext` 封装方法，对应宿主接口为 `HWH5EXT.onTabForUpdate(callback)`。
+4. 仅移动端注册该监听；PC 端不弹版本更新确认框。
+5. 当收到 `onTabForUpdate` 回调时，页面需弹出全局确认弹窗，不直接执行重启。
+6. 该弹窗使用通用确认弹窗组件实现，不再为“删除助理”和“版本更新”分别维护两套确认弹窗结构。
+7. 更新弹窗文案固定为：
+   - 标题：`更新提示`
+   - 内容：`新版本已经准备好，是否重启应用？`
+   - 左按钮：`取消`
+   - 右按钮：`确认`
+8. 更新弹窗底部右侧“确认”按钮文本颜色固定为 `#0D94FF`。
+9. 用户点击取消按钮或蒙层时，仅关闭弹窗，不执行其他动作。
+10. 用户点击确认按钮时，统一调用 `HWH5.reboot()` 重启应用；该能力通过 `hwext.ts` 中的运行时封装方法触发。
+11. 若调用 `HWH5.reboot()` 失败并进入业务 `catch` 分支，需继续遵循全局错误提示规范，直接通过 `showToast(固定错误文案)` 提示用户。
 
 
 

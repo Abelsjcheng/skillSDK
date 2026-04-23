@@ -22,7 +22,7 @@
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
 | `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
-| `queryQrcodeInfo` | `GET /nologin/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
+| `queryQrcodeInfo` | `GET /v4-1/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
 | `updateQrcodeInfo` | `PUT /v4-1/we-crew/im-register/qrcode` | 更新二维码信息 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
@@ -467,6 +467,10 @@ updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
 1. 调用服务端 REST API：`PUT /v4-1/we-crew`。
 2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`；若两者同时传入，则两个参数都透传给服务端。
 3. SDK 从服务端响应中提取 `message`，并映射返回为 `updateResult`。
+4. 当接口调用成功后，SDK 需按 `userId`（当前 mock 值：`mock_user_id`）更新本地缓存：
+   - 更新 `current_we_agent_detail`：若当前缓存中的助理与本次更新目标一致，则将其名称、头像、简介同步更新为最新值；
+   - 更新 `we_agent_details`：定位对应助理在缓存对象中的条目，并将其名称、头像、简介同步更新为最新值。
+5. 若本地未命中对应助理缓存，则 SDK 不新增缓存，仅更新已存在且匹配的缓存项。
 
 ---
 
@@ -517,12 +521,24 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 ### 实现方法
 
-1. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
-2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传删除标识参数：
+1. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传删除标识参数：
    - 若仅传 `partnerAccount`，则透传 `partnerAccount`；
    - 若仅传 `robotId`，则透传 `robotId`；
    - 若两者同时传入，则两个参数都透传给服务端。
-3. SDK 从服务端响应中提取 `message`，并映射返回为 `deleteResult`。
+2. SDK 在调用删除服务端接口前，需按 `userId`（当前 mock 值：`mock_user_id`）优先读取本地 `we_agent_list_cache`；若本地不存在助理列表缓存，则先调用 `getWeAgentList` 对应的服务端接口获取最新助理列表，并更新本地 `we_agent_list_cache`。
+3. SDK 基于“删除前”的助理列表定位当前被删除助理，并预先计算可切换的下一个助理：
+   - 若当前删除助理不是列表最后一个，则取其后一个助理；
+   - 若当前删除助理是列表最后一个，则取列表第 `0` 个助理；
+   - 若列表中不存在可切换的下一个助理，则标记删除成功后需删除本地 `current_we_agent_detail` 缓存。
+4. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
+5. SDK 从服务端响应中提取 `message`，并映射返回为 `deleteResult`。
+6. 当服务端接口请求成功后，SDK 基于删除前列表快照同步移除当前被删除助理，并将删除后的列表回写到本地 `we_agent_list_cache`。
+7. 若预先计算得到下一个助理，则 SDK 基于该助理的 `partnerAccount` 从本地 `we_agent_details` 中读取对应助理详情；若本地不存在该助理详情缓存，则调用查助理详情的服务端接口 `GET /v1/robot-partners/{partnerAccount}` 获取对应详情，并更新本地 `we_agent_details` 缓存。
+8. 若成功获取到下一个助理详情，则将该助理详情设置到本地 `current_we_agent_detail` 缓存；若未预计算到下一个助理，或仍无法获取到下一个助理详情，则删除本地 `current_we_agent_detail` 缓存。
+9. SDK 需在内存中直接组装对应的 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，不再额外调用 `getWeAgentUri` 读取缓存；`deleteWeAgent` 与 `getWeAgentUri` 需复用同一套 URI 组装规则，保证结果一致：
+   - 若已获取到下一个助理详情，则基于该详情组装 URI；
+   - 若下一个助理详情为空，则按 `getWeAgentUri` 的 fallback 规则组装 `nextUris`。
+10. `todo`：使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理。
 
 ---
 
@@ -713,7 +729,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
 
 ### 实现方法
 
-1. SDK 调用服务端 REST API：`GET /nologin/we-crew/im-register/qrcode/{qrcode}`。
+1. SDK 调用服务端 REST API：`GET /v4-1/we-crew/im-register/qrcode/{qrcode}`。
 2. 服务端响应结构为：
    - `code: string`
    - `message: string`
@@ -749,7 +765,7 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `qrcode` | `string` | 是 | 二维码唯一标识 |
-| `ak` | `string` | 否 | Access Key |
+| `robotId` | `string` | 否 | 分身机器人 ID |
 | `status` | `number` | 是 | 二维码状态 |
 
 ### 入参示例
@@ -757,7 +773,7 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 ```json
 {
   "qrcode": "qr_001",
-  "ak": "ak_xxx",
+  "robotId": "860306",
   "status": 2
 }
 ```
@@ -779,7 +795,7 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 ### 实现方法
 
 1. SDK 调用服务端 REST API：`PUT /v4-1/we-crew/im-register/qrcode`。
-2. SDK 透传入参 `qrcode`、`ak`、`status`。
+2. SDK 透传入参 `qrcode`、`robotId`、`status`。
 3. 服务端响应结构为：
    - `code: string`
    - `message: string`
@@ -1010,7 +1026,7 @@ type QrcodeInfo = {
 ```typescript
 type UpdateQrcodeInfoParams = {
   qrcode: string
-  ak?: string
+  robotId?: string
   status: number
 }
 ```
