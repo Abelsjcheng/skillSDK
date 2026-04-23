@@ -7,12 +7,12 @@ public final class UpdateQrcodeInfoBody {
     @NonNull
     private final String qrcode;
     @Nullable
-    private final String ak;
+    private final String robotId;
     private final int status;
 
-    public UpdateQrcodeInfoBody(@NonNull String qrcode, @Nullable String ak, int status) {
+    public UpdateQrcodeInfoBody(@NonNull String qrcode, @Nullable String robotId, int status) {
         this.qrcode = qrcode;
-        this.ak = ak;
+        this.robotId = robotId;
         this.status = status;
     }
 
@@ -22,8 +22,8 @@ public final class UpdateQrcodeInfoBody {
     }
 
     @Nullable
-    public String getAk() {
-        return ak;
+    public String getRobotId() {
+        return robotId;
     }
 
     public int getStatus() {

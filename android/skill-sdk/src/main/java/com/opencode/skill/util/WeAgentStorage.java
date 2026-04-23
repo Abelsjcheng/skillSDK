@@ -113,6 +113,45 @@ public final class WeAgentStorage {
         return details;
     }
 
+    public synchronized void updateCachedWeAgentDetails(
+            @Nullable String partnerAccount,
+            @Nullable String robotId,
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description
+    ) {
+        SharedPreferences prefs = resolveSharedPreferencesIfNeeded();
+        WeAgentDetails currentDetail = getCurrentWeAgentDetail();
+        if (matchesDetail(currentDetail, partnerAccount, robotId)) {
+            applyUpdatedBasicFields(currentDetail, name, icon, description);
+            saveCurrentWeAgentDetail(currentDetail);
+        }
+
+        Map<String, WeAgentDetails> cache = loadWeAgentDetailsCache();
+        boolean updated = false;
+        if (partnerAccount != null) {
+            WeAgentDetails cachedDetail = cache.get(partnerAccount);
+            if (cachedDetail != null) {
+                applyUpdatedBasicFields(cachedDetail, name, icon, description);
+                updated = true;
+            }
+        } else if (robotId != null) {
+            for (Map.Entry<String, WeAgentDetails> entry : cache.entrySet()) {
+                WeAgentDetails cachedDetail = entry.getValue();
+                if (!matchesDetail(cachedDetail, null, robotId)) {
+                    continue;
+                }
+                applyUpdatedBasicFields(cachedDetail, name, icon, description);
+                updated = true;
+                break;
+            }
+        }
+
+        if (updated) {
+            persistWeAgentDetailsCache(prefs, cache);
+        }
+    }
+
     @Nullable
     private SharedPreferences resolveSharedPreferencesIfNeeded() {
         if (sharedPreferences != null) {
@@ -204,6 +243,40 @@ public final class WeAgentStorage {
             return;
         }
         putValue(prefs, KEY_WE_AGENT_DETAILS, gson.toJson(cache));
+    }
+
+    private boolean matchesDetail(
+            @Nullable WeAgentDetails details,
+            @Nullable String partnerAccount,
+            @Nullable String robotId
+    ) {
+        if (details == null) {
+            return false;
+        }
+        if (partnerAccount != null) {
+            return partnerAccount.equals(normalize(details.getPartnerAccount()));
+        }
+        return robotId != null && robotId.equals(normalize(details.getId()));
+    }
+
+    private void applyUpdatedBasicFields(
+            @NonNull WeAgentDetails details,
+            @NonNull String name,
+            @NonNull String icon,
+            @NonNull String description
+    ) {
+        details.setName(name);
+        details.setIcon(icon);
+        details.setDesc(description);
+    }
+
+    @Nullable
+    private String normalize(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
 }

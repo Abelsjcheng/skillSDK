@@ -65,6 +65,7 @@ import com.opencode.skill.model.UpdateQrcodeInfoParams;
 import com.opencode.skill.model.UpdateQrcodeInfoResult;
 import com.opencode.skill.model.UpdateWeAgentParams;
 import com.opencode.skill.model.UpdateWeAgentResult;
+import com.opencode.skill.model.WeAgent;
 import com.opencode.skill.model.WeAgentDetailsArrayResult;
 import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentListResult;
@@ -93,6 +94,8 @@ public final class SkillSDK {
     private static volatile SkillSDK instance;
     private static final String ASSISTANT_H5_URI = "h5://S008623/index.html";
     private static final String WE_AGENT_CUI_APPID = "S008623";
+    private static final int DEFAULT_WE_AGENT_LIST_PAGE_SIZE = 100;
+    private static final int DEFAULT_WE_AGENT_LIST_PAGE_NUMBER = 1;
 
     @NonNull
     private final ApiClient apiClient = new ApiClient();
@@ -1023,43 +1026,7 @@ public final class SkillSDK {
     @NonNull
     public WeAgentUriResult getWeAgentUri() {
         ensureInitializedForVoid();
-        WeAgentDetails details = weAgentStorage.getCurrentWeAgentDetail();
-
-        if (details == null) {
-            String fallbackWeAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
-            fallbackWeAgentUri = appendHashFragment(fallbackWeAgentUri, "activateAssistant");
-
-            return new WeAgentUriResult(
-                    fallbackWeAgentUri == null ? "" : fallbackWeAgentUri,
-                    "",
-                    ""
-            );
-        }
-
-        String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
-        String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
-        String detailId = normalizeOptionalString(details.getId());
-        String weCodeUrlHost = extractUriHost(weCodeUrl);
-
-        String weAgentUri;
-        String baseWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
-        if (WE_AGENT_CUI_APPID.equalsIgnoreCase(weCodeUrlHost == null ? "" : weCodeUrlHost)) {
-            weAgentUri = appendQueryParameter(baseWeAgentUri, "assistantAccount", partnerAccount);
-        } else {
-            weAgentUri = appendQueryParameter(baseWeAgentUri, "robotId", detailId);
-        }
-
-        String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
-        assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
-
-        String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
-        switchAssistantUri = appendHashFragment(switchAssistantUri, "switchAssistant");
-
-        return new WeAgentUriResult(
-                weAgentUri == null ? "" : weAgentUri,
-                assistantDetailUri == null ? "" : assistantDetailUri,
-                switchAssistantUri == null ? "" : switchAssistantUri
-        );
+        return buildWeAgentUriResult(weAgentStorage.getCurrentWeAgentDetail());
     }
 
     // 21. updateWeAgent
@@ -1096,6 +1063,7 @@ public final class SkillSDK {
         apiClient.updateWeAgent(partnerAccount, robotId, name, icon, description, new SkillCallback<UpdateWeAgentResult>() {
             @Override
             public void onSuccess(@Nullable UpdateWeAgentResult result) {
+                weAgentStorage.updateCachedWeAgentDetails(partnerAccount, robotId, name, icon, description);
                 callback.onSuccess(result);
             }
 
@@ -1125,10 +1093,23 @@ public final class SkillSDK {
             return;
         }
 
-        apiClient.deleteWeAgent(partnerAccount, robotId, new SkillCallback<DeleteWeAgentResult>() {
+        prepareDeleteWeAgentTransition(partnerAccount, robotId, new SkillCallback<DeleteTransitionPlan>() {
             @Override
-            public void onSuccess(@Nullable DeleteWeAgentResult result) {
-                callback.onSuccess(result);
+            public void onSuccess(@Nullable DeleteTransitionPlan plan) {
+                DeleteTransitionPlan resolvedPlan = plan == null
+                        ? new DeleteTransitionPlan(new ArrayList<>(), null)
+                        : plan;
+                apiClient.deleteWeAgent(partnerAccount, robotId, new SkillCallback<DeleteWeAgentResult>() {
+                    @Override
+                    public void onSuccess(@Nullable DeleteWeAgentResult result) {
+                        handleDeleteWeAgentSuccess(resolvedPlan, result, callback);
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(wrapError(error));
+                    }
+                });
             }
 
             @Override
@@ -1271,7 +1252,7 @@ public final class SkillSDK {
         }
 
         final String qrcode;
-        final String ak = normalizeOptionalString(params.getAk());
+        final String robotId = normalizeOptionalString(params.getRobotId());
         final int status;
         try {
             qrcode = TypeConvertUtils.requireString(params.getQrcode(), "qrcode");
@@ -1281,7 +1262,7 @@ public final class SkillSDK {
             return;
         }
 
-        apiClient.updateQrcodeInfo(qrcode, ak, status, new SkillCallback<UpdateQrcodeInfoResult>() {
+        apiClient.updateQrcodeInfo(qrcode, robotId, status, new SkillCallback<UpdateQrcodeInfoResult>() {
             @Override
             public void onSuccess(@Nullable UpdateQrcodeInfoResult result) {
                 callback.onSuccess(result);
@@ -1357,6 +1338,182 @@ public final class SkillSDK {
         list.add(detail);
         result.setWeAgentDetailsArray(list);
         return result;
+    }
+
+    private void prepareDeleteWeAgentTransition(
+            @Nullable String partnerAccount,
+            @Nullable String robotId,
+            @NonNull SkillCallback<DeleteTransitionPlan> callback
+    ) {
+        List<WeAgent> cachedList = weAgentStorage.getWeAgentList();
+        if (!cachedList.isEmpty()) {
+            callback.onSuccess(buildDeleteTransitionPlan(cachedList, partnerAccount, robotId));
+            return;
+        }
+
+        apiClient.getWeAgentList(
+                DEFAULT_WE_AGENT_LIST_PAGE_SIZE,
+                DEFAULT_WE_AGENT_LIST_PAGE_NUMBER,
+                new SkillCallback<WeAgentListResult>() {
+                    @Override
+                    public void onSuccess(@Nullable WeAgentListResult result) {
+                        WeAgentListResult resolved = result == null ? new WeAgentListResult() : result;
+                        weAgentStorage.saveWeAgentList(resolved.getContent());
+                        callback.onSuccess(buildDeleteTransitionPlan(resolved.getContent(), partnerAccount, robotId));
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        callback.onError(error);
+                    }
+                }
+        );
+    }
+
+    @NonNull
+    private DeleteTransitionPlan buildDeleteTransitionPlan(
+            @NonNull List<WeAgent> snapshot,
+            @Nullable String partnerAccount,
+            @Nullable String robotId
+    ) {
+        List<WeAgent> updatedList = new ArrayList<>(snapshot);
+        int deletedIndex = findWeAgentIndex(updatedList, partnerAccount, robotId);
+        if (deletedIndex < 0) {
+            return new DeleteTransitionPlan(updatedList, null);
+        }
+
+        updatedList.remove(deletedIndex);
+        if (updatedList.isEmpty()) {
+            return new DeleteTransitionPlan(updatedList, null);
+        }
+
+        int nextIndex = deletedIndex < updatedList.size() ? deletedIndex : 0;
+        String nextPartnerAccount = normalizeOptionalString(updatedList.get(nextIndex).getPartnerAccount());
+        return new DeleteTransitionPlan(updatedList, nextPartnerAccount);
+    }
+
+    private int findWeAgentIndex(
+            @NonNull List<WeAgent> list,
+            @Nullable String partnerAccount,
+            @Nullable String robotId
+    ) {
+        for (int i = 0; i < list.size(); i++) {
+            WeAgent item = list.get(i);
+            String itemPartnerAccount = normalizeOptionalString(item.getPartnerAccount());
+            if (partnerAccount != null && partnerAccount.equals(itemPartnerAccount)) {
+                return i;
+            }
+            if (partnerAccount == null) {
+                String itemRobotId = normalizeOptionalString(item.getRobotId());
+                if (robotId != null && robotId.equals(itemRobotId)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private void handleDeleteWeAgentSuccess(
+            @NonNull DeleteTransitionPlan plan,
+            @Nullable DeleteWeAgentResult result,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    ) {
+        weAgentStorage.saveWeAgentList(plan.updatedList);
+        if (plan.nextPartnerAccount == null) {
+            weAgentStorage.saveCurrentWeAgentDetail(null);
+            callback.onSuccess(result);
+            return;
+        }
+
+        WeAgentDetails cachedDetail = weAgentStorage.getWeAgentDetails(plan.nextPartnerAccount);
+        if (cachedDetail != null) {
+            finalizeDeleteWeAgentTransition(result, cachedDetail, callback);
+            return;
+        }
+
+        apiClient.getWeAgentDetails(plan.nextPartnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetailsArrayResult detailResult) {
+                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(detailResult);
+                cacheWeAgentDetailsResult(plan.nextPartnerAccount, resolved, false);
+                WeAgentDetails nextDetail = resolved.getWeAgentDetailsArray().isEmpty()
+                        ? null
+                        : resolved.getWeAgentDetailsArray().get(0);
+                finalizeDeleteWeAgentTransition(result, nextDetail, callback);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                finalizeDeleteWeAgentTransition(result, null, callback);
+            }
+        });
+    }
+
+    private void finalizeDeleteWeAgentTransition(
+            @Nullable DeleteWeAgentResult result,
+            @Nullable WeAgentDetails nextDetail,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    ) {
+        WeAgentUriResult nextUris;
+        if (nextDetail == null) {
+            weAgentStorage.saveCurrentWeAgentDetail(null);
+            nextUris = buildWeAgentUriResult(null);
+        } else {
+            weAgentStorage.saveCurrentWeAgentDetail(nextDetail);
+            nextUris = buildWeAgentUriResult(nextDetail);
+        }
+        // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+        callback.onSuccess(result);
+    }
+
+    @NonNull
+    private WeAgentUriResult buildWeAgentUriResult(@Nullable WeAgentDetails details) {
+        if (details == null) {
+            String fallbackWeAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
+            fallbackWeAgentUri = appendHashFragment(fallbackWeAgentUri, "activateAssistant");
+            return new WeAgentUriResult(
+                    fallbackWeAgentUri == null ? "" : fallbackWeAgentUri,
+                    "",
+                    ""
+            );
+        }
+
+        String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
+        String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
+        String detailId = normalizeOptionalString(details.getId());
+        String weCodeUrlHost = extractUriHost(weCodeUrl);
+
+        String baseWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
+        String weAgentUri;
+        if (WE_AGENT_CUI_APPID.equalsIgnoreCase(weCodeUrlHost == null ? "" : weCodeUrlHost)) {
+            weAgentUri = appendQueryParameter(baseWeAgentUri, "assistantAccount", partnerAccount);
+        } else {
+            weAgentUri = appendQueryParameter(baseWeAgentUri, "robotId", detailId);
+        }
+
+        String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
+        assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
+
+        String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
+        switchAssistantUri = appendHashFragment(switchAssistantUri, "switchAssistant");
+
+        return new WeAgentUriResult(
+                weAgentUri == null ? "" : weAgentUri,
+                assistantDetailUri == null ? "" : assistantDetailUri,
+                switchAssistantUri == null ? "" : switchAssistantUri
+        );
+    }
+
+    private static final class DeleteTransitionPlan {
+        @NonNull
+        private final List<WeAgent> updatedList;
+        @Nullable
+        private final String nextPartnerAccount;
+
+        private DeleteTransitionPlan(@NonNull List<WeAgent> updatedList, @Nullable String nextPartnerAccount) {
+            this.updatedList = updatedList;
+            this.nextPartnerAccount = nextPartnerAccount;
+        }
     }
 
     private void sendMessageInternal(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,

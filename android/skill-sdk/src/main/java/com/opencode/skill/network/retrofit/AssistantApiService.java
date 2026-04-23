@@ -42,7 +42,7 @@ public interface AssistantApiService {
             @Query("robotId") @Nullable String robotId
     );
 
-    @GET("nologin/we-crew/im-register/qrcode/{qrcode}")
+    @GET("v4-1/we-crew/im-register/qrcode/{qrcode}")
     Call<JsonElement> queryQrcodeInfo(@Path("qrcode") String qrcode);
 
     @PUT("v4-1/we-crew/im-register/qrcode")

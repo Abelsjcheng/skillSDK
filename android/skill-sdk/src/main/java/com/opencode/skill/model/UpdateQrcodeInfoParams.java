@@ -11,12 +11,12 @@ public class UpdateQrcodeInfoParams {
     @NonNull
     private final String qrcode;
     @Nullable
-    private final String ak;
+    private final String robotId;
     private final int status;
 
-    public UpdateQrcodeInfoParams(@NonNull String qrcode, @Nullable String ak, int status) {
+    public UpdateQrcodeInfoParams(@NonNull String qrcode, @Nullable String robotId, int status) {
         this.qrcode = Objects.requireNonNull(qrcode, "qrcode == null");
-        this.ak = ak;
+        this.robotId = robotId;
         this.status = status;
     }
 
@@ -26,8 +26,8 @@ public class UpdateQrcodeInfoParams {
     }
 
     @Nullable
-    public String getAk() {
-        return ak;
+    public String getRobotId() {
+        return robotId;
     }
 
     public int getStatus() {

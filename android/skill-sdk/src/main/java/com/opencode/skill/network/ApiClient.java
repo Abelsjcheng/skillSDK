@@ -263,12 +263,12 @@ public class ApiClient {
 
     public void updateQrcodeInfo(
             @NonNull String qrcode,
-            @Nullable String ak,
+            @Nullable String robotId,
             int status,
             @NonNull SkillCallback<UpdateQrcodeInfoResult> callback
     ) {
         AssistantApiService service = requireAssistantApiService();
-        enqueueJson(service.updateQrcodeInfo(new UpdateQrcodeInfoBody(qrcode, ak, status)), new SkillCallback<JsonElement>() {
+        enqueueJson(service.updateQrcodeInfo(new UpdateQrcodeInfoBody(qrcode, robotId, status)), new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
