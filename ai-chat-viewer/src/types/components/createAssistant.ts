@@ -1,4 +1,4 @@
-import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, DigitalTwinBrainPayload, InternalAssistantOption } from '../digitalTwin';
+import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, DigitalTwinBrainPayload } from '../digitalTwin';
 
 export type FooterButtonVariant = 'cancel' | 'next' | 'confirm';
 
@@ -20,6 +20,7 @@ export interface CreatorStepHeaderProps {
   isPcMiniApp: boolean;
   onClose: () => void;
   onMobileBack?: () => void;
+  pcTitle?: string;
 }
 
 export interface StepBasicInfoProps {
@@ -40,8 +41,6 @@ export interface StepBasicInfoProps {
 export interface StepBrainSelectProps {
   isPcMiniApp?: boolean;
   onClose: () => void;
-  onCancel: () => void;
   onPrev: () => void;
   onConfirm: (payload: DigitalTwinBrainPayload) => void;
-  loadAgentTypes?: () => Promise<InternalAssistantOption[]>;
 }

@@ -12,7 +12,6 @@ import type {
 import {
   buildOpenWeAgentCUIParams,
   createDigitalTwin,
-  getAgentType,
   getQueryParam,
   getWeAgentDetails,
   openWeAgentCUI,
@@ -53,10 +52,6 @@ const SelectBrainAssistantPage: React.FC = () => {
   }
 
   const handleClose = useCallback(() => {
-    closeCreateAssistantWindow();
-  }, []);
-
-  const handleCancel = useCallback(() => {
     closeCreateAssistantWindow();
   }, []);
 
@@ -150,13 +145,8 @@ const SelectBrainAssistantPage: React.FC = () => {
       <StepBrainSelect
         isPcMiniApp={isPc}
         onClose={handleClose}
-        onCancel={handleCancel}
         onPrev={handlePrev}
         onConfirm={handleConfirm}
-        loadAgentTypes={async () => {
-          const result = await getAgentType();
-          return result && Array.isArray(result.content) ? result.content : [];
-        }}
       />
     </div>
   );

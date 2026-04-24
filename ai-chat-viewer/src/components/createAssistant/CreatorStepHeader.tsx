@@ -14,6 +14,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   isPcMiniApp,
   onClose,
   onMobileBack,
+  pcTitle,
 }) => {
   const { t } = useTranslation();
   const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
@@ -41,7 +42,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
     ].filter(Boolean).join(' ')} style={mobileHeaderStyle}>
       {isPcMiniApp ? (
         <>
-          <span className="digital-twin__title">{t('createAssistant.title')}</span>
+          <span className="digital-twin__title">{pcTitle ?? t('createAssistant.title')}</span>
           <button
             type="button"
             className="digital-twin__close-btn"

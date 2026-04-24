@@ -46,9 +46,9 @@
 
 .digital-twin__header {
   width: 100%;
-  height: 40px;
-  min-height: 40px;
-  padding: 0 16px;
+  height: 64px;
+  min-height: 64px;
+  padding: 0 24px;
   background: transparent;
   color: rgba(25, 25, 25, 1);
   display: flex;
@@ -56,7 +56,7 @@
   justify-content: space-between;
   box-sizing: border-box;
   overflow: hidden;
-  flex: 0 0 40px;
+  flex: 0 0 64px;
 
   &.welink-pc-navigation-bar--dragging {
     -webkit-app-region: drag;
@@ -139,12 +139,12 @@
 }
 
 .digital-twin__content--step1 {
-  padding: 16px 24px 12px;
+  padding: 0 24px;
 }
 
 .digital-twin__content--expired {
   padding: 0;
-  background: rgba(196, 196, 196, 1);
+  background: rgba(249, 249, 249, 1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,6 +163,9 @@
 
 .digital-twin__avatar-preview-wrap {
   width: 100%;
+  height: 108px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -176,6 +179,8 @@
 .digital-twin__avatar-preview {
   width: 80px;
   height: 80px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   border-radius: 24px;
   border: 2px solid rgba(255, 255, 255, 1);
   overflow: hidden;
@@ -331,87 +336,11 @@
   line-height: 24px;
 }
 
-.digital-twin__brain-radios {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-
-  > * + * {
-    margin-left: 36px;
-  }
-}
-
-.digital-twin__radio-item {
-  display: inline-flex;
-  align-items: center;
-  color: rgba(51, 51, 51, 1);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-
-  > * + * {
-    margin-left: 8px;
-  }
-}
-
-.digital-twin__radio-item input[type='radio'] {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  border: none;
-  background: transparent;
-  position: relative;
-  flex-shrink: 0;
-  vertical-align: middle;
-  cursor: pointer;
-}
-
-.digital-twin__radio-item input[type='radio']::before {
-  content: '';
-  width: 16.67px;
-  height: 16.67px;
-  border-radius: 50%;
-  border: 1.2px solid rgba(204, 204, 204, 1);
-  background: rgba(255, 255, 255, 1);
-  box-sizing: border-box;
-}
-
-.digital-twin__radio-item input[type='radio']:checked::before {
-  border-color: rgba(13, 148, 255, 1);
-  background: rgba(13, 148, 255, 1);
-}
-
-.digital-twin__radio-item input[type='radio']:checked::after {
-  content: '';
-  width: 6.67px;
-  height: 6.67px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 1);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
 .digital-twin__brain-detail {
-  padding-top: 12px;
-}
-
-.digital-twin__brain-subtitle {
-  margin: 0;
-  color: rgba(153, 153, 153, 1);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
+  padding-top: 0;
 }
 
 .digital-twin__assistant-grid {
-  margin-top: 8px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 12px;
@@ -472,26 +401,13 @@
   text-overflow: ellipsis;
 }
 
-.digital-twin__custom-tip {
-  margin: 0;
-  color: rgba(153, 153, 153, 1);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-}
-
-.digital-twin__custom-tip-link {
-  color: rgb(9, 146, 255);
-  text-decoration: none;
-  cursor: pointer;
-}
-
 .digital-twin__actions {
   width: 100%;
-  height: 60px;
-  min-height: 60px;
-  flex: 0 0 60px;
-  padding: 16px 24px 12px;
+  height: auto;
+  min-height: 68px;
+  flex: 0 0 auto;
+  margin-top: 6px;
+  padding: 16px 24px 24px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -538,6 +454,19 @@
 .digital-twin__action-btn--next.is-active,
 .digital-twin__action-btn--confirm.is-active {
   background: rgba(13, 148, 255, 1);
+}
+
+.digital-twin-creator.is-pc .digital-twin__assistant-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.digital-twin-creator.is-pc .digital-twin__content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.digital-twin-creator.is-pc .digital-twin__content::-webkit-scrollbar {
+  display: none;
 }
 
 .digital-twin--mobile .digital-twin__header {
@@ -677,5 +606,4 @@
 .digital-twin-creator--assistant-edit.is-pc .digital-twin__form-section {
   background: #ffffff;
 }
-
 
