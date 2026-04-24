@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AvatarImage from '../AvatarImage';
-import bannerEn from '../../imgs/banner-en.png';
-import banner from '../../imgs/banner.png';
+import bannerPcEn from '../../imgs/banner-pc-en.png';
+import bannerPcZh from '../../imgs/banner-pc-zh.png';
+import bannerPhoneEn from '../../imgs/banner-phone-en.png';
+import bannerPhoneZh from '../../imgs/banner-phone-zh.png';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
 import type { DigitalTwinBrainPayload, InternalAssistantOption } from '../../types/digitalTwin';
 import type { StepBrainSelectProps } from '../../types/components';
@@ -42,7 +44,11 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   loadAgentTypes,
 }) => {
   const { t, i18n } = useTranslation();
-  const illustration = (i18n.resolvedLanguage ?? i18n.language) === 'en' ? bannerEn : banner;
+  const resolvedLanguage = i18n.resolvedLanguage ?? i18n.language;
+  const isEnglish = resolvedLanguage === 'en';
+  const illustration = isPcMiniApp
+    ? (isEnglish ? bannerPcEn : bannerPcZh)
+    : (isEnglish ? bannerPhoneEn : bannerPhoneZh);
   const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>(INTERNAL_ASSISTANTS[0]?.bizRobotId);
   const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>(INTERNAL_ASSISTANTS);
 
