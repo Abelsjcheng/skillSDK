@@ -54,6 +54,12 @@
     return 0;
 }
 
++ (nullable NSNumber *)optionalIntegerNumberFromValue:(nullable id)value
+                                            fieldName:(NSString *)fieldName
+                                         errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    return [self integerNumberFromValue:value fieldName:fieldName errorMessage:errorMessage];
+}
+
 + (NSInteger)nonNegativeIntegerFromValue:(nullable id)value
                             defaultValue:(NSInteger)defaultValue
                                 fieldName:(NSString *)fieldName

@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSDictionary *)loadCurrentWeAgentDetailDictionary;
 
 - (void)saveWeAgentListDictionaries:(NSArray<NSDictionary *> *)dictionaries;
+- (BOOL)hasWeAgentListCache;
 - (NSArray<NSDictionary *> *)loadWeAgentListDictionaries;
 
 - (void)saveWeAgentDetailDictionary:(nullable NSDictionary *)dictionary

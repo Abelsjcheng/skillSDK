@@ -63,6 +63,13 @@ static NSString * const WLAgentSkillsDetailsCacheKey = @"we_agent_details";
     [defaults synchronize];
 }
 
+- (BOOL)hasWeAgentListCache {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsListCacheKey];
+    id value = [defaults objectForKey:key];
+    return [value isKindOfClass:[NSArray class]];
+}
+
 - (NSArray<NSDictionary *> *)loadWeAgentListDictionaries {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsListCacheKey];

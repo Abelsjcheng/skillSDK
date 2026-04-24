@@ -148,6 +148,15 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsCreateDigitalTwinParams
+
+- (id)description {
+    return self.descriptionValue;
+}
+
+- (void)setDescription:(id)description {
+    self.descriptionValue = description;
+}
+
 @end
 
 @implementation WLAgentSkillsPageParams
@@ -167,6 +176,15 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsUpdateWeAgentParams
+
+- (id)description {
+    return self.descriptionValue;
+}
+
+- (void)setDescription:(id)description {
+    self.descriptionValue = description;
+}
+
 @end
 
 @implementation WLAgentSkillsDeleteWeAgentParams
@@ -176,6 +194,15 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsNotifyAssistantDetailUpdatedParams
+
+- (id)description {
+    return self.descriptionValue;
+}
+
+- (void)setDescription:(id)description {
+    self.descriptionValue = description;
+}
+
 @end
 
 @implementation WLAgentSkillsQueryQrcodeInfoParams

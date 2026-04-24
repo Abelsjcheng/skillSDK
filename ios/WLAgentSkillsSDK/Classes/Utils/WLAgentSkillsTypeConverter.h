@@ -19,6 +19,10 @@ NS_ASSUME_NONNULL_BEGIN
                              fieldName:(NSString *)fieldName
                           errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 
++ (nullable NSNumber *)optionalIntegerNumberFromValue:(nullable id)value
+                                            fieldName:(NSString *)fieldName
+                                         errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
+
 + (NSInteger)nonNegativeIntegerFromValue:(nullable id)value
                             defaultValue:(NSInteger)defaultValue
                                 fieldName:(NSString *)fieldName

@@ -32,10 +32,11 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)createDigitalTwinWithName:(NSString *)name
-                                icon:(NSString *)icon
-                        description:(NSString *)description
-                        weCrewType:(NSNumber *)weCrewType
-                        bizRobotId:(nullable NSString *)bizRobotId
+                             icon:(NSString *)icon
+                      description:(NSString *)description
+                       weCrewType:(nullable NSNumber *)weCrewType
+                       bizRobotId:(nullable NSString *)bizRobotId
+                            qrcode:(nullable NSString *)qrcode
                             success:(WLAgentSkillsHTTPSuccessBlock)success
                             failure:(WLAgentSkillsHTTPFailureBlock)failure;
 

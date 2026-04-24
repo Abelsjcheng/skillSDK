@@ -134,9 +134,13 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @interface WLAgentSkillsCreateDigitalTwinParams : NSObject
 @property (nonatomic, strong, nullable) id name;
 @property (nonatomic, strong, nullable) id icon;
-@property (nonatomic, strong, nullable) id description;
+@property (nonatomic, strong, nullable) id descriptionValue;
 @property (nonatomic, strong, nullable) id weCrewType;
 @property (nonatomic, strong, nullable) id bizRobotId;
+@property (nonatomic, strong, nullable) id qrcode;
+
+- (nullable id)description;
+- (void)setDescription:(nullable id)description;
 @end
 
 @interface WLAgentSkillsPageParams : NSObject
@@ -153,7 +157,10 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, strong, nullable) id robotId;
 @property (nonatomic, strong, nullable) id name;
 @property (nonatomic, strong, nullable) id icon;
-@property (nonatomic, strong, nullable) id description;
+@property (nonatomic, strong, nullable) id descriptionValue;
+
+- (nullable id)description;
+- (void)setDescription:(nullable id)description;
 @end
 
 @interface WLAgentSkillsDeleteWeAgentParams : NSObject
@@ -170,9 +177,12 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @interface WLAgentSkillsNotifyAssistantDetailUpdatedParams : NSObject
 @property (nonatomic, strong, nullable) id name;
 @property (nonatomic, strong, nullable) id icon;
-@property (nonatomic, strong, nullable) id description;
+@property (nonatomic, strong, nullable) id descriptionValue;
 @property (nonatomic, strong, nullable) id partnerAccount;
 @property (nonatomic, strong, nullable) id robotId;
+
+- (nullable id)description;
+- (void)setDescription:(nullable id)description;
 @end
 
 @interface WLAgentSkillsQueryQrcodeInfoParams : NSObject

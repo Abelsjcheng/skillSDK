@@ -5,7 +5,6 @@
 
 #import "WLAgentSkillsSDK.h"
 #import "WLAgentSkillsHTTPClient.h"
-#import "WLAgentSkillsStreamingCache.h"
 #import "WLAgentSkillsWebSocketManager.h"
 #import "WLAgentSkillsConfig.h"
 #import "WLAgentSkillsTypeConverter.h"
@@ -26,6 +25,19 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 @end
 
 @implementation WLAgentSkillsDeleteTransitionPlan
+@end
+
+@interface WLAgentSkillsDeleteWeAgentContext : NSObject
+
+@property (nonatomic, copy, nullable) NSString *partnerAccount;
+@property (nonatomic, copy, nullable) NSString *robotId;
+@property (nonatomic, assign) BOOL deletingCurrentWeAgent;
+@property (nonatomic, assign) BOOL hasListCache;
+@property (nonatomic, strong, nullable) WLAgentSkillsDeleteTransitionPlan *transitionPlan;
+
+@end
+
+@implementation WLAgentSkillsDeleteWeAgentContext
 @end
 
 @interface WLAgentSkillsSDK () <WLAgentSkillsWebSocketManagerDelegate>
@@ -157,7 +169,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }
 
     [manager disconnect];
-    [[WLAgentSkillsStreamingCache sharedCache] clearAllCache];
     @synchronized(self) {
         [self.sendMessageTriggeredBySession removeAllObjects];
         [self.stopSkillHoldingBySession removeAllObjects];
@@ -234,16 +245,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
-    NSString *cachedContent = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
-    if (cachedContent != nil && cachedContent.length > 0) {
-        [self sendMessageWithSessionId:params.welinkSessionId
-                                                        content:cachedContent
-                                                toolCallId:nil
-                                                        success:success
-                                                        failure:failure];
-        return;
-    }
-
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
                                                                                                                                 page:@0
@@ -251,10 +252,8 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                                                                         success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsPageResult *pageResult = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
-        [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:pageResult.content
-                                                                                                                forSessionId:params.welinkSessionId];
 
-        NSString *content = [[WLAgentSkillsStreamingCache sharedCache] lastUserMessageContentForSessionId:params.welinkSessionId];
+        NSString *content = [weakSelf latestUserMessageContentFromMessages:pageResult.content];
         if (content == nil || content.length == 0) {
             [weakSelf dispatchFailure:failure code:4002 message:@"No user message can be used for regenerateAnswer."];
             return;
@@ -319,40 +318,24 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         }];
     };
 
-    NSString *content = [[WLAgentSkillsStreamingCache sharedCache] latestCompletedContentForSessionId:params.welinkSessionId
-                                                                                                                            messageId:normalizedMessageId];
-    if (content != nil && content.length > 0) {
-        sendWithContent(content);
-        return;
-    }
-
     [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
                                                                                                                                 page:@0
                                                                                                                                 size:@100
                                                                                                                         success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsPageResult *pageResult = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
-        [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:pageResult.content
-                                                                                                                forSessionId:params.welinkSessionId];
 
-        NSString *latest = [[WLAgentSkillsStreamingCache sharedCache] latestCompletedContentForSessionId:params.welinkSessionId
-                                                                                                                            messageId:normalizedMessageId];
+        NSString *latest = [weakSelf latestCompletedContentFromMessages:pageResult.content
+                                                              messageId:normalizedMessageId];
         if (latest == nil || latest.length == 0) {
             NSInteger code = 4005;
             NSString *message = @"No completed message available.";
             if (normalizedMessageId != nil) {
-                BOOL exists = [[WLAgentSkillsStreamingCache sharedCache] hasMessageForSessionId:params.welinkSessionId
-                                                                                                                                                                                                messageId:normalizedMessageId];
+                BOOL exists = [weakSelf containsMessageWithId:normalizedMessageId
+                                                   inMessages:pageResult.content];
                 if (!exists) {
                     code = 4003;
-                    message = @"Message not found in SDK cache.";
-                } else {
-                    BOOL completed = [[WLAgentSkillsStreamingCache sharedCache] isMessageCompletedForSessionId:params.welinkSessionId
-                                                                                                                                                                                                    messageId:normalizedMessageId];
-                    if (!completed) {
-                        code = 4004;
-                        message = @"Message is not completed.";
-                    }
+                    message = @"Message not found in server messages.";
                 }
             }
             [weakSelf dispatchFailure:failure code:code message:message];
@@ -380,7 +363,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 
     NSNumber *page = params.page ?: @0;
     NSNumber *size = params.size ?: @50;
-    BOOL isFirst = params.isFirst;
 
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
@@ -395,49 +377,8 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         WLAgentSkillsPageResult *serverPage = [strongSelf normalizedPageResultFromDictionary:data
                                                                                                                     requestPage:page
                                                                                                                     requestSize:size];
-
-        if (!isFirst) {
-            [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:serverPage.content
-                                                                                                                forSessionId:params.welinkSessionId];
-            if (success) {
-                success(serverPage);
-            }
-            return;
-        }
-
-        WLAgentSkillsSessionMessage *localLatest = [[WLAgentSkillsStreamingCache sharedCache] latestLocalMessageNotInServerMessages:serverPage.content
-                                                                                                                                                                                                                                            sessionId:params.welinkSessionId];
-        if (localLatest == nil) {
-            if (success) {
-                success(serverPage);
-            }
-            return;
-        }
-
-        NSMutableArray<WLAgentSkillsSessionMessage *> *merged = [NSMutableArray arrayWithObject:localLatest];
-        for (WLAgentSkillsSessionMessage *message in serverPage.content) {
-            if ([strongSelf isSameSessionMessage:message other:localLatest]) {
-                continue;
-            }
-            [merged addObject:message];
-        }
-
-        NSMutableArray *dictContent = [NSMutableArray arrayWithCapacity:merged.count];
-        for (WLAgentSkillsSessionMessage *message in merged) {
-            [dictContent addObject:[message toDictionary]];
-        }
-
-        NSDictionary *pageDict = @{
-            @"content" : dictContent,
-            @"page" : serverPage.page ?: @0,
-            @"size" : serverPage.size ?: @50,
-            @"total" : serverPage.total ?: @0,
-            @"totalPages" : serverPage.totalPages ?: @0
-        };
-
-        WLAgentSkillsPageResult *result = [[WLAgentSkillsPageResult alloc] initWithDictionary:pageDict];
         if (success) {
-            success(result);
+            success(serverPage);
         }
     }
                                                                                                                         failure:^(NSError * _Nonnull error) {
@@ -499,8 +440,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         }
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsCursorResult *result = [strongSelf normalizedCursorResultFromDictionary:data requestSize:size];
-        [[WLAgentSkillsStreamingCache sharedCache] cacheHistoryMessages:result.content
-                                                           forSessionId:welinkSessionId];
         if (success) {
             success(result);
         }
@@ -809,32 +748,34 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:params.description
+    NSString *desc = [WLAgentSkillsTypeConverter requiredStringFromValue:params.descriptionValue
                                                                  fieldName:@"description"
                                                               errorMessage:&errorMessage];
     if (desc == nil) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSInteger weCrewType = [WLAgentSkillsTypeConverter requiredIntegerFromValue:params.weCrewType
-                                                                        fieldName:@"weCrewType"
-                                                                     errorMessage:&errorMessage];
+    NSNumber *weCrewTypeNumber = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:params.weCrewType
+                                                                                   fieldName:@"weCrewType"
+                                                                                errorMessage:&errorMessage];
     if (errorMessage != nil) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    if (!(weCrewType == 0 || weCrewType == 1)) {
+    if (weCrewTypeNumber != nil && !(weCrewTypeNumber.integerValue == 0 || weCrewTypeNumber.integerValue == 1)) {
         [self dispatchFailure:failure code:1000 message:@"weCrewType must be 0 or 1."];
         return;
     }
     NSString *bizRobotId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bizRobotId];
+    NSString *qrcode = [WLAgentSkillsTypeConverter optionalStringFromValue:params.qrcode];
 
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] createDigitalTwinWithName:name
                                                                   icon:icon
                                                           description:desc
-                                                          weCrewType:@(weCrewType)
+                                                          weCrewType:weCrewTypeNumber
                                                           bizRobotId:bizRobotId
+                                                              qrcode:qrcode
                                                               success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsCreateDigitalTwinResult *result = [[WLAgentSkillsCreateDigitalTwinResult alloc] initWithDictionary:data];
@@ -1047,7 +988,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *description = [WLAgentSkillsTypeConverter requiredStringFromValue:params.description
+    NSString *description = [WLAgentSkillsTypeConverter requiredStringFromValue:params.descriptionValue
                                                                       fieldName:@"description"
                                                                    errorMessage:&errorMessage];
     if (description == nil) {
@@ -1063,13 +1004,22 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                 description:description
                                                                     success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]];
-        if (message == nil) {
+        NSNumber *codeNumber = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:data[@"code"]
+                                                                                fieldName:@"code"
+                                                                             errorMessage:nil];
+        if (codeNumber == nil) {
             [weakSelf dispatchFailure:failure code:7000 message:@"Unexpected updateWeAgent response schema."];
             return;
         }
+        if (codeNumber.integerValue != 200) {
+            NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]] ?: @"updateWeAgent failed.";
+            [weakSelf dispatchFailure:failure
+                                 code:codeNumber.integerValue
+                              message:message];
+            return;
+        }
         WLAgentSkillsUpdateWeAgentResult *result = [[WLAgentSkillsUpdateWeAgentResult alloc] init];
-        result.updateResult = message;
+        result.updateResult = @"success";
         [[WLAgentSkillsWeAgentStore sharedStore] updateCachedWeAgentDetailsWithPartnerAccount:partnerAccount
                                                                                       robotId:robotId
                                                                                          name:name
@@ -1105,35 +1055,28 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         return;
     }
 
+    WLAgentSkillsDeleteWeAgentContext *context = [self buildDeleteWeAgentContextWithPartnerAccount:partnerAccount
+                                                                                           robotId:robotId];
     __weak typeof(self) weakSelf = self;
-    [self prepareDeleteWeAgentTransitionWithPartnerAccount:partnerAccount
-                                                   robotId:robotId
-                                                   success:^(WLAgentSkillsDeleteTransitionPlan *plan) {
-        [[WLAgentSkillsHTTPClient sharedClient] deleteWeAgentWithPartnerAccount:partnerAccount
-                                                                        robotId:robotId
-                                                                        success:^(id  _Nullable responseObject) {
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (strongSelf == nil) {
-                return;
-            }
-            NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-            NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]];
-            if (message == nil) {
-                [strongSelf dispatchFailure:failure code:7000 message:@"Unexpected deleteWeAgent response schema."];
-                return;
-            }
-            WLAgentSkillsDeleteWeAgentResult *result = [[WLAgentSkillsDeleteWeAgentResult alloc] init];
-            result.deleteResult = message;
-            [strongSelf handleDeleteWeAgentSuccessWithPlan:plan
-                                              deleteResult:result
-                                                   success:success];
+    [self prepareDeleteWeAgentContext:context
+                              success:^(WLAgentSkillsDeleteWeAgentContext *preparedContext) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
         }
-                                                                        failure:^(NSError * _Nonnull error) {
-            __strong typeof(weakSelf) strongSelf = weakSelf;
+        WLAgentSkillsDeleteWeAgentContext *resolvedContext = preparedContext ?: context;
+        [strongSelf requestDeleteWeAgentWithContext:resolvedContext
+                                            success:^(WLAgentSkillsDeleteWeAgentResult *result) {
+            [strongSelf handleDeleteWeAgentResultWithContext:resolvedContext
+                                                deleteResult:result
+                                                     success:success
+                                                     failure:failure];
+        }
+                                            failure:^(NSError *error) {
             [strongSelf dispatchFailureObject:failure error:error];
         }];
     }
-                                                   failure:^(NSError *error) {
+                              failure:^(NSError *error) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         [strongSelf dispatchFailureObject:failure error:error];
     }];
@@ -1222,7 +1165,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
-    NSString *description = [WLAgentSkillsTypeConverter requiredStringFromValue:params.description
+    NSString *description = [WLAgentSkillsTypeConverter requiredStringFromValue:params.descriptionValue
                                                                       fieldName:@"description"
                                                                    errorMessage:&errorMessage];
     if (description == nil) {
@@ -1346,8 +1289,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 #pragma mark - WLAgentSkillsWebSocketManagerDelegate
 
 - (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
-    [[WLAgentSkillsStreamingCache sharedCache] updateWithStreamMessage:message];
-
     NSString *sessionId = message.welinkSessionId;
     if (sessionId == nil || sessionId.length == 0) {
         return;
@@ -1378,7 +1319,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                                                                         success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] initWithDictionary:data];
-        [[WLAgentSkillsStreamingCache sharedCache] cacheSendMessageResult:result];
         if (success) {
             success(result);
         }
@@ -1387,6 +1327,56 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [weakSelf setSendMessageTriggered:NO sessionId:welinkSessionId];
         [weakSelf dispatchFailureObject:failure error:error];
     }];
+}
+
+- (nullable NSString *)latestUserMessageContentFromMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages {
+    for (WLAgentSkillsSessionMessage *message in messages) {
+        NSString *role = [self normalizedOptionalString:message.role];
+        if (![role isEqualToString:@"user"]) {
+            continue;
+        }
+        NSString *content = [self normalizedOptionalString:message.content];
+        if (content != nil) {
+            return content;
+        }
+    }
+    return nil;
+}
+
+- (nullable NSString *)latestCompletedContentFromMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
+                                                messageId:(nullable NSString *)messageId {
+    NSString *normalizedMessageId = [self normalizedOptionalString:messageId];
+    if (normalizedMessageId != nil) {
+        for (WLAgentSkillsSessionMessage *message in messages) {
+            if (![[self normalizedOptionalString:message.id] isEqualToString:normalizedMessageId]) {
+                continue;
+            }
+            return [self normalizedOptionalString:message.content];
+        }
+        return nil;
+    }
+
+    for (WLAgentSkillsSessionMessage *message in messages) {
+        NSString *content = [self normalizedOptionalString:message.content];
+        if (content != nil) {
+            return content;
+        }
+    }
+    return nil;
+}
+
+- (BOOL)containsMessageWithId:(NSString *)messageId
+                   inMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages {
+    NSString *normalizedMessageId = [self normalizedOptionalString:messageId];
+    if (normalizedMessageId == nil) {
+        return NO;
+    }
+    for (WLAgentSkillsSessionMessage *message in messages) {
+        if ([[self normalizedOptionalString:message.id] isEqualToString:normalizedMessageId]) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 - (nullable NSDictionary *)pickLatestActiveSessionFromArray:(NSArray *)sessions
@@ -1835,6 +1825,116 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }];
 }
 
+- (WLAgentSkillsDeleteWeAgentContext *)buildDeleteWeAgentContextWithPartnerAccount:(nullable NSString *)partnerAccount
+                                                                           robotId:(nullable NSString *)robotId {
+    WLAgentSkillsDeleteWeAgentContext *context = [[WLAgentSkillsDeleteWeAgentContext alloc] init];
+    context.partnerAccount = partnerAccount;
+    context.robotId = robotId;
+    context.deletingCurrentWeAgent = [self isCurrentWeAgentWithPartnerAccount:partnerAccount robotId:robotId];
+    context.hasListCache = [[WLAgentSkillsWeAgentStore sharedStore] hasWeAgentListCache];
+    return context;
+}
+
+- (void)requestDeleteWeAgentWithContext:(WLAgentSkillsDeleteWeAgentContext *)context
+                                success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
+                                failure:(void (^)(NSError *error))failure {
+    [[WLAgentSkillsHTTPClient sharedClient] deleteWeAgentWithPartnerAccount:context.partnerAccount
+                                                                    robotId:context.robotId
+                                                                    success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        NSNumber *codeNumber = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:data[@"code"]
+                                                                                fieldName:@"code"
+                                                                             errorMessage:nil];
+        if (codeNumber == nil) {
+            if (failure) {
+                failure([NSError errorWithDomain:WLAgentSkillsSDKErrorDomain
+                                            code:7000
+                                        userInfo:@{NSLocalizedDescriptionKey : @"Unexpected deleteWeAgent response schema."}]);
+            }
+            return;
+        }
+        if (codeNumber.integerValue != 200) {
+            NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]] ?: @"deleteWeAgent failed.";
+            [self dispatchFailure:failure
+                             code:codeNumber.integerValue
+                          message:message];
+            return;
+        }
+        WLAgentSkillsDeleteWeAgentResult *result = [[WLAgentSkillsDeleteWeAgentResult alloc] init];
+        result.deleteResult = @"success";
+        if (success) {
+            success(result);
+        }
+    }
+                                                                    failure:^(NSError * _Nonnull error) {
+        if (failure) {
+            failure(error);
+        }
+    }];
+}
+
+- (void)prepareDeleteWeAgentContext:(WLAgentSkillsDeleteWeAgentContext *)context
+                            success:(void (^)(WLAgentSkillsDeleteWeAgentContext *context))success
+                            failure:(void (^)(NSError *error))failure {
+    if (!context.deletingCurrentWeAgent) {
+        if (success) {
+            success(context);
+        }
+        return;
+    }
+
+    [self prepareDeleteWeAgentTransitionWithPartnerAccount:context.partnerAccount
+                                                   robotId:context.robotId
+                                                   success:^(WLAgentSkillsDeleteTransitionPlan *plan) {
+        context.transitionPlan = plan;
+        if (success) {
+            success(context);
+        }
+    }
+                                                   failure:^(NSError *error) {
+        if (failure) {
+            failure(error);
+        }
+    }];
+}
+
+- (void)handleDeleteWeAgentResultWithContext:(WLAgentSkillsDeleteWeAgentContext *)context
+                                deleteResult:(WLAgentSkillsDeleteWeAgentResult *)deleteResult
+                                     success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
+                                     failure:(void (^)(NSError *error))failure {
+    if (!context.deletingCurrentWeAgent) {
+        [self handleDeleteNonCurrentWeAgentSuccessWithContext:context
+                                                 deleteResult:deleteResult
+                                                      success:success];
+        return;
+    }
+    WLAgentSkillsDeleteTransitionPlan *plan = context.transitionPlan;
+    if (plan == nil) {
+        plan = [[WLAgentSkillsDeleteTransitionPlan alloc] init];
+        plan.updatedList = @[];
+        plan.nextPartnerAccount = nil;
+    }
+    [self handleDeleteWeAgentSuccessWithPlan:plan
+                                deleteResult:deleteResult
+                                     success:success];
+}
+
+- (void)handleDeleteNonCurrentWeAgentSuccessWithContext:(WLAgentSkillsDeleteWeAgentContext *)context
+                                           deleteResult:(WLAgentSkillsDeleteWeAgentResult *)deleteResult
+                                                success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success {
+    WLAgentSkillsWeAgentStore *store = [WLAgentSkillsWeAgentStore sharedStore];
+    if (context.hasListCache) {
+        NSArray<WLAgentSkillsWeAgent *> *cachedList = [self weAgentListFromDictionaries:[store loadWeAgentListDictionaries]];
+        WLAgentSkillsDeleteTransitionPlan *plan = [self deleteTransitionPlanFromSnapshot:cachedList
+                                                                          partnerAccount:context.partnerAccount
+                                                                                 robotId:context.robotId];
+        [store saveWeAgentListDictionaries:[self dictionariesFromWeAgentList:plan.updatedList]];
+    }
+    if (success) {
+        success(deleteResult);
+    }
+}
+
 - (void)finalizeDeleteWeAgentTransitionWithDetail:(nullable WLAgentSkillsWeAgentDetails *)nextDetail
                                      deleteResult:(WLAgentSkillsDeleteWeAgentResult *)deleteResult
                                           success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success {
@@ -1851,6 +1951,27 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     if (success) {
         success(deleteResult);
     }
+}
+
+- (BOOL)isCurrentWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
+                                   robotId:(nullable NSString *)robotId {
+    NSDictionary *currentDetail = [[WLAgentSkillsWeAgentStore sharedStore] loadCurrentWeAgentDetailDictionary];
+    return [self detailDictionary:currentDetail matchesPartnerAccount:partnerAccount robotId:robotId];
+}
+
+- (BOOL)detailDictionary:(nullable NSDictionary *)dictionary
+     matchesPartnerAccount:(nullable NSString *)partnerAccount
+                    robotId:(nullable NSString *)robotId {
+    if (![dictionary isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
+    if (normalizedPartnerAccount != nil) {
+        return [normalizedPartnerAccount isEqualToString:[self normalizedOptionalString:dictionary[@"partnerAccount"]]];
+    }
+    NSString *normalizedRobotId = [self normalizedOptionalString:robotId];
+    return normalizedRobotId != nil
+        && [normalizedRobotId isEqualToString:[self normalizedOptionalString:dictionary[@"id"]]];
 }
 
 - (WLAgentSkillsWeAgentUriResult *)weAgentUriResultFromDetails:(nullable WLAgentSkillsWeAgentDetails *)details {
@@ -1956,19 +2077,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     NSURLComponents *components = [NSURLComponents componentsWithString:base];
     NSString *host = components.host;
     return host.length > 0 ? host : nil;
-}
-
-- (BOOL)isSameSessionMessage:(WLAgentSkillsSessionMessage *)left
-                                                                                            other:(WLAgentSkillsSessionMessage *)right {
-    NSString *leftId = (left.id != nil && left.id.length > 0) ? left.id : @"";
-    NSString *rightId = (right.id != nil && right.id.length > 0) ? right.id : @"";
-    if (leftId.length > 0 && rightId.length > 0 && [leftId isEqualToString:rightId]) {
-        return YES;
-    }
-    if (left.messageSeq != nil && right.messageSeq != nil) {
-        return [left.messageSeq compare:right.messageSeq] == NSOrderedSame;
-    }
-    return NO;
 }
 
 - (NSInteger)mapStreamMessageToSessionStatus:(WLAgentSkillsStreamMessage *)message

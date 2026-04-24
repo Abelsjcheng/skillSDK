@@ -81,20 +81,26 @@
 }
 
 - (void)createDigitalTwinWithName:(NSString *)name
-                                icon:(NSString *)icon
-                        description:(NSString *)description
-                        weCrewType:(NSNumber *)weCrewType
-                        bizRobotId:(nullable NSString *)bizRobotId
+                             icon:(NSString *)icon
+                      description:(NSString *)description
+                       weCrewType:(nullable NSNumber *)weCrewType
+                       bizRobotId:(nullable NSString *)bizRobotId
+                            qrcode:(nullable NSString *)qrcode
                             success:(WLAgentSkillsHTTPSuccessBlock)success
                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSMutableDictionary *parameters = [@{
         @"name" : name,
         @"icon" : icon,
-        @"description" : description,
-        @"weCrewType" : weCrewType
+        @"description" : description
     } mutableCopy];
+    if (weCrewType != nil) {
+        parameters[@"weCrewType"] = weCrewType;
+    }
     if (bizRobotId != nil && bizRobotId.length > 0) {
         parameters[@"bizRobotId"] = bizRobotId;
+    }
+    if (qrcode != nil && qrcode.length > 0) {
+        parameters[@"qrcode"] = qrcode;
     }
 
     [self POST:@"/v4-1/we-crew/im-register"
