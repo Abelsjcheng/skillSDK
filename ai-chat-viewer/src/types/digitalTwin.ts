@@ -54,7 +54,8 @@ export interface CreateDigitalTwinParams {
   name: string;
   icon: string;
   description: string;
-  weCrewType: 0 | 1;
+  qrcode?: string;
+  weCrewType?: 0 | 1;
   bizRobotId?: string;
 }
 

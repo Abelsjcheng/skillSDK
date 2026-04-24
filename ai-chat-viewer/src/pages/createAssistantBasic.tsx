@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StepBasicInfo } from '../components/createAssistant/StepBasicInfo';
-import { DEFAULT_AVATARS, INTERNAL_ASSISTANTS } from '../components/createAssistant/constants';
+import { DEFAULT_AVATARS } from '../components/createAssistant/constants';
 import { isPcMiniApp } from '../constants';
 import qrcodeExpiredNotice from '../imgs/qrcode_expired_notice.png';
 import type { CreateAssistantRouteState, CreateDigitalTwinParams, DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
-import { createDigitalTwin, getAgentType, getQueryParam, queryQrcodeInfo, updateQrcodeInfo } from '../utils/hwext';
+import { createDigitalTwin, getQueryParam, queryQrcodeInfo, updateQrcodeInfo } from '../utils/hwext';
 import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
@@ -112,20 +112,6 @@ const CreateAssistantBasicPage: React.FC = () => {
     window.HWH5.navigateBack();
   }, [isQrcodeScene, updateQrcodeStatusSafely]);
 
-  const resolveQrcodeCreateBizRobotId = useCallback(async (): Promise<string | undefined> => {
-    try {
-      const result = await getAgentType();
-      const firstBizRobotId = Array.isArray(result?.content) ? result.content[0]?.bizRobotId?.trim() : '';
-      if (firstBizRobotId) {
-        return firstBizRobotId;
-      }
-    } catch (error) {
-      WeLog(`CreateAssistantBasicPage getAgentType failed | error=${JSON.stringify(error)}`);
-    }
-
-    return INTERNAL_ASSISTANTS[0]?.bizRobotId?.trim();
-  }, []);
-
   const handleNext = useCallback(async (payload: DigitalTwinBasicInfoPayload) => {
     if (!isQrcodeScene) {
       navigate(
@@ -146,12 +132,8 @@ const CreateAssistantBasicPage: React.FC = () => {
       name: payload.name,
       icon: payload.icon,
       description: payload.description,
-      weCrewType: 1,
+      qrcode,
     };
-    const bizRobotId = await resolveQrcodeCreateBizRobotId();
-    if (bizRobotId) {
-      params.bizRobotId = bizRobotId;
-    }
 
     try {
       const createResult = await createDigitalTwin(params);
@@ -175,7 +157,7 @@ const CreateAssistantBasicPage: React.FC = () => {
       })} | error=${JSON.stringify(error)}`);
       showToast(t('createAssistant.createFailed'));
     }
-  }, [from, isQrcodeScene, location.search, navigate, qrcode, resolveQrcodeCreateBizRobotId, t, updateQrcodeStatusSafely]);
+  }, [from, isQrcodeScene, location.search, navigate, qrcode, t, updateQrcodeStatusSafely]);
 
   if (isQrcodeScene && !qrcodeLoaded) {
     return <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()} />;

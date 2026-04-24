@@ -255,7 +255,7 @@ interface CreateDigitalTwinParams {
    - 失效判断只使用“当前时间戳 `Date.now()` 是否严格大于 `Number(expireTime)`”，与需求口径保持一致；
    - `StepBasicInfo` 仅新增受控的失效态展示能力，不在组件内部直接调用二维码查询接口；
    - 失效态使用独立样式 class 覆盖第一页内容区，背景固定 `rgba(196,196,196,1)`，内容区只承载一张从 `src/imgs` 导入的二维码失效提示 `png` 图。
-16. 扫码场景改为第一页直创：`createAssistantBasic.tsx` 在 `from=qrcode` 时不再跳转第二页，第一页点击“确定”后直接触发 `createDigitalTwin`；为保持与第二页默认行为一致，创建参数默认按“内部助手”组装，`bizRobotId` 优先取 `getAgentType()` 返回的第一项，失败或空列表时回退到内置 `INTERNAL_ASSISTANTS[0]`。创建成功后的“非 `weAgent` 场景跳转”不在第一页和第二页各自维护，而是抽成共享的 `handleCreateForOtherScene` 方法，由 `createAssistantBasic.tsx` 与 `selectBrainAssistant.tsx` 共同复用，确保两处跳转逻辑始终一致。
+16. 扫码场景改为第一页直创：`createAssistantBasic.tsx` 在 `from=qrcode` 时不再跳转第二页，第一页点击“确定”后直接触发 `createDigitalTwin`；该场景创建参数透传第一页表单已有字段 `name`、`icon`、`description`，并追加当前二维码值 `qrcode`，不再默认补齐“内部助手”语义，也不再额外请求或传入 `weCrewType`、`bizRobotId`。创建成功后的“非 `weAgent` 场景跳转”不在第一页和第二页各自维护，而是抽成共享的 `handleCreateForOtherScene` 方法，由 `createAssistantBasic.tsx` 与 `selectBrainAssistant.tsx` 共同复用，确保两处跳转逻辑始终一致。
 17. 创建助理流程中的窗口关闭动作同样不在页面内重复定义：`closeCreateAssistantWindow` 抽成共享工具，与 `handleCreateForOtherScene` 放在同一创建流程工具模块中，由第一页、第二页及后续相关流程统一调用，避免宿主关闭逻辑散落多处。
 18. 创建助理成功结果中的 `partnerAccount` 读取逻辑也统一收口：`resolvePartnerAccount` 抽成共享工具，第一页与第二页都不再各自重复声明，后续凡是需要从 `CreateDigitalTwinResult` 中解析 `partnerAccount` 的场景都复用该方法。
 19. 二维码状态回写通过 `updateQrcodeInfo` 统一收口到页面层：

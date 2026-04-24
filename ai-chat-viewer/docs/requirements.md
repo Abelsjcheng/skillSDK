@@ -230,7 +230,7 @@
    - `queryQrcodeInfo({ qrcode })` 查询成功后，无论二维码是否过期，都需调用 `updateQrcodeInfo({ qrcode, status: 1 })`，将二维码状态更新为已扫码；
    - 扫码场景下，第一页底部主按钮文案改为“确定”；
    - 扫码场景下，第一页点击“确定”后直接触发创建助理接口，不再跳转到 `/selectBrainAssistant` 页面；
-   - 扫码场景第一页直创时，创建参数中的大脑类型默认按“内部助手”处理，`bizRobotId` 取 `getAgentType()` 返回列表第一项；若接口失败或返回空列表，则回退到内置默认内部助手第一项；
+   - 扫码场景第一页直创时，`createDigitalTwin` 入参需透传第一页表单已有字段 `name`、`icon`、`description`，并追加传入当前二维码值 `qrcode`；不再额外传 `weCrewType` 与 `bizRobotId`；
    - 当创建助理接口调用成功后，需先调用 `updateQrcodeInfo({ qrcode, robotId, status: 2 })`，其中 `robotId` 取创建助理接口返回值；回写完成后继续复用第二页中 `handleCreateForOtherScene` 共享方法承载的成功跳转逻辑：
       - 移动端优先调用 `window.HWH5.openIMChat({ chatId: partnerAccount })`，若宿主无该能力则调用 `window.HWH5.close()`；
       - PC 端调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`；
