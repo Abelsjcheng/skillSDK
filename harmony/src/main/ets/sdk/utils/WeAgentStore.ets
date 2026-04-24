@@ -52,6 +52,10 @@ export class WeAgentStore {
     this.putJson(KEY_LIST_CACHE, list);
   }
 
+  hasListCache(): boolean {
+    return this.getString(KEY_LIST_CACHE) !== null;
+  }
+
   loadList(): WeAgent[] {
     const raw = this.getString(KEY_LIST_CACHE);
     if (raw === null || raw.trim() === '') {

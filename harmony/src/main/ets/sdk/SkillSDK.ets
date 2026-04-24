@@ -1,7 +1,6 @@
 import { uri } from '@kit.ArkTS';
 import { HttpClient } from './core/HttpClient';
 import { WebSocketManager } from './core/WebSocketManager';
-import { MessageCacheManager } from './managers/MessageCacheManager';
 import { SessionStateManager } from './managers/SessionStateManager';
 import { WeCodeStateManager } from './managers/WeCodeStateManager';
 import { Logger } from './utils/Logger';
@@ -73,6 +72,14 @@ interface DeleteTransitionPlan {
   nextPartnerAccount?: string;
 }
 
+interface DeleteWeAgentContext {
+  partnerAccount?: string;
+  robotId?: string;
+  deletingCurrentWeAgent: boolean;
+  hasListCache: boolean;
+  transitionPlan?: DeleteTransitionPlan;
+}
+
 /**
  * Singleton SDK entry.
  * Exposes public interfaces aligned with SkillClientSdkInterfaceV1.md.
@@ -88,7 +95,6 @@ export class SkillSDK {
   private readonly logger: Logger;
   private readonly httpClient: HttpClient;
   private readonly wsManager: WebSocketManager;
-  private readonly messageCacheManager: MessageCacheManager;
   private readonly sessionStateManager: SessionStateManager;
   private readonly weCodeStateManager: WeCodeStateManager;
   private readonly weAgentStore: WeAgentStore;
@@ -105,14 +111,12 @@ export class SkillSDK {
 
     this.httpClient = new HttpClient(this.config);
     this.wsManager = WebSocketManager.getInstance(this.config);
-    this.messageCacheManager = new MessageCacheManager(this.config.enableLog);
     this.sessionStateManager = new SessionStateManager(this.config.enableLog);
     this.weCodeStateManager = new WeCodeStateManager(this.config.enableLog);
     this.weAgentStore = new WeAgentStore(this.config.context);
     this.assistantDetailUpdatedCallbacks = new Map();
 
     this.wsManager.setMessageHandler((message: StreamMessage) => {
-      this.messageCacheManager.onStreamMessage(message);
       this.sessionStateManager.onStreamMessage(message);
     });
   }
@@ -134,7 +138,6 @@ export class SkillSDK {
     try {
       await SkillSDK.instance.wsManager.disconnect();
       SkillSDK.instance.wsManager.clearAllListeners();
-      SkillSDK.instance.messageCacheManager.clearAll();
       SkillSDK.instance.sessionStateManager.clearAll();
       SkillSDK.instance.weCodeStateManager.clearAll();
       SkillSDK.instance.assistantDetailUpdatedCallbacks.clear();
@@ -156,7 +159,6 @@ export class SkillSDK {
     }
     if (nextConfig.enableLog !== undefined) {
       this.logger.setEnabled(nextConfig.enableLog);
-      this.messageCacheManager.setEnableLog(nextConfig.enableLog);
       this.sessionStateManager.setEnableLog(nextConfig.enableLog);
       this.weCodeStateManager.setEnableLog(nextConfig.enableLog);
     }
@@ -215,7 +217,6 @@ export class SkillSDK {
       }
       await this.wsManager.disconnect();
       this.wsManager.clearAllListeners();
-      this.messageCacheManager.clearAll();
       this.sessionStateManager.clearAll();
       this.weCodeStateManager.clearAll();
       this.assistantDetailUpdatedCallbacks.clear();
@@ -264,12 +265,8 @@ export class SkillSDK {
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       await this.ensureWebSocketConnected();
 
-      let content = this.messageCacheManager.getLastUserMessageContent(params.welinkSessionId);
-      if (content === null) {
-        const history = await this.fetchServerMessages(params.welinkSessionId, 0, 200);
-        this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
-        content = this.messageCacheManager.getLastUserMessageContent(params.welinkSessionId);
-      }
+      const history = await this.fetchServerMessages(params.welinkSessionId, 0, 200);
+      const content = this.findLatestUserMessageContent(history.content);
 
       if (content === null || content.trim() === '') {
         throw new SkillSdkException(4002, 'No user message available for regenerate');
@@ -301,36 +298,17 @@ export class SkillSDK {
       }
       const messageId = this.normalizeOptionalString(params.messageId);
       const chatId = this.normalizeOptionalString(params.chatId);
-
-      const content = this.messageCacheManager.getFinalMessageContent(
-        params.welinkSessionId,
-        messageId
-      );
-      let resolvedContent = content;
-      if (resolvedContent === null) {
-        await this.ensureWebSocketConnected();
-        const history = await this.fetchServerMessages(params.welinkSessionId, 0, 100);
-        this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
-        resolvedContent = this.messageCacheManager.getFinalMessageContent(
-          params.welinkSessionId,
-          messageId
-        );
-      }
+      await this.ensureWebSocketConnected();
+      const history = await this.fetchServerMessages(params.welinkSessionId, 0, 100);
+      const resolvedContent = this.resolveSendToImContent(history.content, messageId);
       if (resolvedContent === null) {
         if (messageId !== undefined) {
-          const exists = this.messageCacheManager.hasMessage(params.welinkSessionId, messageId);
+          const exists = this.containsMessageId(history.content, messageId);
           if (!exists) {
-            throw new SkillSdkException(4003, 'Message not found in local cache');
-          }
-          const completed = this.messageCacheManager.isMessageCompleted(
-            params.welinkSessionId,
-            messageId
-          );
-          if (!completed) {
-            throw new SkillSdkException(4004, 'Message is not completed');
+            throw new SkillSdkException(4003, 'Message not found in server messages');
           }
         }
-        throw new SkillSdkException(4005, 'No finalized message in local cache');
+        throw new SkillSdkException(4005, 'No completed message found in server messages');
       }
 
       const payload: Record<string, Object> = { content: resolvedContent };
@@ -376,25 +354,7 @@ export class SkillSDK {
       const page = params.page ?? 0;
       const size = params.size ?? 50;
       const history = await this.fetchServerMessages(params.welinkSessionId, page, size);
-      this.messageCacheManager.cacheHistory(params.welinkSessionId, history.content);
-      const isFirst = params.isFirst ?? false;
-      if (!isFirst) {
-        return history;
-      }
-
-      const localLatest = this.messageCacheManager.getLatestLocalMessageNotInHistory(
-        params.welinkSessionId,
-        history.content
-      );
-      if (localLatest === null) {
-        return history;
-      }
-
-      const dedupedHistory = history.content.filter((item: SessionMessage) => !this.isSameMessage(item, localLatest));
-      return {
-        ...history,
-        content: [localLatest, ...dedupedHistory]
-      };
+      return history;
     } catch (error) {
       throw this.normalizeError('getSessionMessage', error);
     }
@@ -412,9 +372,7 @@ export class SkillSDK {
       const size = TypeConverter.toPositiveInt(params.size, 50, 'size');
       await this.ensureWebSocketConnected();
 
-      const result = await this.fetchServerMessageHistory(welinkSessionId, beforeSeq, size);
-      this.messageCacheManager.cacheHistory(welinkSessionId, result.content);
-      return result;
+      return await this.fetchServerMessageHistory(welinkSessionId, beforeSeq, size);
     } catch (error) {
       throw this.normalizeError('getSessionMessageHistory', error);
     }
@@ -471,7 +429,6 @@ export class SkillSDK {
         payload
       );
 
-      this.messageCacheManager.cacheSentUserMessage(result);
       return result;
     } catch (error) {
       if (typeof params.welinkSessionId === 'string' && params.welinkSessionId.trim() !== '') {
@@ -616,20 +573,26 @@ export class SkillSDK {
       const name = TypeConverter.toRequiredString(params.name, 'name');
       const icon = TypeConverter.toRequiredString(params.icon, 'icon');
       const description = TypeConverter.toRequiredString(params.description, 'description');
-      const weCrewType = TypeConverter.requireInteger(params.weCrewType, 'weCrewType');
-      if (weCrewType !== 0 && weCrewType !== 1) {
+      const weCrewType = TypeConverter.toOptionalInteger(params.weCrewType, 'weCrewType');
+      if (weCrewType !== undefined && weCrewType !== 0 && weCrewType !== 1) {
         throw new SkillSdkException(1000, 'weCrewType must be 0 or 1');
       }
       const bizRobotId = TypeConverter.toOptionalString(params.bizRobotId, 'bizRobotId');
+      const qrcode = TypeConverter.toOptionalString(params.qrcode, 'qrcode');
 
       const payload: Record<string, Object> = {
         name,
         icon,
-        description,
-        weCrewType
+        description
       };
+      if (weCrewType !== undefined) {
+        payload.weCrewType = weCrewType;
+      }
       if (bizRobotId !== undefined) {
         payload.bizRobotId = bizRobotId;
+      }
+      if (qrcode !== undefined) {
+        payload.qrcode = qrcode;
       }
 
       const result = await this.httpClient.post<Record<string, Object>>(
@@ -751,7 +714,7 @@ export class SkillSDK {
         payload,
         { expectEnvelope: false, useAssistantBaseUrl: true }
       );
-      const updateResult = this.resolveMessageResult(result, 'updateWeAgent');
+      const updateResult = this.resolveSuccessResult(result, 'updateWeAgent');
       this.weAgentStore.updateCachedDetails(partnerAccount, robotId, name, icon, description);
       return {
         updateResult
@@ -769,33 +732,11 @@ export class SkillSDK {
       const robotId = this.normalizeOptionalString(params.robotId);
       this.resolveAssistantIdentityKey(partnerAccount, robotId);
 
-      const deletePlan = await this.prepareDeleteWeAgentTransition(partnerAccount, robotId);
-
-      const query = this.resolveAssistantIdentityQuery(partnerAccount, robotId);
-      const result = await this.httpClient.delete<Record<string, Object>>(
-        '/v4-1/we-crew',
-        query,
-        { expectEnvelope: false, useAssistantBaseUrl: true }
+      const context = await this.prepareDeleteWeAgentContext(
+        this.buildDeleteWeAgentContext(partnerAccount, robotId)
       );
-      const deleteResult = this.resolveMessageResult(result, 'deleteWeAgent');
-      this.weAgentStore.saveList(deletePlan.updatedList);
-
-      let nextUris: WeAgentUriResult;
-      if (deletePlan.nextPartnerAccount === undefined) {
-        this.weAgentStore.clearCurrentDetail();
-        nextUris = this.buildWeAgentUriResult(null);
-      } else {
-        const nextDetail = await this.resolveDeleteNextDetail(deletePlan.nextPartnerAccount);
-        if (nextDetail === null) {
-          this.weAgentStore.clearCurrentDetail();
-          nextUris = this.buildWeAgentUriResult(null);
-        } else {
-          this.weAgentStore.saveCurrentDetail(nextDetail);
-          nextUris = this.buildWeAgentUriResult(nextDetail);
-        }
-      }
-      void nextUris;
-      // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+      const deleteResult = await this.requestDeleteWeAgent(context);
+      await this.handleDeleteWeAgentResult(context, deleteResult);
       return { deleteResult };
     } catch (error) {
       throw this.normalizeError('deleteWeAgent', error);
@@ -1031,6 +972,105 @@ export class SkillSDK {
     return result.weAgentDetailsArray.length > 0 ? result.weAgentDetailsArray[0] : null;
   }
 
+  private buildDeleteWeAgentContext(
+    partnerAccount: string | undefined,
+    robotId: string | undefined
+  ): DeleteWeAgentContext {
+    return {
+      partnerAccount,
+      robotId,
+      deletingCurrentWeAgent: this.isCurrentWeAgent(partnerAccount, robotId),
+      hasListCache: this.weAgentStore.hasListCache()
+    };
+  }
+
+  private async requestDeleteWeAgent(context: DeleteWeAgentContext): Promise<string> {
+    const query = this.resolveAssistantIdentityQuery(context.partnerAccount, context.robotId);
+    const result = await this.httpClient.delete<Record<string, Object>>(
+      '/v4-1/we-crew',
+      query,
+      { expectEnvelope: false, useAssistantBaseUrl: true }
+    );
+    return this.resolveSuccessResult(result, 'deleteWeAgent');
+  }
+
+  private async prepareDeleteWeAgentContext(context: DeleteWeAgentContext): Promise<DeleteWeAgentContext> {
+    if (!context.deletingCurrentWeAgent) {
+      return context;
+    }
+    return {
+      ...context,
+      transitionPlan: await this.prepareDeleteWeAgentTransition(context.partnerAccount, context.robotId)
+    };
+  }
+
+  private async handleDeleteWeAgentResult(
+    context: DeleteWeAgentContext,
+    deleteResult: string
+  ): Promise<void> {
+    if (!context.deletingCurrentWeAgent) {
+      this.handleDeleteNonCurrentWeAgentSuccess(context);
+      return;
+    }
+    await this.handleDeleteCurrentWeAgentSuccess(context, deleteResult);
+  }
+
+  private async handleDeleteCurrentWeAgentSuccess(
+    context: DeleteWeAgentContext,
+    deleteResult: string
+  ): Promise<void> {
+    const deletePlan = context.transitionPlan ?? { updatedList: [] };
+    this.weAgentStore.saveList(deletePlan.updatedList);
+
+    let nextUris: WeAgentUriResult;
+    if (deletePlan.nextPartnerAccount === undefined) {
+      this.weAgentStore.clearCurrentDetail();
+      nextUris = this.buildWeAgentUriResult(null);
+    } else {
+      const nextDetail = await this.resolveDeleteNextDetail(deletePlan.nextPartnerAccount);
+      if (nextDetail === null) {
+        this.weAgentStore.clearCurrentDetail();
+        nextUris = this.buildWeAgentUriResult(null);
+      } else {
+        this.weAgentStore.saveCurrentDetail(nextDetail);
+        nextUris = this.buildWeAgentUriResult(nextDetail);
+      }
+    }
+    void deleteResult;
+    void nextUris;
+    // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+  }
+
+  private handleDeleteNonCurrentWeAgentSuccess(context: DeleteWeAgentContext): void {
+    if (!context.hasListCache) {
+      return;
+    }
+    const cachedList = this.weAgentStore.loadList();
+    const deletePlan = this.buildDeleteTransitionPlan(cachedList, context.partnerAccount, context.robotId);
+    this.weAgentStore.saveList(deletePlan.updatedList);
+  }
+
+  private isCurrentWeAgent(
+    partnerAccount: string | undefined,
+    robotId: string | undefined
+  ): boolean {
+    return this.matchesWeAgentDetail(this.weAgentStore.loadCurrentDetail(), partnerAccount, robotId);
+  }
+
+  private matchesWeAgentDetail(
+    detail: WeAgentDetails | null,
+    partnerAccount: string | undefined,
+    robotId: string | undefined
+  ): boolean {
+    if (detail === null) {
+      return false;
+    }
+    if (partnerAccount !== undefined) {
+      return this.normalizeOptionalString(detail.partnerAccount) === partnerAccount;
+    }
+    return robotId !== undefined && this.normalizeOptionalString(detail.id) === robotId;
+  }
+
   private buildWeAgentUriResult(details: WeAgentDetails | null): WeAgentUriResult {
     if (details === null) {
       const weAgentUri = this.appendHashFragment(
@@ -1261,12 +1301,16 @@ export class SkillSDK {
     };
   }
 
-  private resolveMessageResult(result: Record<string, Object>, method: string): string {
-    const message = TypeConverter.toOptionalString(result.message, 'message');
-    if (message === undefined) {
+  private resolveSuccessResult(result: Record<string, Object>, method: string): string {
+    const code = TypeConverter.toOptionalInteger(result.code, 'code');
+    if (code === undefined) {
       throw new SkillSdkException(7000, `Unexpected ${method} response schema`);
     }
-    return message;
+    if (code === 200) {
+      return 'success';
+    }
+    const message = TypeConverter.toOptionalString(result.message, 'message') ?? `${method} failed`;
+    throw new SkillSdkException(code, message);
   }
 
   private resolveUpdateQrcodeInfoResult(result: Record<string, Object>): UpdateQrcodeInfoResult {
@@ -1367,15 +1411,46 @@ export class SkillSDK {
     }
   }
 
-  private isSameMessage(left: SessionMessage, right: SessionMessage): boolean {
-    if (left.id.trim() !== '' && right.id.trim() !== '' && left.id === right.id) {
-      return true;
+  private findLatestUserMessageContent(messages: SessionMessage[]): string | null {
+    for (const message of messages) {
+      if (message.role !== 'user') {
+        continue;
+      }
+      const content = this.normalizeOptionalString(message.content ?? undefined);
+      if (content !== undefined) {
+        return content;
+      }
     }
-    return left.messageSeq !== undefined
-      && left.messageSeq !== null
-      && right.messageSeq !== undefined
-      && right.messageSeq !== null
-      && left.messageSeq === right.messageSeq;
+    return null;
+  }
+
+  private resolveSendToImContent(messages: SessionMessage[], messageId?: string): string | null {
+    const normalizedMessageId = this.normalizeOptionalString(messageId);
+    if (normalizedMessageId !== undefined) {
+      for (const message of messages) {
+        if (this.normalizeOptionalString(message.id) !== normalizedMessageId) {
+          continue;
+        }
+        return this.normalizeOptionalString(message.content ?? undefined) ?? null;
+      }
+      return null;
+    }
+
+    for (const message of messages) {
+      const content = this.normalizeOptionalString(message.content ?? undefined);
+      if (content !== undefined) {
+        return content;
+      }
+    }
+    return null;
+  }
+
+  private containsMessageId(messages: SessionMessage[], messageId: string): boolean {
+    const normalizedMessageId = this.normalizeOptionalString(messageId);
+    if (normalizedMessageId === undefined) {
+      return false;
+    }
+    return messages.some((message: SessionMessage) => this.normalizeOptionalString(message.id) === normalizedMessageId);
   }
 
   private normalizeSendToImResult(raw: Record<string, Object>): SendMessageToIMResult {

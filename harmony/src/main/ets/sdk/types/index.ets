@@ -418,8 +418,9 @@ export interface CreateDigitalTwinParams {
   name: string;
   icon: string;
   description: string;
-  weCrewType: number;
+  weCrewType?: number;
   bizRobotId?: string;
+  qrcode?: string;
 }
 
 export interface CreateDigitalTwinResult {
