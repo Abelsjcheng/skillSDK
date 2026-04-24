@@ -81,7 +81,7 @@ export const en = {
   'createAssistant.namePlaceholder': 'Example: Smart Assistant (within 50 characters)',
   'createAssistant.description': 'Introduction',
   'createAssistant.descriptionPlaceholder': 'Describe what the assistant can do and where it applies (within 250 characters)',
-  'createAssistant.brainTitle': 'Please select your personal assistant service provider:',
+  'createAssistant.brainTitle': 'Please select the AI capability provider:',
   'createAssistant.brainTypeGroup': 'Personal assistant capability providers',
   'createAssistant.internalProvider': 'Internal provider',
   'createAssistant.customProvider': 'Custom',

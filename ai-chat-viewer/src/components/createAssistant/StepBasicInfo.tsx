@@ -49,7 +49,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   className,
   showHeader = true,
   onClose,
-  onCancel,
   onNext,
   submitLabel,
 }) => {
@@ -284,7 +283,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       <CreatorStepFooter
         isPcMiniApp={isPcMiniApp}
         pcButtons={[
-          { label: t('createAssistant.cancel'), onClick: onCancel, variant: 'cancel' },
           {
             label: resolvedSubmitLabel,
             onClick: handleNext,

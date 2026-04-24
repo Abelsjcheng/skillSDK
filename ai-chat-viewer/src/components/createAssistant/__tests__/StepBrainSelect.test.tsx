@@ -40,9 +40,10 @@ describe('StepBrainSelect', () => {
     expect(firstAssistantButton).toHaveClass('is-selected');
     expect(confirmButton).not.toBeDisabled();
     expect(confirmButton).toHaveClass('is-active');
+    expect(screen.getByText('请选择AI能力提供方：')).toBeInTheDocument();
   });
 
-  it('enables confirm when selecting custom brain', async () => {
+  it('does not render provider tabs or subtitle anymore', async () => {
     render(
       <StepBrainSelect
         onClose={noop}
@@ -56,11 +57,10 @@ describe('StepBrainSelect', () => {
       expect(getAgentTypeMock).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByLabelText('自定义'));
-    const confirmButton = screen.getByRole('button', { name: '确定' });
-
-    expect(confirmButton).not.toBeDisabled();
-    expect(confirmButton).toHaveClass('is-active');
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.queryByText('内部提供方')).not.toBeInTheDocument();
+    expect(screen.queryByText('自定义')).not.toBeInTheDocument();
+    expect(screen.queryByText('请选择')).not.toBeInTheDocument();
   });
 
   it('marks the clicked internal assistant as selected', async () => {
@@ -80,7 +80,7 @@ describe('StepBrainSelect', () => {
     expect(screen.getByRole('button', { name: '确定' })).not.toBeDisabled();
   });
 
-  it('reselects the first internal assistant when switching back from custom', async () => {
+  it('does not render cancel button on pc', async () => {
     render(
       <StepBrainSelect
         onClose={noop}
@@ -91,13 +91,7 @@ describe('StepBrainSelect', () => {
     );
 
     await screen.findByRole('button', { name: '写作助手' });
-
-    fireEvent.click(screen.getByLabelText('自定义'));
-    fireEvent.click(screen.getByLabelText('内部提供方'));
-
-    const firstAssistantButton = screen.getByRole('button', { name: '写作助手' });
-    expect(firstAssistantButton).toHaveClass('is-selected');
-    expect(screen.getByRole('button', { name: '确定' })).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument();
   });
 
   it('calls onPrev when clicking previous button', async () => {

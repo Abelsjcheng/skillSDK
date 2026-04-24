@@ -101,4 +101,17 @@ describe('StepBasicInfo', () => {
 
     expect(avatar2Button).toHaveClass('is-selected');
   });
+
+  it('does not render cancel button on pc', () => {
+    render(
+      <StepBasicInfo
+        defaultAvatars={DEFAULT_AVATARS}
+        onClose={noop}
+        onCancel={noop}
+        onNext={noop}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument();
+  });
 });

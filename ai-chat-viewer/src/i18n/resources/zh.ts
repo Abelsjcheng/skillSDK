@@ -81,7 +81,7 @@ export const zh = {
   'createAssistant.namePlaceholder': '例如：智能助理(50个字符以内)',
   'createAssistant.description': '简介',
   'createAssistant.descriptionPlaceholder': '介绍助理的功能和应用场景(250个字符以内)',
-  'createAssistant.brainTitle': '请选择你的「个人助理」能力提供方：',
+  'createAssistant.brainTitle': '请选择AI能力提供方：',
   'createAssistant.brainTypeGroup': '个人助理能力提供方',
   'createAssistant.internalProvider': '内部提供方',
   'createAssistant.customProvider': '自定义',
