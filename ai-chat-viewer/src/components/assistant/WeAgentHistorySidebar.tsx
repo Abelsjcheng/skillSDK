@@ -258,6 +258,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                 className="we-agent-history-sidebar__empty-image"
                 src={iconWeAgentHistory}
                 alt={t('weAgent.noHistorySessions')}
+                draggable="false"
               />
             </div>
           )}
@@ -310,6 +311,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
             src={closeIcon}
             alt=""
             aria-hidden="true"
+            draggable="false"
           />
         </button>
       )}
@@ -332,6 +334,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
           className="we-agent-cui-actions__icon"
           src={iconWeAgentHistory}
           alt=""
+          draggable="false"
         />
       </button>
       {typeof document !== 'undefined' && sidebarNode

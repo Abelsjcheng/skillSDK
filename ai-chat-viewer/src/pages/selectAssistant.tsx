@@ -22,6 +22,7 @@ import {
   openH5Webview,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
+import { handleServiceClickPc, openWeAgentDialogPc } from '../utils/assistantPcHandle';
 
 const CREATE_ASSISTANT_ROUTE = '/createAssistant';
 
@@ -63,6 +64,9 @@ const SelectAssistant: React.FC = () => {
   }, [loadAssistantList]);
 
   const handleCreateAssistant = useCallback(() => {
+    if (isPc) {
+      openWeAgentDialogPc("weAgentPc");
+    }
     const search = buildCreateAssistantSearch();
     const targetHash = `#${CREATE_ASSISTANT_ROUTE}${search}`;
 
@@ -95,6 +99,10 @@ const SelectAssistant: React.FC = () => {
   }, [assistantList, selectedAssistantId, t]);
 
   const handleServiceClick = useCallback(() => {
+    if (isPc) {
+      handleServiceClickPc();
+      return;
+    }
     openH5Webview({
       uri: CUSTOMER_SERVICE_WEBVIEW_URI,
     });

@@ -1102,6 +1102,7 @@
 2. 所有桥接层相关接口与类型统一收口到 `src/types` 目录：
    - JSAPI / HWH5EXT / WeAgent 相关类型放在 `src/types/bridge`
    - 页面、组件、系统与业务领域类型继续分别放在 `src/types/pages`、`src/types/components`、`src/types/system`、`src/types/digitalTwin` 等目录
+   - 页面组件对外暴露的 props 类型（如 `AssistantDetailProps`）同样视为页面类型，需定义在 `src/types/pages` 并由页面文件导入使用，不再内联定义在页面组件文件中
 3. 业务页面、组件、mock、opencode 适配层在使用接口/类型时，必须直接从 `src/types` 目录导入，不允许再通过 `src/utils/hwext.ts` 间接获取类型。
 
 ## 29. 全局版本更新弹窗

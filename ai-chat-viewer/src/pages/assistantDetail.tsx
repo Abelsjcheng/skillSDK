@@ -19,6 +19,7 @@ import type { WeAgentDetails } from '../types/bridge';
 import type { AssistantPageHeaderAction } from '../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
 import type {
+  AssistantDetailProps,
   AssistantDetailOverlay,
   AssistantDetailPcView,
   DetailInfoRowProps,
@@ -38,11 +39,12 @@ import {
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
+import { handleServiceClickPc } from '../utils/assistantPcHandle';
 
 const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueNode }) => (
-  <div className="assistant-detail__info-row">
-    <span className="assistant-detail__info-label">{label}</span>
-    {valueNode ?? <span className="assistant-detail__info-value">{value}</span>}
+  <div className='assistant-detail__info-row'>
+    <span className='assistant-detail__info-label'>{label}</span>
+    {valueNode ?? <span className='assistant-detail__info-value'>{value}</span>}
   </div>
 );
 
@@ -52,8 +54,7 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .map((value) => (value ?? '').trim())
     .filter(Boolean)
     .join(' ');
-
-const AssistantDetail: React.FC = () => {
+const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => {
   const { t, i18n } = useTranslation();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
@@ -65,14 +66,16 @@ const AssistantDetail: React.FC = () => {
   const pageRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+  const resolvedPartnerAccount = isPc
+    ? (partnerAccount?.trim() ?? '')
+    : useMemo(() => getQueryParam('partnerAccount') ?? '', []);
 
   useEffect(() => {
     void ensureLanguageInitialized();
   }, []);
 
   useEffect(() => {
-    if (!partnerAccount) {
+    if (!resolvedPartnerAccount) {
       setDetail(null);
       return;
     }
@@ -81,13 +84,13 @@ const AssistantDetail: React.FC = () => {
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getWeAgentDetails({ partnerAccount });
+        const result = await getWeAgentDetails({ partnerAccount: resolvedPartnerAccount });
         const nextDetail = result?.weAgentDetailsArray?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);
         }
       } catch (error) {
-        WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ partnerAccount })} | error=${JSON.stringify(error)}`);
+        WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ resolvedPartnerAccount })} | error=${JSON.stringify(error)}`);
         showToast(t('assistantDetail.loadFailed'));
         if (!cancelled) {
           setDetail(null);
@@ -100,7 +103,7 @@ const AssistantDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [partnerAccount, t]);
+  }, [resolvedPartnerAccount, t]);
 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
@@ -143,6 +146,10 @@ const AssistantDetail: React.FC = () => {
   }, [isInternalAssistant, detail?.partnerAccount]);
 
   const handleServiceClick = useCallback(() => {
+    if (isPc) {
+      handleServiceClickPc(detail);
+      return;
+    }
     const sourceUrl = detail?.weCodeUrl?.trim() ?? '';
     if (!sourceUrl) {
       showToast(t('assistantDetail.customerServiceUnavailable'));
@@ -178,7 +185,7 @@ const AssistantDetail: React.FC = () => {
   const handleEditAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
 
-    const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
+    const targetPartnerAccount = (detail?.partnerAccount ?? resolvedPartnerAccount).trim();
 
     if (isPc) {
       setPcView('edit');
@@ -192,7 +199,7 @@ const AssistantDetail: React.FC = () => {
     }
     nextSearch.set('source', 'assistantDetail');
     window.location.hash = nextSearch.toString() ? `#/editAssistant?${nextSearch.toString()}` : '#/editAssistant';
-  }, [detail, isPc, partnerAccount]);
+  }, [detail, isPc, resolvedPartnerAccount]);
 
   const handleRequestDeleteAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
@@ -206,7 +213,7 @@ const AssistantDetail: React.FC = () => {
   }, [isPc]);
 
   const handleConfirmDelete = useCallback(async () => {
-    const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
+    const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount ?? '').trim();
     const targetRobotId = (detail?.id ?? '').trim();
 
     if (!targetPartnerAccount && !targetRobotId) {
@@ -298,9 +305,9 @@ const AssistantDetail: React.FC = () => {
     return (
       <EditAssistantContent
         isPcMiniApp
-        source="assistantDetail"
+        source='assistantDetail'
         initialDetail={detail}
-        partnerAccount={partnerAccount}
+        partnerAccount={resolvedPartnerAccount}
         onClose={() => {
           setPcView('detail');
         }}
@@ -372,7 +379,7 @@ const AssistantDetail: React.FC = () => {
                     }}
                     aria-label={t('assistantDetail.copyAppId')}
                   >
-                    <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                    <img src={iconCopy} alt="" className="assistant-detail__icon" draggable="false" />
                   </button>
                 </div>
               )
@@ -400,7 +407,7 @@ const AssistantDetail: React.FC = () => {
                       }}
                       aria-label={isSecretVisible ? t('assistantDetail.hideSecret') : t('assistantDetail.showSecret')}
                     >
-                      <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                      <img src={iconCopy} alt="" className="assistant-detail__icon" draggable="false" />
                     </button>
                     <button
                       type="button"
@@ -412,7 +419,7 @@ const AssistantDetail: React.FC = () => {
                       }}
                       aria-label={t('assistantDetail.copySecret')}
                     >
-                      <img src={iconCopy} alt="" className="assistant-detail__icon" />
+                      <img src={iconCopy} alt="" className="assistant-detail__icon" draggable="false" />
                     </button>
                   </div>
                 </div>

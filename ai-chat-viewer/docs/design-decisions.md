@@ -531,7 +531,8 @@ interface CreateDigitalTwinParams {
 1. `src/utils/hwext.ts` 仅保留运行时能力适配与辅助方法，不再承担类型中转导出职责。
 2. 桥接层相关类型统一以 `src/types/bridge` 为单一来源；业务层如果需要 `WeAgentDetails`、`GetWeAgentListParams`、`HWH5EXT`、`CreateDigitalTwinResult` 等类型，直接从 `src/types/bridge` 导入。
 3. 页面、组件、mock、opencode 适配层禁止再通过 `hwext.ts` 获取类型，避免出现“工具模块既导出函数又转导出类型”的双重职责。
-4. 此次收口不调整类型定义语义，只调整导入边界：类型定义位置保持稳定，`hwext.ts` 侧只删除 type re-export 和相关下游依赖。
+4. 页面对外暴露的 props 类型也按页面域收口到 `src/types/pages`，例如 `AssistantDetailProps` 不再定义在 `src/pages/assistantDetail.tsx` 内部，而是放到 `src/types/pages/assistant.ts` 后由页面文件和库导出入口共同引用。
+5. 此次收口不调整类型定义语义，只调整导入边界：类型定义位置保持稳定，`hwext.ts` 侧只删除 type re-export 和相关下游依赖。
 
 ## 22. 全局版本更新弹窗设计
 

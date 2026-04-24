@@ -6,6 +6,10 @@ export interface DetailInfoRowProps {
   valueNode?: ReactNode;
 }
 
+export interface AssistantDetailProps {
+  partnerAccount?: string;
+}
+
 export type AssistantDetailOverlay = 'none' | 'action-sheet' | 'delete-modal';
 
 export type AssistantDetailPcView = 'detail' | 'edit';

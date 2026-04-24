@@ -22,14 +22,14 @@ export function dispatchAssistantCloseEvent(): void {
   dispatchHostEvent(ASSISTANT_CLOSE_EVENT);
 }
 
-export function dispatchSwitchAssistantSelectEvent(id: string): void {
-  dispatchHostEvent(SWITCH_ASSISTANT_SELECT_EVENT, { id });
+export function dispatchSwitchAssistantSelectEvent(partnerAccount: string): void {
+  dispatchHostEvent(SWITCH_ASSISTANT_SELECT_EVENT, { partnerAccount });
 }
 
-export function dispatchSwitchAssistantCancelEvent(id: string): void {
-  dispatchHostEvent(SWITCH_ASSISTANT_CANCEL_EVENT, { id });
+export function dispatchSwitchAssistantCancelEvent(partnerAccount: string): void {
+  dispatchHostEvent(SWITCH_ASSISTANT_CANCEL_EVENT, { partnerAccount });
 }
 
-export function dispatchSwitchAssistantConfirmEvent(id: string): void {
-  dispatchHostEvent(SWITCH_ASSISTANT_CONFIRM_EVENT, { id });
+export function dispatchSwitchAssistantConfirmEvent(detail: any): void {
+  dispatchHostEvent(SWITCH_ASSISTANT_CONFIRM_EVENT, { detail });
 }

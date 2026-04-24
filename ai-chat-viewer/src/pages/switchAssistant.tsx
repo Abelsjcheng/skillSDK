@@ -16,10 +16,12 @@ import { WeLog } from '../utils/logger';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getQueryParam,
+  getWeAgentDetails,
   getWeAgentList,
   openH5Webview,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
+import { handleServiceClickPc } from '../utils/assistantPcHandle';
 
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
@@ -88,11 +90,17 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     window.HWH5.close();
   }, [isPc, selectedPartnerAccount]);
 
-  const handleRightButtonClick = useCallback(() => {
+  const handleRightButtonClick = useCallback(async () => {
     if (!selectedPartnerAccount) return;
 
     if (isPc) {
-      dispatchSwitchAssistantConfirmEvent(selectedPartnerAccount);
+      try {
+        const detailResult = await getWeAgentDetails({ partnerAccounts: [selectedPartnerAccount] });
+        const detail = detailResult?.weAgentDetailsArray?.[0];
+        dispatchSwitchAssistantConfirmEvent(selectedPartnerAccount);
+      } catch (error) {
+        dispatchSwitchAssistantConfirmEvent({});
+      }
       return;
     }
 
@@ -100,6 +108,10 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
   }, [handleConfirmSwitch, isPc, selectedPartnerAccount]);
 
   const handleServiceClick = useCallback(() => {
+    if (isPc) {
+      handleServiceClickPc();
+      return;
+    }
     openH5Webview({
       uri: CUSTOMER_SERVICE_WEBVIEW_URI,
     });

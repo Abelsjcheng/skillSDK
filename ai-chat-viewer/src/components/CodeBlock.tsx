@@ -61,6 +61,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   return (
     <div
       className={[
+        'weAgent-code-content',
         'code-block',
         collapsed ? 'code-block--collapsed' : '',
       ].filter(Boolean).join(' ')}
@@ -82,6 +83,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
             src={arrowUpIcon}
             alt=""
             aria-hidden="true"
+            draggable="false"
           />
         </button>
         <button
@@ -98,7 +100,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
           aria-label={copied ? t('codeBlock.copied') : t('codeBlock.copy')}
           title={copied ? t('codeBlock.copied') : t('codeBlock.copy')}
         >
-          <img className="code-block__copy-icon" src={copyIcon} alt="" />
+          <img className="code-block__copy-icon" src={copyIcon} alt="" draggable="false" />
         </button>
       </div>
       {!collapsed ? (

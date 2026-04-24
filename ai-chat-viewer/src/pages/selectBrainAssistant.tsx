@@ -109,7 +109,7 @@ const SelectBrainAssistantPage: React.FC = () => {
           showToast(t('createAssistant.createFailed'));
           return;
         }
-
+        createResult.weCrewType = payload.digitalTwintype === 'internal' ? 1 : 0;
         if (from !== 'weAgent') {
           await handleCreateForOtherScene(createResult);
           return

@@ -4,6 +4,7 @@ import App from '../App';
 import AssistantDetail from '../pages/assistantDetail';
 import SwitchAssistant from '../pages/switchAssistant';
 import type { AppProps } from '../types/components';
+import type { AssistantDetailProps } from '../types/pages';
 import type {
   Message,
   MessagePart,
@@ -21,6 +22,7 @@ export type {
   SessionMessage,
   SessionStatus,
   AgentStatus,
+  AssistantDetailProps
 };
 
 export { AssistantDetail, SwitchAssistant };
