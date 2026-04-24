@@ -1,7 +1,9 @@
 package com.opencode.skill.network.retrofit.body;
 
+import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
+@Keep
 public final class CreateSessionBody {
     @Nullable
     private final String ak;

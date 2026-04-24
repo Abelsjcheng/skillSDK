@@ -1,5 +1,6 @@
 package com.opencode.skill.network.retrofit;
 
+import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonElement;
@@ -17,6 +18,7 @@ import retrofit2.http.POST;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
+@Keep
 public interface SkillApiService {
     @POST("api/skill/sessions")
     Call<JsonElement> createSession(@Body CreateSessionBody body);

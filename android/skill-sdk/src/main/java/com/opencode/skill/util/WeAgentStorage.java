@@ -73,6 +73,10 @@ public final class WeAgentStorage {
         putValue(prefs, KEY_WE_AGENT_LIST_CACHE, gson.toJson(list));
     }
 
+    public synchronized boolean hasWeAgentListCache() {
+        return readValue(resolveSharedPreferencesIfNeeded(), KEY_WE_AGENT_LIST_CACHE) != null;
+    }
+
     @NonNull
     public synchronized List<WeAgent> getWeAgentList() {
         String raw = readValue(resolveSharedPreferencesIfNeeded(), KEY_WE_AGENT_LIST_CACHE);

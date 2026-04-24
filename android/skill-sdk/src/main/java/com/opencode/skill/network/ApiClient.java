@@ -133,13 +133,14 @@ public class ApiClient {
             @NonNull String name,
             @NonNull String icon,
             @NonNull String description,
-            int weCrewType,
+            @Nullable Integer weCrewType,
             @Nullable String bizRobotId,
+            @Nullable String qrcode,
             @NonNull SkillCallback<CreateDigitalTwinResult> callback
     ) {
         AssistantApiService service = requireAssistantApiService();
         enqueueEnvelope(
-                service.createDigitalTwin(new CreateDigitalTwinBody(name, icon, description, weCrewType, bizRobotId)),
+                service.createDigitalTwin(new CreateDigitalTwinBody(name, icon, description, weCrewType, bizRobotId, qrcode)),
                 CreateDigitalTwinResult.class,
                 callback
         );
@@ -215,7 +216,7 @@ public class ApiClient {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
-                    callback.onSuccess(new UpdateWeAgentResult(resolveResponseMessage(result)));
+                    callback.onSuccess(resolveUpdateWeAgentResult(result));
                 } catch (SkillSdkException error) {
                     callback.onError(error);
                 }
@@ -243,7 +244,7 @@ public class ApiClient {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
                 try {
-                    callback.onSuccess(new DeleteWeAgentResult(resolveResponseMessage(result)));
+                    callback.onSuccess(resolveDeleteWeAgentResult(result));
                 } catch (SkillSdkException error) {
                     callback.onError(error);
                 }
@@ -452,16 +453,37 @@ public class ApiClient {
     }
 
     @NonNull
-    private String resolveResponseMessage(@Nullable JsonElement result) {
+    private UpdateWeAgentResult resolveUpdateWeAgentResult(@Nullable JsonElement result) {
+        JsonObject rootObject = requireResponseObject(result, "updateWeAgent");
+        ensureSuccessCode(rootObject, "updateWeAgent");
+        return new UpdateWeAgentResult("success");
+    }
+
+    @NonNull
+    private DeleteWeAgentResult resolveDeleteWeAgentResult(@Nullable JsonElement result) {
+        JsonObject rootObject = requireResponseObject(result, "deleteWeAgent");
+        ensureSuccessCode(rootObject, "deleteWeAgent");
+        return new DeleteWeAgentResult("success");
+    }
+
+    @NonNull
+    private JsonObject requireResponseObject(@Nullable JsonElement result, @NonNull String method) {
         if (result == null || result.isJsonNull() || !result.isJsonObject()) {
-            throw new SkillSdkException(7000, "Unexpected response schema");
+            throw new SkillSdkException(7000, "Unexpected " + method + " response schema");
         }
-        JsonObject rootObject = result.getAsJsonObject();
+        return result.getAsJsonObject();
+    }
+
+    private void ensureSuccessCode(@NonNull JsonObject rootObject, @NonNull String method) {
+        Integer code = getInteger(rootObject, "code");
+        if (code != null && code == 200) {
+            return;
+        }
         String message = getString(rootObject, "message", "");
-        if (message.isEmpty()) {
-            throw new SkillSdkException(7000, "Response message is empty");
+        if (code == null) {
+            throw new SkillSdkException(7000, "Unexpected " + method + " response schema");
         }
-        return message;
+        throw new SkillSdkException(code, message.isEmpty() ? method + " failed" : message);
     }
 
     public synchronized void shutdown() {
@@ -657,5 +679,17 @@ public class ApiClient {
             return fallback;
         }
         return object.get(key).getAsString();
+    }
+
+    @Nullable
+    private static Integer getInteger(@NonNull JsonObject object, @NonNull String key) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return object.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

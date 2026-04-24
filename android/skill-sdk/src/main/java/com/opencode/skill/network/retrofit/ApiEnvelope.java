@@ -1,7 +1,9 @@
 package com.opencode.skill.network.retrofit;
 
+import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
+@Keep
 public final class ApiEnvelope<T> {
     @Nullable
     private String code;

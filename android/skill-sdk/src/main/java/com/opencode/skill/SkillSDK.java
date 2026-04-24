@@ -71,7 +71,6 @@ import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentListResult;
 import com.opencode.skill.model.WeAgentUriResult;
 import com.opencode.skill.network.ApiClient;
-import com.opencode.skill.network.StreamingMessageCache;
 import com.opencode.skill.network.WebSocketManager;
 import com.opencode.skill.util.TypeConvertUtils;
 import com.opencode.skill.util.WeAgentStorage;
@@ -102,8 +101,6 @@ public final class SkillSDK {
     @NonNull
     private final WebSocketManager webSocketManager = WebSocketManager.getInstance();
     @NonNull
-    private final StreamingMessageCache streamingMessageCache = new StreamingMessageCache();
-    @NonNull
     private final WeAgentStorage weAgentStorage = new WeAgentStorage();
 
     @NonNull
@@ -128,7 +125,6 @@ public final class SkillSDK {
     private final WebSocketManager.InternalListener internalStreamListener = new WebSocketManager.InternalListener() {
         @Override
         public void onMessage(@NonNull StreamMessage message) {
-            streamingMessageCache.ingestStreamMessage(message);
             emitSessionStatusByEvent(message);
         }
 
@@ -253,7 +249,6 @@ public final class SkillSDK {
             lastSessionStatusBySession.clear();
             awaitingExecutingBySession.clear();
             stoppedHoldingBySession.clear();
-            streamingMessageCache.clearAll();
         } catch (Exception e) {
             cleanupException = e;
         }
@@ -345,18 +340,11 @@ public final class SkillSDK {
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean connected) {
-                String cached = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
-                if (cached != null && !cached.trim().isEmpty()) {
-                    sendMessageInternal(params.getWelinkSessionId(), cached, null, callback);
-                    return;
-                }
-
                 apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
                     @Override
                     public void onSuccess(@Nullable PageResult<SessionMessage> result) {
                         PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
-                        streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), page.getContent());
-                        String latest = streamingMessageCache.findLastUserMessageContent(params.getWelinkSessionId());
+                        String latest = findLatestUserMessageContent(page.getContent());
                         if (latest == null || latest.trim().isEmpty()) {
                             callback.onError(error(4002, "No user message to regenerate"));
                             return;
@@ -440,7 +428,6 @@ public final class SkillSDK {
         }
         int page = Math.max(params.getPage(), 0);
         int size = params.getSize() <= 0 ? 50 : params.getSize();
-        boolean isFirst = params.isFirst();
 
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
@@ -449,14 +436,7 @@ public final class SkillSDK {
                     @Override
                     public void onSuccess(@Nullable PageResult<SessionMessage> result) {
                         PageResult<SessionMessage> serverPage = normalizeSessionMessagePage(result, page, size);
-                        if (!isFirst) {
-                            streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), serverPage.getContent());
-                            callback.onSuccess(serverPage);
-                            return;
-                        }
-                        PageResult<SessionMessage> merged = streamingMessageCache.mergeWithLocalCache(
-                                params.getWelinkSessionId(), serverPage);
-                        callback.onSuccess(merged);
+                        callback.onSuccess(serverPage);
                     }
 
                     @Override
@@ -509,10 +489,6 @@ public final class SkillSDK {
                             @Override
                             public void onSuccess(@Nullable CursorResult<SessionMessage> result) {
                                 CursorResult<SessionMessage> cursorResult = normalizeSessionMessageCursor(result, size);
-                                streamingMessageCache.ingestServerMessages(
-                                        welinkSessionId,
-                                        cursorResult.getContent()
-                                );
                                 callback.onSuccess(cursorResult);
                             }
 
@@ -846,25 +822,27 @@ public final class SkillSDK {
         final String name;
         final String icon;
         final String description;
-        final int weCrewType;
+        final Integer weCrewType;
         final String bizRobotId;
+        final String qrcode;
         try {
             name = TypeConvertUtils.requireString(params.getName(), "name");
             icon = TypeConvertUtils.requireString(params.getIcon(), "icon");
             description = TypeConvertUtils.requireString(params.getDescription(), "description");
-            weCrewType = TypeConvertUtils.requireInteger(params.getWeCrewType(), "weCrewType");
+            weCrewType = TypeConvertUtils.optionalInteger(params.getWeCrewType(), "weCrewType");
             bizRobotId = TypeConvertUtils.optionalString(params.getBizRobotId());
+            qrcode = TypeConvertUtils.optionalString(params.getQrcode());
         } catch (SkillSdkException e) {
             callback.onError(e);
             return;
         }
 
-        if (weCrewType != 0 && weCrewType != 1) {
+        if (weCrewType != null && weCrewType != 0 && weCrewType != 1) {
             callback.onError(error(1000, "weCrewType must be 0 or 1"));
             return;
         }
 
-        apiClient.createDigitalTwin(name, icon, description, weCrewType, bizRobotId,
+        apiClient.createDigitalTwin(name, icon, description, weCrewType, bizRobotId, qrcode,
                 new SkillCallback<CreateDigitalTwinResult>() {
                     @Override
                     public void onSuccess(@Nullable CreateDigitalTwinResult result) {
@@ -1093,16 +1071,15 @@ public final class SkillSDK {
             return;
         }
 
-        prepareDeleteWeAgentTransition(partnerAccount, robotId, new SkillCallback<DeleteTransitionPlan>() {
+        DeleteWeAgentContext context = buildDeleteWeAgentContext(partnerAccount, robotId);
+        prepareDeleteWeAgentContext(context, new SkillCallback<DeleteWeAgentContext>() {
             @Override
-            public void onSuccess(@Nullable DeleteTransitionPlan plan) {
-                DeleteTransitionPlan resolvedPlan = plan == null
-                        ? new DeleteTransitionPlan(new ArrayList<>(), null)
-                        : plan;
-                apiClient.deleteWeAgent(partnerAccount, robotId, new SkillCallback<DeleteWeAgentResult>() {
+            public void onSuccess(@Nullable DeleteWeAgentContext preparedContext) {
+                DeleteWeAgentContext resolvedContext = preparedContext == null ? context : preparedContext;
+                requestDeleteWeAgent(resolvedContext, new SkillCallback<DeleteWeAgentResult>() {
                     @Override
                     public void onSuccess(@Nullable DeleteWeAgentResult result) {
-                        handleDeleteWeAgentSuccess(resolvedPlan, result, callback);
+                        handleDeleteWeAgentResult(resolvedContext, result, callback);
                     }
 
                     @Override
@@ -1286,7 +1263,6 @@ public final class SkillSDK {
         wecodeStatusCallbacks.clear();
         awaitingExecutingBySession.clear();
         stoppedHoldingBySession.clear();
-        streamingMessageCache.clearAll();
         config = null;
     }
 
@@ -1413,6 +1389,63 @@ public final class SkillSDK {
         return -1;
     }
 
+    @NonNull
+    private DeleteWeAgentContext buildDeleteWeAgentContext(
+            @Nullable String partnerAccount,
+            @Nullable String robotId
+    ) {
+        return new DeleteWeAgentContext(
+                partnerAccount,
+                robotId,
+                isCurrentWeAgent(partnerAccount, robotId),
+                weAgentStorage.hasWeAgentListCache(),
+                null
+        );
+    }
+
+    private void requestDeleteWeAgent(
+            @NonNull DeleteWeAgentContext context,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    ) {
+        apiClient.deleteWeAgent(context.partnerAccount, context.robotId, callback);
+    }
+
+    private void prepareDeleteWeAgentContext(
+            @NonNull DeleteWeAgentContext context,
+            @NonNull SkillCallback<DeleteWeAgentContext> callback
+    ) {
+        if (!context.deletingCurrentWeAgent) {
+            callback.onSuccess(context);
+            return;
+        }
+        prepareDeleteWeAgentTransition(context.partnerAccount, context.robotId, new SkillCallback<DeleteTransitionPlan>() {
+            @Override
+            public void onSuccess(@Nullable DeleteTransitionPlan plan) {
+                callback.onSuccess(context.withTransitionPlan(plan));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    private void handleDeleteWeAgentResult(
+            @NonNull DeleteWeAgentContext context,
+            @Nullable DeleteWeAgentResult result,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    ) {
+        if (!context.deletingCurrentWeAgent) {
+            handleDeleteNonCurrentWeAgentSuccess(context, result, callback);
+            return;
+        }
+        DeleteTransitionPlan resolvedPlan = context.transitionPlan == null
+                ? new DeleteTransitionPlan(new ArrayList<>(), null)
+                : context.transitionPlan;
+        handleDeleteWeAgentSuccess(resolvedPlan, result, callback);
+    }
+
     private void handleDeleteWeAgentSuccess(
             @NonNull DeleteTransitionPlan plan,
             @Nullable DeleteWeAgentResult result,
@@ -1449,6 +1482,19 @@ public final class SkillSDK {
         });
     }
 
+    private void handleDeleteNonCurrentWeAgentSuccess(
+            @NonNull DeleteWeAgentContext context,
+            @Nullable DeleteWeAgentResult result,
+            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    ) {
+        if (context.hasListCache) {
+            List<WeAgent> cachedList = weAgentStorage.getWeAgentList();
+            DeleteTransitionPlan plan = buildDeleteTransitionPlan(cachedList, context.partnerAccount, context.robotId);
+            weAgentStorage.saveWeAgentList(plan.updatedList);
+        }
+        callback.onSuccess(result);
+    }
+
     private void finalizeDeleteWeAgentTransition(
             @Nullable DeleteWeAgentResult result,
             @Nullable WeAgentDetails nextDetail,
@@ -1464,6 +1510,24 @@ public final class SkillSDK {
         }
         // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
         callback.onSuccess(result);
+    }
+
+    private boolean isCurrentWeAgent(@Nullable String partnerAccount, @Nullable String robotId) {
+        return matchesWeAgentDetails(weAgentStorage.getCurrentWeAgentDetail(), partnerAccount, robotId);
+    }
+
+    private boolean matchesWeAgentDetails(
+            @Nullable WeAgentDetails details,
+            @Nullable String partnerAccount,
+            @Nullable String robotId
+    ) {
+        if (details == null) {
+            return false;
+        }
+        if (partnerAccount != null) {
+            return partnerAccount.equals(normalizeOptionalString(details.getPartnerAccount()));
+        }
+        return robotId != null && robotId.equals(normalizeOptionalString(details.getId()));
     }
 
     @NonNull
@@ -1516,6 +1580,42 @@ public final class SkillSDK {
         }
     }
 
+    private static final class DeleteWeAgentContext {
+        @Nullable
+        private final String partnerAccount;
+        @Nullable
+        private final String robotId;
+        private final boolean deletingCurrentWeAgent;
+        private final boolean hasListCache;
+        @Nullable
+        private final DeleteTransitionPlan transitionPlan;
+
+        private DeleteWeAgentContext(
+                @Nullable String partnerAccount,
+                @Nullable String robotId,
+                boolean deletingCurrentWeAgent,
+                boolean hasListCache,
+                @Nullable DeleteTransitionPlan transitionPlan
+        ) {
+            this.partnerAccount = partnerAccount;
+            this.robotId = robotId;
+            this.deletingCurrentWeAgent = deletingCurrentWeAgent;
+            this.hasListCache = hasListCache;
+            this.transitionPlan = transitionPlan;
+        }
+
+        @NonNull
+        private DeleteWeAgentContext withTransitionPlan(@Nullable DeleteTransitionPlan transitionPlan) {
+            return new DeleteWeAgentContext(
+                    partnerAccount,
+                    robotId,
+                    deletingCurrentWeAgent,
+                    hasListCache,
+                    transitionPlan
+            );
+        }
+    }
+
     private void sendMessageInternal(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,
             @NonNull SkillCallback<SendMessageResult> callback) {
         awaitingExecutingBySession.put(welinkSessionId, Boolean.TRUE);
@@ -1524,9 +1624,6 @@ public final class SkillSDK {
             public void onSuccess(@Nullable SendMessageResult result) {
                 if (result == null) {
                     awaitingExecutingBySession.put(welinkSessionId, Boolean.FALSE);
-                }
-                if (result != null) {
-                    streamingMessageCache.recordUserMessage(result);
                 }
                 callback.onSuccess(result);
             }
@@ -1541,18 +1638,11 @@ public final class SkillSDK {
 
     private void tryResolveSendToImContent(@NonNull SendMessageToIMParams params,
             @NonNull SkillCallback<String> callback) {
-        String fromCache = streamingMessageCache.getCompletedMessageContent(params.getWelinkSessionId(), params.getMessageId());
-        if (fromCache != null && !fromCache.trim().isEmpty()) {
-            callback.onSuccess(fromCache);
-            return;
-        }
-
         apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
             @Override
             public void onSuccess(@Nullable PageResult<SessionMessage> result) {
                 PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
-                streamingMessageCache.ingestServerMessages(params.getWelinkSessionId(), page.getContent());
-                String content = streamingMessageCache.getCompletedMessageContent(params.getWelinkSessionId(), params.getMessageId());
+                String content = resolveSendToImContent(page.getContent(), params.getMessageId());
                 if (content != null && !content.trim().isEmpty()) {
                     callback.onSuccess(content);
                     return;
@@ -1560,12 +1650,8 @@ public final class SkillSDK {
 
                 if (!isBlank(params.getMessageId())) {
                     String messageId = params.getMessageId();
-                    if (!streamingMessageCache.hasMessage(params.getWelinkSessionId(), messageId)) {
+                    if (!containsMessageId(page.getContent(), messageId)) {
                         callback.onError(error(4003, "Message does not exist"));
-                        return;
-                    }
-                    if (!streamingMessageCache.isMessageCompleted(params.getWelinkSessionId(), messageId)) {
-                        callback.onError(error(4004, "Message is not completed"));
                         return;
                     }
                 }
@@ -1585,6 +1671,73 @@ public final class SkillSDK {
             return;
         }
         webSocketManager.connect(callback);
+    }
+
+    @Nullable
+    private static String findLatestUserMessageContent(@Nullable List<SessionMessage> messages) {
+        if (messages == null) {
+            return null;
+        }
+        for (SessionMessage message : messages) {
+            if (message == null) {
+                continue;
+            }
+            if (!"user".equalsIgnoreCase(normalizeOptionalString(message.getRole()))) {
+                continue;
+            }
+            String content = normalizeOptionalString(message.getContent());
+            if (content != null) {
+                return content;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String resolveSendToImContent(@Nullable List<SessionMessage> messages, @Nullable String messageId) {
+        if (messages == null) {
+            return null;
+        }
+        String normalizedMessageId = normalizeOptionalString(messageId);
+        if (normalizedMessageId != null) {
+            for (SessionMessage message : messages) {
+                if (message == null) {
+                    continue;
+                }
+                if (!normalizedMessageId.equals(normalizeOptionalString(message.getId()))) {
+                    continue;
+                }
+                return normalizeOptionalString(message.getContent());
+            }
+            return null;
+        }
+
+        for (SessionMessage message : messages) {
+            if (message == null) {
+                continue;
+            }
+            String content = normalizeOptionalString(message.getContent());
+            if (content != null) {
+                return content;
+            }
+        }
+        return null;
+    }
+
+    private static boolean containsMessageId(@Nullable List<SessionMessage> messages, @Nullable String messageId) {
+        String normalizedMessageId = normalizeOptionalString(messageId);
+        if (messages == null || normalizedMessageId == null) {
+            return false;
+        }
+        for (SessionMessage message : messages) {
+            if (message == null) {
+                continue;
+            }
+            if (normalizedMessageId.equals(normalizeOptionalString(message.getId()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void emitSessionStatusByEvent(@NonNull StreamMessage message) {

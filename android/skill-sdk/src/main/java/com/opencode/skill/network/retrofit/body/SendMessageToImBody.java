@@ -1,8 +1,10 @@
 package com.opencode.skill.network.retrofit.body;
 
+import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+@Keep
 public final class SendMessageToImBody {
     @NonNull
     private final String content;

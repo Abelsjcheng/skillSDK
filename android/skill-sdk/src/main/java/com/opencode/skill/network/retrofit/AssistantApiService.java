@@ -1,5 +1,6 @@
 package com.opencode.skill.network.retrofit;
 
+import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonElement;
@@ -17,6 +18,7 @@ import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
+@Keep
 public interface AssistantApiService {
     @POST("v4-1/we-crew/im-register")
     Call<JsonElement> createDigitalTwin(@Body CreateDigitalTwinBody body);
