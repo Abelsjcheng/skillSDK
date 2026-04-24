@@ -24,6 +24,7 @@ import type {
   NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
+  QueryQrcodeInfoResult,
   RegenerateAnswerParams,
   RegisterSessionListenerParams,
   ReplyPermissionParams,
@@ -34,6 +35,7 @@ import type {
   UnregisterSessionListenerParams,
   UpdateWeAgentParams,
   UpdateWeAgentResult,
+  UpdateQrcodeInfoResult,
   WeAgentDetails,
   WeAgentDetailsArrayResult,
   WeAgentListResult,
@@ -46,6 +48,7 @@ interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
+  addEventListener?: (params: { type: 'back'; func: () => boolean }) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<{ statusBarHeight: number }>;
   getAppInfo?: () => Promise<{ language: string }>;
   getUserInfo?: () => Promise<{
@@ -1477,6 +1480,10 @@ function ensureMockHWH5Bridge(): void {
     hwh5.reboot = async () => undefined;
   }
 
+  if (typeof hwh5.addEventListener !== 'function') {
+    hwh5.addEventListener = async () => undefined;
+  }
+
   if (typeof hwh5.getDeviceInfo !== 'function') {
     hwh5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
   }
@@ -1788,6 +1795,19 @@ function buildMockApi(): HWH5EXT {
         deleteResult: 'success',
       };
     },
+
+    queryQrcodeInfo: async ({ qrcode }): Promise<QueryQrcodeInfoResult> => ({
+      qrcode,
+      weUrl: `${URL_BASE}/#/createAssistant?from=qrcode&qrcode=${encodeURIComponent(qrcode)}`,
+      pcUrl: `${URL_BASE}/#/createAssistant?from=qrcode&qrcode=${encodeURIComponent(qrcode)}`,
+      expireTime: String(Date.now() + 10 * 60 * 1000),
+      status: 0,
+      expired: false,
+    }),
+
+    updateQrcodeInfo: async (): Promise<UpdateQrcodeInfoResult> => ({
+      status: 'success',
+    }),
 
     notifyAssistantDetailUpdated: async (
       params: NotifyAssistantDetailUpdatedParams,

@@ -102,7 +102,6 @@ export const AppRouter: React.FC = () => {
             </div>
           )}
         />
-        <Route path="/startAssistant" element={<Navigate to="/selectAssistant" replace />} />
         <Route path="/" element={<Navigate to="/weAgentCUI" replace />} />
         <Route path="*" element={<Navigate to="/weAgentCUI" replace />} />
       </Routes>

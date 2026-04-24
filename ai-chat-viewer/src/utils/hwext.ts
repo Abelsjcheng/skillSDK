@@ -33,6 +33,8 @@ import type {
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   Pedestal,
+  QueryQrcodeInfoParams,
+  QueryQrcodeInfoResult,
   RegisterSessionListenerParams,
   RegenerateAnswerParams,
   ReplyPermissionParams,
@@ -44,6 +46,8 @@ import type {
   UnregisterSessionListenerParams,
   UpdateWeAgentParams,
   UpdateWeAgentResult,
+  UpdateQrcodeInfoParams,
+  UpdateQrcodeInfoResult,
   UploadFileParams,
   WeAgentDetails,
   WeAgentDetailsArrayResult,
@@ -54,6 +58,7 @@ import { APP_ID, isPcMiniApp } from '../constants';
 import { WeLog } from './logger';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
+const PC_QRCODE_METHOD = 'method://agentSkillsDialog';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
@@ -77,6 +82,8 @@ function getPedestalOrThrow(): Pedestal {
 function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
   const call = <T>(funName: string, params: unknown) =>
     Promise.resolve(pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T);
+  const callDirect = <T>(method: string, params: unknown) =>
+    Promise.resolve(pedestal.callMethod(`${PC_QRCODE_METHOD}/${method}`, params) as T);
 
   return {
     regenerateAnswer: (params) => call<RegenerateAnswerResponse>('regenerateAnswer', params),
@@ -114,6 +121,8 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getWeAgentDetails: (params) => call<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
     updateWeAgent: (params) => call<UpdateWeAgentResult>('updateWeAgent', params),
     deleteWeAgent: (params) => call<DeleteWeAgentResult>('deleteWeAgent', params),
+    queryQrcodeInfo: (params) => callDirect<QueryQrcodeInfoResult>('queryQrcodeInfo', params),
+    updateQrcodeInfo: (params) => callDirect<UpdateQrcodeInfoResult>('updateQrcodeInfo', params),
     notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
@@ -477,6 +486,14 @@ export async function updateWeAgent(params: UpdateWeAgentParams): Promise<Update
 
 export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
   return getJsApiOrThrow().deleteWeAgent(params);
+}
+
+export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
+  return getJsApiOrThrow().queryQrcodeInfo(params);
+}
+
+export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
+  return getJsApiOrThrow().updateQrcodeInfo(params);
 }
 
 export async function notifyAssistantDetailUpdated(

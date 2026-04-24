@@ -217,6 +217,38 @@
    - toast 文案统一使用业务代码中已定义的固定错误文案，不再从 `error` 对象中解析宿主返回信息；
    - PC 端 toast 定位规则：当前页面存在标题区时，toast 距离该标题区顶部 `50px`；当前页面无标题区时，toast 距离页面顶部 `50px`；始终水平居中；
    - 移动端 toast 统一通过 `HWH5.showToast({ msg, type: 'w' })` 调用宿主原生提示能力，业务侧不再自行控制页面内定位样式。
+10. 创建个人助理二维码场景：
+   - 当路由 query 中 `from=qrcode` 且存在 `qrcode` 时，视为扫二维码打开创建个人助理第一页；
+   - 页面打开后需根据 `小程序JSAPI接口文档.md` 调用 `queryQrcodeInfo({ qrcode })` 查询二维码信息；
+   - 二维码是否失效必须通过 `expireTime` 与当前时间戳比较判断，不以 `expired` 字段直接替代判断；
+   - 仅当“当前时间戳 > expireTime”时才判定为已过期；
+   - 若二维码未失效，则继续展示第一页现有创建表单；
+   - 若二维码已失效，则第一页内容区切换为失效态：
+      - 内容区背景颜色 `rgba(196,196,196,1)`；
+      - 内容垂直居中显示一张从 `src/imgs` 导入的二维码失效提示 `png` 图片；
+      - 失效态下不再展示表单内容与底部操作按钮；
+   - `queryQrcodeInfo({ qrcode })` 查询成功后，无论二维码是否过期，都需调用 `updateQrcodeInfo({ qrcode, status: 1 })`，将二维码状态更新为已扫码；
+   - 扫码场景下，第一页底部主按钮文案改为“确定”；
+   - 扫码场景下，第一页点击“确定”后直接触发创建助理接口，不再跳转到 `/selectBrainAssistant` 页面；
+   - 扫码场景第一页直创时，创建参数中的大脑类型默认按“内部助手”处理，`bizRobotId` 取 `getAgentType()` 返回列表第一项；若接口失败或返回空列表，则回退到内置默认内部助手第一项；
+   - 当创建助理接口调用成功后，需先调用 `updateQrcodeInfo({ qrcode, robotId, status: 2 })`，其中 `robotId` 取创建助理接口返回值；回写完成后继续复用第二页中 `handleCreateForOtherScene` 共享方法承载的成功跳转逻辑：
+      - 移动端优先调用 `window.HWH5.openIMChat({ chatId: partnerAccount })`，若宿主无该能力则调用 `window.HWH5.close()`；
+      - PC 端调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`；
+      - 不再跳转到 `/selectBrainAssistant` 页面。
+   - 扫码场景下，用户主动退出创建流程时：
+      - 移动端第一页点击左上角返回；
+      - PC 端点击右上角关闭按钮；
+      - PC 端点击会直接关闭页面的“取消”按钮；
+      - 以上场景都需先调用 `updateQrcodeInfo({ qrcode, status: 3 })` 更新为取消，再继续原有关闭/返回动作；
+   - 扫码进入第一页后，移动端需额外调用 `HWH5.addEventListener({ type: 'back', func })` 注册宿主返回监听；
+      - `func` 中需调用 `updateQrcodeInfo({ qrcode, status: 3 })`；
+      - `func` 必须同步 `return true`；
+      - 宿主 `back` 监听中的二维码状态回写同样复用页面内既有的错误提示逻辑，不额外解析错误对象；
+   - 扫码场景的二维码状态流转全部收口在第一页 `/createAssistant`，第二页 `/selectBrainAssistant` 不再承接二维码状态回写与退出处理；
+   - 创建助理页面涉及关闭当前窗口的逻辑统一复用共享 `closeCreateAssistantWindow` 方法，不在不同页面各自重复实现宿主关闭代码；
+   - 创建助理成功结果中的 `partnerAccount` 解析统一复用共享 `resolvePartnerAccount` 方法，不在第一页、第二页各自重复实现字符串读取与裁剪逻辑；
+   - 二维码状态回写 helper 不对 `qrcode`、`robotId`、`status` 做本地入参校验，调用时直接按当前业务参数透传 `updateQrcodeInfo`；
+   - `updateQrcodeInfo(status: 1/2/3)` 进入 `catch` 分支时，需 toast 提示固定错误文案，但不阻断当前页面既有关闭、返回或创建成功后的后续流程。
 
 ## 5. 页面 2（大脑选择页）需求
 
@@ -809,7 +841,10 @@
 
 1. 接口调用端能力适配：
    - 移动端：通过 `window.HWH5EXT.xxx` 调用对应 JSAPI；
-   - PC 端：通过 `window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'xxx', params})` 调用同名能力；
+   - PC 端：默认通过 `window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'xxx', params})` 调用同名能力；
+   - 二维码相关接口按《小程序JSAPI接口文档》走专用方法，不复用 `handleSdk`：
+      - `queryQrcodeInfo`：`window.Pedestal.callMethod('method://agentSkillsDialog/queryQrcodeInfo', params)`
+      - `updateQrcodeInfo`：`window.Pedestal.callMethod('method://agentSkillsDialog/updateQrcodeInfo', params)`
    - 页面内统一封装调用入口，保证业务代码按同一方法名调用，不直接耦合端差异。
    - `getWeAgentDetails` 参数适配：
       - 业务侧统一按单个账号传入 `partnerAccount`；

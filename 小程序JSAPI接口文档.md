@@ -1339,7 +1339,7 @@ window.HWH5EXT.queryQrcodeInfo(params)
 ### PC端调用方式
 
 ```javascript
-window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'queryQrcodeInfo', params})
+window.Pedestal.callMethod('method://agentSkillsDialog/queryQrcodeInfo',params);
 ```
 
 ### 参数说明
@@ -1396,7 +1396,7 @@ window.HWH5EXT.updateQrcodeInfo(params)
 ### PC端调用方式
 
 ```javascript
-window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateQrcodeInfo', params})
+window.Pedestal.callMethod('method://agentSkillsDialog/updateQrcodeInfo',params);
 ```
 
 ### 参数说明

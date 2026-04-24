@@ -141,8 +141,23 @@
   padding: 16px 24px 12px;
 }
 
+.digital-twin__content--expired {
+  padding: 0;
+  background: rgba(196, 196, 196, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .digital-twin__content--step2 {
   padding: 0 24px;
+}
+
+.digital-twin__expired-image {
+  width: 220px;
+  max-width: calc(100% - 32px);
+  height: auto;
+  display: block;
 }
 
 .digital-twin__avatar-preview-wrap {
@@ -578,6 +593,10 @@
 
 .digital-twin--mobile .digital-twin__content--step1 {
   padding: 16px 16px 12px;
+}
+
+.digital-twin--mobile .digital-twin__content--expired {
+  padding: 0;
 }
 
 .digital-twin--mobile .digital-twin__avatar-option,

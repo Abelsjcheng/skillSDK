@@ -9,7 +9,6 @@ import type {
   DigitalTwinBasicInfoPayload,
   DigitalTwinBrainPayload,
 } from '../types/digitalTwin';
-import type { CreateDigitalTwinResult } from '../types/bridge';
 import {
   buildOpenWeAgentCUIParams,
   createDigitalTwin,
@@ -20,20 +19,10 @@ import {
   resolveRobotIdForOpenWeAgentCUI,
   resolveWeCodeUrlForOpenWeAgentCUI,
 } from '../utils/hwext';
+import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
-
-function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
-  const value = result?.partnerAccount;
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function closeCreateAssistantWindow(): void {
-  if (typeof window !== 'undefined' && (window as any).Pedestal?.remote?.getCurrentWindow) {
-    (window as any).Pedestal.remote.getCurrentWindow().close();
-  }
-}
 
 const SelectBrainAssistantPage: React.FC = () => {
   const { t } = useTranslation();
@@ -122,16 +111,8 @@ const SelectBrainAssistantPage: React.FC = () => {
         }
 
         if (from !== 'weAgent') {
-          if (!isPc) {
-            if (typeof window.HWH5.openIMChat === 'function') {
-              await window.HWH5.openIMChat({ chatId: partnerAccount });
-            } else {
-              window.HWH5.close();
-            }
-          } else if (typeof window !== 'undefined' && window.Pedestal?.callMethod) {
-            await window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount });
-          }
-          return;
+          await handleCreateForOtherScene(createResult);
+          return
         }
 
         const detailResult = await getWeAgentDetails({ partnerAccount });

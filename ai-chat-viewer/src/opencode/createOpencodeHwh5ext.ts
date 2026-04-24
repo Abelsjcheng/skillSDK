@@ -22,6 +22,7 @@ import type {
   NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
+  QueryQrcodeInfoResult,
   RegisterSessionListenerParams,
   ReplyPermissionParams,
   SendMessageParams,
@@ -31,6 +32,7 @@ import type {
   UnregisterSessionListenerParams,
   UpdateWeAgentParams,
   UpdateWeAgentResult,
+  UpdateQrcodeInfoResult,
   WeAgentDetails,
   WeAgentDetailsArrayResult,
   WeAgentListResult,
@@ -589,6 +591,23 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
     async deleteWeAgent(): Promise<DeleteWeAgentResult> {
       return {
         deleteResult: 'success',
+      };
+    },
+
+    async queryQrcodeInfo(params: { qrcode: string }): Promise<QueryQrcodeInfoResult> {
+      return {
+        qrcode: params.qrcode,
+        weUrl: '',
+        pcUrl: '',
+        expireTime: String(Date.now() + 10 * 60 * 1000),
+        status: 0,
+        expired: false,
+      };
+    },
+
+    async updateQrcodeInfo(): Promise<UpdateQrcodeInfoResult> {
+      return {
+        status: 'success',
       };
     },
 

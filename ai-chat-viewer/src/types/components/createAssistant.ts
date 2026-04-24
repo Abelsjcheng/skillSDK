@@ -28,8 +28,11 @@ export interface StepBasicInfoProps {
   initialValue?: DigitalTwinBasicInfoPayload | null;
   className?: string;
   showHeader?: boolean;
+  expired?: boolean;
+  expiredImageSrc?: string;
   onClose: () => void;
   onCancel: () => void;
+  onMobileBack?: () => void;
   onNext: (payload: DigitalTwinBasicInfoPayload) => void;
   submitLabel?: string;
 }

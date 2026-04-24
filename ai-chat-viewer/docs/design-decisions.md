@@ -246,6 +246,30 @@ interface CreateDigitalTwinParams {
    - `weCrewType`：页面 2 单选值映射（`internal => 1`，`custom => 0`）
    - `bizRobotId`：仅 `weCrewType = 1` 时传，值为选中内部助手项的 `bizRobotId`
 13. 所有 `HWH5EXT` / `HWH5` 能力调用在业务层进入 `catch` 分支时，统一直接通过 `showToast(固定错误文案)` 告知用户，不再解析 `error.message/errorMessage`；其中 PC 端由 toast 自身根据当前页面是否存在标题区动态定位，有标题区时显示在标题区顶部 `50px`，无标题区时显示在页面顶部 `50px`，并保持水平居中；移动端则统一透传到宿主 `HWH5.showToast({ msg, type: 'w' })`，不再维护页面内定位。端类型判断统一收口到 `src/constants.tsx` 中的 `isPcMiniApp` / `isIosMobileDevice`，页面、组件与工具层都直接从常量模块取值；`src/utils/hwext.ts` 仅保留复用与兼容导出，避免业务层继续直接依赖环境工具文件中的判端实现。
+14. PC 端 JSAPI 适配默认走 `method://agentSkills/handleSdk + funName`，但二维码接口按《小程序JSAPI接口文档》单独走专用 Pedestal 方法：
+   - `queryQrcodeInfo`：`window.Pedestal.callMethod('method://agentSkillsDialog/queryQrcodeInfo', params)`
+   - `updateQrcodeInfo`：`window.Pedestal.callMethod('method://agentSkillsDialog/updateQrcodeInfo', params)`
+   - 这两个接口参数直接透传 `params`，不再包装 `{ funName, params }`。
+15. 创建助理二维码场景采用“页面层判断 + 组件层展示”的分层实现：
+   - 页面层在 `createAssistantBasic.tsx` 读取 `from` / `qrcode` query，并调用 `queryQrcodeInfo({ qrcode })`；
+   - 失效判断只使用“当前时间戳 `Date.now()` 是否严格大于 `Number(expireTime)`”，与需求口径保持一致；
+   - `StepBasicInfo` 仅新增受控的失效态展示能力，不在组件内部直接调用二维码查询接口；
+   - 失效态使用独立样式 class 覆盖第一页内容区，背景固定 `rgba(196,196,196,1)`，内容区只承载一张从 `src/imgs` 导入的二维码失效提示 `png` 图。
+16. 扫码场景改为第一页直创：`createAssistantBasic.tsx` 在 `from=qrcode` 时不再跳转第二页，第一页点击“确定”后直接触发 `createDigitalTwin`；为保持与第二页默认行为一致，创建参数默认按“内部助手”组装，`bizRobotId` 优先取 `getAgentType()` 返回的第一项，失败或空列表时回退到内置 `INTERNAL_ASSISTANTS[0]`。创建成功后的“非 `weAgent` 场景跳转”不在第一页和第二页各自维护，而是抽成共享的 `handleCreateForOtherScene` 方法，由 `createAssistantBasic.tsx` 与 `selectBrainAssistant.tsx` 共同复用，确保两处跳转逻辑始终一致。
+17. 创建助理流程中的窗口关闭动作同样不在页面内重复定义：`closeCreateAssistantWindow` 抽成共享工具，与 `handleCreateForOtherScene` 放在同一创建流程工具模块中，由第一页、第二页及后续相关流程统一调用，避免宿主关闭逻辑散落多处。
+18. 创建助理成功结果中的 `partnerAccount` 读取逻辑也统一收口：`resolvePartnerAccount` 抽成共享工具，第一页与第二页都不再各自重复声明，后续凡是需要从 `CreateDigitalTwinResult` 中解析 `partnerAccount` 的场景都复用该方法。
+19. 二维码状态回写通过 `updateQrcodeInfo` 统一收口到页面层：
+   - 状态 `1`：第一页 `queryQrcodeInfo` 查询成功后立即回写，不区分二维码是否已过期；
+   - 状态 `2`：扫码场景第一页直创成功后立即回写；
+   - 状态 `3`：扫码场景主动退出流程时回写。
+   - `updateQrcodeStatusSafely` 自身不再判断 `qrcode` 是否为空、也不判断当前是否二维码场景，入参统一原样透传给 `updateQrcodeInfo`；是否需要触发回写由页面调用点自行决定。
+20. 扫码场景的退出动作按“是否离开创建流程”区分：
+   - 第一步页面：移动端左上角返回、PC 端右上角关闭、PC 端取消按钮，都视为退出流程，回写 `status:3`。
+21. 扫码场景第一页额外接入宿主返回键监听：在 `createAssistantBasic.tsx` 页面层、且仅在移动端 `from=qrcode` 时调用 `HWH5.addEventListener({ type: 'back', func })` 注册；`func` 内通过 `void updateQrcodeStatusSafely(3)` 异步触发二维码取消回写，并同步 `return true` 交还宿主返回结果，不把监听逻辑下沉到 `StepBasicInfo`。
+22. 二维码状态回写失败不阻断主流程：
+   - `status:1` 回写失败只 toast 提示，第一页仍进入失效态；
+   - `status:2` 回写失败只 toast 提示，创建成功后的既有非 `weAgent` 流程继续执行；
+   - `status:3` 回写失败只 toast 提示，关闭窗口或返回动作继续执行。
 
 ## 8. 样式与实现约束
 

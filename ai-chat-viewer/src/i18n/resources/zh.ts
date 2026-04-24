@@ -133,4 +133,7 @@ export const zh = {
   'appUpdate.description': '新版本已经准备好，是否重启应用？',
   'appUpdate.rebootFailed': '重启应用失败',
   'assistantDetail.deleteFailed': '删除助理失败',
+  'createAssistant.queryQrcodeInfoFailed': '获取二维码信息失败',
+  'createAssistant.updateQrcodeInfoFailed': '更新二维码状态失败',
+  'createAssistant.qrcodeExpiredAlt': '二维码失效提示',
 } as const;

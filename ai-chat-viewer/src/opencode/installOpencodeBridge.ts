@@ -91,6 +91,10 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
     window.HWH5.reboot = async () => undefined;
   }
 
+  if (typeof window.HWH5.addEventListener !== 'function') {
+    window.HWH5.addEventListener = async () => undefined;
+  }
+
   if (typeof window.HWH5.getDeviceInfo !== 'function') {
     window.HWH5.getDeviceInfo = async () => ({ statusBarHeight: 0 });
   }

@@ -161,6 +161,29 @@ export interface DeleteWeAgentResult {
   deleteResult: string;
 }
 
+export interface QueryQrcodeInfoParams {
+  qrcode: string;
+}
+
+export interface QueryQrcodeInfoResult {
+  qrcode: string;
+  weUrl: string;
+  pcUrl: string;
+  expireTime: string;
+  status: number;
+  expired: boolean;
+}
+
+export interface UpdateQrcodeInfoParams {
+  qrcode: string;
+  robotId?: string;
+  status: number;
+}
+
+export interface UpdateQrcodeInfoResult {
+  status: string;
+}
+
 export interface NotifyAssistantDetailUpdatedParams {
   name: string;
   icon: string;
@@ -225,6 +248,11 @@ export interface OpenWeAgentCUIParams {
   switchAssistantUri: string;
 }
 
+export interface OpenIMChatParams {
+  chatID?: string,
+  chatType?: string
+}
+
 export interface BuildOpenWeAgentCUIOptions {
   bizRobotId?: string;
   robotId?: string;
@@ -255,6 +283,11 @@ export interface ChooseImageParams {
   type: number;
 }
 
+export interface HWH5AddEventListenerParams {
+  type: string;
+  func: Function;
+}
+
 export interface WeAgentUriResult {
   weAgentUri: string;
   assistantDetailUri: string;
@@ -280,6 +313,8 @@ export interface HWH5EXT {
   getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> | WeAgentDetailsArrayResult;
   updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> | UpdateWeAgentResult;
   deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> | DeleteWeAgentResult;
+  queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> | QueryQrcodeInfoResult;
+  updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> | UpdateQrcodeInfoResult;
   notifyAssistantDetailUpdated(
     params: NotifyAssistantDetailUpdatedParams,
   ): Promise<NotifyAssistantDetailUpdatedResult> | NotifyAssistantDetailUpdatedResult;
@@ -295,9 +330,9 @@ export interface Pedestal {
 export interface HWH5Bridge {
   openWebview: (payload: { uri: string }) => void;
   log?: (payload: { content: string; type: 'i' }) => Promise<unknown> | unknown;
-  openIMChat?: (payload: { chatId: string }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
+  addEventListener?: (params: HWH5AddEventListenerParams) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
@@ -309,6 +344,7 @@ export interface HWH5Bridge {
   disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;
   navigateBack: () => void;
   close: () => void;
+  openIMChat?: (params: OpenIMChatParams) => Promise<unknown> | unknown;
 }
 
 export interface HWH5DeviceInfo {
