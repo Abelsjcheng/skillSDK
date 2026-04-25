@@ -56,7 +56,7 @@ const CreateAssistantBasicPage: React.FC = () => {
         }
 
         const expireTimestamp = Number(result.expireTime);
-        const expired = Number.isFinite(expireTimestamp) && Date.now() > expireTimestamp;
+        const expired = Number.isFinite(expireTimestamp) && Date.now() > expireTimestamp * 1000;
 
         setQrcodeExpired(expired);
         setQrcodeLoaded(true);

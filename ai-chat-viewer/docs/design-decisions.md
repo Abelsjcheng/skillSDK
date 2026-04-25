@@ -191,6 +191,7 @@ interface CreateDigitalTwinParams {
 9. 页面 2 移动端 `digital-twin__brain-title` 与后续内容区之间的垂直间距固定为 `20px`。
 10. 页面 2 移动端内部助手按钮组改为 1 列，每项高度 `48px`。
 11. 页面 2 移动端底部操作区仅保留“确定”按钮，`44px` 高、全宽、圆角 `999px`。
+12. 创建个人助理页面移动端内容区继续保留 `overflow-y: auto`，但补充 `scrollbar-width: none`、`-ms-overflow-style: none` 与 `::-webkit-scrollbar { display: none; width: 0; height: 0; }`，实现“可滚动但默认不显示滚动条”。
 12. 页面 2 移动端内部助手按钮选中态右侧 `√` 图标尺寸覆盖为 `24px x 24px`。
 
 ## 6. 状态模型决策
@@ -255,7 +256,7 @@ interface CreateDigitalTwinParams {
    - 这两个接口参数直接透传 `params`，不再包装 `{ funName, params }`。
 15. 创建助理二维码场景采用“页面层判断 + 组件层展示”的分层实现：
    - 页面层在 `createAssistantBasic.tsx` 读取 `from` / `qrcode` / `channel` query，其中扫码场景标识仅由 `from === 'qrcode'` 判断；涉及二维码查询与状态回写的接口调用点再单独要求 `qrcode` 非空；
-   - 失效判断只使用“当前时间戳 `Date.now()` 是否严格大于 `Number(expireTime)`”，与需求口径保持一致；
+   - 失效判断只使用“当前时间戳 `Date.now()` 是否严格大于 `Number(expireTime) * 1000`”；`queryQrcodeInfo` 返回的 `expireTime` 按秒级时间戳处理，前端比较前统一先换算为毫秒；
    - `StepBasicInfo` 仅新增受控的失效态展示能力，不在组件内部直接调用二维码查询接口；
    - 失效态使用独立样式 class 覆盖第一页内容区，背景固定 `rgba(196,196,196,1)`，内容区只承载一张从 `src/imgs` 导入的二维码失效提示 `png` 图。
 16. 扫码场景改为第一页直创：`createAssistantBasic.tsx` 在 `from=qrcode` 时不再跳转第二页，第一页点击“确定”后直接触发 `createDigitalTwin`；该场景创建参数透传第一页表单已有字段 `name`、`icon`、`description`，并追加当前二维码值 `qrcode`，不再默认补齐“内部助手”语义，也不再额外请求或传入 `weCrewType`、`bizRobotId`。同一页面还会消费 query 中的 `channel` 作为只读展示文案 `AI能力提供方：${channel}`：移动端显示在第一页简介块下方 `12px` 处，PC 端显示在第一页底部按钮区左侧并按左对齐展示。创建成功后的“非 `weAgent` 场景跳转”不在第一页和第二页各自维护，而是抽成共享的 `handleCreateForOtherScene` 方法，由 `createAssistantBasic.tsx` 与 `selectBrainAssistant.tsx` 共同复用，确保两处跳转逻辑始终一致。
@@ -562,11 +563,12 @@ interface CreateDigitalTwinParams {
    - `app-container--we-agent-cui`
 4. 页面根背景在暗黑模式下统一切换为 `rgba(18,19,20,1)`，并移除原有浅色背景图/渐变对主视觉的影响。
 5. 选择助理、切换助理、助理详情共用的卡片/标题区颜色通过共用样式文件（如 `SwitchAssistant.less`、`AssistantPageHeader.less`）统一覆盖，避免同一结构在不同页面重复写一套暗黑规则。
-6. 创建个人助理页的暗黑模式除颜色覆盖外，需要轻量调整 JSX：自定义上传头像入口同时渲染文字加号和 `add_black.png` 图标，再通过媒体查询切换可见性，避免为暗黑模式新增运行时分支。
+6. 创建个人助理页的暗黑模式除颜色覆盖外，上传头像入口继续复用统一的 `add_icon.svg` 图标，不再为暗黑模式单独维护一套加号图片。
 7. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
-8. 创建个人助理页的自定义头像上传入口补充双图资源策略：亮色模式使用 `add.png`，暗黑模式使用 `add_black.png`；组件内同时导入两张图片，样式层按媒体查询切换可见性，继续避免在 JSX 中按主题分支渲染。
-9. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
-10. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 `svg/png` 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，避免分散替换多套图标资源。
+8. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
+9. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
+10. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
+11. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
 
 
 

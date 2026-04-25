@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import selectionIcon from '../../imgs/selection_icon.png';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
-import addIcon from '../../imgs/add.png';
-import addBlackIcon from '../../imgs/add_black.png';
+import addIcon from '../../imgs/add_icon.svg';
 import type {
   DefaultAvatarOption,
   DigitalTwinBasicInfoPayload,
@@ -282,8 +281,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                     });
                   }}
                 >
-                  <img src={addIcon} alt="" aria-hidden="true" className="digital-twin__upload-icon digital-twin__upload-icon--light" />
-                  <img src={addBlackIcon} alt="" aria-hidden="true" className="digital-twin__upload-icon digital-twin__upload-icon--dark" />
+                  <img src={addIcon} alt="" aria-hidden="true" className="digital-twin__upload-icon" />
                   {avatarType === 'custom' ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
                 </button>
               </div>
