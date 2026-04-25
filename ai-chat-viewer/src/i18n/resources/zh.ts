@@ -136,4 +136,6 @@ export const zh = {
   'createAssistant.queryQrcodeInfoFailed': '获取二维码信息失败',
   'createAssistant.updateQrcodeInfoFailed': '更新二维码状态失败',
   'createAssistant.qrcodeExpiredAlt': '二维码失效提示',
+  'createAssistant.nameInvalidHint': '仅支持汉字、数字、字母',
+  'createAssistant.descriptionInvalidHint': '仅支持汉字数字字母/常用标点符号',
 } as const;

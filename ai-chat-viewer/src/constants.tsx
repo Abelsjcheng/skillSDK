@@ -24,11 +24,17 @@ function resolveIsProEnv(): boolean {
   return typeof __IS_PRO_ENV__ === 'boolean' ? __IS_PRO_ENV__ : true;
 }
 
-export const isProEnv = resolveIsProEnv();
+export function isProEnv(): boolean {
+  return resolveIsProEnv();
+}
 
-export const APP_ID = isProEnv ? '921535418692659' : 'S008623';
+export function APP_ID(): string {
+  return isProEnv() ? '921535418692659' : 'S008623';
+}
 
-export const HOST = `h5://${APP_ID}`;
+export function HOST(): string {
+  return `h5://${APP_ID()}`;
+}
 
 
 export function isIosMobileDevice(): boolean {

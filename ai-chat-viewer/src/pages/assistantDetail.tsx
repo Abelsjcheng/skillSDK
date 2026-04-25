@@ -157,7 +157,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
     }
 
     openH5Webview({
-      uri: getUrlHost(sourceUrl) === APP_ID
+      uri: getUrlHost(sourceUrl) === APP_ID()
         ? CUSTOMER_SERVICE_WEBVIEW_URI
         : buildCustomerServiceWebviewUri(sourceUrl),
     });

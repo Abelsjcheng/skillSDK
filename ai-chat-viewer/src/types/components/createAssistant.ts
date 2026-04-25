@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import type { DefaultAvatarOption, DigitalTwinBasicInfoPayload, DigitalTwinBrainPayload } from '../digitalTwin';
 
 export type FooterButtonVariant = 'cancel' | 'next' | 'confirm';
@@ -14,6 +16,7 @@ export interface CreatorStepFooterProps {
   isPcMiniApp: boolean;
   pcButtons: CreatorStepFooterButton[];
   mobileButton: CreatorStepFooterButton;
+  leftContent?: ReactNode;
 }
 
 export interface CreatorStepHeaderProps {
@@ -31,6 +34,7 @@ export interface StepBasicInfoProps {
   showHeader?: boolean;
   expired?: boolean;
   expiredImageSrc?: string;
+  providerChannel?: string;
   onClose: () => void;
   onCancel: () => void;
   onMobileBack?: () => void;

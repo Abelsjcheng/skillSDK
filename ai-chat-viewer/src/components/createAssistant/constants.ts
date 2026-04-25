@@ -42,7 +42,7 @@ export function resolveAssistantIconUrl(icon: string | undefined | null): string
   }
 
   if (normalizedIcon.startsWith('/')) {
-    return `${trimTrailingSlash(HOST)}${normalizedIcon}`;
+    return `${trimTrailingSlash(HOST())}${normalizedIcon}`;
   }
 
   return normalizedIcon;

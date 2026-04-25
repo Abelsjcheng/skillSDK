@@ -143,11 +143,12 @@ interface CreateDigitalTwinParams {
 11. 名称输入框与简介框边框统一为 `1px solid rgba(0,0,0,0.08)`。
 12. 简介输入框整体可见高度固定为 `82px`（包含边框与上下内边距），实现采用 `box-sizing: border-box`，圆角半径 `8px`，`padding: 8px`。
 13. 简介块（标题 + 间距 + 简介输入框）整体高度固定为 `112px`。
-14. 为消除 2px 行盒误差，名称/简介标签采用块级元素并固定 `height: 22px; line-height: 22px; margin: 0`。
-15. 操作区使用 `padding: 16px 24px 12px`，右对齐两个按钮：取消/下一步。
-16. 操作区必须固定在组件容器可视范围内，不得超出底部边界；内容区域应自适应可滚动。
-17. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
-17. “下一步”启用条件：`name.trim() && description.trim()`。
+14. 为消除 2px 行盒误差，名称/简介标题区采用一行式 `label-row`：左侧主标签保持 `height: 22px; line-height: 22px; margin: 0`，当校验失败时在右侧 `8px` 追加错误提示文本；提示文本样式固定为 `14px/400`、`rgba(243,111,100,1)`。对应输入框的校验边框颜色也统一为 `rgba(243,111,100,1)`。
+15. 名称输入校验失败提示文案固定为“仅支持汉字、数字、字母”；简介输入校验失败提示文案固定为“仅支持汉字数字字母/常用标点符号”。
+16. 操作区使用 `padding: 16px 24px 12px`，右对齐两个按钮：取消/下一步。
+17. 操作区必须固定在组件容器可视范围内，不得超出底部边界；内容区域应自适应可滚动。
+18. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
+19. “下一步”启用条件：`name.trim() && description.trim()`。
 
 ## 5.2 页面 2（大脑选择）
 
@@ -159,7 +160,7 @@ interface CreateDigitalTwinParams {
      - `internal`：显示 3x2 按钮组（由 `window.getAgentType()` 动态提供）；
      - `custom`：显示提示文案。
    - 内部助手数据请求过程中及空结果场景均不展示“内部助手加载中...”与“暂无可用内部助手”文案。
-4. 内容区新增第三容器用于展示插画，尺寸为 `height: 114px; width: 100%`，圆角半径 `12px`；插画由 `StepBrainSelect` 组件内部直接从 `src/imgs` 静态导入，按当前国际化语言切换：中文使用 `banner.png`，英文使用 `banner-en.png`，不再通过父组件 props 透传。插画本身直接使用单个 `img` 标签渲染并绑定点击打开指导文档，不再额外包裹 `a` 或 `div` 容器。
+4. 内容区新增第三容器用于展示插画，尺寸为 `height: 114px; width: 100%`，圆角半径 `12px`；插画与上方内容区固定间距 `20px`；插画由 `StepBrainSelect` 组件内部直接从 `src/imgs` 静态导入，按当前国际化语言切换：中文使用 `banner.png`，英文使用 `banner-en.png`，不再通过父组件 props 透传。插画本身直接使用单个 `img` 标签渲染并绑定点击打开指导文档，不再额外包裹 `a` 或 `div` 容器。
 5. 操作区使用 `padding: 16px 24px 12px`，按钮右对齐。
    - 按钮顺序为：取消 / 上一步 / 确定；
    - “上一步”按钮样式与“取消”一致（`64x28`、圆角 `4px`、浅灰背景）。
@@ -183,12 +184,14 @@ interface CreateDigitalTwinParams {
 2. 页面 1 移动端头部改为三段式：左返回区（调用 `window.HWH5.navigateBack()`）/中标题/右占位，头部高度 `44px`。
 3. 页面 1 移动端头像预览改为 `48x48`（圆角 `60px`），头像选项圆角改为 `100px`。
 4. 页面 1 移动端底部操作区仅保留“下一步”按钮，`44px` 高、全宽、圆角 `999px`。
-5. 页面 2 移动端头部改为三段式：左返回区（调用 `onPrev` 返回第一页）/中标题/右占位，头部高度 `44px`。
-6. 页面 2 移动端大脑类型单选改为两列等宽按钮样式：高度 `48px`、间距 `16px`、边框 `1px rgba(0,0,0,0.05)`、圆角 `8px`。
-7. 页面 2 移动端单选圆点尺寸改为：容器 `24px`、外环 `20px`、内实心 `13.33px`。
-8. 页面 2 移动端内部助手按钮组改为 1 列，每项高度 `48px`。
-9. 页面 2 移动端底部操作区仅保留“确定”按钮，`44px` 高、全宽、圆角 `999px`。
-10. 页面 2 移动端内部助手按钮选中态右侧 `√` 图标尺寸覆盖为 `24px x 24px`。
+5. 页面 1 与页面 2 的移动端内容区统一覆盖为 `padding: 12px 16px 0`，仅二维码失效态继续保持独立容器样式，不复用该内边距。
+6. 页面 2 移动端头部改为三段式：左返回区（调用 `onPrev` 返回第一页）/中标题/右占位，头部高度 `44px`。
+7. 页面 2 移动端大脑类型单选改为两列等宽按钮样式：高度 `48px`、间距 `16px`、边框 `1px rgba(0,0,0,0.05)`、圆角 `8px`。
+8. 页面 2 移动端单选圆点尺寸改为：容器 `24px`、外环 `20px`、内实心 `13.33px`。
+9. 页面 2 移动端 `digital-twin__brain-title` 与后续内容区之间的垂直间距固定为 `20px`。
+10. 页面 2 移动端内部助手按钮组改为 1 列，每项高度 `48px`。
+11. 页面 2 移动端底部操作区仅保留“确定”按钮，`44px` 高、全宽、圆角 `999px`。
+12. 页面 2 移动端内部助手按钮选中态右侧 `√` 图标尺寸覆盖为 `24px x 24px`。
 
 ## 6. 状态模型决策
 
@@ -251,11 +254,11 @@ interface CreateDigitalTwinParams {
    - `updateQrcodeInfo`：`window.Pedestal.callMethod('method://agentSkillsDialog/updateQrcodeInfo', params)`
    - 这两个接口参数直接透传 `params`，不再包装 `{ funName, params }`。
 15. 创建助理二维码场景采用“页面层判断 + 组件层展示”的分层实现：
-   - 页面层在 `createAssistantBasic.tsx` 读取 `from` / `qrcode` query，并调用 `queryQrcodeInfo({ qrcode })`；
+   - 页面层在 `createAssistantBasic.tsx` 读取 `from` / `qrcode` / `channel` query，其中扫码场景标识仅由 `from === 'qrcode'` 判断；涉及二维码查询与状态回写的接口调用点再单独要求 `qrcode` 非空；
    - 失效判断只使用“当前时间戳 `Date.now()` 是否严格大于 `Number(expireTime)`”，与需求口径保持一致；
    - `StepBasicInfo` 仅新增受控的失效态展示能力，不在组件内部直接调用二维码查询接口；
    - 失效态使用独立样式 class 覆盖第一页内容区，背景固定 `rgba(196,196,196,1)`，内容区只承载一张从 `src/imgs` 导入的二维码失效提示 `png` 图。
-16. 扫码场景改为第一页直创：`createAssistantBasic.tsx` 在 `from=qrcode` 时不再跳转第二页，第一页点击“确定”后直接触发 `createDigitalTwin`；该场景创建参数透传第一页表单已有字段 `name`、`icon`、`description`，并追加当前二维码值 `qrcode`，不再默认补齐“内部助手”语义，也不再额外请求或传入 `weCrewType`、`bizRobotId`。创建成功后的“非 `weAgent` 场景跳转”不在第一页和第二页各自维护，而是抽成共享的 `handleCreateForOtherScene` 方法，由 `createAssistantBasic.tsx` 与 `selectBrainAssistant.tsx` 共同复用，确保两处跳转逻辑始终一致。
+16. 扫码场景改为第一页直创：`createAssistantBasic.tsx` 在 `from=qrcode` 时不再跳转第二页，第一页点击“确定”后直接触发 `createDigitalTwin`；该场景创建参数透传第一页表单已有字段 `name`、`icon`、`description`，并追加当前二维码值 `qrcode`，不再默认补齐“内部助手”语义，也不再额外请求或传入 `weCrewType`、`bizRobotId`。同一页面还会消费 query 中的 `channel` 作为只读展示文案 `AI能力提供方：${channel}`：移动端显示在第一页简介块下方 `12px` 处，PC 端显示在第一页底部按钮区左侧并按左对齐展示。创建成功后的“非 `weAgent` 场景跳转”不在第一页和第二页各自维护，而是抽成共享的 `handleCreateForOtherScene` 方法，由 `createAssistantBasic.tsx` 与 `selectBrainAssistant.tsx` 共同复用，确保两处跳转逻辑始终一致。
 17. 创建助理流程中的窗口关闭动作同样不在页面内重复定义：`closeCreateAssistantWindow` 抽成共享工具，与 `handleCreateForOtherScene` 放在同一创建流程工具模块中，由第一页、第二页及后续相关流程统一调用，避免宿主关闭逻辑散落多处。
 18. 创建助理成功结果中的 `partnerAccount` 读取逻辑也统一收口：`resolvePartnerAccount` 抽成共享工具，第一页与第二页都不再各自重复声明，后续凡是需要从 `CreateDigitalTwinResult` 中解析 `partnerAccount` 的场景都复用该方法。
 19. 二维码状态回写通过 `updateQrcodeInfo` 统一收口到页面层：
@@ -508,7 +511,7 @@ interface CreateDigitalTwinParams {
    - `src/i18n/config.ts`：负责初始化 `i18next`、注册 `react-i18next`、导出 `i18n` 实例与语言标准化方法；
    - `src/i18n/resources/zh.ts`、`src/i18n/resources/en.ts`：分别维护中英文资源；
    - `src/i18n/types.ts`：提供资源类型声明与 `i18next` 模块增强，尽量保留 key 的类型约束能力。
-5. 启动语言初始化继续复用 `getAppInfo().language`：语言来源兼容统一在 [hwext.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/utils/hwext.ts) 的 `getAppInfo()` 函数内部实现，通过 `isPcMiniApp()` 区分端类型，移动端直接读取 `window.HWH5.getAppInfo()`，PC 端直接读取 `window.localStorage?.getItem('language')`，并在该函数内部统一映射为 `{ language: 'zh' | 'en' }`。前端 `normalizeLanguage` 仅作为最后一道兜底，兼容 `1033 -> en`、`2052 -> zh` 以及 `en-US` / `zh-CN` 等旧值，再调用 `i18n.changeLanguage(...)`。
+5. 环境与宿主地址常量收口到 [constants.tsx](/F:/AIProject/skillSDK/ai-chat-viewer/src/constants.tsx) 的方法调用：`isProEnv()`、`APP_ID()`、`HOST()`，避免在模块初始化阶段固化为一次性常量值；依赖宿主 AppId 或 host 的页面、工具层与 mock 层统一改为按需调用。启动语言初始化继续复用 `getAppInfo().language`：语言来源兼容统一在 [hwext.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/utils/hwext.ts) 的 `getAppInfo()` 函数内部实现，通过 `isPcMiniApp()` 区分端类型，移动端直接读取 `window.HWH5.getAppInfo()`，PC 端直接读取 `window.localStorage?.getItem('language')`，并在该函数内部统一映射为 `{ language: 'zh' | 'en' }`。前端 `normalizeLanguage` 仅作为最后一道兜底，兼容 `1033 -> en`、`2052 -> zh` 以及 `en-US` / `zh-CN` 等旧值，再调用 `i18n.changeLanguage(...)`。
 6. PC 端新增运行时语言桥接：在 `hwext.ts` 中统一封装宿主 `window.onReceive(payload)` 监听，其中 `2052` 映射为 `zh`、`1033` 映射为 `en`；应用初始化时注册一次监听，收到合法语言值后直接通知 `i18n` 单例执行 `changeLanguage`，不增加 `localStorage` 回写、旧回调链保留等额外兼容逻辑。
 7. 页面入口需在最早阶段引入 `src/i18n/config.ts`，确保首次渲染前完成国际化实例初始化，避免首屏出现未初始化或文案闪动；同时在该配置层内注册运行时语言监听。
 8. 本轮迁移范围优先覆盖当前已接入自研 i18n 的链路：
@@ -546,6 +549,24 @@ interface CreateDigitalTwinParams {
 8. `rebootApp()` 调用失败时，`AppRouter` 捕获异常并按现有规范直接执行 `showToast(固定错误文案)`；不解析宿主错误对象。
 9. 为保持本地调试与 OpenCode 适配编译通过，`HWH5EXT` mock / opencode 适配层需要补齐 `onTabForUpdate` 空实现，`HWH5` mock 需要补齐 `reboot` 空实现。
 10. 更新弹窗文案纳入现有 `react-i18next` 资源，统一由 `useTranslation()` 读取，避免全局组件引入新的文案常量来源。
+
+## 23. 暗黑模式设计
+
+1. 暗黑模式仅通过 CSS 媒体查询 `@media (prefers-color-scheme: dark)` 实现，不新增运行时主题状态或 JS 监听。
+2. 主题色值先收口到共享 `theme.less` 变量层；变量层只负责提供颜色 token，不直接覆写页面结构样式。
+3. 各页面和组件样式文件仍在自身根 class 作用域内追加暗黑覆盖，例如：
+   - `activate-assistant`
+   - `switch-assistant`
+   - `assistant-detail`
+   - `digital-twin`
+   - `app-container--we-agent-cui`
+4. 页面根背景在暗黑模式下统一切换为 `rgba(18,19,20,1)`，并移除原有浅色背景图/渐变对主视觉的影响。
+5. 选择助理、切换助理、助理详情共用的卡片/标题区颜色通过共用样式文件（如 `SwitchAssistant.less`、`AssistantPageHeader.less`）统一覆盖，避免同一结构在不同页面重复写一套暗黑规则。
+6. 创建个人助理页的暗黑模式除颜色覆盖外，需要轻量调整 JSX：自定义上传头像入口同时渲染文字加号和 `add_black.png` 图标，再通过媒体查询切换可见性，避免为暗黑模式新增运行时分支。
+7. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
+8. 创建个人助理页的自定义头像上传入口补充双图资源策略：亮色模式使用 `add.png`，暗黑模式使用 `add_black.png`；组件内同时导入两张图片，样式层按媒体查询切换可见性，继续避免在 JSX 中按主题分支渲染。
+9. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
+10. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 `svg/png` 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，避免分散替换多套图标资源。
 
 
 

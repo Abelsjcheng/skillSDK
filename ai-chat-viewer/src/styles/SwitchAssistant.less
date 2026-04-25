@@ -1,3 +1,5 @@
+@import './theme.less';
+
 .switch-assistant {
   width: 100%;
   height: 100%;
@@ -168,4 +170,42 @@
 .switch-assistant__action-btn--confirm {
   background: rgba(13, 148, 255, 1);
   color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .switch-assistant {
+    background: var(--ai-dark-page-bg);
+    background-image: none;
+  }
+
+  .switch-assistant__card {
+    background: var(--ai-dark-card-bg);
+  }
+
+  .switch-assistant__card--selected {
+    border-color: var(--ai-dark-border-strong);
+  }
+
+  .switch-assistant__name {
+    color: var(--ai-dark-text-primary);
+  }
+
+  .switch-assistant__summary {
+    color: var(--ai-dark-text-secondary);
+  }
+
+  .switch-assistant__tag {
+    background: var(--ai-dark-tag-bg);
+    color: var(--ai-dark-tag-text);
+  }
+
+  .switch-assistant__action-btn--cancel {
+    background: var(--ai-dark-button-secondary-bg);
+    color: var(--ai-dark-button-secondary-text);
+  }
+
+  .switch-assistant__action-btn--confirm {
+    background: var(--ai-dark-button-primary-bg);
+    color: var(--ai-dark-button-primary-text);
+  }
 }

@@ -727,6 +727,8 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
 | `pcUrl` | `string` | PC 侧地址 |
 | `expireTime` | `string` | 过期时间戳 |
 | `status` | `number` | 二维码状态 |
+| `mac` | `string` | 设备 MAC 地址 |
+| `channel` | `string` | 二维码渠道标识 |
 | `expired` | `boolean` | 过期状态 |
 
 ### 出参示例
@@ -738,6 +740,8 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
   "pcUrl": "https://xxx",
   "expireTime": "1713686400000",
   "status": 1,
+  "mac": "AA-BB-CC-DD-EE-FF",
+  "channel": "welink",
   "expired": false
 }
 ```
@@ -755,6 +759,8 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
    - `pcUrl`
    - `expireTime`
    - `status`
+   - `mac`
+   - `channel`
    - `expired`
 
 ---

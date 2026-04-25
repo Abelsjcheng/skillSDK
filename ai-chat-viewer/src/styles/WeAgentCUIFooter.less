@@ -1,3 +1,5 @@
+@import './theme.less';
+
 .we-agent-cui-footer {
   width: 100%;
   height: 40px;
@@ -254,4 +256,47 @@
   border-radius: 16px;
   background: rgba(10, 89, 247, 0.05);
   padding: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .we-agent-cui-footer,
+  .we-agent-cui-footer--pc {
+    background: var(--ai-dark-card-bg);
+    border-color: var(--ai-dark-border-soft);
+  }
+
+  .we-agent-cui-footer__input,
+  .we-agent-cui-footer--pc .we-agent-cui-footer__input,
+  .we-agent-cui-footer--pc .we-agent-cui-footer__shortcut-item {
+    color: var(--ai-dark-text-primary);
+  }
+
+  .we-agent-cui-footer__input::placeholder,
+  .we-agent-cui-footer--pc .we-agent-cui-footer__input::placeholder {
+    color: var(--ai-dark-input-placeholder);
+  }
+
+  .we-agent-cui-footer--pc .we-agent-cui-footer__input {
+    background: transparent;
+  }
+
+  .we-agent-cui-footer__send-btn:hover:not(:disabled),
+  .we-agent-cui-footer__send-btn:active:not(:disabled),
+  .we-agent-cui-footer--pc .we-agent-cui-footer__shortcut-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .we-agent-cui-footer--pc .we-agent-cui-footer__shortcut-arrow-icon {
+    border-top-color: var(--ai-dark-text-muted);
+  }
+
+  .we-agent-cui-footer--pc .we-agent-cui-footer__shortcut-popup {
+    border-color: var(--ai-dark-border-soft);
+    background: var(--ai-dark-card-bg);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+  }
+
+  .we-agent-cui-footer--pc .we-agent-cui-footer__shortcut-item.is-selected {
+    background: var(--ai-dark-brand-surface);
+  }
 }

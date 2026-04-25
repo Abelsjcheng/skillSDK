@@ -51,10 +51,18 @@ function renderButton(button: CreatorStepFooterButton, includeMobilePrimary = fa
   );
 }
 
-export const CreatorStepFooter: React.FC<CreatorStepFooterProps> = ({ isPcMiniApp, pcButtons, mobileButton }) => {
+export const CreatorStepFooter: React.FC<CreatorStepFooterProps> = ({
+  isPcMiniApp,
+  pcButtons,
+  mobileButton,
+  leftContent,
+}) => {
   return (
     <footer className="digital-twin__actions">
-      {isPcMiniApp ? pcButtons.map((button) => renderButton(button)) : renderButton(mobileButton, true)}
+      {isPcMiniApp && leftContent ? <div className="digital-twin__actions-note">{leftContent}</div> : null}
+      <div className="digital-twin__actions-content">
+        {isPcMiniApp ? pcButtons.map((button) => renderButton(button)) : renderButton(mobileButton, true)}
+      </div>
     </footer>
   );
 };

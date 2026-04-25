@@ -1,3 +1,5 @@
+@import './theme.less';
+
 .app-container--we-agent-cui {
   padding: 8px 12px;
   box-shadow: none;
@@ -622,5 +624,59 @@
   .we-agent-history-sidebar__close-button {
     transform: translate(-284px, -50%);
     opacity: 0;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-container--we-agent-cui,
+  .app-container--we-agent-cui.pc-mode {
+    background: var(--ai-dark-page-bg);
+    background-image: none;
+  }
+
+  .app-container--we-agent-cui {
+    color: var(--ai-dark-text-primary);
+  }
+
+  .app-container--we-agent-cui .we-agent-message__meta-text,
+  .app-container--we-agent-cui .we-agent-message__pending-text {
+    color: var(--ai-dark-text-primary);
+  }
+
+  .app-container--we-agent-cui .we-agent-cui-welcome__title,
+  .app-container--we-agent-cui .we-agent-cui-welcome__subtitle {
+    color: var(--ai-dark-text-muted);
+  }
+
+  .app-container--we-agent-cui .we-agent-cui-actions__button,
+  .app-container--we-agent-cui .we-agent-cui-actions__status {
+    background: var(--ai-dark-card-bg);
+  }
+
+  .app-container--we-agent-cui .we-agent-history-sidebar__panel {
+    background: var(--ai-dark-page-bg);
+  }
+
+  .app-container--we-agent-cui .we-agent-history-sidebar--pc .we-agent-history-sidebar__panel {
+    background: var(--ai-dark-page-bg);
+    border-right-color: var(--ai-dark-border-soft);
+  }
+
+  .app-container--we-agent-cui .we-agent-history-sidebar__header-title,
+  .app-container--we-agent-cui .we-agent-history-sidebar__session-item,
+  .app-container--we-agent-cui .we-agent-history-sidebar--pc .we-agent-history-sidebar__header-title,
+  .app-container--we-agent-cui .we-agent-history-sidebar--pc .we-agent-history-sidebar__session-item {
+    color: var(--ai-dark-text-primary);
+  }
+
+  .app-container--we-agent-cui .we-agent-history-sidebar__group-title,
+  .app-container--we-agent-cui .we-agent-history-sidebar--pc .we-agent-history-sidebar__group-title {
+    color: var(--ai-dark-text-muted);
+  }
+
+  .app-container--we-agent-cui .we-agent-history-sidebar__session-item.is-selected,
+  .app-container--we-agent-cui .we-agent-history-sidebar--pc .we-agent-history-sidebar__session-item.is-selected {
+    background: var(--ai-dark-card-bg);
+    color: var(--ai-dark-text-primary);
   }
 }

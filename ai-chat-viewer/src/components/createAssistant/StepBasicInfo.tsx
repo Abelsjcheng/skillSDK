@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import selectionIcon from '../../imgs/selection_icon.png';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
+import addIcon from '../../imgs/add.png';
+import addBlackIcon from '../../imgs/add_black.png';
 import type {
   DefaultAvatarOption,
   DigitalTwinBasicInfoPayload,
@@ -50,6 +52,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   showHeader = true,
   expired = false,
   expiredImageSrc,
+  providerChannel,
   onClose,
   onCancel,
   onMobileBack,
@@ -66,7 +69,12 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   );
   const [name, setName] = useState(initialValue?.name ?? '');
   const [description, setDescription] = useState(initialValue?.description ?? '');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [prefersDarkMode, setPrefersDarkMode] = useState(() =>
+    window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false,
+  );
   const resolvedSubmitLabel = submitLabel ?? t('createAssistant.next');
+  const providerChannelText = providerChannel ? `AI能力提供方：${providerChannel}` : '';
 
   useEffect(() => {
     setAvatarType(initialValue?.avatarType ?? 'default');
@@ -74,11 +82,40 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     setCustomAvatarPreview(initialValue?.avatarType === 'custom' ? initialValue.icon : undefined);
     setName(initialValue?.name ?? '');
     setDescription(initialValue?.description ?? '');
+    setSubmitAttempted(false);
   }, [defaultAvatars, initialValue]);
 
-  const nameIsInvalid = useMemo(() => hasInvalidName(name), [name]);
-  const descriptionIsInvalid = useMemo(() => hasInvalidDescription(description), [description]);
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mediaQuery) {
+      return;
+    }
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setPrefersDarkMode(event.matches);
+    };
+
+    setPrefersDarkMode(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  const nameIsInvalid = useMemo(
+    () => hasInvalidName(name) || (submitAttempted && !name.trim()),
+    [name, submitAttempted],
+  );
+  const descriptionIsInvalid = useMemo(
+    () => hasInvalidDescription(description) || (submitAttempted && !description.trim()),
+    [description, submitAttempted],
+  );
   const canNext = useMemo(() => canProceedNext(name, description), [description, name]);
+  const allowDarkModeValidateClick = useMemo(
+    () => prefersDarkMode && (!name.trim() || !description.trim()),
+    [description, name, prefersDarkMode],
+  );
 
   const currentAvatarSrc =
     avatarType === 'custom'
@@ -154,6 +191,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   );
 
   const handleNext = useCallback(() => {
+    setSubmitAttempted(true);
     if (!canNext) return;
     onNext({
       avatarType,
@@ -244,7 +282,8 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                     });
                   }}
                 >
-                  +
+                  <img src={addIcon} alt="" aria-hidden="true" className="digital-twin__upload-icon digital-twin__upload-icon--light" />
+                  <img src={addBlackIcon} alt="" aria-hidden="true" className="digital-twin__upload-icon digital-twin__upload-icon--dark" />
                   {avatarType === 'custom' ? <img src={selectionIcon} alt="" aria-hidden="true" className="digital-twin__check" /> : null}
                 </button>
               </div>
@@ -252,9 +291,16 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
             <div className="digital-twin__form-section">
               <div className="digital-twin__field">
-                <span id="digital-twin-name-label" className="digital-twin__label">
-                  {t('createAssistant.name')}
-                </span>
+                <div className="digital-twin__label-row">
+                  <span id="digital-twin-name-label" className="digital-twin__label">
+                    {t('createAssistant.name')}
+                  </span>
+                  {nameIsInvalid ? (
+                    <span className="digital-twin__label-hint">
+                      {t('createAssistant.nameInvalidHint')}
+                    </span>
+                  ) : null}
+                </div>
                 <input
                   id="digital-twin-name"
                   aria-labelledby="digital-twin-name-label"
@@ -273,9 +319,16 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
               </div>
 
               <div className="digital-twin__field">
-                <span id="digital-twin-description-label" className="digital-twin__label">
-                  {t('createAssistant.description')}
-                </span>
+                <div className="digital-twin__label-row">
+                  <span id="digital-twin-description-label" className="digital-twin__label">
+                    {t('createAssistant.description')}
+                  </span>
+                  {descriptionIsInvalid ? (
+                    <span className="digital-twin__label-hint">
+                      {t('createAssistant.descriptionInvalidHint')}
+                    </span>
+                  ) : null}
+                </div>
                 <textarea
                   id="digital-twin-description"
                   aria-labelledby="digital-twin-description-label"
@@ -291,17 +344,28 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                   }}
                 />
               </div>
+
+              {!isPcMiniApp && providerChannelText ? (
+                <div className="digital-twin__provider-note digital-twin__provider-note--mobile">
+                  {providerChannelText}
+                </div>
+              ) : null}
             </div>
           </div>
 
           <CreatorStepFooter
             isPcMiniApp={isPcMiniApp}
+            leftContent={
+              isPcMiniApp && providerChannelText ? (
+                <div className="digital-twin__provider-note">{providerChannelText}</div>
+              ) : undefined
+            }
             pcButtons={[
               {
                 label: resolvedSubmitLabel,
                 onClick: handleNext,
                 variant: 'next',
-                enabled: canNext,
+                enabled: allowDarkModeValidateClick || canNext,
                 withStateClass: true,
               },
             ]}
@@ -309,7 +373,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
               label: resolvedSubmitLabel,
               onClick: handleNext,
               variant: 'next',
-              enabled: canNext,
+              enabled: allowDarkModeValidateClick || canNext,
               withStateClass: true,
             }}
           />

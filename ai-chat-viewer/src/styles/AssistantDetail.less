@@ -1,3 +1,5 @@
+@import './theme.less';
+
 .assistant-detail {
   width: 100%;
   height: 100%;
@@ -243,4 +245,33 @@
   width: 16px;
   height: 16px;
   display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  .assistant-detail,
+  .assistant-detail--pc {
+    background: var(--ai-dark-page-bg);
+    background-image: none;
+  }
+
+  .assistant-detail__card {
+    background: var(--ai-dark-card-bg);
+  }
+
+  .assistant-detail__name,
+  .assistant-detail__section-title,
+  .assistant-detail__info-label {
+    color: var(--ai-dark-text-primary);
+  }
+
+  .assistant-detail__section-desc,
+  .assistant-detail__info-value,
+  .assistant-detail__org-value {
+    color: var(--ai-dark-text-secondary);
+  }
+
+  .assistant-detail__tag {
+    background: var(--ai-dark-tag-bg);
+    color: var(--ai-dark-tag-text);
+  }
 }

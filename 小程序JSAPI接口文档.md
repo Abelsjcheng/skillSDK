@@ -1359,13 +1359,15 @@ window.Pedestal.callMethod('method://agentSkillsDialog/queryQrcodeInfo',params);
 | pcUrl | string | PC 侧地址 |
 | expireTime | string | 过期时间戳 |
 | status | number | 二维码状态 |
+| mac | string | 设备 MAC 地址 |
+| channel | string | 二维码渠道标识 |
 | expired | boolean | 过期状态 |
 
 ### 行为说明
 
 1. JSAPI 调用 SDK `queryQrcodeInfo` 接口。
 2. SDK 调用服务端 `GET /v4-1/we-crew/im-register/qrcode/{qrcode}`。
-3. SDK 不透出服务端包装字段，直接透传响应 `data` 中的 `qrcode`、`weUrl`、`pcUrl`、`expireTime`、`status`、`expired`。
+3. SDK 不透出服务端包装字段，直接透传响应 `data` 中的 `qrcode`、`weUrl`、`pcUrl`、`expireTime`、`status`、`mac`、`channel`、`expired`。
 
 ### 调用示例
 

@@ -58,8 +58,8 @@ import { APP_ID, isPcMiniApp } from '../constants';
 import { WeLog } from './logger';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
-export const WE_AGENT_BASE_URI = `h5://${APP_ID}/index.html#weAgentCUI`;
-export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID}/index.html`;
+export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
+export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
 export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
@@ -144,8 +144,8 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getAgentType: () => assistantCall<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => assistantCall<WeAgentListResult>('getWeAgentList', params),
     getWeAgentDetails: (params) => assistantCall<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
-    updateWeAgent: (params) => call<UpdateWeAgentResult>('updateWeAgent', params),
-    deleteWeAgent: (params) => call<DeleteWeAgentResult>('deleteWeAgent', params),
+    updateWeAgent: (params) => assistantCall<UpdateWeAgentResult>('updateWeAgent', params),
+    deleteWeAgent: (params) => assistantCall<DeleteWeAgentResult>('deleteWeAgent', params),
     queryQrcodeInfo: (params) => assistantCall<QueryQrcodeInfoResult>('queryQrcodeInfo', params),
     updateQrcodeInfo: (params) => assistantCall<UpdateQrcodeInfoResult>('updateQrcodeInfo', params),
     notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
@@ -298,7 +298,7 @@ export function buildOpenWeAgentCUIParams(
   const normalizedPartnerAccount = partnerAccount?.trim() ?? '';
   const normalizedWeCodeUrl = normalizeString(weCodeUrl) || WE_AGENT_BASE_URI;
   const weCodeUrlHost = getUrlHost(normalizedWeCodeUrl);
-  const isSameAppIdHost = weCodeUrlHost === APP_ID;
+  const isSameAppIdHost = weCodeUrlHost === APP_ID();
   const normalizedRobotId = normalizeString(options?.robotId);
   let weAgentUri = appendQueryParam(normalizedWeCodeUrl, 'wecodePlace', 'weAgent');
 

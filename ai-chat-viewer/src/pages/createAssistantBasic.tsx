@@ -21,7 +21,8 @@ const CreateAssistantBasicPage: React.FC = () => {
   const initialValue = useMemo(() => routeState?.draft ?? null, [routeState]);
   const from = useMemo(() => getQueryParam('from', location.search) ?? '', [location.search]);
   const qrcode = useMemo(() => getQueryParam('qrcode', location.search) ?? '', [location.search]);
-  const isQrcodeScene = from === 'qrcode' && qrcode.trim().length > 0;
+  const channel = useMemo(() => getQueryParam('channel', location.search)?.trim() ?? '', [location.search]);
+  const isQrcodeScene = from === 'qrcode';
   const [qrcodeLoaded, setQrcodeLoaded] = useState(!isQrcodeScene);
   const [qrcodeExpired, setQrcodeExpired] = useState(false);
 
@@ -171,6 +172,7 @@ const CreateAssistantBasicPage: React.FC = () => {
         initialValue={initialValue}
         expired={qrcodeExpired}
         expiredImageSrc={qrcodeExpiredNotice}
+        providerChannel={isQrcodeScene ? channel : ''}
         onClose={handleClose}
         onCancel={handleCancel}
         onMobileBack={handleMobileBack}
