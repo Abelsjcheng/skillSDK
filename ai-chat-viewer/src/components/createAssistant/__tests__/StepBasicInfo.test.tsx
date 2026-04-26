@@ -10,7 +10,6 @@ describe('StepBasicInfo', () => {
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
         onClose={noop}
-        onCancel={noop}
         onNext={noop}
       />,
     );
@@ -31,7 +30,6 @@ describe('StepBasicInfo', () => {
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
         onClose={noop}
-        onCancel={noop}
         onNext={noop}
       />,
     );
@@ -61,7 +59,6 @@ describe('StepBasicInfo', () => {
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
         onClose={noop}
-        onCancel={noop}
         onNext={noop}
       />,
     );
@@ -91,7 +88,6 @@ describe('StepBasicInfo', () => {
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
         onClose={noop}
-        onCancel={noop}
         onNext={noop}
       />,
     );
@@ -107,7 +103,6 @@ describe('StepBasicInfo', () => {
       <StepBasicInfo
         defaultAvatars={DEFAULT_AVATARS}
         onClose={noop}
-        onCancel={noop}
         onNext={noop}
       />,
     );

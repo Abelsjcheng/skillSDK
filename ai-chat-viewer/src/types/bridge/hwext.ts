@@ -288,6 +288,25 @@ export interface HWH5AddEventListenerParams {
   func: Function;
 }
 
+export interface FetchFullOptions {
+  method: string;
+  headers: Record<string, string>;
+}
+
+export interface FetchFullResponse<T = unknown> {
+  json: () => Promise<T>;
+}
+
+export interface CreateAssistantWhitelistResponse {
+  code: number;
+  data?: {
+    IMPersonalAssistant?: {
+      enable?: number;
+    };
+    [key: string]: unknown;
+  };
+}
+
 export interface WeAgentUriResult {
   weAgentUri: string;
   assistantDetailUri: string;
@@ -339,6 +358,10 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  fetchFull: <T = unknown>(
+    url: string,
+    options: FetchFullOptions,
+  ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
   onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
   offKeyboardHeightChange?: () => void;
   disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;

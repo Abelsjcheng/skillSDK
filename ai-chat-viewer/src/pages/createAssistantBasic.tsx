@@ -6,11 +6,21 @@ import { DEFAULT_AVATARS } from '../components/createAssistant/constants';
 import { isPcMiniApp } from '../constants';
 import qrcodeExpiredNotice from '../imgs/qrcode_expired_notice.png';
 import type { CreateAssistantRouteState, CreateDigitalTwinParams, DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
-import { createDigitalTwin, getQueryParam, queryQrcodeInfo, updateQrcodeInfo } from '../utils/hwext';
+import {
+  checkCreateAssistantWhitelist,
+  createDigitalTwin,
+  getQueryParam,
+  queryQrcodeInfo,
+  updateQrcodeInfo,
+} from '../utils/hwext';
 import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
+
+function isExpiredByExpireTime(expireTime: string): boolean {
+  return Date.now() > Number(expireTime) * 1000;
+}
 
 const CreateAssistantBasicPage: React.FC = () => {
   const { t } = useTranslation();
@@ -25,6 +35,13 @@ const CreateAssistantBasicPage: React.FC = () => {
   const isQrcodeScene = from === 'qrcode';
   const [qrcodeLoaded, setQrcodeLoaded] = useState(!isQrcodeScene);
   const [qrcodeExpired, setQrcodeExpired] = useState(false);
+  const [qrcodeExpiredMessage, setQrcodeExpiredMessage] = useState('');
+
+  const showQrcodeExpired = useCallback((message: string) => {
+    setQrcodeExpired(true);
+    setQrcodeExpiredMessage(message);
+    setQrcodeLoaded(true);
+  }, []);
 
   const updateQrcodeStatusSafely = useCallback(async (status: number, robotId?: string) => {
     try {
@@ -43,6 +60,7 @@ const CreateAssistantBasicPage: React.FC = () => {
     if (!isQrcodeScene || !qrcode) {
       setQrcodeLoaded(true);
       setQrcodeExpired(false);
+      setQrcodeExpiredMessage('');
       return;
     }
 
@@ -50,21 +68,36 @@ const CreateAssistantBasicPage: React.FC = () => {
 
     const fetchQrcodeInfo = async () => {
       try {
+        const hasPermission = await checkCreateAssistantWhitelist();
+        if (cancelled) {
+          return;
+        }
+
+        if (!hasPermission) {
+          showQrcodeExpired(t('createAssistant.noPermission'));
+          return;
+        }
+
         const result = await queryQrcodeInfo({ qrcode });
         if (cancelled) {
           return;
         }
 
-        const expireTimestamp = Number(result.expireTime);
-        const expired = Number.isFinite(expireTimestamp) && Date.now() > expireTimestamp * 1000;
+        const invalidOnInit = isExpiredByExpireTime(result.expireTime) || result.status !== 0;
+        if (invalidOnInit) {
+          showQrcodeExpired(t('createAssistant.qrcodeInvalid'));
+          return;
+        }
 
-        setQrcodeExpired(expired);
+        setQrcodeExpired(false);
+        setQrcodeExpiredMessage('');
         setQrcodeLoaded(true);
         void updateQrcodeStatusSafely(1);
       } catch (error) {
         WeLog(`CreateAssistantBasicPage queryQrcodeInfo failed | extra=${JSON.stringify({ qrcode })} | error=${JSON.stringify(error)}`);
         if (!cancelled) {
           setQrcodeExpired(false);
+          setQrcodeExpiredMessage('');
           setQrcodeLoaded(true);
         }
         showToast(t('createAssistant.queryQrcodeInfoFailed'));
@@ -76,7 +109,7 @@ const CreateAssistantBasicPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isQrcodeScene, qrcode, t, updateQrcodeStatusSafely]);
+  }, [isQrcodeScene, qrcode, showQrcodeExpired, t, updateQrcodeStatusSafely]);
 
   useEffect(() => {
     if (isPc || !isQrcodeScene || !qrcode) {
@@ -93,13 +126,6 @@ const CreateAssistantBasicPage: React.FC = () => {
   }, [isPc, isQrcodeScene, qrcode, updateQrcodeStatusSafely]);
 
   const handleClose = useCallback(async () => {
-    if (isQrcodeScene) {
-      await updateQrcodeStatusSafely(3);
-    }
-    closeCreateAssistantWindow();
-  }, [isQrcodeScene, updateQrcodeStatusSafely]);
-
-  const handleCancel = useCallback(async () => {
     if (isQrcodeScene) {
       await updateQrcodeStatusSafely(3);
     }
@@ -129,6 +155,20 @@ const CreateAssistantBasicPage: React.FC = () => {
       return;
     }
 
+    try {
+      const qrcodeInfo = await queryQrcodeInfo({ qrcode });
+      if (isExpiredByExpireTime(qrcodeInfo.expireTime)) {
+        showQrcodeExpired(t('createAssistant.qrcodeInvalid'));
+        return;
+      }
+    } catch (error) {
+      WeLog(`CreateAssistantBasicPage queryQrcodeInfo before create failed | extra=${JSON.stringify({
+        qrcode,
+      })} | error=${JSON.stringify(error)}`);
+      showToast(t('createAssistant.queryQrcodeInfoFailed'));
+      return;
+    }
+
     const params: CreateDigitalTwinParams = {
       name: payload.name,
       icon: payload.icon,
@@ -139,7 +179,6 @@ const CreateAssistantBasicPage: React.FC = () => {
     try {
       const createResult = await createDigitalTwin(params);
       const partnerAccount = resolvePartnerAccount(createResult);
-      const createdRobotId = typeof createResult.robotId === 'string' ? createResult.robotId.trim() : '';
 
       if (!partnerAccount) {
         WeLog(`CreateAssistantBasicPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
@@ -149,7 +188,6 @@ const CreateAssistantBasicPage: React.FC = () => {
         return;
       }
 
-      await updateQrcodeStatusSafely(2, createdRobotId);
       await handleCreateForOtherScene(createResult);
     } catch (error) {
       WeLog(`CreateAssistantBasicPage createDigitalTwin failed | extra=${JSON.stringify({
@@ -158,7 +196,7 @@ const CreateAssistantBasicPage: React.FC = () => {
       })} | error=${JSON.stringify(error)}`);
       showToast(t('createAssistant.createFailed'));
     }
-  }, [from, isQrcodeScene, location.search, navigate, qrcode, t, updateQrcodeStatusSafely]);
+  }, [from, isQrcodeScene, location.search, navigate, qrcode, showQrcodeExpired, t]);
 
   if (isQrcodeScene && !qrcodeLoaded) {
     return <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()} />;
@@ -172,9 +210,9 @@ const CreateAssistantBasicPage: React.FC = () => {
         initialValue={initialValue}
         expired={qrcodeExpired}
         expiredImageSrc={qrcodeExpiredNotice}
+        expiredMessage={qrcodeExpiredMessage}
         providerChannel={isQrcodeScene ? channel : ''}
         onClose={handleClose}
-        onCancel={handleCancel}
         onMobileBack={handleMobileBack}
         onNext={handleNext}
         submitLabel={isQrcodeScene && !qrcodeExpired ? t('common.confirm') : undefined}

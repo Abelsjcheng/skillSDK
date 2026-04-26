@@ -61,6 +61,30 @@ interface ApiEnvelope<T> {
 }
 
 type SessionListenerSet = Map<string, Set<RegisterSessionListenerParams>>;
+type LocalEmitPayload = Omit<Parameters<RegisterSessionListenerParams['onMessage']>[0], 'welinkSessionId' | 'seq' | 'emittedAt'> & {
+  emittedAt?: string | null;
+};
+
+const MOCK_CODEBLOCK_REPLY = [
+  '下面给你一段用于验证代码块样式的 mock 返回：',
+  '',
+  '```cpp',
+  'class Solution {',
+  'public:',
+  '    int countTestedDevices(vector<int>& batteryPercentages) {',
+  '        int tested = 0;',
+  '        for (int battery : batteryPercentages) {',
+  '            if (battery - tested > 0) {',
+  '                tested++;',
+  '            }',
+  '        }',
+  '        return tested;',
+  '    }',
+  '};',
+  '```',
+].join('\n');
+
+let localIdCounter = 0;
 
 function createSvgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -179,6 +203,47 @@ function normalizeProtocolMessage<T>(rawMessage: T): T {
   return rawMessage;
 }
 
+function nextLocalId(prefix: string): string {
+  localIdCounter += 1;
+  return `${prefix}_${Date.now()}_${localIdCounter}`;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function splitReplyContent(content: string): string[] {
+  const chunks: string[] = [];
+  let cursor = 0;
+  const chunkSize = 12;
+  while (cursor < content.length) {
+    chunks.push(content.slice(cursor, cursor + chunkSize));
+    cursor += chunkSize;
+  }
+  return chunks.length > 0 ? chunks : [content];
+}
+
+function matchesMockKeyword(content: string, keywords: string[]): boolean {
+  const normalized = content.trim().toLowerCase();
+  return keywords.some((keyword) => normalized.includes(keyword));
+}
+
+function buildLocalSendMessageResponse(welinkSessionId: string, content: string): SendMessageResponse {
+  const createdAt = nowIso();
+  return {
+    id: nextLocalId('opencode_user_message'),
+    welinkSessionId,
+    seq: null,
+    messageSeq: null,
+    role: 'user',
+    content,
+    contentType: 'plain',
+    createdAt,
+    meta: null,
+    parts: null,
+  };
+}
+
 async function requestJson<T>(
   config: OpenCodeBridgeConfig,
   path: string,
@@ -225,6 +290,7 @@ class SkillStreamSocket {
   private listeners: SessionListenerSet = new Map();
   private reconnectTimer: number | null = null;
   private connecting = false;
+  private localSeq = 0;
 
   constructor(private readonly config: OpenCodeBridgeConfig) {}
 
@@ -242,6 +308,23 @@ class SkillStreamSocket {
     if (this.listeners.size === 0) {
       this.close();
     }
+  }
+
+  emitLocal(sessionId: string, payload: LocalEmitPayload): void {
+    const sessionListeners = this.listeners.get(sessionId);
+    if (!sessionListeners || sessionListeners.size === 0) {
+      return;
+    }
+
+    this.localSeq += 1;
+    sessionListeners.forEach((listener) => {
+      listener.onMessage({
+        ...payload,
+        welinkSessionId: sessionId,
+        seq: this.localSeq,
+        emittedAt: payload.emittedAt ?? nowIso(),
+      });
+    });
   }
 
   private ensureConnected(): void {
@@ -473,6 +556,47 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
     },
 
     async sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
+      if (matchesMockKeyword(params.content, ['mock-codeblock', 'trigger-codeblock'])) {
+        const messageId = nextLocalId('opencode_mock_assistant');
+        const partId = nextLocalId('opencode_mock_part');
+        const chunks = splitReplyContent(MOCK_CODEBLOCK_REPLY);
+
+        window.setTimeout(() => {
+          socket.emitLocal(params.welinkSessionId, {
+            type: 'session.status',
+            sessionStatus: 'busy',
+          });
+        }, 20);
+
+        chunks.forEach((chunk, index) => {
+          window.setTimeout(() => {
+            socket.emitLocal(params.welinkSessionId, {
+              type: 'text.delta',
+              messageId,
+              role: 'assistant',
+              partId,
+              content: chunk,
+            });
+          }, 80 + index * 60);
+        });
+
+        window.setTimeout(() => {
+          socket.emitLocal(params.welinkSessionId, {
+            type: 'text.done',
+            messageId,
+            role: 'assistant',
+            partId,
+            content: MOCK_CODEBLOCK_REPLY,
+          });
+          socket.emitLocal(params.welinkSessionId, {
+            type: 'session.status',
+            sessionStatus: 'idle',
+          });
+        }, 120 + chunks.length * 60);
+
+        return buildLocalSendMessageResponse(params.welinkSessionId, params.content);
+      }
+
       const result = await requestJson<SendMessageResponse>(
         config,
         `/api/skill/sessions/${encodeURIComponent(params.welinkSessionId)}/messages`,

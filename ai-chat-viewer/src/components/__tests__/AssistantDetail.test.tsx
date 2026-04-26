@@ -123,18 +123,18 @@ describe('AssistantDetail', () => {
     expect(screen.getByText(i18n.t('assistantDetail.introTitle'))).toBeInTheDocument();
     expect(screen.getByText('Internal assistant description')).toBeInTheDocument();
     expect(screen.getByText(i18n.t('assistantDetail.creator'))).toBeInTheDocument();
-    expect(screen.getByText('creator-zh u1')).toBeInTheDocument();
+    expect(screen.getByText('creator-zh creator_w3')).toBeInTheDocument();
     expect(screen.getByText(i18n.t('assistantDetail.capabilityProvider'))).toBeInTheDocument();
   });
 
-  it('uses creatorNameEn when current language is english', async () => {
+  it('uses creatorNameEn with creatorW3Account when current language is english', async () => {
     window.localStorage.setItem('language', '1033');
     await i18n.changeLanguage('en');
     installAssistantDetailMock('internal');
 
     renderAssistantDetail();
 
-    expect(await screen.findByText('creator-en u1')).toBeInTheDocument();
+    expect(await screen.findByText('creator-en creator_w3')).toBeInTheDocument();
   });
 
   it('renders appid and secret actions for external assistant', async () => {

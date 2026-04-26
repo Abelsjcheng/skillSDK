@@ -248,29 +248,28 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .assistant-detail,
-  .assistant-detail--pc {
+  .assistant-detail:not(.assistant-detail--pc) {
     background: var(--ai-dark-page-bg);
     background-image: none;
   }
 
-  .assistant-detail__card {
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__card {
     background: var(--ai-dark-card-bg);
   }
 
-  .assistant-detail__name,
-  .assistant-detail__section-title,
-  .assistant-detail__info-label {
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__name,
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__section-title,
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__info-label {
     color: var(--ai-dark-text-primary);
   }
 
-  .assistant-detail__section-desc,
-  .assistant-detail__info-value,
-  .assistant-detail__org-value {
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__section-desc,
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__info-value,
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__org-value {
     color: var(--ai-dark-text-secondary);
   }
 
-  .assistant-detail__tag {
+  .assistant-detail:not(.assistant-detail--pc) .assistant-detail__tag {
     background: var(--ai-dark-tag-bg);
     color: var(--ai-dark-tag-text);
   }

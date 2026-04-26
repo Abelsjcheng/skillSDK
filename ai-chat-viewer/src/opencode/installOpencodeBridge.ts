@@ -73,6 +73,16 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
   if (!window.HWH5) {
     window.HWH5 = {
       close: () => undefined,
+      fetchFull: async <T>() => ({
+        json: async () => ({
+          code: 0,
+          data: {
+            IMPersonalAssistant: {
+              enable: 1,
+            },
+          },
+        }) as T,
+      }),
       openWebview: ({ uri }) => {
         window.open(uri, '_blank', 'noopener,noreferrer');
       },
