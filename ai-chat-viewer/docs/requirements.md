@@ -123,6 +123,7 @@
 4. 自定义上传入口触发文件选择时，必须执行上传限制：
    - 仅支持 `JPG/PNG` 格式（含 `jpg/jpeg/png`）。
    - 文件大小必须小于 `2MB`。
+   - `chooseImage` 接口出参若返回 `size` 字段（单位：字节），则文件大小校验优先基于该 `size` 字段判断。
 5. 上传文件不满足限制时：
    - 保持当前头像选中状态不变；
    - 通过 toast 弹窗提示错误文案，不再使用页面内 `avatarError` 错误提示文本；
@@ -222,6 +223,7 @@
    - 移动端 toast 统一通过 `HWH5.showToast({ msg, type: 'w' })` 调用宿主原生提示能力，业务侧不再自行控制页面内定位样式。
 10. 创建个人助理二维码场景：
    - 当路由 query 中 `from=qrcode` 时，即视为扫二维码打开创建个人助理第一页；扫码场景 query 会额外携带 `qrcode` 与 `channel` 参数；
+   - PC 端打开创建个人助理第一页时，页面组件实例需挂载 `key`，取 query 中的 `qrcode`；若未传则使用固定值 `defalut`；
    - 页面打开后需根据 `小程序JSAPI接口文档.md` 调用 `queryQrcodeInfo({ qrcode })` 查询二维码信息；
    - 二维码是否失效必须通过 `expireTime` 与当前时间戳比较判断，不以 `expired` 字段直接替代判断；
    - `queryQrcodeInfo` 返回的 `expireTime` 单位为秒（`s`），前端比较前需先换算为毫秒时间戳；

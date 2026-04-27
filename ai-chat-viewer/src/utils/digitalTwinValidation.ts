@@ -2,7 +2,6 @@ import i18n from '../i18n/config';
 import type { BrainType, GetFilePathResult } from '../types/digitalTwin';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png']);
 const NAME_MIN_LENGTH = 2;
 const NAME_MAX_LENGTH = 50;
@@ -62,6 +61,10 @@ export function canConfirm(brainType?: BrainType, bizRobotId?: string): boolean 
 }
 
 export function validateAvatarFile(file: GetFilePathResult): AvatarValidationResult {
+  if (typeof file.size === 'number' && file.size >= MAX_AVATAR_SIZE) {
+    return { valid: false, reason: i18n.t('createAssistant.avatarTooLarge'), code: 'size' };
+  }
+
   const ext = file.filePath.split('.').pop()?.toLowerCase();
   if (ext && ALLOWED_EXTENSIONS.has(ext)) {
     return { valid: true };

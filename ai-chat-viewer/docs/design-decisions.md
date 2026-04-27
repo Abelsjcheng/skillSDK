@@ -222,6 +222,7 @@ interface CreateDigitalTwinParams {
 1. 通过“+”自定义头像按钮触发文件选择时，执行客户端二次校验：
    - 仅允许 `jpg/jpeg/png`
    - 文件大小 `< 2MB`
+   - 若 `chooseImage` 返回 `size`（字节）字段，则大小校验优先直接使用该值，不再只依赖文件路径后缀或其他推断信息
 2. 上传不合法时：
    - 不改变当前头像选择
    - 文件大小超限（`>= 2MB`）使用 toast 提示：`图片大小需小于2MB`
@@ -256,6 +257,7 @@ interface CreateDigitalTwinParams {
    - 这两个接口参数直接透传 `params`，不再包装 `{ funName, params }`。
 15. 创建助理二维码场景采用“页面层判断 + 组件层展示”的分层实现：
    - 页面层在 `createAssistantBasic.tsx` 读取 `from` / `qrcode` / `channel` query，其中扫码场景标识仅由 `from === 'qrcode'` 判断；涉及二维码查询与状态回写的接口调用点再单独要求 `qrcode` 非空；
+   - PC 端创建个人助理第一页的组件重建控制放在路由层实现：由 `CreateAssistantPageRouter.tsx` 使用 query 中的 `qrcode` 生成 `CreateAssistantBasicPage` 的 React `key`，未传时回退为 `defalut`；不要把该 `key` 挂在页面内部根节点上，避免组件实例不重建；
    - 失效判断只使用“当前时间戳 `Date.now()` 是否严格大于 `Number(expireTime) * 1000`”；`queryQrcodeInfo` 返回的 `expireTime` 按秒级时间戳处理，前端比较前统一先换算为毫秒；
    - `StepBasicInfo` 仅新增受控的失效态展示能力，不在组件内部直接调用二维码查询接口；
    - 失效态使用独立样式 class 覆盖第一页内容区，背景固定 `rgba(196,196,196,1)`，内容区只承载一张从 `src/imgs` 导入的二维码失效提示 `png` 图。

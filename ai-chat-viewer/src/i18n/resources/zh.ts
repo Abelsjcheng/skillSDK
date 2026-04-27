@@ -89,6 +89,7 @@ export const zh = {
   'createAssistant.customTipPrefix': '需在本地电脑自定义部署第三方助手，点击查看',
   'createAssistant.guideDocument': '指导文档→',
   'createAssistant.illustrationAlt': '个人助理插画',
+  'createAssistant.avatarTooLarge': '图片大小需小于2MB',
   'createAssistant.invalidAvatarFormat': '仅支持JPG/PNG格式',
   'editAssistant.title': '编辑个人助理',
   'editAssistant.loadFailed': '获取助理详情失败',

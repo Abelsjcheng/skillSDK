@@ -66,4 +66,5 @@ export interface UploadTinyImageResult {
 
 export interface GetFilePathResult {
   filePath: string;
+  size?: number;
 }

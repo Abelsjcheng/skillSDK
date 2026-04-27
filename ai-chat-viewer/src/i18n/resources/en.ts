@@ -99,6 +99,7 @@ export const en = {
   'createAssistant.customTipPrefix': 'Deploy a third-party assistant on your local computer, then click to view the ',
   'createAssistant.guideDocument': 'guide',
   'createAssistant.illustrationAlt': 'Personal assistant illustration',
+  'createAssistant.avatarTooLarge': 'Image size must be less than 2MB',
   'createAssistant.invalidAvatarFormat': 'Only JPG/PNG is supported',
   'editAssistant.title': 'Edit personal assistant',
   'editAssistant.loadFailed': 'Failed to load assistant details',
