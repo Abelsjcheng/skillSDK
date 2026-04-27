@@ -53,6 +53,7 @@ export const en = {
   'permission.command': 'Command execution',
   'permission.network': 'Network access',
   'permission.unknown': 'Permission request',
+  'permission.allowOnce': 'Allow once',
   'permission.processFailed': 'Failed to handle permission',
   'permission.toolLabel': 'Tool',
   'question.customPlaceholder': 'Enter a custom answer...',

@@ -126,6 +126,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
             userSelect: 'none',
             fontSize: '14px',
             fontWeight: 400,
+            fontStyle: 'normal',
             lineHeight: 1.8,
             fontFamily: '"SFMono-Regular", Consolas, "Courier New", Monaco, monospace',
             fontVariantNumeric: 'tabular-nums',

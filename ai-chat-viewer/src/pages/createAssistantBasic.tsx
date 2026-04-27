@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StepBasicInfo } from '../components/createAssistant/StepBasicInfo';
@@ -33,6 +33,7 @@ const CreateAssistantBasicPage: React.FC = () => {
   const qrcode = useMemo(() => getQueryParam('qrcode', location.search) ?? '', [location.search]);
   const channel = useMemo(() => getQueryParam('channel', location.search)?.trim() ?? '', [location.search]);
   const isQrcodeScene = from === 'qrcode';
+  const shouldUpdateQrcodeStatusRef = useRef(false);
   const [qrcodeLoaded, setQrcodeLoaded] = useState(!isQrcodeScene);
   const [qrcodeExpired, setQrcodeExpired] = useState(false);
   const [qrcodeExpiredMessage, setQrcodeExpiredMessage] = useState('');
@@ -58,6 +59,7 @@ const CreateAssistantBasicPage: React.FC = () => {
 
   useEffect(() => {
     if (!isQrcodeScene || !qrcode) {
+      shouldUpdateQrcodeStatusRef.current = false;
       setQrcodeLoaded(true);
       setQrcodeExpired(false);
       setQrcodeExpiredMessage('');
@@ -83,6 +85,8 @@ const CreateAssistantBasicPage: React.FC = () => {
           return;
         }
 
+        shouldUpdateQrcodeStatusRef.current = Number(result.status) === 0;
+
         const invalidOnInit = isExpiredByExpireTime(result.expireTime) || result.status !== 0;
         if (invalidOnInit) {
           showQrcodeExpired(t('createAssistant.qrcodeInvalid'));
@@ -92,10 +96,13 @@ const CreateAssistantBasicPage: React.FC = () => {
         setQrcodeExpired(false);
         setQrcodeExpiredMessage('');
         setQrcodeLoaded(true);
-        void updateQrcodeStatusSafely(1);
+        if (shouldUpdateQrcodeStatusRef.current) {
+          void updateQrcodeStatusSafely(1);
+        }
       } catch (error) {
         WeLog(`CreateAssistantBasicPage queryQrcodeInfo failed | extra=${JSON.stringify({ qrcode })} | error=${JSON.stringify(error)}`);
         if (!cancelled) {
+          shouldUpdateQrcodeStatusRef.current = false;
           setQrcodeExpired(false);
           setQrcodeExpiredMessage('');
           setQrcodeLoaded(true);
@@ -119,21 +126,23 @@ const CreateAssistantBasicPage: React.FC = () => {
     window.HWH5.addEventListener?.({
       type: 'back',
       func: () => {
-        void updateQrcodeStatusSafely(3);
+        if (shouldUpdateQrcodeStatusRef.current) {
+          void updateQrcodeStatusSafely(3);
+        }
         return true;
       },
     });
   }, [isPc, isQrcodeScene, qrcode, updateQrcodeStatusSafely]);
 
   const handleClose = useCallback(async () => {
-    if (isQrcodeScene) {
+    if (isQrcodeScene && shouldUpdateQrcodeStatusRef.current) {
       await updateQrcodeStatusSafely(3);
     }
     closeCreateAssistantWindow();
   }, [isQrcodeScene, updateQrcodeStatusSafely]);
 
   const handleMobileBack = useCallback(async () => {
-    if (isQrcodeScene) {
+    if (isQrcodeScene && shouldUpdateQrcodeStatusRef.current) {
       await updateQrcodeStatusSafely(3);
     }
     window.HWH5.navigateBack();

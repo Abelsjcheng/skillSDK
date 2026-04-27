@@ -596,107 +596,171 @@
 
   // PermissionCard
   .permission-card {
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     border-radius: 8px;
-    border: 1px solid #faad14;
-    background-color: #fffbe6;
-    padding: 12px;
-    margin: 4px 0;
-
-    &--resolved {
-      border-color: #52c41a;
-      background-color: #f6ffed;
-    }
+    border: 1px solid rgba(238, 238, 238, 1);
+    background-color: #ffffff;
+    margin: 4px 0 0;
   }
 
   .permission-card__header {
     display: flex;
     align-items: center;
-    margin-bottom: 8px;
+    height: 40px;
+    padding: 0 12px;
+    background: rgba(245, 245, 245, 1);
 
     > * + * {
-      margin-left: 8px;
+      margin-left: 4px;
     }
   }
 
   .permission-card__icon {
-    font-size: 16px;
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    flex-shrink: 0;
   }
 
   .permission-card__type {
+    font-size: 14px;
     font-weight: 500;
-    color: #333;
+    line-height: 22px;
+    color: rgba(51, 51, 51, 1);
   }
 
   .permission-card__info {
-    font-size: 13px;
-    color: #666;
-    margin-bottom: 12px;
+    padding: 12px;
+    background: #ffffff;
+    font-size: 14px;
+    line-height: 22px;
   }
 
   .permission-card__tool {
-    margin-bottom: 4px;
+    color: rgba(153, 153, 153, 1);
   }
 
   .permission-card__desc {
-    color: #999;
+    margin-top: 4px;
+    color: rgba(51, 51, 51, 1);
+  }
+
+  .permission-card__result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 12px 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(235, 255, 234, 1);
+  }
+
+  .permission-card__result-label {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+    color: rgba(51, 189, 44, 1);
+  }
+
+  .permission-card__result-content {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+    color: rgba(51, 51, 51, 1);
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .permission-card__actions,
+  .permission-card__status {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 12px;
+    border-radius: 8px;
+    background: #ffffff;
   }
 
   .permission-card__actions {
     display: flex;
-    flex-wrap: wrap;
-    margin-top: -8px;
-    margin-left: -8px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+  }
 
-    > * {
-      margin-top: 8px;
-      margin-left: 8px;
-    }
+  .permission-card__actions-label {
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+    color: rgba(51, 51, 51, 1);
+  }
+
+  .permission-card__actions-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
   }
 
   .permission-card__btn {
-    padding: 6px 12px;
+    width: 64px;
+    height: 24px;
+    padding: 0;
     border: none;
-    border-radius: 4px;
+    border-radius: 35px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 20px;
     transition: all 0.2s;
+    flex-shrink: 0;
 
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
 
-    &--allow {
-      background-color: #52c41a;
-      color: #fff;
+    &--always {
+      background: rgba(245, 245, 245, 1);
+      color: rgba(102, 102, 102, 1);
 
       &:hover:not(:disabled) {
-        background-color: #73d13d;
+        background: rgba(235, 235, 235, 1);
       }
     }
 
-    &--always {
-      background-color: #1890ff;
-      color: #fff;
+    &--allow {
+      background: rgba(239, 246, 255, 1);
+      color: rgba(13, 148, 255, 1);
 
       &:hover:not(:disabled) {
-        background-color: #40a9ff;
+        background: rgba(227, 239, 255, 1);
       }
     }
 
     &--deny {
-      background-color: #ff4d4f;
-      color: #fff;
+      background: rgba(255, 241, 241, 1);
+      color: rgba(243, 111, 100, 1);
 
       &:hover:not(:disabled) {
-        background-color: #ff7875;
+        background: rgba(255, 232, 232, 1);
       }
     }
   }
 
   .permission-card__status {
-    font-size: 12px;
-    color: #52c41a;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+    color: rgba(51, 189, 44, 1);
   }
 
   // ErrorBlock
@@ -856,8 +920,7 @@
       border-color: rgba(13, 148, 255, 1);
     }
 
-    .question-card--answered,
-    .permission-card--resolved {
+    .question-card--answered {
       background: rgba(82, 196, 26, 0.12);
     }
 
@@ -877,8 +940,13 @@
       background: rgba(82, 196, 26, 0.12);
     }
 
-    .permission-card {
-      border-color: #faad14;
+    .permission-card__header {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .permission-card__actions,
+    .permission-card__status {
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .error-block {

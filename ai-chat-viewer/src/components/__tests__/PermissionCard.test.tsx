@@ -57,5 +57,7 @@ describe('PermissionCard', () => {
     expect(container.querySelector('.permission-card')).toBeInTheDocument();
     expect(container.querySelector('.permission-card__result')).toBeInTheDocument();
     expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
+    expect(container.querySelector('.permission-card__result-label')?.textContent).toBe('已确认');
+    expect(container.querySelector('.permission-card .permission-card__actions')).not.toBeInTheDocument();
   });
 });

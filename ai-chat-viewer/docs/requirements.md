@@ -233,14 +233,17 @@
       - 内容区背景颜色 `rgba(196,196,196,1)`；
       - 内容垂直居中显示一张从 `src/imgs` 导入的二维码失效提示 `png` 图片；
       - 失效态下不再展示表单内容与底部操作按钮；
-   - `queryQrcodeInfo({ qrcode })` 查询成功后，无论二维码是否过期，都需调用 `updateQrcodeInfo({ qrcode, status: 1 })`，将二维码状态更新为已扫码；
+   - 仅当第一页初始化调用 `queryQrcodeInfo({ qrcode })` 成功且返回 `status === 0` 时，才允许后续调用 `updateQrcodeInfo` 更新二维码状态；
+   - 若第一页初始化查询返回 `status !== 0`，则后续 `status: 1 / 2 / 3` 的二维码状态回写全部不再调用；
+   - 若第一页初始化查询失败，同样不再调用后续 `updateQrcodeInfo` 状态回写；
+   - 满足上述回写前提时，第一页初始化查询成功后需调用 `updateQrcodeInfo({ qrcode, status: 1 })`，将二维码状态更新为已扫码；
    - 扫码场景下，第一页底部主按钮文案改为“确定”；
    - 扫码场景下，第一页点击“确定”后直接触发创建助理接口，不再跳转到 `/selectBrainAssistant` 页面；
    - 扫码场景第一页需展示 AI 能力提供方注释，文案固定为 `AI能力提供方：${channel}`，其中 `${channel}` 取 query 参数 `channel`；
       - 移动端：注释显示在简介块下方 `12px` 处，文本水平居中，样式为 `12px / 400`、`rgba(153,153,153,1)`；
       - PC 端：注释显示在底部按钮区左侧，文本左对齐，样式为 `12px / 400`、`rgba(153,153,153,1)`；
    - 扫码场景第一页直创时，`createDigitalTwin` 入参需透传第一页表单已有字段 `name`、`icon`、`description`，并追加传入当前二维码值 `qrcode`；不再额外传 `weCrewType` 与 `bizRobotId`；
-   - 当创建助理接口调用成功后，需先调用 `updateQrcodeInfo({ qrcode, robotId, status: 2 })`，其中 `robotId` 取创建助理接口返回值；回写完成后继续复用第二页中 `handleCreateForOtherScene` 共享方法承载的成功跳转逻辑：
+   - 当创建助理接口调用成功后，若满足二维码状态回写前提，则需先调用 `updateQrcodeInfo({ qrcode, robotId, status: 2 })`，其中 `robotId` 取创建助理接口返回值；回写完成后继续复用第二页中 `handleCreateForOtherScene` 共享方法承载的成功跳转逻辑：
       - 移动端优先调用 `window.HWH5.openIMChat({ chatId: partnerAccount })`，若宿主无该能力则调用 `window.HWH5.close()`；
       - PC 端调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`；
       - 不再跳转到 `/selectBrainAssistant` 页面。
@@ -248,9 +251,9 @@
       - 移动端第一页点击左上角返回；
       - PC 端点击右上角关闭按钮；
       - PC 端点击会直接关闭页面的“取消”按钮；
-      - 以上场景都需先调用 `updateQrcodeInfo({ qrcode, status: 3 })` 更新为取消，再继续原有关闭/返回动作；
+      - 以上场景若满足二维码状态回写前提，则需先调用 `updateQrcodeInfo({ qrcode, status: 3 })` 更新为取消，再继续原有关闭/返回动作；
    - 扫码进入第一页后，移动端需额外调用 `HWH5.addEventListener({ type: 'back', func })` 注册宿主返回监听；
-      - `func` 中需调用 `updateQrcodeInfo({ qrcode, status: 3 })`；
+      - `func` 中若满足二维码状态回写前提，需调用 `updateQrcodeInfo({ qrcode, status: 3 })`；
       - `func` 必须同步 `return true`；
       - 宿主 `back` 监听中的二维码状态回写同样复用页面内既有的错误提示逻辑，不额外解析错误对象；
    - 扫码场景的二维码状态流转全部收口在第一页 `/createAssistant`，第二页 `/selectBrainAssistant` 不再承接二维码状态回写与退出处理；
@@ -722,6 +725,20 @@
    - AI 消息时间来源：消息生成时间（当前消息对象的时间戳）。
    - 消息内容块距第一行 `8px`，宽度占满当前消息容器整行；该规则适用于所有 AI 消息类型块，不再仅代码块独占整行。
    - 权限消息块（`PermissionCard`）宽度占满当前消息容器可用宽度，不再按内容宽度收缩。
+   - 权限确认块外层圆角半径 `8px`，整体采用“灰色头部 + 白色内容区”的分层结构：
+      - 权限消息块外层边框固定为 `1px solid rgba(238,238,238,1)`；
+      - 头部块高度 `40px`，`padding: 0 12px`，垂直居中显示图标与名称，背景色 `rgba(245,245,245,1)`；
+      - 头部左侧显示一个从 `src/imgs` 导入的锁图标 `png`，图标右侧 `4px` 显示 `{typeLabel}`；
+      - 内容区背景色固定为白色。
+   - 权限确认块中的 `permission-card__tool` 直接显示 `part.toolName`，文本颜色 `rgba(153,153,153,1)`；不再显示 `t('permission.toolLabel')` 文案。
+   - 权限确认结果块样式固定为：圆角半径 `8px`、`padding: 8px 12px`、背景颜色 `rgba(235,255,234,1)`，左侧显示文本“已确认”（颜色 `rgba(51,189,44,1)`），最右侧显示权限确认结果按钮名称；结果文本样式统一为 `14px / 400 / 22px`。
+   - 未确认时的操作区通过独立块展示，与前后块间距 `12px`，单独占满一行，`padding: 9px 12px`；该独立块不放在 `permission-card` 内部。左侧显示固定文本 `edit`（不做国际化），右侧依次展示“始终允许 / 允许一次 / 拒绝”3 个按钮，按钮间距 `8px`。
+   - 三个权限确认按钮尺寸与配色固定为：
+      - 尺寸：`64px x 24px`，圆角半径 `35px`；
+      - 文本样式：`12px / 400 / 20px`；
+      - “始终允许”：背景 `rgba(245,245,245,1)`，文本 `rgba(102,102,102,1)`；
+      - “允许”：背景 `rgba(239,246,255,1)`，文本 `rgba(13,148,255,1)`；
+      - “拒绝”：背景 `rgba(255,241,241,1)`，文本 `rgba(243,111,100,1)`。
    - AI 消息块内部涉及展开/收起的交互组件（如代码块、思考块、工具调用块）统一使用 `src/imgs/arrow_up_icon.svg` 作为箭头图标资源；展开状态箭头朝上，收缩状态箭头朝下。
    - AI 消息块内如果渲染代码组件块，则该代码组件块需作为块级内容单独占满一整行可用宽度；普通文本消息块仍保持按内容宽度自适应。
    - 代码块在移动端显示时不允许强制换行；当代码内容超出手机屏幕宽度时，代码块内部应保持单行结构并支持横向滚动查看，不得破坏原始缩进与换行语义。
