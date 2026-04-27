@@ -57,7 +57,7 @@ const ActivateAssistant: React.FC = () => {
     const latestList = assistantList.length > 0 ? assistantList : await loadAssistantList();
     if (isPc) {
       if (latestList.length > 0) {
-        window.location.hash = '/selectAssistant';
+        window.location.hash = '#selectAssistant';
       } else {
         openWeAgentDialogPc('weAgentPc')
       }
