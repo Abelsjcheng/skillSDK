@@ -92,7 +92,7 @@
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 
 .digital-twin__close-icon {
@@ -122,7 +122,7 @@
 }
 
 .digital-twin__brain-illustration {
-  margin-top: 20px;
+  margin-top: 100px;
   width: 100%;
   object-fit: contain;
   display: block;
@@ -146,6 +146,7 @@
   padding: 0;
   background: rgba(249, 249, 249, 1);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -154,11 +155,26 @@
   padding: 0 24px;
 }
 
-.digital-twin__expired-image {
-  width: 220px;
+.digital-twin__expired-wrap {
+  width: 235px;
   max-width: calc(100% - 32px);
+}
+
+.digital-twin__expired-image {
+  width: 100%;
+  max-width: 100%;
   height: auto;
   display: block;
+  margin: 0 auto;
+}
+
+.digital-twin__expired-message {
+  margin: 12px 0 0;
+  color: rgba(102, 102, 102, 1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  text-align: center;
 }
 
 .digital-twin__avatar-preview-wrap {
@@ -486,7 +502,7 @@
 .digital-twin__action-btn--mobile-primary {
   width: 100%;
   height: 44px;
-  border-radius: 999px;
+  border-radius: 4px;
 }
 
 .digital-twin__action-btn--cancel {
@@ -682,108 +698,103 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .digital-twin-creator,
-  .digital-twin-creator--assistant-edit,
-  .digital-twin,
-  .digital-twin--assistant-edit,
+  .digital-twin-creator.is-mobile,
+  .digital-twin-creator--assistant-edit.is-mobile,
   .digital-twin-creator.is-mobile .digital-twin {
     background: rgba(18, 19, 20, 1);
     background-image: none;
     box-shadow: none;
   }
 
-  .digital-twin__title,
-  .digital-twin--mobile .digital-twin__mobile-title,
-  .digital-twin__label,
-  .digital-twin__brain-title,
-  .digital-twin__assistant-label {
+  .digital-twin-creator.is-mobile .digital-twin__mobile-title,
+  .digital-twin-creator.is-mobile .digital-twin__label,
+  .digital-twin-creator.is-mobile .digital-twin__brain-title,
+  .digital-twin-creator.is-mobile .digital-twin__assistant-label {
     color: rgba(220, 221, 221, 1);
   }
 
-  .digital-twin__close-btn,
-  .digital-twin__mobile-back-btn,
-  .digital-twin__brain-detail {
+  .digital-twin-creator.is-mobile .digital-twin__mobile-back-btn,
+  .digital-twin-creator.is-mobile .digital-twin__brain-detail {
     color: rgba(220, 221, 221, 1);
   }
 
-  .digital-twin__close-icon,
-  .digital-twin__mobile-back-icon {
+  .digital-twin-creator.is-mobile .digital-twin__mobile-back-icon {
     filter: brightness(0) saturate(100%) invert(96%) sepia(3%) saturate(119%) hue-rotate(145deg) brightness(90%) contrast(88%);
   }
 
-  .digital-twin__avatar-tip,
-  .digital-twin__provider-note {
+  .digital-twin-creator.is-mobile .digital-twin__avatar-tip,
+  .digital-twin-creator.is-mobile .digital-twin__provider-note {
     color: rgba(174, 175, 176, 1);
   }
 
-  .digital-twin__avatar-preview,
-  .digital-twin__avatar-option {
+  .digital-twin-creator.is-mobile .digital-twin__avatar-preview,
+  .digital-twin-creator.is-mobile .digital-twin__avatar-option {
     background: rgba(239, 246, 255, 1);
   }
 
-  .digital-twin__avatar-preview {
+  .digital-twin-creator.is-mobile .digital-twin__avatar-preview {
     border: none;
   }
 
-  .digital-twin__avatar-option:not(.digital-twin__avatar-option--upload):not(.is-selected) {
+  .digital-twin-creator.is-mobile .digital-twin__avatar-option:not(.digital-twin__avatar-option--upload):not(.is-selected) {
     border: none;
   }
 
-  .digital-twin__avatar-option.is-selected {
+  .digital-twin-creator.is-mobile .digital-twin__avatar-option.is-selected {
     padding: 1px;
     background: transparent;
     border-width: 1px;
     border-color: rgba(13, 148, 255, 1);
   }
 
-  .digital-twin__avatar-option--upload {
+  .digital-twin-creator.is-mobile .digital-twin__avatar-option--upload {
     background: transparent;
     border-color: rgba(127, 130, 131, 1);
     color: transparent;
     font-size: 0;
   }
 
-  .digital-twin__input,
-  .digital-twin__textarea {
+  .digital-twin-creator.is-mobile .digital-twin__input,
+  .digital-twin-creator.is-mobile .digital-twin__textarea {
     border-color: rgba(255, 255, 255, 0.05);
     background: transparent;
     color: rgba(220, 221, 221, 1);
     -webkit-text-fill-color: rgba(220, 221, 221, 1);
   }
 
-  .digital-twin__input::placeholder,
-  .digital-twin__textarea::placeholder {
+  .digital-twin-creator.is-mobile .digital-twin__input::placeholder,
+  .digital-twin-creator.is-mobile .digital-twin__textarea::placeholder {
     color: rgba(80, 84, 86, 1);
     -webkit-text-fill-color: rgba(80, 84, 86, 1);
   }
 
-  .digital-twin__input.is-invalid,
-  .digital-twin__textarea.is-invalid {
+  .digital-twin-creator.is-mobile .digital-twin__input.is-invalid,
+  .digital-twin-creator.is-mobile .digital-twin__textarea.is-invalid {
     border-color: rgba(13, 148, 255, 1);
     box-shadow: 0 0 0 1px rgba(13, 148, 255, 0.12);
   }
 
-  .digital-twin__assistant-btn {
+  .digital-twin-creator.is-mobile .digital-twin__assistant-btn {
     border-color: rgba(255, 255, 255, 0.05);
     background: transparent;
   }
 
-  .digital-twin__assistant-btn.is-selected {
+  .digital-twin-creator.is-mobile .digital-twin__assistant-btn.is-selected {
     border-color: rgba(13, 148, 255, 1);
     background: rgba(5, 59, 102, 1);
   }
 
-  .digital-twin__assistant-btn.is-selected .digital-twin__assistant-label {
+  .digital-twin-creator.is-mobile .digital-twin__assistant-btn.is-selected .digital-twin__assistant-label {
     color: rgba(13, 148, 255, 1);
   }
 
-  .digital-twin__action-btn--cancel {
+  .digital-twin-creator.is-mobile .digital-twin__action-btn--cancel {
     background: rgba(36, 38, 39, 1);
     color: rgba(174, 175, 176, 1);
   }
 
-  .digital-twin__action-btn--next.is-active,
-  .digital-twin__action-btn--confirm.is-active {
+  .digital-twin-creator.is-mobile .digital-twin__action-btn--next.is-active,
+  .digital-twin-creator.is-mobile .digital-twin__action-btn--confirm.is-active {
     background: rgba(13, 148, 255, 1);
     color: #ffffff;
   }

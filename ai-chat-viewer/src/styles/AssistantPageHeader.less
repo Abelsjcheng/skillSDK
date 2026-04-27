@@ -133,7 +133,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .assistant-page-header__title {
+  .assistant-page-header--mobile .assistant-page-header__title {
     color: var(--ai-dark-text-primary);
   }
 
@@ -141,19 +141,11 @@
     background: var(--ai-dark-page-bg);
   }
 
-  .assistant-page-header__icon-btn,
-  .assistant-page-header__pc-btn {
+  .assistant-page-header--mobile .assistant-page-header__icon-btn {
     color: var(--ai-dark-text-primary);
   }
 
-  .assistant-page-header__pc-btn {
-    background: var(--ai-dark-card-bg);
-    color: var(--ai-dark-text-primary);
-  }
-
-  .assistant-page-header__icon-img,
-  .assistant-page-header__pc-icon {
+  .assistant-page-header--mobile .assistant-page-header__icon-img {
     filter: brightness(0) saturate(100%) invert(96%) sepia(3%) saturate(119%) hue-rotate(145deg) brightness(90%) contrast(88%);
   }
-
 }

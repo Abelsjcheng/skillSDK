@@ -51,9 +51,9 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   showHeader = true,
   expired = false,
   expiredImageSrc,
+  expiredMessage,
   providerChannel,
   onClose,
-  onCancel,
   onMobileBack,
   onNext,
   submitLabel,
@@ -70,7 +70,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const [description, setDescription] = useState(initialValue?.description ?? '');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [prefersDarkMode, setPrefersDarkMode] = useState(() =>
-    window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false,
+    !isPcMiniApp && (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false),
   );
   const resolvedSubmitLabel = submitLabel ?? t('createAssistant.next');
   const providerChannelText = providerChannel ? `AI能力提供方：${providerChannel}` : '';
@@ -85,6 +85,11 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   }, [defaultAvatars, initialValue]);
 
   useEffect(() => {
+    if (isPcMiniApp) {
+      setPrefersDarkMode(false);
+      return;
+    }
+
     const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
     if (!mediaQuery) {
       return;
@@ -100,7 +105,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
-  }, []);
+  }, [isPcMiniApp]);
 
   const nameIsInvalid = useMemo(
     () => hasInvalidName(name) || (submitAttempted && !name.trim()),
@@ -213,13 +218,18 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
 
       {expired ? (
         <div className="digital-twin__content digital-twin__content--step1 digital-twin__content--expired">
-          {expiredImageSrc ? (
-            <img
-              src={expiredImageSrc}
-              alt={t('createAssistant.qrcodeExpiredAlt')}
-              className="digital-twin__expired-image"
-            />
-          ) : null}
+          <div className="digital-twin__expired-wrap">
+            {expiredImageSrc ? (
+              <img
+                src={expiredImageSrc}
+                alt={t('createAssistant.qrcodeExpiredAlt')}
+                className="digital-twin__expired-image"
+              />
+            ) : null}
+            {expiredMessage ? (
+              <p className="digital-twin__expired-message">{expiredMessage}</p>
+            ) : null}
+          </div>
         </div>
       ) : (
         <>

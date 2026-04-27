@@ -34,9 +34,9 @@ export interface StepBasicInfoProps {
   showHeader?: boolean;
   expired?: boolean;
   expiredImageSrc?: string;
+  expiredMessage?: string;
   providerChannel?: string;
   onClose: () => void;
-  onCancel: () => void;
   onMobileBack?: () => void;
   onNext: (payload: DigitalTwinBasicInfoPayload) => void;
   submitLabel?: string;

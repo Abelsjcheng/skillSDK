@@ -173,38 +173,38 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .switch-assistant {
+  .switch-assistant:not(.switch-assistant--pc) {
     background: var(--ai-dark-page-bg);
     background-image: none;
   }
 
-  .switch-assistant__card {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__card {
     background: var(--ai-dark-card-bg);
   }
 
-  .switch-assistant__card--selected {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__card--selected {
     border-color: var(--ai-dark-border-strong);
   }
 
-  .switch-assistant__name {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__name {
     color: var(--ai-dark-text-primary);
   }
 
-  .switch-assistant__summary {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__summary {
     color: var(--ai-dark-text-secondary);
   }
 
-  .switch-assistant__tag {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__tag {
     background: var(--ai-dark-tag-bg);
     color: var(--ai-dark-tag-text);
   }
 
-  .switch-assistant__action-btn--cancel {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__action-btn--cancel {
     background: var(--ai-dark-button-secondary-bg);
     color: var(--ai-dark-button-secondary-text);
   }
 
-  .switch-assistant__action-btn--confirm {
+  .switch-assistant:not(.switch-assistant--pc) .switch-assistant__action-btn--confirm {
     background: var(--ai-dark-button-primary-bg);
     color: var(--ai-dark-button-primary-text);
   }

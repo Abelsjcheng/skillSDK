@@ -163,7 +163,6 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
         initialValue={initialValue}
         showHeader={false}
         onClose={onClose}
-        onCancel={onClose}
         onNext={handleSubmit}
         submitLabel={t('createAssistant.confirm')}
       />

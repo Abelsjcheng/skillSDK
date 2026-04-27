@@ -12,6 +12,7 @@ import { getWeAgentList, openH5Webview } from '../utils/hwext';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
+import { openWeAgentDialogPc } from '../utils/assistantPcHandle';
 
 const CREATE_ASSISTANT_URI = `h5://${APP_ID()}/index.html?from=weAgent#createAssistant`;
 const SELECT_ASSISTANT_URI = `h5://${APP_ID()}/index.html?from=weAgent#selectAssistant`;
@@ -56,7 +57,9 @@ const ActivateAssistant: React.FC = () => {
     const latestList = assistantList.length > 0 ? assistantList : await loadAssistantList();
     if (isPc) {
       if (latestList.length > 0) {
-        navigate('/selectAssistant');
+        window.location.hash = '/selectAssistant';
+      } else {
+        openWeAgentDialogPc('weAgentPc')
       }
       return;
     }

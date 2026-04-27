@@ -781,6 +781,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
   record.session.status = 'ACTIVE';
   const sessionId = record.session.welinkSessionId;
   const scenario = resolveMockReplyScenario(userContent);
+  const assistantMessageId = nextId('msg_assistant_stream');
   scheduleRecordTimer(record, 40, () => {
     emit(sessionId, {
       type: 'session.status',
@@ -797,6 +798,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
       scheduleRecordTimer(record, 120 + index * 80, () => {
         emit(sessionId, {
           type: 'text.delta',
+          messageId: assistantMessageId,
           role: 'assistant',
           partId,
           content: chunk,
@@ -807,6 +809,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 180 + chunks.length * 80, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId,
         content: assistantContent,
@@ -842,6 +845,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
       scheduleRecordTimer(record, 120 + index * 80, () => {
         emit(sessionId, {
           type: 'thinking.delta',
+          messageId: assistantMessageId,
           role: 'assistant',
           partId: thinkingPartId,
           content: chunk,
@@ -852,6 +856,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 140 + thinkingChunks.length * 80, () => {
       emit(sessionId, {
         type: 'thinking.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: thinkingPartId,
         content: scenario.thinkingContent,
@@ -862,6 +867,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
       scheduleRecordTimer(record, 220 + thinkingChunks.length * 80 + index * 80, () => {
         emit(sessionId, {
           type: 'text.delta',
+          messageId: assistantMessageId,
           role: 'assistant',
           partId: textPartId,
           content: chunk,
@@ -872,6 +878,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 280 + thinkingChunks.length * 80 + textChunks.length * 80, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: textPartId,
         content: scenario.assistantContent,
@@ -900,6 +907,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 120, () => {
       emit(sessionId, {
         type: 'tool.update',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: toolPartId,
         toolName: scenario.toolName,
@@ -913,6 +921,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 220, () => {
       emit(sessionId, {
         type: 'tool.update',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: toolPartId,
         toolName: scenario.toolName,
@@ -926,6 +935,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 320, () => {
       emit(sessionId, {
         type: 'tool.update',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: toolPartId,
         toolName: scenario.toolName,
@@ -940,6 +950,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 420, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: textPartId,
         content: scenario.assistantContent,
@@ -966,6 +977,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 120, () => {
       emit(sessionId, {
         type: 'question',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: questionPartId,
         toolCallId: scenario.toolCallId,
@@ -995,6 +1007,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 120, () => {
       emit(sessionId, {
         type: 'permission.ask',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: permissionPartId,
         permissionId: scenario.permissionId,
@@ -1008,6 +1021,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 220, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: nextId('part_permission_text'),
         content: scenario.assistantContent,
@@ -1044,6 +1058,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 120, () => {
       emit(sessionId, {
         type: 'file',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: filePartId,
         fileName: scenario.fileName,
@@ -1055,6 +1070,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 220, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: textPartId,
         content: scenario.assistantContent,
@@ -1087,6 +1103,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 220, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId,
         content: scenario.assistantContent,
@@ -1159,6 +1176,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 120, () => {
       emit(sessionId, {
         type: 'streaming',
+        messageId: assistantMessageId,
         role: 'assistant',
         sessionStatus: 'busy',
         parts: [
@@ -1181,12 +1199,14 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 240, () => {
       emit(sessionId, {
         type: 'thinking.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: thinkingPartId,
         content: scenario.thinkingContent,
       });
       emit(sessionId, {
         type: 'text.delta',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: textPartId,
         content: '\nContinuing after recovered partial output...',
@@ -1196,6 +1216,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 360, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId: textPartId,
         content: scenario.finalText,
@@ -1267,6 +1288,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
     scheduleRecordTimer(record, 220, () => {
       emit(sessionId, {
         type: 'text.done',
+        messageId: assistantMessageId,
         role: 'assistant',
         partId,
         content: scenario.assistantContent,

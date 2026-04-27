@@ -54,6 +54,7 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .map((value) => (value ?? '').trim())
     .filter(Boolean)
     .join(' ');
+
 const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => {
   const { t, i18n } = useTranslation();
   const isPc = isPcMiniApp();
@@ -112,7 +113,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const creatorDisplayName = (i18n.resolvedLanguage ?? i18n.language) === 'en'
     ? detail?.creatorNameEn
     : detail?.creatorName;
-  const displayCreator = joinDisplayValue(creatorDisplayName, detail?.createdBy);
+  const displayCreator = joinDisplayValue(creatorDisplayName, detail?.creatorW3Account);
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
   const secret = detail?.appSecret ?? '';

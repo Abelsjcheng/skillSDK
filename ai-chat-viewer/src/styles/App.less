@@ -5,6 +5,24 @@
   box-sizing: border-box;
 }
 
+button,
+[type='button'],
+[type='reset'],
+[type='submit'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus,
+button:focus-visible,
+[type='button']:focus,
+[type='button']:focus-visible,
+[type='reset']:focus,
+[type='reset']:focus-visible,
+[type='submit']:focus,
+[type='submit']:focus-visible {
+  outline: none;
+}
+
 .app-container {
   margin: 0;
   padding: 12px;
