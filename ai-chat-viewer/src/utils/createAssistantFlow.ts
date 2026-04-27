@@ -1,5 +1,6 @@
 import { isPcMiniApp } from '../constants';
 import type { CreateDigitalTwinResult } from '../types/bridge';
+import { handleCreateForOtherScenePc } from './assistantPcHandle';
 
 export function resolvePartnerAccount(result: CreateDigitalTwinResult): string {
   const value = result?.partnerAccount;
@@ -16,10 +17,7 @@ export async function handleCreateForOtherScene(result: CreateDigitalTwinResult)
   const partnerAccount = resolvePartnerAccount(result);
 
   if (isPcMiniApp()) {
-    await (window as any)?.Pedestal?.callMethod?.('method://agentSkills/handleSdk', {
-      owner: partnerAccount,
-    });
-    closeCreateAssistantWindow();
+    handleCreateForOtherScenePc(result)
     return;
   }
 

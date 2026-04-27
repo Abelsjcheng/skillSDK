@@ -9,6 +9,7 @@ const WeAgentCUI: React.FC = () => {
 
   return (
     <App
+      key={assistantAccount || 'default-assitant'}
       assistantAccount={assistantAccount}
     />
   );

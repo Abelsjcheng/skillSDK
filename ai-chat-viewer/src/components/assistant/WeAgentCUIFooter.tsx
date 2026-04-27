@@ -167,6 +167,11 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handlePcKeyDown}
         rows={1}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }}
       />
       <div className="we-agent-cui-footer__toolbar">
         <div className="we-agent-cui-footer__toolbar-left">{leftActions}</div>

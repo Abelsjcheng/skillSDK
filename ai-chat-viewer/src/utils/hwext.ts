@@ -98,7 +98,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
   }
 
   const assistantCall = async <T>(funName: string, params: unknown) => {
-    const result = await pedestal.callMethod(`method://agentSkillsDialog/${funName}`, { funName, params }) as T;
+    const result = await pedestal.callMethod(`method://agentSkillsDialog/${funName}`, params) as T;
     if ((result as any)?.errorMessage) {
      return Promise.reject(result)
     } else {

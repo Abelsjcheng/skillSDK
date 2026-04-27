@@ -343,7 +343,7 @@ export interface HWH5EXT {
 }
 
 export interface Pedestal {
-  callMethod: (method: string, payload: unknown) => Promise<unknown> | unknown;
+  callMethod: (method: string, payload?: unknown) => Promise<unknown> | unknown;
 }
 
 export interface HWH5Bridge {
