@@ -418,6 +418,31 @@ export async function rebootApp(): Promise<void> {
   await Promise.resolve(window.HWH5.reboot());
 }
 
+export async function reportUemEvent(
+  eventId: string,
+  eventTitle: string,
+  data: Record<string, unknown> = {},
+): Promise<void> {
+  if (isPcMiniApp()) {
+    // TODO: implement PC-side uem report when the PC bridge is ready.
+    return;
+  }
+
+  if (typeof window === 'undefined' || typeof window.HWH5?.uem !== 'function') {
+    throw new Error('HWH5.uem is not available.');
+  }
+
+  await Promise.resolve(window.HWH5.uem('event', {
+    type: 'info',
+    code: eventId,
+    name: eventTitle,
+    result: true,
+    msg: eventTitle,
+    duration: 0,
+    data,
+  }));
+}
+
 export async function getUserInfo(): Promise<HWH5UserInfo> {
   if (isPcMiniApp()) {
     return {

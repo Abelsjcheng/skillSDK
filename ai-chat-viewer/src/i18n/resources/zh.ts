@@ -140,4 +140,5 @@ export const zh = {
   'createAssistant.qrcodeInvalid': '二维码已失效，请刷新二维码后重新扫码',
   'createAssistant.nameInvalidHint': '仅支持汉字、数字、字母',
   'createAssistant.descriptionInvalidHint': '仅支持汉字数字字母/常用标点符号',
+  'permission.allowOnce': '\u5141\u8bb8\u4e00\u6b21',
 } as const;

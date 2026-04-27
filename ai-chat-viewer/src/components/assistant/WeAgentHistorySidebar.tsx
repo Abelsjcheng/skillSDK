@@ -11,7 +11,7 @@ import type {
   WeAgentHistorySidebarProps,
 } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import { getHistorySessionsList } from '../../utils/hwext';
+import { getHistorySessionsList, reportUemEvent } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
 
@@ -197,6 +197,16 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   }, [shouldRenderSidebar]);
 
   const handleOpen = useCallback(async () => {
+    void reportUemEvent('weagent_history_click', '历史会话', {
+      clientType: '',
+      entry: 'WeAgent',
+      operationTime: new Date().getTime(),
+    }).catch((error) => {
+      WeLog(`WeAgentHistorySidebar reportUemEvent failed | extra=${JSON.stringify({
+        eventId: 'weagent_history_click',
+      })} | error=${JSON.stringify(error)}`);
+    });
+
     if (shouldRenderSidebar && isVisible) {
       closeSidebar();
       return;

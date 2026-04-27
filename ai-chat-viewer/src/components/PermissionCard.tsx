@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isPcMiniApp } from '../constants';
 import lockIcon from '../imgs/lock_icon.png';
@@ -35,7 +35,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
     unknown: t('permission.unknown'),
   }), [t]);
   const permissionResponseLabels = useMemo<Record<PermissionResponse, string>>(() => ({
-    once: t('common.allow'),
+    once: t('permission.allowOnce'),
     always: t('common.allowAlways'),
     reject: t('common.reject'),
   }), [t]);
@@ -85,75 +85,75 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
     ? permissionResponseLabels[permissionResponse as PermissionResponse]
     : permissionResponse;
 
+  if (!resolved) {
+    return (
+      <div className="permission-card__actions">
+        <span className="permission-card__actions-label">edit</span>
+        <div className="permission-card__actions-buttons">
+          <button
+            className="permission-card__btn permission-card__btn--always"
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleDecision('always');
+              });
+            }}
+            disabled={isLocked}
+          >
+            {t('common.allowAlways')}
+          </button>
+          <button
+            className="permission-card__btn permission-card__btn--allow"
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleDecision('once');
+              });
+            }}
+            disabled={isLocked}
+          >
+            {t('permission.allowOnce')}
+          </button>
+          <button
+            className="permission-card__btn permission-card__btn--deny"
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleDecision('reject');
+              });
+            }}
+            disabled={isLocked}
+          >
+            {t('common.reject')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Fragment>
-      <div
-        className={[
-          'permission-card',
-          resolved ? 'permission-card--resolved' : '',
-          isPc ? 'permission-card--pc' : '',
-        ].filter(Boolean).join(' ')}
-      >
-        <div className="permission-card__header">
-          <img className="permission-card__icon" src={lockIcon} alt="" aria-hidden="true" draggable="false" />
-          <span className="permission-card__type">{typeLabel}</span>
-        </div>
-
-        <div className="permission-card__info">
-          {part.toolName ? <div className="permission-card__tool">{part.toolName}</div> : null}
-          {part.content ? <div className="permission-card__desc">{part.content}</div> : null}
-        </div>
-
-        {resolved && permissionResponseText ? (
-          <div className="permission-card__result">
-            <span className="permission-card__result-label">已确认</span>
-            <div className="permission-card__result-content">{permissionResponseText}</div>
-          </div>
-        ) : null}
+    <div
+      className={[
+        'permission-card',
+        'permission-card--resolved',
+        isPc ? 'permission-card--pc' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <div className="permission-card__header">
+        <img className="permission-card__icon" src={lockIcon} alt="" aria-hidden="true" draggable="false" />
+        <span className="permission-card__type">{typeLabel}</span>
       </div>
 
-      {!resolved ? (
-        <div className="permission-card__actions">
-          <span className="permission-card__actions-label">edit</span>
-          <div className="permission-card__actions-buttons">
-            <button
-              className="permission-card__btn permission-card__btn--always"
-              onClick={(event) => {
-                runButtonClickWithDebounce(event, () => {
-                  void handleDecision('always');
-                });
-              }}
-              disabled={isLocked}
-            >
-              {t('common.allowAlways')}
-            </button>
-            <button
-              className="permission-card__btn permission-card__btn--allow"
-              onClick={(event) => {
-                runButtonClickWithDebounce(event, () => {
-                  void handleDecision('once');
-                });
-              }}
-              disabled={isLocked}
-            >
-              允许一次
-            </button>
-            <button
-              className="permission-card__btn permission-card__btn--deny"
-              onClick={(event) => {
-                runButtonClickWithDebounce(event, () => {
-                  void handleDecision('reject');
-                });
-              }}
-              disabled={isLocked}
-            >
-              {t('common.reject')}
-            </button>
-          </div>
+      <div className="permission-card__info">
+        {part.toolName ? <div className="permission-card__tool">{part.toolName}</div> : null}
+        {part.content ? <div className="permission-card__desc">{part.content}</div> : null}
+      </div>
+
+      {permissionResponseText ? (
+        <div className="permission-card__result">
+          <span className="permission-card__result-label">{t('common.confirmed')}</span>
+          <div className="permission-card__result-content">{permissionResponseText}</div>
         </div>
-      ) : !permissionResponseText ? (
+      ) : (
         <div className="permission-card__status">{t('common.processed')}</div>
-      ) : null}
-    </Fragment>
+      )}
+    </div>
   );
 };

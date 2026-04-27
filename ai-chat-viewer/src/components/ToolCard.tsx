@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
+import errorIcon from '../imgs/error_icon.svg';
+import successIcon from '../imgs/success_icon.svg';
 import type { ToolCardProps } from '../types/components';
 
 const statusLabels: Record<string, string> = {
@@ -10,17 +12,17 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusIcons: Record<string, string> = {
-  pending: 'O',
-  running: '*',
-  completed: 'OK',
-  error: 'X',
+  pending: successIcon,
+  running: successIcon,
+  completed: successIcon,
+  error: errorIcon,
 };
 
 export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
   const [expanded, setExpanded] = useState(true);
   const status = part.status ?? 'pending';
   const statusLabel = statusLabels[status] ?? status;
-  const statusIcon = statusIcons[status] ?? 'i';
+  const statusIcon = statusIcons[status] ?? successIcon;
 
   return (
     <div className={`tool-card tool-card--${status}`}>
@@ -30,7 +32,15 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
         role="button"
         tabIndex={0}
       >
-        <span className="tool-card__icon">{statusIcon}</span>
+        <span className="tool-card__icon">
+          <img
+            className="tool-card__icon-img"
+            src={statusIcon}
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+          />
+        </span>
         <span className="tool-card__name">{part.toolName ?? 'Tool call'}</span>
         {part.title && (
           <span className="tool-card__title">{part.title}</span>

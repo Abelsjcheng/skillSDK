@@ -25,7 +25,7 @@ function createPermissionPart(): MessagePart {
 }
 
 describe('PermissionCard', () => {
-  it('keeps the card visible after allowing permission', async () => {
+  it('shows only actions before confirmation and shows card after allowing permission', async () => {
     const replyPermissionMock = replyPermission as jest.MockedFunction<typeof replyPermission>;
     replyPermissionMock.mockResolvedValue({
       welinkSessionId: 'session-1',
@@ -40,6 +40,9 @@ describe('PermissionCard', () => {
         welinkSessionId="session-1"
       />,
     );
+
+    expect(container.querySelector('.permission-card')).not.toBeInTheDocument();
+    expect(container.querySelector('.permission-card__actions')).toBeInTheDocument();
 
     const allowButton = container.querySelector('.permission-card__btn--allow');
     expect(allowButton).toBeInTheDocument();
@@ -58,6 +61,5 @@ describe('PermissionCard', () => {
     expect(container.querySelector('.permission-card__result')).toBeInTheDocument();
     expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
     expect(container.querySelector('.permission-card__result-label')?.textContent).toBe('已确认');
-    expect(container.querySelector('.permission-card .permission-card__actions')).not.toBeInTheDocument();
   });
 });

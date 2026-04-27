@@ -349,6 +349,18 @@ export interface Pedestal {
 export interface HWH5Bridge {
   openWebview: (payload: { uri: string }) => void;
   log?: (payload: { content: string; type: 'i' }) => Promise<unknown> | unknown;
+  uem?: (
+    eventName: string,
+    payload: {
+      type: 'info';
+      code: string;
+      name: string;
+      result: boolean;
+      msg: string;
+      duration: number;
+      data: Record<string, unknown>;
+    },
+  ) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
   addEventListener?: (params: HWH5AddEventListenerParams) => Promise<unknown> | unknown;

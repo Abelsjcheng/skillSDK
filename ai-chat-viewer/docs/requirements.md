@@ -577,6 +577,7 @@
             - item 1：左侧 `APPID`，右侧展示 `appKey`；
             - item 2：左侧 `密钥`，右侧展示 `appSecret` 的掩码文本（`*`）；
             - 右侧密钥支持按压查看：按下显示明文，松手恢复 `*` 掩码。
+            - PC 端“隐藏密钥”和“复制密钥”两个操作按钮之间固定间距 `8px`。
       - 容器 3 中 `能力提供方`、`APPID`、`密钥` 对应右侧值显示块保持不溢出容器边界。
       - 内部助理场景下，容器 3 不再渲染第二行组织信息，也不再展示“部门/责任人”之间的描边分割。
 4. 数据渲染约束：
@@ -725,14 +726,16 @@
    - AI 消息时间来源：消息生成时间（当前消息对象的时间戳）。
    - 消息内容块距第一行 `8px`，宽度占满当前消息容器整行；该规则适用于所有 AI 消息类型块，不再仅代码块独占整行。
    - 权限消息块（`PermissionCard`）宽度占满当前消息容器可用宽度，不再按内容宽度收缩。
+   - AI 权限未确认前，不显示权限消息块主体，仅显示独立的 3 个按钮确认块。
+   - 用户完成权限确认后，再显示 AI 权限消息块。
    - 权限确认块外层圆角半径 `8px`，整体采用“灰色头部 + 白色内容区”的分层结构：
       - 权限消息块外层边框固定为 `1px solid rgba(238,238,238,1)`；
       - 头部块高度 `40px`，`padding: 0 12px`，垂直居中显示图标与名称，背景色 `rgba(245,245,245,1)`；
-      - 头部左侧显示一个从 `src/imgs` 导入的锁图标 `png`，图标右侧 `4px` 显示 `{typeLabel}`；
+      - 头部左侧显示一个从 `src/imgs` 导入的锁图标 `png`，图标容器尺寸 `20px x 20px`，图片本身尺寸 `16px x 16px`，图标右侧 `4px` 显示 `{typeLabel}`；
       - 内容区背景色固定为白色。
    - 权限确认块中的 `permission-card__tool` 直接显示 `part.toolName`，文本颜色 `rgba(153,153,153,1)`；不再显示 `t('permission.toolLabel')` 文案。
    - 权限确认结果块样式固定为：圆角半径 `8px`、`padding: 8px 12px`、背景颜色 `rgba(235,255,234,1)`，左侧显示文本“已确认”（颜色 `rgba(51,189,44,1)`），最右侧显示权限确认结果按钮名称；结果文本样式统一为 `14px / 400 / 22px`。
-   - 未确认时的操作区通过独立块展示，与前后块间距 `12px`，单独占满一行，`padding: 9px 12px`；该独立块不放在 `permission-card` 内部。左侧显示固定文本 `edit`（不做国际化），右侧依次展示“始终允许 / 允许一次 / 拒绝”3 个按钮，按钮间距 `8px`。
+   - 未确认时的操作区通过独立块展示，与前后块间距 `12px`，单独占满一行，`padding: 9px 12px`；该独立块不放在 `permission-card` 内部，且未确认阶段不再显示权限消息块主体。左侧显示固定文本 `edit`（不做国际化），右侧依次展示“始终允许 / 允许一次 / 拒绝”3 个按钮，按钮间距 `8px`。
    - 三个权限确认按钮尺寸与配色固定为：
       - 尺寸：`64px x 24px`，圆角半径 `35px`；
       - 文本样式：`12px / 400 / 20px`；
@@ -740,6 +743,18 @@
       - “允许”：背景 `rgba(239,246,255,1)`，文本 `rgba(13,148,255,1)`；
       - “拒绝”：背景 `rgba(255,241,241,1)`，文本 `rgba(243,111,100,1)`。
    - AI 消息块内部涉及展开/收起的交互组件（如代码块、思考块、工具调用块）统一使用 `src/imgs/arrow_up_icon.svg` 作为箭头图标资源；展开状态箭头朝上，收缩状态箭头朝下。
+   - `ToolCard` 工具消息块样式统一为：
+      - 外层圆角半径 `8px`，边框 `1px solid rgba(238,238,238,1)`；
+      - 头部高度 `40px`、`padding: 0 12px`、背景 `rgba(245,245,245,1)`；
+      - 左侧状态图标使用单独 `20px x 20px` 容器承载，图标图片本身尺寸 `16px x 16px`；
+      - 图标右侧 `4px` 显示 `part.toolName`，`part.title` 与左右相邻文本都保持 `4px` 间距并左对齐显示；
+      - `tool-card__status` 与展开箭头间距 `4px`；
+      - 头部文本统一样式为 `14px / 400 / 22px`、`rgba(51,51,51,1)`，其中 `part.title` 文本颜色固定为 `rgba(153,153,153,1)`；
+      - `pending`、`running`、`completed` 三种状态图标统一使用 `src/imgs/success_icon.svg`，`error` 状态使用 `src/imgs/error_icon.svg`；
+      - 内容区 `tool-card__body` 内边距固定为上 `8px`、左右 `12px`、下 `12px`；
+      - 内容区内部的 `tool-card__section` 不额外增加顶部外边距；
+      - `tool-card__code` 上下外边距固定为 `10px`；
+      - `tool-card__section-title` 文本样式固定为 `14px / 400 / 22px`、`rgba(51,51,51,1)`。
    - AI 消息块内如果渲染代码组件块，则该代码组件块需作为块级内容单独占满一整行可用宽度；普通文本消息块仍保持按内容宽度自适应。
    - 代码块在移动端显示时不允许强制换行；当代码内容超出手机屏幕宽度时，代码块内部应保持单行结构并支持横向滚动查看，不得破坏原始缩进与换行语义。
    - 代码块显示代码区域的滚动条需隐藏，但保留横向滚动能力。
@@ -755,6 +770,7 @@
    - 宽度占满，高度 `40px`，内边距 `8px 12px`，圆角 `30px`，背景白色。
    - 内部左侧输入框与右侧发送按钮间距 `8px`。
    - 输入框 placeholder：`有问题尽管问我~`。
+   - 输入框容器聚焦后显示 `1px` 渐变边框，颜色从 `rgba(13,146,255,1)` 线性过渡到 `rgba(81,69,255,1)`。
    - 发送按钮尺寸 `24px x 24px`，发送图标尺寸 `20px x 20px`。
    - iOS 端唤起软键盘后，不允许通过 `transform` 将底部输入区视觉上移；需改为根据键盘高度真实缩减 `WeAgentCUI` 主内容区高度，并保持页面外层不可滚动，仅消息区内部可滚动。
    - `WeAgentCUI` 内容区滚动容器需隐藏滚动条：补充 `scrollbar-width: none`、`-ms-overflow-style: none`，并对 `::-webkit-scrollbar` 使用 `display: none; width: 0; height: 0;`，保持消息区可滚动但默认不显示滚动条。
@@ -1134,6 +1150,18 @@
    - 页面、组件、系统与业务领域类型继续分别放在 `src/types/pages`、`src/types/components`、`src/types/system`、`src/types/digitalTwin` 等目录
    - 页面组件对外暴露的 props 类型（如 `AssistantDetailProps`）同样视为页面类型，需定义在 `src/types/pages` 并由页面文件导入使用，不再内联定义在页面组件文件中
 3. 业务页面、组件、mock、opencode 适配层在使用接口/类型时，必须直接从 `src/types` 目录导入，不允许再通过 `src/utils/hwext.ts` 间接获取类型。
+4. `hwext.ts` 需新增统一埋码上报方法，签名为 `reportUemEvent(eventId, eventTitle, data)`：
+   - 移动端调用 `window.HWH5.uem('event', payload)`；
+   - `payload` 固定结构为 `{ type: 'info', code: eventId, name: eventTitle, result: true, msg: eventTitle, duration: 0, data }`；
+   - PC 端当前版本先保留 `todo` 占位，不接真实桥能力。
+5. 当前版本需补齐以下点击埋码触发点，且调用 `reportUemEvent(...)` 时必须采用异步 fire-and-forget 方式，不得阻塞现有点击逻辑、跳转逻辑或接口调用链：
+   - 激活助理页面点击“选择助理”：`eventId = 'activate_select_assistant_click'`，`eventTitle = '选择助理'`；
+   - `WeAgentCUI` 页面点击“历史会话”按钮：`eventId = 'weagent_history_click'`，`eventTitle = '历史会话'`；
+   - `WeAgentCUI` 页面点击“创建会话”按钮：`eventId = 'weagent_create_session_click'`，`eventTitle = '创建会话'`；
+   - 切换助理页面点击“确认切换”：`eventId = 'switch_assistant_confirm_click'`，`eventTitle = '确认切换'`；
+   - 选择助理页面点击“创建助理”：`eventId = 'select_assistant_create_click'`，`eventTitle = '创建助理'`；
+   - 选择助理页面点击“开始使用”：`eventId = 'select_assistant_start_click'`，`eventTitle = '开始使用'`。
+6. 当前这些点击埋码的 `data` 统一固定传入 `{ clientType: '', entry: 'WeAgent', operationTime: new Date().getTime() }`，先不附加页面级动态字段。
 
 ## 29. 全局版本更新弹窗
 

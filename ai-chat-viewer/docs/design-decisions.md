@@ -372,6 +372,7 @@ interface CreateDigitalTwinParams {
    - 卡片 1：头像（`72x72`，圆角 `19px`）+ 名称“小咪”+ 标签“员工助手”；名称文本需独立水平居中，标签不参与名称居中计算；
    - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行；创建者右侧值按当前语言选择：中文使用 `creatorName + ' ' + createdBy`，英文使用 `creatorNameEn + ' ' + createdBy`；
    - 卡片 3：内部助理场景仅展示 1 行“能力提供方 / displayTag”，不再展示“部门/责任人”；外部助理场景继续展示 `APPID` 与 `密钥` 两行。
+   - PC 端外部助理“密钥”行中的两个操作按钮（隐藏/显示密钥、复制密钥）单独通过 action-group 管理，按钮间距固定为 `8px`。
    - 卡片 2 中“助理简介内容”和“创建者行”之间增加 `1px solid rgba(0,0,0,0.05)` 分割线；
    - 卡片 3 仅在外部助理双行场景下保留上下分层布局；内部助理单行场景不再需要“部门/责任人”之间的分割线。
    - 标题区与头像区域相关图标/图片均通过 `src/imgs` 静态资源导入，不再使用内联 SVG 或纯色块占位。
@@ -444,6 +445,7 @@ interface CreateDigitalTwinParams {
 7. 输入区在 `Footer` 增加变体样式支持：
    - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px; background: #fff`；
    - placeholder 固定为“有问题尽管问我~”；
+   - 容器聚焦态不直接切纯色边框，而是通过“内层背景 + 外层 border-box 线性渐变”的方式渲染 `1px` 渐变描边，颜色从 `rgba(13,146,255,1)` 过渡到 `rgba(81,69,255,1)`；
    - 发送按钮为 `24x24` 图标按钮，图标尺寸 `20x20`。
 8. iOS 端 `WeAgentCUI` 输入框唤起软键盘时，不再通过对底部输入区做 `transform` 上抬来规避遮挡；改为继续监听 `HWH5.onKeyboardHeightChange`，并将键盘高度写入页面根容器的布局变量，由 `we-agent-cui-main` 按真实高度缩减可视区域。键盘打开期间页面外层需保持 `overflow: hidden`，只允许消息内容区内部滚动，避免 iOS WebView 暴露整页滚动条。
 9. `WeAgentCUI` 内容区滚动容器需保持“可滚动但隐藏滚动条”的策略；除通用 `.content` 样式外，还需对 `.content--we-agent-cui` 单独补充 `scrollbar-width: none`、`-ms-overflow-style: none` 与 `::-webkit-scrollbar { display: none; width: 0; height: 0; }`，尽量降低 iOS WebView 中系统滚动指示条的可见概率。
@@ -478,16 +480,25 @@ interface CreateDigitalTwinParams {
 24. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
 25. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
 26. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
-27. `PermissionCard` 改为“头部 / 内容 / 结果或操作区”三段式结构：
-   - `permission-card` 主体保留 `1px solid rgba(238,238,238,1)` 边框与 `8px` 圆角；头部固定高 `40px`、`padding: 0 12px`、背景 `rgba(245,245,245,1)`，左侧锁图标使用 `src/imgs/lock_icon.png`，右侧 `4px` 显示 `typeLabel`；
+27. `PermissionCard` 的渲染时序按确认状态拆分：
+   - 未确认态：只渲染独立的 `permission-card__actions` 操作块，不渲染 `permission-card` 主体；
+   - 已确认态：再渲染 `permission-card` 主体，内部包含头部、内容区与结果区/状态区。
+28. `PermissionCard` 改为“头部 / 内容 / 结果或操作区”三段式结构：
+   - `permission-card` 主体保留 `1px solid rgba(238,238,238,1)` 边框与 `8px` 圆角；头部固定高 `40px`、`padding: 0 12px`、背景 `rgba(245,245,245,1)`，左侧锁图标使用 `src/imgs/lock_icon.png`，图标容器尺寸 `20px x 20px`、图片本身尺寸 `16px x 16px`，右侧 `4px` 显示 `typeLabel`；
    - 内容区保留 `toolName` 与 `content` 两个字段，其中 `permission-card__tool` 只直接渲染 `part.toolName`，不再拼接国际化前缀；
    - 已确认态结果块仍渲染在 `permission-card` 主体内部，但背景改为 `rgba(235,255,234,1)`，左侧固定文案“已确认”，右侧显示当前确认结果文本；
    - 未确认态的 `permission-card__actions` 从 `permission-card` 主体中拆出，作为与权限卡片并列的独立块渲染；左侧固定文案 `edit`，右侧 3 个按钮按“始终允许 / 允许一次 / 拒绝”顺序排列，按钮尺寸统一 `64px x 24px`、圆角 `35px`。
-28. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；该阶段仅打开独立的“正在生成中，请稍等...”预览块，并重置上一轮 assistant 的流式上下文，不再向 `messages` 插入随机 `id` 的 pending assistant message。
-29. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
-30. `WeAgentCUI` 对 AI 流式助手消息采用“独立占位预览 + 真实消息直写”的策略：页面显示“正在生成中，请稍等...”时，不把该占位块作为 `Message` 写入 `messages`；该独立占位预览仅由 `message.user` 事件拉起。真正承载内容的 AI 事件根据 SDK 文档保证都会携带真实 `messageId`，因此实时内容、`streaming` 补流、`snapshot`/历史恢复都直接按该真实 `messageId` 创建或更新 assistant 消息，不再做随机占位消息 ID 提权。
-31. `streamingMsgIdRef` 保持原命名，但语义收敛为“当前真实 assistant 消息的 `messageId` 引用”：在尚未收到真正内容前始终为 `null`；收到首个承载内容事件时写入真实 `messageId`；会话结束、停止、错误、切换会话、快照恢复时统一清空。
-32. 通用助理背景图分流继续留在样式层实现：移动端默认使用 `assistant-cui-bg.png`，PC 端新增 `assistant-cui-pc-bg.png` 并通过 `.pc-mode`、`--pc` 这类页面级 class 覆盖 `background-image`；不把背景图选择下沉到组件内的 `isPcMiniApp()` 运行时判断，避免同一视觉资源策略散落到 JSX 逻辑里。
+29. `ToolCard` 统一收敛为“浅灰头部 + 白色内容区”的信息卡结构：
+   - 外层只保留 `1px solid rgba(238,238,238,1)` 边框与 `8px` 圆角，不再通过不同状态切换左侧高亮边条；
+   - 头部固定高 `40px`、`padding: 0 12px`、背景 `rgba(245,245,245,1)`，状态图标统一放进 `20px x 20px` 容器，图标本体为 `16px x 16px`；
+   - `part.toolName`、`part.title`、状态文本、展开箭头都放在头部同一行，元素之间统一按 `4px` 间距排布，状态文本通过自动占位贴到右侧；
+   - `pending` / `running` / `completed` 三个状态沿用同一个成功态图标资源 `src/imgs/success_icon.svg`，仅 `error` 状态切换为 `src/imgs/error_icon.svg`，避免继续用字符占位；
+   - 内容区改为 `padding: 8px 12px 12px`，不再给 `tool-card__section` 额外叠加顶部间距；代码块 `tool-card__code` 统一使用 `10px` 的上下外边距；分节标题统一使用 `14px / 400 / 22px` 正文样式，与头部文本保持一致。
+30. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；该阶段仅打开独立的“正在生成中，请稍等...”预览块，并重置上一轮 assistant 的流式上下文，不再向 `messages` 插入随机 `id` 的 pending assistant message。
+31. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
+32. `WeAgentCUI` 对 AI 流式助手消息采用“独立占位预览 + 真实消息直写”的策略：页面显示“正在生成中，请稍等...”时，不把该占位块作为 `Message` 写入 `messages`；该独立占位预览仅由 `message.user` 事件拉起。真正承载内容的 AI 事件根据 SDK 文档保证都会携带真实 `messageId`，因此实时内容、`streaming` 补流、`snapshot`/历史恢复都直接按该真实 `messageId` 创建或更新 assistant 消息，不再做随机占位消息 ID 提权。
+33. `streamingMsgIdRef` 保持原命名，但语义收敛为“当前真实 assistant 消息的 `messageId` 引用”：在尚未收到真正内容前始终为 `null`；收到首个承载内容事件时写入真实 `messageId`；会话结束、停止、错误、切换会话、快照恢复时统一清空。
+34. 通用助理背景图分流继续留在样式层实现：移动端默认使用 `assistant-cui-bg.png`，PC 端新增 `assistant-cui-pc-bg.png` 并通过 `.pc-mode`、`--pc` 这类页面级 class 覆盖 `background-image`；不把背景图选择下沉到组件内的 `isPcMiniApp()` 运行时判断，避免同一视觉资源策略散落到 JSX 逻辑里。
 21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。
 22. 本地 JSAPI mock 的目标扩展到全部业务页面：`activateAssistant`、`selectAssistant`、`switchAssistant`、`assistantDetail`、`createAssistant`、`weAgentCUI` 都应能在浏览器本地通过 mock 数据直接访问与联动。
 23. mock 环境不单独维护一套伪判端逻辑，端类型判断统一复用 `src/utils/hwext.ts` 中的 `isPcMiniApp`：仅当存在真实或 mock 的 `window.Pedestal.callMethod` 时视为 PC，否则按移动端处理，避免样式和 toast 分流与生产逻辑偏离。
@@ -547,6 +558,17 @@ interface CreateDigitalTwinParams {
 3. 页面、组件、mock、opencode 适配层禁止再通过 `hwext.ts` 获取类型，避免出现“工具模块既导出函数又转导出类型”的双重职责。
 4. 页面对外暴露的 props 类型也按页面域收口到 `src/types/pages`，例如 `AssistantDetailProps` 不再定义在 `src/pages/assistantDetail.tsx` 内部，而是放到 `src/types/pages/assistant.ts` 后由页面文件和库导出入口共同引用。
 5. 此次收口不调整类型定义语义，只调整导入边界：类型定义位置保持稳定，`hwext.ts` 侧只删除 type re-export 和相关下游依赖。
+6. `hwext.ts` 内统一新增 `reportUemEvent(eventId, eventTitle, data)` 运行时封装，业务层不直接访问 `window.HWH5.uem`：
+   - 移动端固定调用 `window.HWH5.uem('event', payload)`，其中 `payload` 结构收敛为 `{ type: 'info', code, name, result: true, msg, duration: 0, data }`；
+   - PC 端先仅保留 `TODO` 分支，不提前猜测或硬编码 PC 埋码桥协议。
+7. 业务层点击埋码统一采用“调用即放行”的接入方式：点击事件内只执行 `void reportUemEvent(...).catch(...)`，不 `await` 埋码结果，也不因为埋码失败中断原有按钮行为。当前固定触发点包括：
+   - `activate_select_assistant_click` / `选择助理`
+   - `weagent_history_click` / `历史会话`
+   - `weagent_create_session_click` / `创建会话`
+   - `switch_assistant_confirm_click` / `确认切换`
+   - `select_assistant_create_click` / `创建助理`
+   - `select_assistant_start_click` / `开始使用`
+8. 当前这批点击埋码的 `data` 统一只传基础对象 `{ clientType: '', entry: 'WeAgent', operationTime: new Date().getTime() }`，暂不在各页面分散拼接上下文字段。
 
 ## 22. 全局版本更新弹窗设计
 

@@ -25,6 +25,7 @@ import {
   getUserInfo,
   getWeAgentDetails,
   registerSessionListener,
+  reportUemEvent,
   sendMessage as sendMessageApi,
   stopSkill,
   unregisterSessionListener,
@@ -884,6 +885,16 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const handleCreateSession = useCallback(async () => {
     const currentAssistantAccount = assistantAccountRef.current;
+    void reportUemEvent('weagent_create_session_click', '创建会话', {
+      clientType: '',
+      entry: 'WeAgent',
+      operationTime: new Date().getTime(),
+    }).catch((error) => {
+      WeLog(`App reportUemEvent failed | extra=${JSON.stringify({
+        eventId: 'weagent_create_session_click',
+      })} | error=${JSON.stringify(error)}`);
+    });
+
     if (!currentAssistantAccount) {
       return;
     }
@@ -919,7 +930,7 @@ function App({ assistantAccount = '' }: AppProps) {
       WeLog(`App createNewSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
       showToast(t('weAgent.createSessionFailed'));
     }
-  }, [messages.length, resolveAssistantDetail, createSessionForAssistant, hidePendingAssistantPreview]);
+  }, [messages.length, resolveAssistantDetail, createSessionForAssistant, hidePendingAssistantPreview, welinkSessionId]);
 
   const handleSwitchWeAgentSession = useCallback((nextWelinkSessionId: string) => {
     const normalizedSessionId = nextWelinkSessionId;

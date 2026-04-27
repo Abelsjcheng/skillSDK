@@ -8,7 +8,7 @@ import activateGuidePcEn from '../imgs/activate-guide-pc-en.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import type { WeAgentListItem } from '../types/bridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { getWeAgentList, openH5Webview } from '../utils/hwext';
+import { getWeAgentList, openH5Webview, reportUemEvent } from '../utils/hwext';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
@@ -68,6 +68,14 @@ const ActivateAssistant: React.FC = () => {
     openH5Webview({ uri: targetUri });
   }, [assistantList, isPc, loadAssistantList, navigate]);
 
+  const reportSelectAssistantClick = useCallback(() => {
+    void reportUemEvent('activate_select_assistant_click', '选择助理', {
+      clientType: '',
+      entry: 'WeAgent',
+      operationTime: new Date().getTime(),
+    });
+  }, []);
+
   return (
     <div className={`activate-assistant ${isPc ? 'activate-assistant--pc' : 'activate-assistant--mobile'}`}>
       <div className="activate-assistant__center">
@@ -83,6 +91,7 @@ const ActivateAssistant: React.FC = () => {
             className="activate-assistant__enable-btn"
             onClick={(event) => {
               runButtonClickWithDebounce(event, () => {
+                reportSelectAssistantClick();
                 void handleSelectAssistant();
               });
             }}
