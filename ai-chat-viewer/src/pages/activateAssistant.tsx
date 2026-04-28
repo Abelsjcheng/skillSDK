@@ -8,11 +8,12 @@ import activateGuidePcEn from '../imgs/activate-guide-pc-en.png';
 import activateGuidePc from '../imgs/activate-guide-pc.png';
 import type { WeAgentListItem } from '../types/bridge';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
-import { getWeAgentList, openH5Webview, reportUemEvent } from '../utils/hwext';
+import { getWeAgentList, openH5Webview } from '../utils/hwext';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
 import '../styles/ActivateAssistant.less';
 import { openWeAgentDialogPc } from '../utils/assistantPcHandle';
+import { reportSelectAssistantClick } from '../utils/uemUtil';
 
 const CREATE_ASSISTANT_URI = `h5://${APP_ID()}/index.html?from=weAgent#createAssistant`;
 const SELECT_ASSISTANT_URI = `h5://${APP_ID()}/index.html?from=weAgent#selectAssistant`;
@@ -67,14 +68,6 @@ const ActivateAssistant: React.FC = () => {
     const targetUri = latestList.length === 0 ? CREATE_ASSISTANT_URI : SELECT_ASSISTANT_URI;
     openH5Webview({ uri: targetUri });
   }, [assistantList, isPc, loadAssistantList, navigate]);
-
-  const reportSelectAssistantClick = useCallback(() => {
-    void reportUemEvent('activate_select_assistant_click', '选择助理', {
-      clientType: '',
-      entry: 'WeAgent',
-      operationTime: new Date().getTime(),
-    });
-  }, []);
 
   return (
     <div className={`activate-assistant ${isPc ? 'activate-assistant--pc' : 'activate-assistant--mobile'}`}>

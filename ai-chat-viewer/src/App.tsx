@@ -25,7 +25,6 @@ import {
   getUserInfo,
   getWeAgentDetails,
   registerSessionListener,
-  reportUemEvent,
   sendMessage as sendMessageApi,
   stopSkill,
   unregisterSessionListener,
@@ -52,6 +51,7 @@ import { showToast } from './utils/toast';
 import createSession from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
+import { reportCreateSessionClick } from './utils/uemUtil';
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -885,15 +885,6 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const handleCreateSession = useCallback(async () => {
     const currentAssistantAccount = assistantAccountRef.current;
-    void reportUemEvent('weagent_create_session_click', '创建会话', {
-      clientType: '',
-      entry: 'WeAgent',
-      operationTime: new Date().getTime(),
-    }).catch((error) => {
-      WeLog(`App reportUemEvent failed | extra=${JSON.stringify({
-        eventId: 'weagent_create_session_click',
-      })} | error=${JSON.stringify(error)}`);
-    });
 
     if (!currentAssistantAccount) {
       return;
@@ -904,8 +895,8 @@ function App({ assistantAccount = '' }: AppProps) {
       return;
     }
 
+    let detail = assistantDetailRef.current;
     try {
-      let detail = assistantDetailRef.current;
       if (!detail || detail.partnerAccount !== currentAssistantAccount) {
         detail = await resolveAssistantDetail(currentAssistantAccount);
       }
@@ -926,9 +917,11 @@ function App({ assistantAccount = '' }: AppProps) {
         const next = prev.filter((session) => session.welinkSessionId !== newSession.welinkSessionId);
         return [newSession, ...next];
       });
-    } catch (err) {
+      reportCreateSessionClick(detail);
+    } catch (err: any) {
       WeLog(`App createNewSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
       showToast(t('weAgent.createSessionFailed'));
+      reportCreateSessionClick(detail, err);
     }
   }, [messages.length, resolveAssistantDetail, createSessionForAssistant, hidePendingAssistantPreview, welinkSessionId]);
 
@@ -1025,6 +1018,11 @@ function App({ assistantAccount = '' }: AppProps) {
                 mode={isOutputting ? 'generating' : footerMode}
                 onSend={handleGenerate}
                 onStop={handleStop}
+                onInputFocus={() => {
+                  if (!isPc && !isHistorySidebarVisible) {
+                    setScrollToBottomSignal((prev) => prev + 1);
+                  }
+                }}
               />
             </div>
           </div>

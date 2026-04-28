@@ -102,6 +102,7 @@ export interface WeAgentCUIFooterProps {
   mode: 'generate' | 'generating' | 'regenerate';
   onSend: (message: string) => void;
   onStop: () => void;
+  onInputFocus?: () => void;
   leftActions?: ReactNode;
 }
 

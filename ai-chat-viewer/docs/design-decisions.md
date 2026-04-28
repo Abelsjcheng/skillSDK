@@ -175,6 +175,7 @@ interface CreateDigitalTwinParams {
 12. 第二页内部助手选择按钮圆角半径固定为 `8px`。
 13. 第二页内部助手选择按钮在选中态时，按钮文本颜色固定为 `rgba(13,148,255,1)`。
 14. 第二页内部助手选择按钮在选中态时，圆形 `√` 固定在按钮内部右侧，距离右边 `8px`。
+15. 第二页内部助手按钮左侧头像改为圆形展示；实现上在 `StepBrainSelect` 内为头像增加固定 `20x20` 的圆形裁切容器，并在 `DigitalTwinCreator.less` 中通过 `border-radius: 50%` + `overflow: hidden` 收口，保证非标准比例头像也能稳定显示为圆形。
 
 ## 5.3 移动端适配（isPcMiniApp）
 
@@ -395,7 +396,7 @@ interface CreateDigitalTwinParams {
 5. 助理列表项样式固定：
    - 列表项间距 `12px`；
    - 单项尺寸 `height: 72px; width: 100%; border-radius: 8px; padding: 16px 12px`；
-   - 左侧头像 `40x40`，与右侧说明块间距 `16px`。
+   - 左侧头像 `40x40`，统一显示为圆形头像，与右侧说明块间距 `16px`。
    - 列表项支持单选态，点击后为当前项增加 `1px solid rgba(13,148,255,1)` 边框；未选中项保持透明边框，避免布局抖动。
    - 列表项去除浏览器默认点击/聚焦高亮，仅保留选中边框作为反馈。
 6. 说明块第一行左侧主标题样式为 `16px/500/24px`、`rgba(51,51,51,1)`，右侧 tag 为内容自适应宽度、`padding: 2px 4px`、`4px` 圆角、`rgba(217,232,255,1)` 背景，tag 文本为 `10px/400/14px`、`rgba(65,142,255,1)`。
@@ -410,6 +411,7 @@ interface CreateDigitalTwinParams {
 12. 助理详情页与切换助理页源码文件仅保留 `default export`；组件化引用场景所需的命名导出统一由 `src/lib/index.ts` 转出。
 13. 新增 `example/assistant-components-demo`，用于演示通过库产物（`dist/lib/index.js`）导入 `AssistantDetail` 与 `SwitchAssistant` 并进行页面切换展示。
 14. “切换助理页”与“启动助理页”共用列表布局与交互结构，提取到 `src/components/assistant/AssistantSelectionPage.tsx` 复用；两个页面仅传入不同的标题和底部按钮文案。
+15. 由于“切换助理页”与“启动助理页”都复用 `AssistantCardList`，助理头像圆形样式统一在 `SwitchAssistant.less` 中收口，避免两个页面分别维护头像圆角逻辑。
 
 ## 16. 启动助理页面设计
 
@@ -432,21 +434,26 @@ interface CreateDigitalTwinParams {
 1. `WeAgentCUI` 为当前唯一对话页，`App` 仅保留 `weAgentCUI` 数据流与会话能力（消息加载、发送、流式更新、停止、历史分页）。
 2. 页面结构为：`对话内容区 + 多功能按钮区 + 底部输入区`。
 4. `weAgentCUI` 页面根容器背景统一使用助理背景图，并按当前页面尺寸拉伸显示（`background-size: 100% 100%`）；移动端默认 `assistant-cui-bg.png`，PC 端继续通过页面级 class 覆盖为 `assistant-cui-pc-bg.png`。
-5. 多功能按钮区高度固定为 `32px`，左侧提供相邻排列的“新建会话”“历史会话”两个 `32px x 32px` 的白底圆角按钮，按钮间距固定 `8px`，图标统一为 `16px x 16px`；其中“新建会话”按钮按最简规则直接使用 `messages.length === 0` 判断当前是否为空会话，满足时不重复创建会话，直接 toast 提示“当前是最新会话”；中间增加白底圆角状态提示块“输出中...”，高度 `32px`、圆角 `20px`、文本样式 `12px/400`、颜色 `rgba(38,159,255,1)`，仅在 AI 生成阶段显示，且位置固定在整行多功能按钮区的水平中点。该提示块必须与当前激活的 `welinkSessionId` 绑定，切换会话后不继承旧会话的生成态，旧会话晚到的 `busy/idle/error` 事件也不得影响当前会话的显示状态。
-6. 消息渲染层在 `MessageBubble` 增加变体样式支持：
+5. 移动端页面根容器内边距统一为 `padding: 8px 16px 12px`；PC 端继续在 `.pc-mode` 下覆盖为 `padding: 0`，避免影响左右分栏布局。
+6. 多功能按钮区高度固定为 `32px`，左侧提供相邻排列的“新建会话”“历史会话”两个 `32px x 32px` 的白底圆角按钮，按钮间距固定 `8px`，图标统一为 `16px x 16px`；其中“新建会话”按钮按最简规则直接使用 `messages.length === 0` 判断当前是否为空会话，满足时不重复创建会话，直接 toast 提示“当前是最新会话”；中间增加白底圆角状态提示块“输出中...”，高度 `32px`、圆角 `20px`、文本样式 `12px/400`、颜色 `rgba(38,159,255,1)`，仅在 AI 生成阶段显示，且位置固定在整行多功能按钮区的水平中点。该提示块必须与当前激活的 `welinkSessionId` 绑定，切换会话后不继承旧会话的生成态，旧会话晚到的 `busy/idle/error` 事件也不得影响当前会话的显示状态。
+7. 消息渲染层在 `MessageBubble` 增加变体样式支持：
    - 用户消息右对齐，头部文案为“测试 + 时间”，右侧头像 `24x24`；
    - 助手消息左对齐，头部文案为“小米 + 时间”，左侧头像 `24x24`；
+   - 用户头部与助手头部中的“名称 + 时间”元信息文本统一使用 `12px/400/20px`、`rgba(102,102,102,1)`；
    - 助手消息中，头像名称头部块与下方 AI 回复消息块之间的纵向间距固定为 `8px`；
    - 用户气泡使用蓝色线性渐变；助手气泡容器宽度改为占满当前消息容器整行，适用于所有 AI 消息类型块，不再仅限代码块场景。
    - AI 消息块内部的可折叠子组件（代码块、思考块、工具调用块）统一使用 `arrow_up_icon.svg` 作为箭头资源，并保持“展开朝上、收缩朝下”的方向约定，避免不同卡片各自使用字符箭头或方向不一致。
    - `CodeBlock` 在助手消息中按块级元素独占一行展示，并占满当前消息内容区域的可用宽度；普通文本内容仍保持气泡按内容宽度收缩。
    - `CodeBlock` 在移动端不启用强制折行，长代码统一保持原始行结构，通过代码块内容区自身的横向滚动承载，避免窄屏下把代码缩进和语义打散；代码区域滚动条隐藏，但不移除横向滚动能力。
    - AI 回复代码块中的行号样式固定为非斜体，需覆盖语法高亮主题对 `comment` token 的默认斜体设置，避免行号跟随主题变成 italic。
-7. 输入区在 `Footer` 增加变体样式支持：
-   - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px; background: #fff`；
+8. 输入区在 `Footer` 增加变体样式支持：
+   - 容器 `height: 40px; padding: 8px 12px; border-radius: 30px`；
+   - 默认态背景为 `rgba(255, 255, 255, 0.9)`，无边框，并补充阴影 `0px 4px 8px -5px rgba(107, 133, 235, 0.05)`；
    - placeholder 固定为“有问题尽管问我~”；
-   - 容器聚焦态不直接切纯色边框，而是通过“内层背景 + 外层 border-box 线性渐变”的方式渲染 `1px` 渐变描边，颜色从 `rgba(13,146,255,1)` 过渡到 `rgba(81,69,255,1)`；
+   - 容器聚焦态保持 `rgba(255, 255, 255, 0.9)` 背景，边框改为使用伪元素渲染独立的“空心渐变描边”层：容器本体继续只负责半透明白底，伪元素通过 `linear-gradient(90deg, #0d92ff 0%, #5145ff 100%)` 从左到右绘制 `1px` 水平平滑渐变边框，使左侧边框与左上/左下圆角保持蓝色起点，向右过渡到右侧边框与右上/右下圆角的紫色终点，并通过 mask/裁切仅保留边框环，不让渐变参与主体背景；
+   - 聚焦态实现需保证移动端输入框容器的背景色前后视觉完全一致，因此焦点态不重写输入框主体背景，只切换独立描边层的显示状态；
    - 发送按钮为 `24x24` 图标按钮，图标尺寸 `20x20`。
+   - 移动端输入框不额外引入键盘高度联动补滚逻辑；仅在 `input focus` 时通过 `App` 复用现有 `scrollToBottomSignal` 机制触发内容区滚到底部，减少改动面并避免和既有 `keyboardHeight` 缩容逻辑叠加。
 8. iOS 端 `WeAgentCUI` 输入框唤起软键盘时，不再通过对底部输入区做 `transform` 上抬来规避遮挡；改为继续监听 `HWH5.onKeyboardHeightChange`，并将键盘高度写入页面根容器的布局变量，由 `we-agent-cui-main` 按真实高度缩减可视区域。键盘打开期间页面外层需保持 `overflow: hidden`，只允许消息内容区内部滚动，避免 iOS WebView 暴露整页滚动条。
 9. `WeAgentCUI` 内容区滚动容器需保持“可滚动但隐藏滚动条”的策略；除通用 `.content` 样式外，还需对 `.content--we-agent-cui` 单独补充 `scrollbar-width: none`、`-ms-overflow-style: none` 与 `::-webkit-scrollbar { display: none; width: 0; height: 0; }`，尽量降低 iOS WebView 中系统滚动指示条的可见概率。
 10. 样式文件 `src/styles/WeAgentCUI.less` 负责维护 WeAgentCUI 布局，class 前缀统一使用 `we-agent-cui-`。
@@ -462,6 +469,7 @@ interface CreateDigitalTwinParams {
    - 标题文本使用运行时用户信息动态生成（如存在 `weAgentUserName` 则展示 `早上好，${weAgentUserName}`）；其中 `weAgentUserName` 按当前国际化语言选择用户字段：中文取 `userNameZH`，英文取 `userNameEN`，样式 `18px/500/26px`、`rgba(25,25,25,1)`；
    - 对应国际化资源中的用户名占位符统一使用 `i18next` 标准插值语法 `{{name}}`，避免欢迎块渲染时把 `{name}` 原样输出到页面；
    - 副标题文本使用运行时助理信息动态拼接（`weAgentAssistantName | weAgentAssistantDescription`），样式 `14px/400/22px`、`rgba(89,89,89,1)`；
+   - PC 端欢迎块在 `WeAgentCUI.less` 的 `.app-container--we-agent-cui.pc-mode` 作用域下做局部覆盖，不改移动端通用规格：块顶部间距提升到 `57px`，头像到标题改为 `16px`，标题到副标题改为 `24px`；标题文字升级为 `28px/600/30px`，副标题调整为 `14px/400/24px`；
    - 不为欢迎标题和副标题提供默认兜底文案；当对应数据为空时直接不渲染文本节点。
 12. `WeAgentCUI` 消息区不保留“复制消息”“发送到IM”入口，`App -> Content -> MessageBubble` 组件链路中移除 `onCopy`、`onSendToIM` 参数透传。
 13. 历史消息中的 AI `Question` / `Permission` 卡片统一按只读展示处理：`App` 在历史消息映射阶段标记来源，`MessageBubble` 将该标记透传到 `QuestionCard` 与 `PermissionCard`，并在组件内部禁用选项点击、输入提交及授权按钮点击。
@@ -469,18 +477,19 @@ interface CreateDigitalTwinParams {
 15. 全页面取消“禁止复制”限制：不通过触摸事件 `preventDefault` 或样式策略阻断系统默认文本选择与复制行为。
 16. 历史会话侧栏的每个会话 item 标题按单行省略处理，超出宽度显示 `...`。
 17. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
-18. 历史会话面板按端分流：移动端改为“左侧抽屉 + 右侧蒙层”方案；PC 端为左侧固定宽度 `260px` 的历史会话栏，并通过页面布局为右侧对话区预留空间，形成左右分栏显示。由于组件触发按钮位于多功能按钮区内部，PC 端侧边栏外层容器必须脱离按钮区局部定位上下文，采用覆盖整个页面左侧区域的定位方式，避免被按钮区 `32px` 高度裁剪。PC 端 `weAgentCUI` 根容器去除外层 `padding`；右侧 AI 对话容器单独承担上下内边距，固定 `padding-top: 16px`、`padding-bottom: 30px`。默认状态下右侧 AI 对话容器左右内边距为 `150px`，内容宽度占满右侧可用区域；当历史会话侧边栏展开时，左右内边距切换为 `50px`，内容宽度仍占满右侧可用区域，不再限制 `max-width`。
-19. PC 端历史会话关闭按钮不参与页面分栏宽度计算：侧边栏布局宽度始终按 `260px` 计算，关闭按钮通过 `position: absolute` 悬浮到侧边栏右侧，可超出侧边栏盒模型显示，但不额外占用页面宽度。
-20. 历史会话侧边栏面板改为“整块容器统一 `padding: 20px 18px`”的布局模式；顶部标题区位于该容器内部，尺寸为“高 `32px`、宽占满”；标题文案为“历史对话”，标题容器 `padding: 6px 12px`，文本样式 `12px/500`、`rgba(51,51,51,1)`。标题区下方内容区继续承担分组列表和空态内容。
-21. 历史会话侧边栏在挂载显示时增加过渡动画：面板使用轻量平移动画进入，蒙层同步做透明度过渡；历史数据请求过程中不再渲染“加载中...”文字，仅保留面板基础结构。
-22. 历史会话空态图片尺寸调整为宽 `100px`、高自适应，避免当前图标占位过小。
-23. PC 端历史会话分组标题由“今天 / 昨天 / 3天前”组成；“今天”“昨天”“3天前”标题容器高度统一 `32px`，`padding: 6px 12px`，文本样式 `12px/400`、`rgba(153,153,153,1)`。
-24. PC 端历史会话 item 容器高度统一 `32px`，`padding: 6px 12px`；item 文本样式 `12px/400`、`rgba(51,51,51,1)`，当前会话选中态背景改为白色、圆角半径 `8px`。
-23. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
-24. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
-25. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
-26. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
-27. `PermissionCard` 的渲染时序按确认状态拆分：
+18. `Content` 组件中的历史消息上拉加载与“没有更多消息”提示解耦：继续保留基于滚动位置、`hasMoreHistory`、`isLoadingHistory` 的触顶加载逻辑，但移除顶部 `history-status--end` 结束提示块渲染，避免在消息流里额外插入静态提示节点。
+19. 历史会话面板按端分流：移动端改为“左侧抽屉 + 右侧蒙层”方案；PC 端为左侧固定宽度 `260px` 的历史会话栏，并通过页面布局为右侧对话区预留空间，形成左右分栏显示。由于组件触发按钮位于多功能按钮区内部，PC 端侧边栏外层容器必须脱离按钮区局部定位上下文，采用覆盖整个页面左侧区域的定位方式，避免被按钮区 `32px` 高度裁剪。PC 端 `weAgentCUI` 根容器去除外层 `padding`；右侧 AI 对话容器单独承担上下内边距，固定 `padding-top: 16px`、`padding-bottom: 30px`。默认状态下右侧 AI 对话容器左右内边距为 `150px`，内容宽度占满右侧可用区域；当历史会话侧边栏展开时，左右内边距切换为 `50px`，内容宽度仍占满右侧可用区域，不再限制 `max-width`。
+20. PC 端历史会话关闭按钮不参与页面分栏宽度计算：侧边栏布局宽度始终按 `260px` 计算，关闭按钮通过 `position: absolute` 悬浮到侧边栏右侧，可超出侧边栏盒模型显示，但不额外占用页面宽度。
+21. 历史会话侧边栏面板改为“整块容器统一 `padding: 20px 18px`”的布局模式；顶部标题区位于该容器内部，尺寸为“高 `32px`、宽占满”；标题文案为“历史对话”，标题容器 `padding: 6px 12px`。移动端标题文本按基础样式使用 `16px/500/24px`，PC 端再通过 `.we-agent-history-sidebar--pc` 局部覆盖回 `12px/500/20px`。标题区下方内容区继续承担分组列表和空态内容。
+22. 历史会话侧边栏在挂载显示时增加过渡动画：面板使用轻量平移动画进入，蒙层同步做透明度过渡；历史数据请求过程中不再渲染“加载中...”文字，仅保留面板基础结构。
+23. 历史会话空态图片尺寸调整为宽 `100px`、高自适应，避免当前图标占位过小。
+24. PC 端历史会话分组标题由“今天 / 昨天 / 3天前”组成；“今天”“昨天”“3天前”标题容器高度统一 `32px`，`padding: 6px 12px`，文本样式 `12px/400`、`rgba(153,153,153,1)`。
+25. PC 端历史会话 item 容器高度统一 `32px`，`padding: 6px 12px`；item 文本样式 `12px/400`、`rgba(51,51,51,1)`，当前会话选中态背景改为白色、圆角半径 `8px`。
+26. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
+27. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
+28. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
+29. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
+30. `PermissionCard` 的渲染时序按确认状态拆分：
    - 未确认态：只渲染独立的 `permission-card__actions` 操作块，不渲染 `permission-card` 主体；
    - 已确认态：再渲染 `permission-card` 主体，内部包含头部、内容区与结果区/状态区。
 28. `PermissionCard` 改为“头部 / 内容 / 结果或操作区”三段式结构：
@@ -569,6 +578,7 @@ interface CreateDigitalTwinParams {
    - `select_assistant_create_click` / `创建助理`
    - `select_assistant_start_click` / `开始使用`
 8. 当前这批点击埋码的 `data` 统一只传基础对象 `{ clientType: '', entry: 'WeAgent', operationTime: new Date().getTime() }`，暂不在各页面分散拼接上下文字段。
+9. 为避免埋码事件名、标题文案、基础 `data` 与错误兜底日志继续分散在页面中，新增 `src/utils/uemUtil.ts` 作为业务埋码入口：页面与组件只调用该文件导出的具名上报方法，不再直接 import `reportUemEvent`。
 
 ## 22. 全局版本更新弹窗设计
 
@@ -597,10 +607,14 @@ interface CreateDigitalTwinParams {
 5. 选择助理、切换助理、助理详情共用的卡片/标题区颜色通过共用样式文件（如 `SwitchAssistant.less`、`AssistantPageHeader.less`）统一覆盖，避免同一结构在不同页面重复写一套暗黑规则。
 6. 创建个人助理页的暗黑模式除颜色覆盖外，上传头像入口继续复用统一的 `add_icon.svg` 图标，不再为暗黑模式单独维护一套加号图片。
 7. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
-8. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
-9. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
-10. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
-11. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
+8. WeAgentCUI 多功能按钮区的“历史会话”“新建会话”图标继续复用现有黑色 SVG 资源，不新增暗黑图；暗黑模式下在 `WeAgentCUI.less` 的组件根作用域内通过样式层 `filter` 做白色映射，避免新增资源与分支渲染逻辑。
+9. `ToolCard` 与 `PermissionCard` 的暗黑模式视觉层级直接对齐 `CodeBlock`：统一使用 `var(--ai-dark-card-bg)` 作为卡片底色、`var(--ai-dark-border-soft)` 作为边框，头部使用 `rgba(255, 255, 255, 0.04)` 的浅层深色背景，内容区改为透明承载；实现收口在 `Content.less` 的 `WeAgentCUI` 暗黑作用域中，不修改 TSX 结构与资源引用。
+10. 移动端历史会话侧边栏的暗黑模式在 `WeAgentCUI.less` 中单独覆盖：面板背景直接使用 `rgba(31,33,34,1)`；头部标题与会话 item 默认文本切到 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”使用 `rgba(127,130,131,1)`；当前选中 item 不沿用通用暗黑卡片底色，而是单独使用 `rgba(4,45,77,1)` 作为高亮底，文本色切到 `rgba(13,148,255,1)`，避免和普通暗黑卡片层级混淆。
+11. 由于历史会话侧边栏通过 `createPortal` 挂载到 `document.body`，其暗黑样式不能依赖 `.app-container--we-agent-cui` 祖先选择器命中；移动端暗黑覆盖需直接以 `.we-agent-history-sidebar--mobile` 及其子元素为选择器作用域，避免 portal 脱离页面容器后样式失效。
+12. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
+13. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
+14. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
+15. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
 
 
 

@@ -20,10 +20,10 @@ import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getWeAgentList,
   openH5Webview,
-  reportUemEvent,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import { handleServiceClickPc, openWeAgentDialogPc } from '../utils/assistantPcHandle';
+import { reportCreateAssistantClick, reportEnableNowClick } from '../utils/uemUtil';
 
 const CREATE_ASSISTANT_ROUTE = '/createAssistant';
 
@@ -65,15 +65,7 @@ const SelectAssistant: React.FC = () => {
   }, [loadAssistantList]);
 
   const handleCreateAssistant = useCallback(() => {
-    void reportUemEvent('select_assistant_create_click', '创建助理', {
-      clientType: '',
-      entry: 'WeAgent',
-      operationTime: new Date().getTime(),
-    }).catch((error) => {
-      WeLog(`SelectAssistant reportUemEvent failed | extra=${JSON.stringify({
-        eventId: 'select_assistant_create_click',
-      })} | error=${JSON.stringify(error)}`);
-    });
+    reportCreateAssistantClick();
 
     if (isPc) {
       openWeAgentDialogPc("weAgentPc");
@@ -95,15 +87,7 @@ const SelectAssistant: React.FC = () => {
   }, [isPc, navigate]);
 
   const handleEnableNow = useCallback(async () => {
-    void reportUemEvent('select_assistant_start_click', '开始使用', {
-      clientType: '',
-      entry: 'WeAgent',
-      operationTime: new Date().getTime(),
-    }).catch((error) => {
-      WeLog(`SelectAssistant reportUemEvent failed | extra=${JSON.stringify({
-        eventId: 'select_assistant_start_click',
-      })} | error=${JSON.stringify(error)}`);
-    });
+    reportEnableNowClick();
 
     if (!selectedAssistantId) return;
 

@@ -1,7 +1,7 @@
 @import './theme.less';
 
 .app-container--we-agent-cui {
-  padding: 8px 12px;
+  padding: 8px 16px 12px;
   box-shadow: none;
   background: url('../imgs/assistant-cui-bg.png');
   background-size: cover;
@@ -22,7 +22,6 @@
   }
 
   .content--we-agent-cui {
-    padding: 7px 0;
     background: transparent;
   }
 
@@ -67,7 +66,7 @@
   }
 
   .we-agent-message__meta-text {
-    color: rgba(57, 57, 57, 1);
+    color: rgba(102, 102, 102, 1);
     font-size: 12px;
     font-weight: 400;
     line-height: 20px;
@@ -249,6 +248,28 @@
     transition: padding 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: padding;
   }
+
+  .we-agent-cui-welcome {
+    margin-top: 64px;
+
+    > * + * {
+      margin-top: 0;
+    }
+  }
+
+  .we-agent-cui-welcome__title {
+    margin-top: 16px;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 30px;
+  }
+
+  .we-agent-cui-welcome__subtitle {
+    margin-top: 24px;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 24px;
+  }
 }
 
 .app-container--we-agent-cui.pc-mode.has-history-sidebar {
@@ -409,9 +430,9 @@
   margin: 0;
   padding-left: 12px;
   color: rgba(51, 51, 51, 1);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 24px;
 }
 
 .we-agent-history-sidebar__body {
@@ -655,26 +676,34 @@
     background: var(--ai-dark-card-bg);
   }
 
+  .app-container--we-agent-cui:not(.pc-mode) .we-agent-cui-actions__icon {
+    filter: brightness(0) invert(1);
+  }
+
   .app-container--we-agent-cui:not(.pc-mode) .we-agent-message__bubble.is-user .message-content,
   .app-container--we-agent-cui:not(.pc-mode) .we-agent-message__bubble.is-user .message-content blockquote {
     color: #ffffff;
   }
 
-  .app-container--we-agent-cui:not(.pc-mode) .we-agent-history-sidebar__panel {
-    background: var(--ai-dark-page-bg);
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__panel {
+    background: rgba(31, 33, 34, 1);
   }
 
-  .app-container--we-agent-cui:not(.pc-mode) .we-agent-history-sidebar__header-title,
-  .app-container--we-agent-cui:not(.pc-mode) .we-agent-history-sidebar__session-item {
-    color: var(--ai-dark-text-primary);
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__header-title,
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__session-item {
+    color: rgba(220, 221, 221, 1);
   }
 
-  .app-container--we-agent-cui:not(.pc-mode) .we-agent-history-sidebar__group-title {
-    color: var(--ai-dark-text-muted);
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__group-title {
+    color: rgba(127, 130, 131, 1);
   }
 
-  .app-container--we-agent-cui:not(.pc-mode) .we-agent-history-sidebar__session-item.is-selected {
-    background: var(--ai-dark-card-bg);
-    color: var(--ai-dark-text-primary);
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__session-item.is-selected {
+    background: rgba(4, 45, 77, 1);
+    color: rgba(13, 148, 255, 1);
+  }
+
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__session-item.is-selected .we-agent-history-sidebar__session-item-text {
+    color: rgba(13, 148, 255, 1);
   }
 }

@@ -11,9 +11,10 @@ import type {
   WeAgentHistorySidebarProps,
 } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import { getHistorySessionsList, reportUemEvent } from '../../utils/hwext';
+import { getHistorySessionsList } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
+import { reportViewHistoryClick } from '../../utils/uemUtil';
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
@@ -197,23 +198,13 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   }, [shouldRenderSidebar]);
 
   const handleOpen = useCallback(async () => {
-    void reportUemEvent('weagent_history_click', '历史会话', {
-      clientType: '',
-      entry: 'WeAgent',
-      operationTime: new Date().getTime(),
-    }).catch((error) => {
-      WeLog(`WeAgentHistorySidebar reportUemEvent failed | extra=${JSON.stringify({
-        eventId: 'weagent_history_click',
-      })} | error=${JSON.stringify(error)}`);
-    });
-
     if (shouldRenderSidebar && isVisible) {
       closeSidebar();
       return;
     }
 
     openSidebar();
-
+    reportViewHistoryClick(assistantAccount);
     if (cachedSessions.length > 0) {
       setHistorySessions(cachedSessions);
       setIsLoading(false);

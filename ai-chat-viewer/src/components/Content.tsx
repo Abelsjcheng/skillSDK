@@ -158,9 +158,6 @@ export const Content: React.FC<ContentProps> = ({
       onScroll={handleScroll}
     >
       <div className="messages-container messages-container--we-agent-cui">
-        {messages.length > 0 && !isLoadingHistory && !hasMoreHistory && (
-          <div className="history-status history-status--end">{t('weAgent.noMoreMessages')}</div>
-        )}
         {messages.map((message) => (
           <div key={message.id} data-message-id={message.id}>
             <MessageBubble

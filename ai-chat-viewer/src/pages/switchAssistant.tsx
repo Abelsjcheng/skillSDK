@@ -19,10 +19,10 @@ import {
   getWeAgentDetails,
   getWeAgentList,
   openH5Webview,
-  reportUemEvent,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
+import { reportSwitchAssistantClick } from '../utils/uemUtil';
 
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
@@ -92,15 +92,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
   }, [isPc, selectedPartnerAccount]);
 
   const handleRightButtonClick = useCallback(async () => {
-    void reportUemEvent('switch_assistant_confirm_click', '确认切换', {
-      clientType: '',
-      entry: 'WeAgent',
-      operationTime: new Date().getTime(),
-    }).catch((error) => {
-      WeLog(`SwitchAssistant reportUemEvent failed | extra=${JSON.stringify({
-        eventId: 'switch_assistant_confirm_click',
-      })} | error=${JSON.stringify(error)}`);
-    });
+    reportSwitchAssistantClick();
 
     if (!selectedPartnerAccount) return;
 

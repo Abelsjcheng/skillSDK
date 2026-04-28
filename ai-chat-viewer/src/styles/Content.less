@@ -864,6 +864,7 @@
     .thinking-block__chevron,
     .question-card__header,
     .question-card__option-desc,
+    .permission-card__tool,
     .permission-card__desc {
       color: var(--ai-dark-text-muted);
     }
@@ -906,14 +907,24 @@
     .thinking-block,
     .question-card,
     .permission-card,
+    .permission-card__actions,
+    .permission-card__status,
     .file-part {
       background: var(--ai-dark-card-bg);
       color: var(--ai-dark-text-primary);
     }
 
     .tool-card,
-    .thinking-block {
+    .thinking-block,
+    .permission-card,
+    .permission-card__actions,
+    .permission-card__status {
       border-color: var(--ai-dark-border-soft);
+    }
+
+    .permission-card__actions,
+    .permission-card__status {
+      border: 1px solid var(--ai-dark-border-soft);
     }
 
     .tool-card__header:hover,
@@ -921,10 +932,21 @@
       background: rgba(255, 255, 255, 0.04);
     }
 
+    .tool-card__header,
+    .permission-card__header {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
     .tool-card__body,
-    .thinking-block__content {
+    .thinking-block__content,
+    .permission-card__info {
       border-top-color: var(--ai-dark-border-soft);
       background: transparent;
+    }
+
+    .tool-card__code {
+      background: transparent;
+      border: 1px solid var(--ai-dark-border-soft);
     }
 
     .question-card {
@@ -951,13 +973,8 @@
       background: rgba(82, 196, 26, 0.12);
     }
 
-    .permission-card__header {
-      background: rgba(255, 255, 255, 0.04);
-    }
-
-    .permission-card__actions,
-    .permission-card__status {
-      background: rgba(255, 255, 255, 0.02);
+    .permission-card__actions-label {
+      color: var(--ai-dark-text-primary);
     }
 
     .error-block {

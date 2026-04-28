@@ -16,6 +16,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   mode,
   onSend,
   onStop,
+  onInputFocus,
   leftActions,
 }) => {
   const { t } = useTranslation();
@@ -146,6 +147,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
           placeholder={t('weAgent.inputPlaceholder')}
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onFocus={() => {
+            onInputFocus?.();
+          }}
           onKeyDown={handleMobileKeyDown}
           onDrop={(e) => {
             e.preventDefault();

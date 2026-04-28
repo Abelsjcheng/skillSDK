@@ -103,13 +103,15 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                     aria-label={assistant.name}
                   >
                     <span className="digital-twin__assistant-content">
-                      <AvatarImage
-                        src={assistant.icon}
-                        fallbackSrc={defaultAvatar}
-                        alt=""
-                        className="digital-twin__assistant-icon"
-                        aria-hidden="true"
-                      />
+                      <span className="digital-twin__assistant-icon-wrap" aria-hidden="true">
+                        <AvatarImage
+                          src={assistant.icon}
+                          fallbackSrc={defaultAvatar}
+                          alt=""
+                          className="digital-twin__assistant-icon"
+                          aria-hidden="true"
+                        />
+                      </span>
                       <span className="digital-twin__assistant-label">{assistant.name}</span>
                     </span>
                     {selected ? <span className="digital-twin__check">&#10003;</span> : null}
