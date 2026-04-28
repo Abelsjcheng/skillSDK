@@ -75,13 +75,15 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         isPcMiniApp={isPcMiniApp}
         onClose={onClose}
         onMobileBack={onPrev}
-        pcTitle={isPcMiniApp ? t('createAssistant.brainTitle') : undefined}
+        pcTitle={isPcMiniApp ? t("createAssistant.brainTitle") : undefined}
       />
 
       <div className="digital-twin__content digital-twin__content--step2">
         {!isPcMiniApp ? (
           <div className="digital-twin__brain-type-block">
-            <h3 className="digital-twin__brain-title">{t('createAssistant.brainTitle')}</h3>
+            <h3 className="digital-twin__brain-title">
+              {t("createAssistant.brainTitle")}
+            </h3>
           </div>
         ) : null}
 
@@ -94,7 +96,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                   <button
                     key={assistant.bizRobotId}
                     type="button"
-                    className={`digital-twin__assistant-btn ${selected ? 'is-selected' : ''}`.trim()}
+                    className={`digital-twin__assistant-btn ${selected ? "is-selected" : ""}`.trim()}
                     onClick={(event) => {
                       runButtonClickWithDebounce(event, () => {
                         setSelectedBizRobotId(assistant.bizRobotId);
@@ -114,7 +116,9 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
                       </span>
                       <span className="digital-twin__assistant-label">{assistant.name}</span>
                     </span>
-                    {selected ? <span className="digital-twin__check">&#10003;</span> : null}
+                    {selected ? (
+                      <span className="digital-twin__check">&#10003;</span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -123,9 +127,12 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
         </div>
 
         <img
-          className="digital-twin__brain-illustration"
+          className={[
+            "digital-twin__brain-illustration",
+            isPcMiniApp ? "digital-twin__brain-illustration_pc" : "",
+          ].join(" ")}
           src={illustration}
-          alt={t('createAssistant.illustrationAlt')}
+          alt={t("createAssistant.illustrationAlt")}
           draggable="false"
         />
       </div>
@@ -133,19 +140,23 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
       <CreatorStepFooter
         isPcMiniApp={isPcMiniApp}
         pcButtons={[
-          { label: t('createAssistant.prev'), onClick: onPrev, variant: 'cancel' },
           {
-            label: t('createAssistant.confirm'),
+            label: t("createAssistant.prev"),
+            onClick: onPrev,
+            variant: "cancel",
+          },
+          {
+            label: t("createAssistant.confirm"),
             onClick: handleConfirm,
-            variant: 'confirm',
+            variant: "confirm",
             enabled: confirmEnabled,
             withStateClass: true,
           },
         ]}
         mobileButton={{
-          label: t('createAssistant.confirm'),
+          label: t("createAssistant.confirm"),
           onClick: handleConfirm,
-          variant: 'confirm',
+          variant: "confirm",
           enabled: confirmEnabled,
           withStateClass: true,
         }}

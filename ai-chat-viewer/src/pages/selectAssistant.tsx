@@ -69,6 +69,7 @@ const SelectAssistant: React.FC = () => {
 
     if (isPc) {
       openWeAgentDialogPc("weAgentPc");
+      return
     }
     const search = buildCreateAssistantSearch();
     const targetHash = `#${CREATE_ASSISTANT_ROUTE}${search}`;

@@ -106,23 +106,30 @@ function createStyleRules({ singletonStyleTag = false } = {}) {
   ];
 }
 
-function createAssetRule() {
-  return {
-    test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
-    type: 'asset',
-    parser: {
-      dataUrlCondition: {
-        maxSize: 8192,
+function createAssetRule({ singletonStyleTag = false } = {}) {
+  if (singletonStyleTag) {
+    return {
+      test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
+      type: "asset/inline"
+    };
+  } else {
+    return {
+      test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
+      type: "asset",
+      parser: {
+        dataUrlCondition: {
+          maxSize: 8192,
+        },
       },
-    },
-  };
+    };
+  } 
 }
 
 function createModuleRules({ includePolyfills = false, singletonStyleTag = false } = {}) {
   return [
     createBabelRule({ includePolyfills }),
     ...createStyleRules({ singletonStyleTag }),
-    createAssetRule(),
+    createAssetRule({ singletonStyleTag }),
   ];
 }
 
