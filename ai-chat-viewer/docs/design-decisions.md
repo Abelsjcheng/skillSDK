@@ -608,13 +608,14 @@ interface CreateDigitalTwinParams {
 6. 创建个人助理页的暗黑模式除颜色覆盖外，上传头像入口继续复用统一的 `add_icon.svg` 图标，不再为暗黑模式单独维护一套加号图片。
 7. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
 8. WeAgentCUI 多功能按钮区的“历史会话”“新建会话”图标继续复用现有黑色 SVG 资源，不新增暗黑图；暗黑模式下继续使用样式层 `filter` 做近似着色，将图标视觉调整到接近 `rgba(220,221,221,1)`，避免为图标链路额外维护 `mask-image` 结构与变量样式。
-9. `ToolCard` 与 `PermissionCard` 的暗黑模式视觉层级直接对齐 `CodeBlock`：统一使用 `var(--ai-dark-card-bg)` 作为卡片底色、`var(--ai-dark-border-soft)` 作为边框，头部使用 `rgba(255, 255, 255, 0.04)` 的浅层深色背景，内容区改为透明承载；实现收口在 `Content.less` 的 `WeAgentCUI` 暗黑作用域中，不修改 TSX 结构与资源引用。
-10. 移动端历史会话侧边栏的暗黑模式在 `WeAgentCUI.less` 中单独覆盖：面板背景直接使用 `rgba(31,33,34,1)`；头部标题与会话 item 默认文本切到 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”使用 `rgba(127,130,131,1)`；当前选中 item 不沿用通用暗黑卡片底色，而是单独使用 `rgba(4,45,77,1)` 作为高亮底，文本色切到 `rgba(13,148,255,1)`，避免和普通暗黑卡片层级混淆。
-11. 由于历史会话侧边栏通过 `createPortal` 挂载到 `document.body`，其暗黑样式不能依赖 `.app-container--we-agent-cui` 祖先选择器命中；移动端暗黑覆盖需直接以 `.we-agent-history-sidebar--mobile` 及其子元素为选择器作用域，避免 portal 脱离页面容器后样式失效。
-12. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
-13. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
-14. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
-15. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
+9. WeAgentCUI 暗黑模式下图标着色继续遵循“样式层近似 filter 映射”策略：代码块复制图标、权限块锁图标统一近似映射到 `rgba(220,221,221,1)`；代码块、思考块、工具块等消息卡片内的折叠箭头统一近似映射到 `rgba(174,175,176,1)`，保持图标层级弱于正文主文本。
+10. `ToolCard` 与 `PermissionCard` 的暗黑模式视觉层级直接对齐 `CodeBlock`：统一使用 `var(--ai-dark-card-bg)` 作为卡片底色、`var(--ai-dark-border-soft)` 作为边框，头部使用 `rgba(255, 255, 255, 0.04)` 的浅层深色背景，内容区改为透明承载；实现收口在 `Content.less` 的 `WeAgentCUI` 暗黑作用域中，不修改 TSX 结构与资源引用。
+11. 移动端历史会话侧边栏的暗黑模式在 `WeAgentCUI.less` 中单独覆盖：面板背景直接使用 `rgba(31,33,34,1)`；头部标题与会话 item 默认文本切到 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”使用 `rgba(127,130,131,1)`；当前选中 item 不沿用通用暗黑卡片底色，而是单独使用 `rgba(4,45,77,1)` 作为高亮底，文本色切到 `rgba(13,148,255,1)`，避免和普通暗黑卡片层级混淆。
+12. 由于历史会话侧边栏通过 `createPortal` 挂载到 `document.body`，其暗黑样式不能依赖 `.app-container--we-agent-cui` 祖先选择器命中；移动端暗黑覆盖需直接以 `.we-agent-history-sidebar--mobile` 及其子元素为选择器作用域，避免 portal 脱离页面容器后样式失效。
+13. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
+14. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
+15. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
+16. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
 
 
 
