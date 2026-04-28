@@ -607,7 +607,7 @@ interface CreateDigitalTwinParams {
 5. 选择助理、切换助理、助理详情共用的卡片/标题区颜色通过共用样式文件（如 `SwitchAssistant.less`、`AssistantPageHeader.less`）统一覆盖，避免同一结构在不同页面重复写一套暗黑规则。
 6. 创建个人助理页的暗黑模式除颜色覆盖外，上传头像入口继续复用统一的 `add_icon.svg` 图标，不再为暗黑模式单独维护一套加号图片。
 7. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
-8. WeAgentCUI 多功能按钮区的“历史会话”“新建会话”图标继续复用现有黑色 SVG 资源，不新增暗黑图；暗黑模式下在 `WeAgentCUI.less` 的组件根作用域内通过样式层 `filter` 做白色映射，避免新增资源与分支渲染逻辑。
+8. WeAgentCUI 多功能按钮区的“历史会话”“新建会话”图标继续复用现有黑色 SVG 资源，不新增暗黑图；暗黑模式下继续使用样式层 `filter` 做近似着色，将图标视觉调整到接近 `rgba(220,221,221,1)`，避免为图标链路额外维护 `mask-image` 结构与变量样式。
 9. `ToolCard` 与 `PermissionCard` 的暗黑模式视觉层级直接对齐 `CodeBlock`：统一使用 `var(--ai-dark-card-bg)` 作为卡片底色、`var(--ai-dark-border-soft)` 作为边框，头部使用 `rgba(255, 255, 255, 0.04)` 的浅层深色背景，内容区改为透明承载；实现收口在 `Content.less` 的 `WeAgentCUI` 暗黑作用域中，不修改 TSX 结构与资源引用。
 10. 移动端历史会话侧边栏的暗黑模式在 `WeAgentCUI.less` 中单独覆盖：面板背景直接使用 `rgba(31,33,34,1)`；头部标题与会话 item 默认文本切到 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”使用 `rgba(127,130,131,1)`；当前选中 item 不沿用通用暗黑卡片底色，而是单独使用 `rgba(4,45,77,1)` 作为高亮底，文本色切到 `rgba(13,148,255,1)`，避免和普通暗黑卡片层级混淆。
 11. 由于历史会话侧边栏通过 `createPortal` 挂载到 `document.body`，其暗黑样式不能依赖 `.app-container--we-agent-cui` 祖先选择器命中；移动端暗黑覆盖需直接以 `.we-agent-history-sidebar--mobile` 及其子元素为选择器作用域，避免 portal 脱离页面容器后样式失效。
