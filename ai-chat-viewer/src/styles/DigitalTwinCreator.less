@@ -553,10 +553,10 @@
 }
 
 .digital-twin--mobile .digital-twin__header {
-  height: 44px;
-  min-height: 44px;
-  flex-basis: 44px;
-  padding: 0;
+  height: calc(44px + var(--mobile-safe-top));
+  min-height: calc(44px + var(--mobile-safe-top));
+  flex-basis: calc(44px + var(--mobile-safe-top));
+  padding: var(--mobile-safe-top) 0 0;
   justify-content: space-between;
 }
 

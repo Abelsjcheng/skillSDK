@@ -1,40 +1,53 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { getStatusBarHeight } from './hwext';
 import { WeLog } from './logger';
 import { showToast } from './toast';
 
-export function useMobileStatusBarHeight(isPcMiniApp: boolean): number {
-  const [statusBarHeight, setStatusBarHeight] = useState<number>(0);
+let cachedHeight: number | null = null;
+let loadingPromise: Promise<number> | null = null;
 
+function applyMobileSafeTop(height: number): void {
+  document.documentElement.style.setProperty('--mobile-safe-top', `${height}px`);
+}
+
+function loadStatusBarHeight(): Promise<number> {
+  if (cachedHeight !== null) {
+    return Promise.resolve(cachedHeight);
+  }
+
+  if (!loadingPromise) {
+    loadingPromise = getStatusBarHeight()
+      .catch((error) => {
+        WeLog(`useMobileStatusBarHeight getStatusBarHeight failed | error=${JSON.stringify(error)}`);
+        showToast('获取状态栏高度失败');
+        return 0;
+      })
+      .then((height) => {
+        cachedHeight = height;
+        applyMobileSafeTop(height);
+        return height;
+      })
+      .finally(() => {
+        loadingPromise = null;
+      });
+  }
+
+  return loadingPromise;
+}
+
+export function useMobileStatusBarHeight(isPcMiniApp: boolean): number {
   useEffect(() => {
     if (isPcMiniApp) {
-      setStatusBarHeight(0);
       return;
     }
 
-    let cancelled = false;
-
-    const loadStatusBarHeight = async () => {
-      try {
-        const height = await getStatusBarHeight();
-        if (!cancelled) {
-          setStatusBarHeight(height);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStatusBarHeight(0);
-        }
-        WeLog(`useMobileStatusBarHeight getStatusBarHeight failed | error=${JSON.stringify(error)}`);
-        showToast('获取状态栏高度失败');
-      }
-    };
+    if (cachedHeight !== null) {
+      applyMobileSafeTop(cachedHeight);
+      return;
+    }
 
     void loadStatusBarHeight();
-
-    return () => {
-      cancelled = true;
-    };
   }, [isPcMiniApp]);
 
-  return statusBarHeight;
+  return isPcMiniApp ? 0 : (cachedHeight ?? 0);
 }

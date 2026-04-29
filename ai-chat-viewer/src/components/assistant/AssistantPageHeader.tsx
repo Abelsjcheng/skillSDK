@@ -23,7 +23,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   pcRightActions,
 }) => {
   const { t } = useTranslation();
-  const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
+  useMobileStatusBarHeight(isPcMiniApp);
 
   const resolvedDefaultPcCloseAction: AssistantPageHeaderAction = {
     label: t('common.close'),
@@ -101,16 +101,8 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
     );
   }
 
-  const mobileHeaderStyle = statusBarHeight > 0
-    ? {
-      paddingTop: `${statusBarHeight}px`,
-      height: `${44 + statusBarHeight}px`,
-      minHeight: `${44 + statusBarHeight}px`,
-    }
-    : undefined;
-
   return (
-    <header className="assistant-page-header assistant-page-header--mobile" style={mobileHeaderStyle}>
+    <header className="assistant-page-header assistant-page-header--mobile">
       <div className="assistant-page-header__side assistant-page-header__side--left">
         <button
           type="button"

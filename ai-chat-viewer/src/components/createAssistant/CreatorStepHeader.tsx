@@ -17,15 +17,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
   pcTitle,
 }) => {
   const { t } = useTranslation();
-  const statusBarHeight = useMobileStatusBarHeight(isPcMiniApp);
-  const mobileHeaderStyle = !isPcMiniApp && statusBarHeight > 0
-    ? {
-      paddingTop: `${statusBarHeight}px`,
-      height: `${44 + statusBarHeight}px`,
-      minHeight: `${44 + statusBarHeight}px`,
-      flexBasis: `${44 + statusBarHeight}px`,
-    }
-    : undefined;
+  useMobileStatusBarHeight(isPcMiniApp);
 
   const handleMobileBack = useCallback(() => {
     if (onMobileBack) {
@@ -39,7 +31,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
     <header className={[
       "digital-twin__header",
       isPcMiniApp ? 'welink-pc-navigation-bar--dragging' : ''
-    ].filter(Boolean).join(' ')} style={mobileHeaderStyle}>
+    ].filter(Boolean).join(' ')}>
       {isPcMiniApp ? (
         <>
           <span className="digital-twin__title">{pcTitle ?? t('createAssistant.title')}</span>

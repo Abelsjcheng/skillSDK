@@ -14,6 +14,8 @@ import defaultAvatar from '../imgs/defaultAvatar.png';
 import editIcon from '../imgs/edit_icon.png';
 import iconCopy from '../imgs/icon-copy.svg';
 import moreIcon from '../imgs/more_icon.png';
+import closeEyeIcon from '../imgs/close_eye_icon.svg';
+import openEyeIcon from '../imgs/open_eye_icon.svg';
 import serviceIcon from '../imgs/icon-service.svg';
 import type { WeAgentDetails } from '../types/bridge';
 import type { AssistantPageHeaderAction } from '../types/components';
@@ -408,7 +410,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
                       }}
                       aria-label={isSecretVisible ? t('assistantDetail.hideSecret') : t('assistantDetail.showSecret')}
                     >
-                      <img src={iconCopy} alt="" className="assistant-detail__icon" draggable="false" />
+                      <img
+                        src={isSecretVisible ? openEyeIcon : closeEyeIcon}
+                        alt=""
+                        className="assistant-detail__icon"
+                        draggable="false"
+                      />
                     </button>
                     <button
                       type="button"

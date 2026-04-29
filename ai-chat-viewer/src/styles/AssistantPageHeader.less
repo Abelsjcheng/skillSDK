@@ -13,8 +13,9 @@
 }
 
 .assistant-page-header--mobile {
-  height: 44px;
-  min-height: 44px;
+  padding-top: var(--mobile-safe-top);
+  height: calc(44px + var(--mobile-safe-top));
+  min-height: calc(44px + var(--mobile-safe-top));
   display: flex;
   align-items: center;
   background: #f4f7fd;

@@ -189,6 +189,8 @@ interface CreateDigitalTwinParams {
 6. 页面 2 移动端头部改为三段式：左返回区（调用 `onPrev` 返回第一页）/中标题/右占位，头部高度 `44px`。
 7. 页面 2 移动端大脑类型单选改为两列等宽按钮样式：高度 `48px`、间距 `16px`、边框 `1px rgba(0,0,0,0.05)`、圆角 `8px`。
 8. 页面 2 移动端单选圆点尺寸改为：容器 `24px`、外环 `20px`、内实心 `13.33px`。
+9. 为避免移动端标题栏首屏先贴顶、异步拿到 `statusBarHeight` 后再整体下跳，移动端头部首屏默认直接使用 CSS 变量 `--mobile-safe-top`，其默认值取 `env(safe-area-inset-top)`；这样页面首次渲染时即可带上系统安全区高度，不再等待接口返回后才显示。
+10. 状态栏高度读取通过共享 hook 统一缓存：实现保持最小化，仅保留一个缓存高度值、一个共享加载 Promise，以及把宿主返回的真实高度异步写回 `--mobile-safe-top` 的能力；页面层不再消费 `ready` 门控。
 9. 页面 2 移动端 `digital-twin__brain-title` 与后续内容区之间的垂直间距固定为 `20px`。
 10. 页面 2 移动端内部助手按钮组改为 1 列，每项高度 `48px`。
 11. 页面 2 移动端底部操作区仅保留“确定”按钮，`44px` 高、全宽、圆角 `999px`。
@@ -216,7 +218,7 @@ interface CreateDigitalTwinParams {
 2. 页面 1 默认选中第一个默认头像（若存在）
 3. 页面 1 `name/description` 为空
 4. 页面 2 默认 `brainType = 'internal'`，`selectedBizRobotId` 默认取内部助手列表第一项的 `bizRobotId`（若存在）
-5. 页面 1 点击“下一步”时将当前头像/名称/简介快照写入路由 `state` 草稿；页面 2 点击“上一步”或浏览器返回时回到 `/createAssistant`，并继续携带该草稿回填 `StepBasicInfo` 本地状态，避免依赖本地存储。
+5. 页面 1 点击“下一步”时将当前头像/名称/简介快照写入路由 `state` 草稿，并通过路由 `replace` 进入 `/selectBrainAssistant`；页面 2 点击“上一步”或浏览器返回时回到 `/createAssistant`，并继续通过路由 `replace` 携带该草稿回填 `StepBasicInfo` 本地状态，避免依赖本地存储，同时避免 history 栈残留“空草稿第一页”导致返回时先闪回空表单页。
 
 ## 7. 交互与校验决策
 
@@ -373,7 +375,7 @@ interface CreateDigitalTwinParams {
    - 卡片 1：头像（`72x72`，圆角 `19px`）+ 名称“小咪”+ 标签“员工助手”；名称文本需独立水平居中，标签不参与名称居中计算；
    - 卡片 2：助理简介标题与正文（“你的全能AI生活助理”）+ 创建者行；创建者右侧值按当前语言选择：中文使用 `creatorName + ' ' + createdBy`，英文使用 `creatorNameEn + ' ' + createdBy`；
    - 卡片 3：内部助理场景仅展示 1 行“能力提供方 / displayTag”，不再展示“部门/责任人”；外部助理场景继续展示 `APPID` 与 `密钥` 两行。
-   - PC 端外部助理“密钥”行中的两个操作按钮（隐藏/显示密钥、复制密钥）单独通过 action-group 管理，按钮间距固定为 `8px`。
+   - PC 端外部助理“密钥”行中的两个操作按钮（隐藏/显示密钥、复制密钥）单独通过 action-group 管理，按钮间距固定为 `8px`；其中查看按钮默认显示 `src/imgs/close_eye_icon.svg`，明文态切换为 `src/imgs/open_eye_icon.svg`。
    - 卡片 2 中“助理简介内容”和“创建者行”之间增加 `1px solid rgba(0,0,0,0.05)` 分割线；
    - 卡片 3 仅在外部助理双行场景下保留上下分层布局；内部助理单行场景不再需要“部门/责任人”之间的分割线。
    - 标题区与头像区域相关图标/图片均通过 `src/imgs` 静态资源导入，不再使用内联 SVG 或纯色块占位。

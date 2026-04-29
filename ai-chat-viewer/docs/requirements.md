@@ -576,7 +576,7 @@
          - `bizRobotId` 为空（外部助理）：
             - item 1：左侧 `APPID`，右侧展示 `appKey`；
             - item 2：左侧 `密钥`，右侧展示 `appSecret` 的掩码文本（`*`）；
-            - 右侧密钥支持按压查看：按下显示明文，松手恢复 `*` 掩码。
+            - 右侧密钥支持查看切换：默认加密态显示 `src/imgs/close_eye_icon.svg`，点击后显示明文并切换为 `src/imgs/open_eye_icon.svg`。
             - PC 端“隐藏密钥”和“复制密钥”两个操作按钮之间固定间距 `8px`。
       - 容器 3 中 `能力提供方`、`APPID`、`密钥` 对应右侧值显示块保持不溢出容器边界。
       - 内部助理场景下，容器 3 不再渲染第二行组织信息，也不再展示“部门/责任人”之间的描边分割。
@@ -931,10 +931,11 @@
       - 按上述 `weCodeUrl` 规则组装 `openWeAgentCUI` 入参并调用 `openWeAgentCUI`。
 4. 创建助理页面（`/createAssistant`）：
    - 页面初始化读取 query 参数 `from`；
-   - 第一页点击“下一步”时，将基础信息草稿写入路由 `state`，并通过路由跳转到 `/selectBrainAssistant`，同时保留当前 query 参数；
+   - 第一页点击“下一步”时，将基础信息草稿写入路由 `state`，并通过路由 `replace` 跳转到 `/selectBrainAssistant`，同时保留当前 query 参数；
    - 第二页（`/selectBrainAssistant`）初始化时先从路由 `state` 读取第一页草稿；若草稿缺失，则重定向回 `/createAssistant`；
    - 第二页进入后调用 `getAgentType`，使用返回 `content` 获取内部助手数据；
    - 第二页点击浏览器返回时，应回到 `/createAssistant`；
+   - 第二页回第一页时继续通过路由 `replace` 写回带 `draft` 的 `/createAssistant`，避免 history 栈中残留“未带草稿的旧第一页”记录，导致第一页再次点击返回时先切回空表单页、第二次返回才真正退出；
    - 点击“确定”调用 `createDigitalTwin`；
    - 若 `from=weAgent`：
       - 从创建结果获取 `partnerAccount`，调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
@@ -983,7 +984,9 @@
    - 当 `isPcMiniApp === false` 时，需要调用 `window.HWH5.getDeviceInfo()`；
    - 从出参对象读取 `statusBarHeight`（状态栏高度）；
    - 将标题栏顶部安全距离设置为 `statusBarHeight`，避免系统状态栏遮挡标题栏内容；
-   - 业务页面在标题组件中直接调用 `hwext.ts` 的 `getDeviceInfo` 获取该值，不使用单独的 `useMobileStatusBarHeight.ts` 方法文件。
+   - 移动端标题栏首屏默认通过 CSS 变量使用 `env(safe-area-inset-top)` 作为顶部安全区高度，确保页面第一次渲染时头部已处于接近正确的位置；
+   - `getStatusBarHeight()` 作为异步校正值使用：页面首屏不等待接口返回，待宿主真实高度返回后再覆盖 CSS 变量，避免首屏先贴顶闪一下；
+   - 页面层不再通过 `ready` 门控阻塞整页渲染；统一复用最小化状态栏高度 hook，在同一会话内缓存已读取高度并异步写入 CSS 变量即可；
    - `getDeviceInfo/statusBarHeight` 封装实现需遵循最小判空策略：仅保留必要能力判断与数值归一化，不引入重复空判断分支。
 9. 移动端标题栏返回事件（创建助理/助理详情/切换助理/启动助理）：
    - 返回按钮点击后直接调用 `window.HWH5.navigateBack()`；

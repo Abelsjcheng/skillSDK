@@ -156,6 +156,7 @@ const CreateAssistantBasicPage: React.FC = () => {
           search: location.search,
         },
         {
+          replace: true,
           state: {
             draft: payload,
           } satisfies CreateAssistantRouteState,
