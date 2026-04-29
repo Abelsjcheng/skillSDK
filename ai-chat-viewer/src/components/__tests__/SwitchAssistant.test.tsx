@@ -10,7 +10,7 @@ describe('SwitchAssistant', () => {
         return {
           content: [
             {
-              name: '编程助理',
+              name: '编程助手',
               icon: '',
               description: '设计师一枚，擅长代码实现与技术方案整理',
               partnerAccount: 'x00_1',
@@ -24,7 +24,7 @@ describe('SwitchAssistant', () => {
         return {
           weAgentDetailsArray: [
             {
-              name: '编程助理',
+              name: '编程助手',
               icon: '',
               desc: '设计师一枚，擅长代码实现与技术方案整理',
               moduleId: '',
@@ -72,14 +72,14 @@ describe('SwitchAssistant', () => {
   it('renders switch assistant page header and list items', async () => {
     render(<SwitchAssistant />);
 
-    expect(screen.getByText('切换助理')).toBeInTheDocument();
+    expect(screen.getByText('切换助手')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '客服' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '取消选择' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '确认切换' })).toBeInTheDocument();
 
-    expect(await screen.findByText('编程助理')).toBeInTheDocument();
-    expect(await screen.findByText('自定义助理')).toBeInTheDocument();
+    expect(await screen.findByText('编程助手')).toBeInTheDocument();
+    expect(await screen.findByText('自定义助手')).toBeInTheDocument();
     expect(await screen.findByText(/设计师一枚/)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 import type { WeAgentListItem } from '../types/bridge';
 
-export const CUSTOM_ASSISTANT_TAG = '自定义助理';
+export const CUSTOM_ASSISTANT_TAG = '自定义助手';
 
 export function resolveAssistantTag(assistant: WeAgentListItem): string {
   const bizRobotName = assistant.bizRobotName?.trim() ?? '';

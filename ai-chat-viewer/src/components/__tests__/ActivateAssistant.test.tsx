@@ -14,7 +14,7 @@ describe('ActivateAssistant', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('button', { name: '选择助理' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '激活助理引导图' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '选择助手' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '激活助手引导图' })).toBeInTheDocument();
   });
 });
