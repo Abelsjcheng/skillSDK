@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import type { AvatarImageProps } from '../types/components';
 import { isRemoteAvatarUrl } from '../utils/avatar';
 
+const loadedRemoteAvatarSet = new Set<string>();
+
 const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) => {
   const [resolvedSrc, setResolvedSrc] = useState(fallbackSrc);
 
@@ -18,12 +20,18 @@ const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) 
       return undefined;
     }
 
+    if (loadedRemoteAvatarSet.has(nextSrc)) {
+      setResolvedSrc(nextSrc);
+      return undefined;
+    }
+
     let active = true;
     setResolvedSrc(fallbackSrc);
 
     const image = new Image();
     image.onload = () => {
       if (active) {
+        loadedRemoteAvatarSet.add(nextSrc);
         setResolvedSrc(nextSrc);
       }
     };

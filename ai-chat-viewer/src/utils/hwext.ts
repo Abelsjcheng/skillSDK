@@ -415,12 +415,12 @@ export function registerCommonForUpdate(listener: () => void): void {
     return;
   }
 
-  window?.HWH5?.onCheckForUpdate()
+  window?.HWH5?.onCheckForUpdate?.()
     .then((data) => {
       WeLog(`onCheckForUpdate update:${JSON.stringify(data)}`);
     })
 
-  window?.HWH5?.onUpdateReady(listener)
+  window?.HWH5?.onUpdateReady?.(listener)
 }
 
 export async function rebootApp(): Promise<void> {

@@ -277,9 +277,7 @@ function App({ assistantAccount = '' }: AppProps) {
       assemblerRef.current.reset();
       streamingMsgIdRef.current = messageId;
     }
-
-    hidePendingAssistantPreview();
-  }, [finalizeStreamingMessage, hidePendingAssistantPreview]);
+  }, [finalizeStreamingMessage]);
 
   const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
     if (!welinkSessionId) {
@@ -588,6 +586,9 @@ function App({ assistantAccount = '' }: AppProps) {
             meta: current?.meta,
             isHistory: current?.isHistory,
           }));
+          window.requestAnimationFrame(() => {
+            hidePendingAssistantPreview();
+          });
           break;
         }
 
@@ -782,6 +783,9 @@ function App({ assistantAccount = '' }: AppProps) {
             meta: current?.meta,
             isHistory: current?.isHistory,
           }));
+          window.requestAnimationFrame(() => {
+            hidePendingAssistantPreview();
+          });
           break;
         }
 
@@ -1018,11 +1022,6 @@ function App({ assistantAccount = '' }: AppProps) {
                 mode={isOutputting ? 'generating' : footerMode}
                 onSend={handleGenerate}
                 onStop={handleStop}
-                onInputFocus={() => {
-                  if (!isPc && !isHistorySidebarVisible) {
-                    setScrollToBottomSignal((prev) => prev + 1);
-                  }
-                }}
               />
             </div>
           </div>

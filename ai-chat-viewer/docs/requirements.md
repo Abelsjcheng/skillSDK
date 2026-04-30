@@ -884,6 +884,7 @@
    - 错误块文案优先展示事件中的 `error` 字段，无明确内容时使用场景兜底文案。
 22. `WeAgentCUI` 中 AI 流式回复的消息 ID 处理规则：
    - “正在生成中，请稍等...”占位块不再作为 `Message` 插入 `messages`，而是改为独立的临时预览渲染态；
+   - 独立占位预览块在视觉结构上需与真实 AI 消息块保持一致：复用相同的头像/名称时间区、assistant bubble 宽度与主文案字号/行高，避免从“生成中”切换到真实 AI 消息时产生明显布局抖动；
    - `messages` 列表中仅保留真实消息，assistant 消息 `id` 只使用服务端真实 `messageId`；
    - `streamingMsgIdRef` 仅保存当前真实 assistant 消息的 `messageId`，在尚未收到真正承载内容的 AI 事件前必须保持为空；
    - 当收到真正承载内容的 AI 流式事件（如 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file`、`streaming`）时，直接使用事件中的真实 `messageId` 创建或更新 assistant 消息；

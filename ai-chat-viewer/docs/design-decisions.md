@@ -506,6 +506,7 @@ interface CreateDigitalTwinParams {
 30. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；该阶段仅打开独立的“正在生成中，请稍等...”预览块，并重置上一轮 assistant 的流式上下文，不再向 `messages` 插入随机 `id` 的 pending assistant message。
 31. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
 32. `WeAgentCUI` 对 AI 流式助手消息采用“独立占位预览 + 真实消息直写”的策略：页面显示“正在生成中，请稍等...”时，不把该占位块作为 `Message` 写入 `messages`；该独立占位预览仅由 `message.user` 事件拉起。真正承载内容的 AI 事件根据 SDK 文档保证都会携带真实 `messageId`，因此实时内容、`streaming` 补流、`snapshot`/历史恢复都直接按该真实 `messageId` 创建或更新 assistant 消息，不再做随机占位消息 ID 提权。
+33. 在保留“独立占位预览 + 真实消息直写”架构前提下，`PendingAssistantBubble` 需与真实 assistant 消息块复用同一套视觉骨架：头像/名称时间区、assistant bubble 外层宽度、文案字号与行高保持一致；同时独立占位预览不在收到第一条真实 AI 事件的同一时刻立即隐藏，而是至少延后一帧，减少从占位态切换到真实消息态时的列表重排抖动。
 33. `streamingMsgIdRef` 保持原命名，但语义收敛为“当前真实 assistant 消息的 `messageId` 引用”：在尚未收到真正内容前始终为 `null`；收到首个承载内容事件时写入真实 `messageId`；会话结束、停止、错误、切换会话、快照恢复时统一清空。
 34. 通用助理背景图分流继续留在样式层实现：移动端默认使用 `assistant-cui-bg.png`，PC 端新增 `assistant-cui-pc-bg.png` 并通过 `.pc-mode`、`--pc` 这类页面级 class 覆盖 `background-image`；不把背景图选择下沉到组件内的 `isPcMiniApp()` 运行时判断，避免同一视觉资源策略散落到 JSX 逻辑里。
 21. 本地 JSAPI mock 增加关键词驱动的错误注入策略：`sendMessage` 命中特定提示词时，不走正常完成回复，而是先输出一段前置 `text.delta`，再按场景发送 `session.error` 或 `error`，用于稳定验证 `WeAgentCUI` 的消息内错误块渲染与流式收尾逻辑。

@@ -80,7 +80,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
     }
   };
 
-  const typeLabel = permTypeLabels[part.permType ?? 'unknown'] ?? part.permType ?? t('permission.unknown');
+  const typeLabel = permTypeLabels[part.permType ?? 'unknown'] ?? t('permission.unknown');
   const permissionResponseText = permissionResponse && permissionResponse in permissionResponseLabels
     ? permissionResponseLabels[permissionResponse as PermissionResponse]
     : permissionResponse;
