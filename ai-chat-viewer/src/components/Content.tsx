@@ -5,6 +5,7 @@ import type { ContentProps } from '../types/components';
 import AvatarImage from './AvatarImage';
 import { MessageBubble } from './MessageBubble';
 import { PendingAssistantBubble } from './PendingAssistantBubble';
+import { shouldRenderMessage } from '../utils/message';
 import '../styles/Content.less';
 
 const TOP_LOAD_THRESHOLD = 24;
@@ -40,6 +41,7 @@ export const Content: React.FC<ContentProps> = ({
 
   const welcomeTitle = weAgentUserName ? t('weAgent.welcomeMorning', { name: weAgentUserName }) : '';
   const welcomeSubtitle = [weAgentAssistantName, weAgentAssistantDescription].filter(Boolean).join(' | ');
+  const visibleMessages = messages.filter(shouldRenderMessage);
 
   const getMessageOffsetTop = useCallback((messageId: string | null): number | null => {
     if (!messageId) return null;
@@ -132,7 +134,7 @@ export const Content: React.FC<ContentProps> = ({
     };
   }, [scrollToBottom, scrollToBottomSignal]);
 
-  if (messages.length === 0 && !pendingAssistantPreview.visible) {
+  if (visibleMessages.length === 0 && !pendingAssistantPreview.visible) {
     return (
       <div className="content content--we-agent-cui">
         <div className="we-agent-cui-welcome">
@@ -158,7 +160,7 @@ export const Content: React.FC<ContentProps> = ({
       onScroll={handleScroll}
     >
       <div className="messages-container messages-container--we-agent-cui">
-        {messages.map((message) => (
+        {visibleMessages.map((message) => (
           <div key={message.id} data-message-id={message.id}>
             <MessageBubble
               message={message}

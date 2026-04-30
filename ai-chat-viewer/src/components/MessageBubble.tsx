@@ -15,7 +15,11 @@ import { ErrorBlock } from './ErrorBlock';
 import { createMarkdownComponents } from './markdownComponents';
 import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
-import { normalizeRole, syncToolCallIdForQuestionParts } from '../utils/message';
+import {
+  normalizeRole,
+  shouldRenderMessagePart,
+  syncToolCallIdForQuestionParts,
+} from '../utils/message';
 import defaultAvatar from '../imgs/defaultAvatar.png';
 import 'katex/dist/katex.min.css';
 
@@ -41,46 +45,6 @@ function messageContainsCodeBlock(message: Message): boolean {
     return true;
   }
   return hasMarkdownCodeBlock(message.content);
-}
-
-function hasVisibleText(value?: string): boolean {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function shouldRenderPart(part: MessagePart): boolean {
-  switch (part.type) {
-    case 'text':
-    case 'thinking':
-    case 'error':
-      return hasVisibleText(part.content);
-    case 'tool':
-      return hasVisibleText(part.content)
-        || hasVisibleText(part.toolName)
-        || hasVisibleText(part.title)
-        || hasVisibleText(part.output)
-        || hasVisibleText(part.error)
-        || Boolean(part.input)
-        || Boolean(part.status);
-    case 'question':
-      return hasVisibleText(part.content)
-        || hasVisibleText(part.header)
-        || hasVisibleText(part.question)
-        || Boolean(part.options?.length)
-        || hasVisibleText(part.output)
-        || Boolean(part.answered);
-    case 'permission':
-      return hasVisibleText(part.content)
-        || hasVisibleText(part.permType)
-        || hasVisibleText(part.permissionId)
-        || hasVisibleText(part.response)
-        || Boolean(part.permResolved);
-    case 'file':
-      return hasVisibleText(part.content)
-        || hasVisibleText(part.fileName)
-        || hasVisibleText(part.fileUrl);
-    default:
-      return hasVisibleText(part.content);
-  }
 }
 
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
@@ -172,7 +136,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const renderContent = () => {
     const normalizedParts = message.parts
-      ? syncToolCallIdForQuestionParts(message.parts).filter(shouldRenderPart)
+      ? syncToolCallIdForQuestionParts(message.parts).filter(shouldRenderMessagePart)
       : undefined;
     if (normalizedParts && normalizedParts.length > 0) {
       return (
@@ -182,7 +146,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (message.content === '') {
+    if (!message.content.trim()) {
       return null;
     }
 

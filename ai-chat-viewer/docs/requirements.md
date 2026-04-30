@@ -243,7 +243,7 @@
       - 移动端：注释显示在简介块下方 `12px` 处，文本水平居中，样式为 `12px / 400`、`rgba(153,153,153,1)`；
       - PC 端：注释显示在底部按钮区左侧，文本左对齐，样式为 `12px / 400`、`rgba(153,153,153,1)`；
    - 扫码场景第一页直创时，`createDigitalTwin` 入参需透传第一页表单已有字段 `name`、`icon`、`description`，并追加传入当前二维码值 `qrcode`；不再额外传 `weCrewType` 与 `bizRobotId`；
-   - 当创建助理接口调用成功后，若满足二维码状态回写前提，则需先调用 `updateQrcodeInfo({ qrcode, robotId, status: 2 })`，其中 `robotId` 取创建助理接口返回值；回写完成后继续复用第二页中 `handleCreateForOtherScene` 共享方法承载的成功跳转逻辑：
+   - 当创建助理接口调用成功后，不再额外调用 `updateQrcodeInfo` 更新二维码状态；后续继续复用第二页中 `handleCreateForOtherScene` 共享方法承载的成功跳转逻辑：
       - 移动端优先调用 `window.HWH5.openIMChat({ chatId: partnerAccount })`，若宿主无该能力则调用 `window.HWH5.close()`；
       - PC 端调用 `window.Pedestal.callMethod('method://agentSkills/handleSdk', { owner: partnerAccount })`；
       - 不再跳转到 `/selectBrainAssistant` 页面。
@@ -260,7 +260,7 @@
    - 创建助理页面涉及关闭当前窗口的逻辑统一复用共享 `closeCreateAssistantWindow` 方法，不在不同页面各自重复实现宿主关闭代码；
    - 创建助理成功结果中的 `partnerAccount` 解析统一复用共享 `resolvePartnerAccount` 方法，不在第一页、第二页各自重复实现字符串读取与裁剪逻辑；
    - 二维码状态回写 helper 不对 `qrcode`、`robotId`、`status` 做本地入参校验，调用时直接按当前业务参数透传 `updateQrcodeInfo`；
-   - `updateQrcodeInfo(status: 1/2/3)` 进入 `catch` 分支时，需 toast 提示固定错误文案，但不阻断当前页面既有关闭、返回或创建成功后的后续流程。
+   - `updateQrcodeInfo(status: 1/3)` 进入 `catch` 分支时，需 toast 提示固定错误文案，但不阻断当前页面既有关闭、返回或创建成功后的后续流程。
 
 ## 5. 页面 2（大脑选择页）需求
 
@@ -822,7 +822,7 @@
    - 上拉加载更早消息时，使用上一批返回的 `nextBeforeSeq` 作为 `beforeSeq` 继续拉取；
    - 对话内容区不再展示“没有更多消息”提示块，但需保留触顶下拉加载历史消息能力；
    - 渲染历史消息时，若 AI 回复包含 `Question` 或 `Permission` 类型消息块，则该消息块仅展示，不允许选择选项、输入提交或点击授权按钮；
-   - 渲染历史消息时，保持“优先按 `parts` 渲染、`parts` 为空时再回退到 `message.content`”的现有逻辑；仅当进入 `message.content` 回退分支且 `content === ''` 时，该条消息不渲染；
+   - 渲染历史消息时，保持“优先按 `parts` 渲染、`parts` 为空时再回退到 `message.content`”的现有逻辑；若一条消息在 `parts` 维度无任何可见内容，且 `message.content.trim()` 后仍为空字符串，则整条消息不渲染（包含外层消息容器），避免内容区出现空白消息块与额外间隔；
    - 获取历史消息（`getSessionMessageHistory`）接口失败时，页面需通过 toast 弹窗提示失败信息。
 12. 历史会话分组与展示：
    - 按 `updatedAt` 将历史会话分为 3 组：`今天`、`昨天`、`3天前`；

@@ -5,6 +5,36 @@
   box-sizing: border-box;
 }
 
+.weagentCUI {
+
+  button,
+  [type='button'],
+  [type='reset'],
+  [type='submit'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:focus,
+  button:focus-visible,
+  [type='button']:focus,
+  [type='button']:focus-visible,
+  [type='reset']:focus,
+  [type='reset']:focus-visible,
+  [type='submit']:focus,
+  [type='submit']:focus-visible {
+    outline: none;
+  }
+
+  input,
+  [type='radio'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  img {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 .app-container {
   margin: 0;
   padding: 12px;
@@ -29,25 +59,6 @@
   &.pc-mode {
     height: 320px;
   }
-
-  button,
-  [type='button'],
-  [type='reset'],
-  [type='submit'] {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  button:focus,
-  button:focus-visible,
-  [type='button']:focus,
-  [type='button']:focus-visible,
-  [type='reset']:focus,
-  [type='reset']:focus-visible,
-  [type='submit']:focus,
-  [type='submit']:focus-visible {
-    outline: none;
-  }
-
 }
 
 .app-container * {
@@ -60,7 +71,7 @@
 .content-wrapper,
 .footer-wrapper {
   margin-bottom: 8px;
-  
+
   &:last-child {
     margin-bottom: 0;
   }
@@ -76,6 +87,7 @@
 // iOS Safari zooms the page when focusing form controls with font-size < 16px.
 // Apply only on iOS-like WebKit environments to prevent focus zoom.
 @supports (-webkit-touch-callout: none) {
+
   .app-container input,
   .app-container textarea,
   .app-container select {

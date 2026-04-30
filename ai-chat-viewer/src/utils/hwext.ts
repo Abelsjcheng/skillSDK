@@ -86,23 +86,23 @@ const addEventListenerOnMessage = (e: any) => {
   const msg = e.detail.msg;
   listenerParams?.onMessage(msg);
 }
-   
+
 function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
   const call = async <T>(funName: string, params: unknown) => {
     const result = await pedestal.callMethod(PEDESTAL_METHOD, { funName, params }) as T;
     if ((result as any)?.errorMessage) {
-     return Promise.reject(result)
+      return Promise.reject(result)
     } else {
-     return Promise.resolve(result)
+      return Promise.resolve(result)
     }
   }
 
   const assistantCall = async <T>(funName: string, params: unknown) => {
     const result = await pedestal.callMethod(`method://agentSkillsDialog/${funName}`, params) as T;
     if ((result as any)?.errorMessage) {
-     return Promise.reject(result)
+      return Promise.reject(result)
     } else {
-     return Promise.resolve(result)
+      return Promise.resolve(result)
     }
   }
   return {
@@ -117,9 +117,9 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
         window.addEventListener('agentSkills_registerSessionListener_onMessage', addEventListenerOnMessage);
       } else {
         window.addEventListener('agentSkills_registerSessionListener_onMessage', (e: any) => {
-        const msg = e.detail.msg;
-        params.onMessage(msg);
-      });
+          const msg = e.detail.msg;
+          params.onMessage(msg);
+        });
       }
       void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
         WeLog(`hwext registerSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
@@ -408,6 +408,19 @@ export function registerTabForUpdate(listener: () => void): void {
   }
 
   window.HWH5EXT?.onTabForUpdate?.(listener);
+}
+
+export function registerCommonForUpdate(listener: () => void): void {
+  if (isPcMiniApp()) {
+    return;
+  }
+
+  window?.HWH5?.onCheckForUpdate()
+    .then((data) => {
+      WeLog(`onCheckForUpdate update:${JSON.stringify(data)}`);
+    })
+
+  window?.HWH5?.onUpdateReady(listener)
 }
 
 export async function rebootApp(): Promise<void> {

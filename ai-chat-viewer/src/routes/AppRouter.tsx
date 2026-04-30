@@ -11,7 +11,7 @@ import SelectAssistant from '../pages/selectAssistant';
 import SelectBrainAssistantPage from '../pages/selectBrainAssistant';
 import SwitchAssistant from '../pages/switchAssistant';
 import WeAgentCUI from '../pages/weAgentCUI';
-import { rebootApp, registerTabForUpdate } from '../utils/hwext';
+import { rebootApp, registerCommonForUpdate, registerTabForUpdate } from '../utils/hwext';
 import { showToast } from '../utils/toast';
 
 const FULL_PAGE_ROUTE_STYLE: React.CSSProperties = {
@@ -29,6 +29,10 @@ export const AppRouter: React.FC = () => {
 
   useEffect(() => {
     registerTabForUpdate(() => {
+      setIsUpdateModalOpen(true);
+    });
+    
+    registerCommonForUpdate(() => {
       setIsUpdateModalOpen(true);
     });
   }, []);

@@ -380,6 +380,8 @@ export interface HWH5Bridge {
   navigateBack: () => void;
   close: () => void;
   openIMChat?: (params: OpenIMChatParams) => Promise<unknown> | unknown;
+  onCheckForUpdate: () => Promise<unknown>;
+  onUpdateReady: (listener: Function) => Promise<unknown>
 }
 
 export interface HWH5DeviceInfo {

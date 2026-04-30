@@ -42,6 +42,10 @@ export function collectUserMessageIds(messages: Message[]): Set<string> {
   );
 }
 
+function hasVisibleText(value?: string | null): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 export function contentTypeForRole(role: Message['role']): NonNullable<Message['contentType']> {
   switch (role) {
     case 'assistant':
@@ -231,6 +235,50 @@ export function mapRawParts(
     return undefined;
   }
   return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming));
+}
+
+export function shouldRenderMessagePart(part: MessagePart): boolean {
+  switch (part.type) {
+    case 'text':
+    case 'thinking':
+    case 'error':
+      return hasVisibleText(part.content);
+    case 'tool':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.toolName)
+        || hasVisibleText(part.title)
+        || hasVisibleText(part.output)
+        || hasVisibleText(part.error)
+        || Boolean(part.input)
+        || Boolean(part.status);
+    case 'question':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.header)
+        || hasVisibleText(part.question)
+        || Boolean(part.options?.length)
+        || hasVisibleText(part.output)
+        || Boolean(part.answered);
+    case 'permission':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.permType)
+        || hasVisibleText(part.permissionId)
+        || hasVisibleText(part.response)
+        || Boolean(part.permResolved);
+    case 'file':
+      return hasVisibleText(part.content)
+        || hasVisibleText(part.fileName)
+        || hasVisibleText(part.fileUrl);
+    default:
+      return hasVisibleText(part.content);
+  }
+}
+
+export function shouldRenderMessage(message: Message): boolean {
+  if (message.parts?.some(shouldRenderMessagePart)) {
+    return true;
+  }
+
+  return hasVisibleText(message.content);
 }
 
 export function sessionMessageToMessage(sessionMessage: SessionMessage): Message {

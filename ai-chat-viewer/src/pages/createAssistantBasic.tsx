@@ -198,6 +198,7 @@ const CreateAssistantBasicPage: React.FC = () => {
         return;
       }
 
+      shouldUpdateQrcodeStatusRef.current = false;
       await handleCreateForOtherScene(createResult);
     } catch (error) {
       WeLog(`CreateAssistantBasicPage createDigitalTwin failed | extra=${JSON.stringify({

@@ -269,17 +269,15 @@ interface CreateDigitalTwinParams {
 18. 创建助理成功结果中的 `partnerAccount` 读取逻辑也统一收口：`resolvePartnerAccount` 抽成共享工具，第一页与第二页都不再各自重复声明，后续凡是需要从 `CreateDigitalTwinResult` 中解析 `partnerAccount` 的场景都复用该方法。
 19. 二维码状态回写通过 `updateQrcodeInfo` 统一收口到页面层：
    - 页面初始化查询成功后，先根据 `Number(result.status) === 0` 生成一个“允许回写二维码状态”的页面级门禁标记；只有该标记为 `true` 时，后续才允许触发 `updateQrcodeInfo`；
-   - 若初始化查询返回 `status !== 0`，则后续 `status: 1 / 2 / 3` 都不再回写；若初始化查询失败，也同样不再回写；
+   - 若初始化查询返回 `status !== 0`，则后续 `status: 1 / 3` 都不再回写；若初始化查询失败，也同样不再回写；
    - 状态 `1`：仅在允许回写前提下，第一页 `queryQrcodeInfo` 查询成功后立即回写；
-   - 状态 `2`：仅在允许回写前提下，扫码场景第一页直创成功后立即回写；
-   - 状态 `3`：仅在允许回写前提下，扫码场景主动退出流程时回写。
+   - 状态 `3`：仅在允许回写前提下，扫码场景主动退出流程时回写；但若扫码场景已经创建助理成功，则需立即关闭该页面级门禁，后续成功跳转/关闭链路不再继续触发 `status:3`。
    - `updateQrcodeStatusSafely` 自身不再判断 `qrcode` 是否为空、也不判断当前是否二维码场景，入参统一原样透传给 `updateQrcodeInfo`；是否需要触发回写由页面调用点自行决定。
 20. 扫码场景的退出动作按“是否离开创建流程”区分：
    - 第一步页面：移动端左上角返回、PC 端右上角关闭、PC 端取消按钮，都视为退出流程，回写 `status:3`。
 21. 扫码场景第一页额外接入宿主返回键监听：在 `createAssistantBasic.tsx` 页面层、且仅在移动端 `from=qrcode` 时调用 `HWH5.addEventListener({ type: 'back', func })` 注册；`func` 内通过 `void updateQrcodeStatusSafely(3)` 异步触发二维码取消回写，并同步 `return true` 交还宿主返回结果，不把监听逻辑下沉到 `StepBasicInfo`。
 22. 二维码状态回写失败不阻断主流程：
    - `status:1` 回写失败只 toast 提示，第一页仍进入失效态；
-   - `status:2` 回写失败只 toast 提示，创建成功后的既有非 `weAgent` 流程继续执行；
    - `status:3` 回写失败只 toast 提示，关闭窗口或返回动作继续执行。
 
 ## 8. 样式与实现约束
@@ -475,7 +473,7 @@ interface CreateDigitalTwinParams {
    - 不为欢迎标题和副标题提供默认兜底文案；当对应数据为空时直接不渲染文本节点。
 12. `WeAgentCUI` 消息区不保留“复制消息”“发送到IM”入口，`App -> Content -> MessageBubble` 组件链路中移除 `onCopy`、`onSendToIM` 参数透传。
 13. 历史消息中的 AI `Question` / `Permission` 卡片统一按只读展示处理：`App` 在历史消息映射阶段标记来源，`MessageBubble` 将该标记透传到 `QuestionCard` 与 `PermissionCard`，并在组件内部禁用选项点击、输入提交及授权按钮点击。
-14. `MessageBubble` 保持现有消息渲染优先级：优先消费 `message.parts` 渲染结构化消息；仅当 `parts` 不存在或为空时才回退到 `message.content`。在该回退分支下，若 `message.content === ''`，则直接不渲染该条消息，避免历史消息或实时消息出现空文本占位。
+14. `MessageBubble` 保持现有消息渲染优先级：优先消费 `message.parts` 渲染结构化消息；仅当 `parts` 不存在或为空时才回退到 `message.content`。消息列表层需在进入 `MessageBubble` 之前统一过滤“无可见 parts 且 `message.content.trim()` 为空”的消息，避免即使 `MessageBubble` 返回 `null`，外层消息占位容器仍然留在 DOM 中，导致内容区出现空白间隔。
 15. 全页面取消“禁止复制”限制：不通过触摸事件 `preventDefault` 或样式策略阻断系统默认文本选择与复制行为。
 16. 历史会话侧栏的每个会话 item 标题按单行省略处理，超出宽度显示 `...`。
 17. 历史会话侧栏面板保持纵向滚动能力，同时隐藏可视滚动条（`scrollbar-width: none` + `::-webkit-scrollbar { display: none; }`）。
