@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import AvatarImage from '../AvatarImage';
 import bannerPcEn from '../../imgs/banner-pc-en.png';
 import bannerPcZh from '../../imgs/banner-pc-zh.png';
+import bannerPhoneEnDark from '../../imgs/banner-phone-en-dark.png';
+import bannerPhoneZhDark from '../../imgs/banner-phone-zh-dark.png';
 import bannerPhoneEn from '../../imgs/banner-phone-en.png';
 import bannerPhoneZh from '../../imgs/banner-phone-zh.png';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
@@ -15,6 +17,7 @@ import { showToast } from '../../utils/toast';
 import { INTERNAL_ASSISTANTS } from './constants';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
+import { useMobileDarkMode } from './useMobileDarkMode';
 import { getAgentType } from '../../utils/hwext';
 
 export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
@@ -26,9 +29,12 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   const { t, i18n } = useTranslation();
   const resolvedLanguage = i18n.resolvedLanguage ?? i18n.language;
   const isEnglish = resolvedLanguage === 'en';
+  const prefersDarkMode = useMobileDarkMode(isPcMiniApp);
   const illustration = isPcMiniApp
     ? (isEnglish ? bannerPcEn : bannerPcZh)
-    : (isEnglish ? bannerPhoneEn : bannerPhoneZh);
+    : prefersDarkMode
+      ? (isEnglish ? bannerPhoneEnDark : bannerPhoneZhDark)
+      : (isEnglish ? bannerPhoneEn : bannerPhoneZh);
   const [selectedBizRobotId, setSelectedBizRobotId] = useState<string | undefined>(INTERNAL_ASSISTANTS[0]?.bizRobotId);
   const [internalAssistants, setInternalAssistants] = useState<InternalAssistantOption[]>(INTERNAL_ASSISTANTS);
 

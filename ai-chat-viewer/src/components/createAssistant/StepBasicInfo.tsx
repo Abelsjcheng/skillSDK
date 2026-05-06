@@ -23,6 +23,7 @@ import { showToast } from '../../utils/toast';
 import AvatarImage from '../AvatarImage';
 import { CreatorStepFooter } from './CreatorStepFooter';
 import { CreatorStepHeader, getStepClassName } from './CreatorStepHeader';
+import { useMobileDarkMode } from './useMobileDarkMode';
 
 function resolveInitialDefaultAvatarId(
   defaultAvatars: DefaultAvatarOption[],
@@ -69,9 +70,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   const [name, setName] = useState(initialValue?.name ?? '');
   const [description, setDescription] = useState(initialValue?.description ?? '');
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [prefersDarkMode, setPrefersDarkMode] = useState(() =>
-    !isPcMiniApp && (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false),
-  );
+  const prefersDarkMode = useMobileDarkMode(isPcMiniApp);
   const resolvedSubmitLabel = submitLabel ?? t('createAssistant.next');
   const providerChannelText = providerChannel ? `AI能力提供方：${providerChannel}` : '';
 
@@ -83,29 +82,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
     setDescription(initialValue?.description ?? '');
     setSubmitAttempted(false);
   }, [defaultAvatars, initialValue]);
-
-  useEffect(() => {
-    if (isPcMiniApp) {
-      setPrefersDarkMode(false);
-      return;
-    }
-
-    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!mediaQuery) {
-      return;
-    }
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      setPrefersDarkMode(event.matches);
-    };
-
-    setPrefersDarkMode(mediaQuery.matches);
-    mediaQuery.addEventListener('change', handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, [isPcMiniApp]);
 
   const nameIsInvalid = useMemo(
     () => hasInvalidName(name) || (submitAttempted && !name.trim()),
