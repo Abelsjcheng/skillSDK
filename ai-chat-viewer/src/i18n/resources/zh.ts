@@ -1,4 +1,5 @@
 export const zh = {
+  'versionNotSupported': '当前客户端版本过低，请升级后再试',
   'common.close': '关闭',
   'common.back': '返回',
   'common.service': '客服',

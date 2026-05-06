@@ -110,7 +110,7 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
   }
 
   if (typeof window.HWH5.getAppInfo !== 'function') {
-    window.HWH5.getAppInfo = async () => ({ language: resolveBridgeLanguage() });
+    window.HWH5.getAppInfo = async () => ({ language: resolveBridgeLanguage(), versionName: '5.83.0' });
   }
 
   if (typeof window.HWH5.getUserInfo !== 'function') {

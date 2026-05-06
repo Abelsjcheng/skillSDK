@@ -49,3 +49,29 @@ export function isIosMobileDevice(): boolean {
 
   return false;
 }
+
+export function isHarmonyMobileDevice(): boolean {
+  if (!navigator) {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent || '';
+  if (/ArkWeb/.test(userAgent)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+export function isAndroidMobileDevice(): boolean {
+  if (!navigator) {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent || '';
+  if (/Android|SymbianOS|Windows Phone/.test(userAgent)) {
+    return true;
+  } else {
+    return false;
+  }
+}

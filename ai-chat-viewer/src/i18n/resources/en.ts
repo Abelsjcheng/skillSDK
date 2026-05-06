@@ -13,6 +13,7 @@ export const en = {
   'common.confirmed': 'Confirmed',
   'common.processed': 'Processed',
   'common.copySuccess': 'Copied successfully',
+  'versionNotSupported': 'Your client version is too low. Please upgrade and try again',
   'pending.generating': 'Generating, please wait...',
   'weAgent.inputPlaceholder': 'Ask me anything',
   'weAgent.shortcut.enterSend': 'Send with Enter',

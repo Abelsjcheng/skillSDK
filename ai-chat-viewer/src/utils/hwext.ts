@@ -350,6 +350,8 @@ function toAppLanguage(value: string): 'zh' | 'en' {
   }
 }
 
+let appInfoPromise: Promise<HWH5AppInfo> | null = null;
+
 export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   if (isPcMiniApp()) {
     return { statusBarHeight: 0, safeAreaInsetBottom: 0 };
@@ -368,25 +370,33 @@ export async function getStatusBarHeight(): Promise<number> {
 }
 
 export async function getAppInfo(): Promise<HWH5AppInfo> {
-  try {
-    if (isPcMiniApp()) {
-      const language = window?.localStorage?.getItem('language') || '';
-      return {
-        language: toAppLanguage(language),
-      };
-    }
+  if (!appInfoPromise) {
+    appInfoPromise = (async () => {
+      try {
+        if (isPcMiniApp()) {
+          const language = window?.localStorage?.getItem('language') || '';
+          return {
+            language: toAppLanguage(language),
+          };
+        }
 
-    const result = await window.HWH5?.getAppInfo?.();
-    const appInfo = (result && typeof result === 'object' ? result : {}) as HWH5AppInfo;
+        const result = await window.HWH5?.getAppInfo?.();
+        const appInfo = (result && typeof result === 'object' ? result : {}) as HWH5AppInfo;
 
-    return {
-      language: toAppLanguage(appInfo.language),
-    };
-  } catch (error) {
-    return {
-      language: 'zh',
-    };
+        return {
+          language: toAppLanguage(appInfo.language),
+          versionName: toTrimmedString(appInfo.versionName),
+        };
+      } catch (error) {
+        return {
+          language: 'zh',
+          versionName: '',
+        };
+      }
+    })();
   }
+
+  return appInfoPromise;
 }
 
 export function registerAppLanguageListener(listener: (language: 'zh' | 'en') => void): void {

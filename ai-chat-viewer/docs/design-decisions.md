@@ -143,12 +143,13 @@ interface CreateDigitalTwinParams {
 11. 名称输入框与简介框边框统一为 `1px solid rgba(0,0,0,0.08)`。
 12. 简介输入框整体可见高度固定为 `82px`（包含边框与上下内边距），实现采用 `box-sizing: border-box`，圆角半径 `8px`，`padding: 8px`。
 13. 简介块（标题 + 间距 + 简介输入框）整体高度固定为 `112px`。
-14. 为消除 2px 行盒误差，名称/简介标题区采用一行式 `label-row`：左侧主标签保持 `height: 22px; line-height: 22px; margin: 0`，当校验失败时在右侧 `8px` 追加错误提示文本；提示文本样式固定为 `14px/400`、`rgba(243,111,100,1)`。对应输入框的校验边框颜色也统一为 `rgba(243,111,100,1)`。
-15. 名称输入校验失败提示文案固定为“仅支持汉字、数字、字母”；简介输入校验失败提示文案固定为“仅支持汉字数字字母/常用标点符号”。
-16. 操作区使用 `padding: 16px 24px 12px`，右对齐两个按钮：取消/下一步。
-17. 操作区必须固定在组件容器可视范围内，不得超出底部边界；内容区域应自适应可滚动。
-18. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
-19. “下一步”启用条件：`name.trim() && description.trim()`。
+14. 创建个人助理第一页名称输入框与简介输入框在聚焦态统一高亮为 `1px solid rgba(13,148,255,1)`；该高亮仅影响正常焦点态，不覆盖现有 `is-invalid` 错误边框优先级。
+15. 为消除 2px 行盒误差，名称/简介标题区采用一行式 `label-row`：左侧主标签保持 `height: 22px; line-height: 22px; margin: 0`，当校验失败时在右侧 `8px` 追加错误提示文本；提示文本样式固定为 `14px/400`、`rgba(243,111,100,1)`。对应输入框的校验边框颜色也统一为 `rgba(243,111,100,1)`。
+16. 名称输入校验失败提示文案固定为“仅支持汉字、数字、字母”；简介输入校验失败提示文案固定为“仅支持汉字数字字母/常用标点符号”。
+17. 操作区使用 `padding: 16px 24px 12px`，右对齐两个按钮：取消/下一步。
+18. 操作区必须固定在组件容器可视范围内，不得超出底部边界；内容区域应自适应可滚动。
+19. 操作区按钮文本统一样式为 `font-size: 12px; line-height: 20px`。
+20. “下一步”启用条件：`name.trim() && description.trim()`。
 
 ## 5.2 页面 2（大脑选择）
 
@@ -279,6 +280,14 @@ interface CreateDigitalTwinParams {
 22. 二维码状态回写失败不阻断主流程：
    - `status:1` 回写失败只 toast 提示，第一页仍进入失效态；
    - `status:3` 回写失败只 toast 提示，关闭窗口或返回动作继续执行。
+23. 二维码创建入口新增客户端版本门禁：`createAssistantBasic.tsx` 在 `from=qrcode` 的初始化链路最前面先调用 `canIUse.qrcodeCreateAssistant()`；若返回 `false`，则直接执行 `showQrcodeExpired(t('versionNotSupported'))`，并终止后续 `checkCreateAssistantWhitelist`、`queryQrcodeInfo`、`updateQrcodeInfo` 调用。
+24. 版本能力判断统一收口到 `src/utils/versionCheck.ts`：
+   - 复用 `compareVersion(currentVersion, minVersion)` 比较版本；
+   - 通过 `getAppInfo().versionName` 获取当前客户端版本；
+   - 当前最低支持版本固定为 Android `5.83.0`、iOS `5.83.0`、Harmony `1.29.0`；
+   - 对外只暴露 `canIUse` 能力对象，页面侧不直接读取最低版本常量。
+25. Android / Harmony 端识别统一从 `src/constants.tsx` 导出方法复用，不在 `versionCheck.ts` 内重复手写 UA 正则；平台判断优先级为 Harmony -> iOS -> Android，避免鸿蒙 UA 被安卓规则误判。
+26. `getAppInfo()` 的宿主调用缓存统一收口到 `src/utils/hwext.ts`：通过模块级 Promise 保证当前页面运行期内只触发一次 `HWH5.getAppInfo()`，国际化初始化与版本能力判断都复用同一份内存结果；不额外引入 `localStorage` 或其他持久化缓存。
 
 ## 8. 样式与实现约束
 
@@ -607,16 +616,17 @@ interface CreateDigitalTwinParams {
 4. 页面根背景在暗黑模式下统一切换为 `rgba(18,19,20,1)`，并移除原有浅色背景图/渐变对主视觉的影响。
 5. 选择助理、切换助理、助理详情共用的卡片/标题区颜色通过共用样式文件（如 `SwitchAssistant.less`、`AssistantPageHeader.less`）统一覆盖，避免同一结构在不同页面重复写一套暗黑规则。
 6. 创建个人助理页的暗黑模式除颜色覆盖外，上传头像入口继续复用统一的 `add_icon.svg` 图标，不再为暗黑模式单独维护一套加号图片。
-7. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
-8. WeAgentCUI 多功能按钮区的“历史会话”“新建会话”图标继续复用现有黑色 SVG 资源，不新增暗黑图；暗黑模式下继续使用样式层 `filter` 做近似着色，将图标视觉调整到接近 `rgba(220,221,221,1)`，避免为图标链路额外维护 `mask-image` 结构与变量样式。
-9. WeAgentCUI 暗黑模式下图标着色继续遵循“样式层近似 filter 映射”策略：代码块复制图标、权限块锁图标统一近似映射到 `rgba(220,221,221,1)`；代码块、思考块、工具块等消息卡片内的折叠箭头统一近似映射到 `rgba(174,175,176,1)`，保持图标层级弱于正文主文本。
-10. `ToolCard` 与 `PermissionCard` 的暗黑模式视觉层级直接对齐 `CodeBlock`：统一使用 `var(--ai-dark-card-bg)` 作为卡片底色、`var(--ai-dark-border-soft)` 作为边框，头部使用 `rgba(255, 255, 255, 0.04)` 的浅层深色背景，内容区改为透明承载；实现收口在 `Content.less` 的 `WeAgentCUI` 暗黑作用域中，不修改 TSX 结构与资源引用。
-11. 移动端历史会话侧边栏的暗黑模式在 `WeAgentCUI.less` 中单独覆盖：面板背景直接使用 `rgba(31,33,34,1)`；头部标题与会话 item 默认文本切到 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”使用 `rgba(127,130,131,1)`；当前选中 item 不沿用通用暗黑卡片底色，而是单独使用 `rgba(4,45,77,1)` 作为高亮底，文本色切到 `rgba(13,148,255,1)`，避免和普通暗黑卡片层级混淆。
-12. 由于历史会话侧边栏通过 `createPortal` 挂载到 `document.body`，其暗黑样式不能依赖 `.app-container--we-agent-cui` 祖先选择器命中；移动端暗黑覆盖需直接以 `.we-agent-history-sidebar--mobile` 及其子元素为选择器作用域，避免 portal 脱离页面容器后样式失效。
-13. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
-14. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
-15. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
-16. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
+7. 创建个人助理第一页名称输入框与简介输入框的暗黑态焦点高亮只收口在样式层实现：默认仍使用暗色浅描边，`input/textarea:focus` 与对应容器 `:focus-within` 时统一切换为 `1px solid rgba(13,148,255,1)`，不改现有表单校验与按钮逻辑。
+8. WeAgentCUI 的暗黑模式拆分到 `WeAgentCUI.less`、`WeAgentCUIFooter.less`、`Content.less`、`CodeBlock.less` 四处处理：容器背景、输入区、消息卡片/权限卡片/问题卡片、代码块分别追加暗黑覆盖。
+9. WeAgentCUI 多功能按钮区的“历史会话”“新建会话”图标继续复用现有黑色 SVG 资源，不新增暗黑图；暗黑模式下继续使用样式层 `filter` 做近似着色，将图标视觉调整到接近 `rgba(220,221,221,1)`，避免为图标链路额外维护 `mask-image` 结构与变量样式。
+10. WeAgentCUI 暗黑模式下图标着色继续遵循“样式层近似 filter 映射”策略：代码块复制图标、权限块锁图标统一近似映射到 `rgba(220,221,221,1)`；代码块、思考块、工具块等消息卡片内的折叠箭头统一近似映射到 `rgba(174,175,176,1)`，保持图标层级弱于正文主文本。
+11. `ToolCard` 与 `PermissionCard` 的暗黑模式视觉层级直接对齐 `CodeBlock`：统一使用 `var(--ai-dark-card-bg)` 作为卡片底色、`var(--ai-dark-border-soft)` 作为边框，头部使用 `rgba(255, 255, 255, 0.04)` 的浅层深色背景，内容区改为透明承载；实现收口在 `Content.less` 的 `WeAgentCUI` 暗黑作用域中，不修改 TSX 结构与资源引用。
+12. 移动端历史会话侧边栏的暗黑模式在 `WeAgentCUI.less` 中单独覆盖：面板背景直接使用 `rgba(31,33,34,1)`；头部标题与会话 item 默认文本切到 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”使用 `rgba(127,130,131,1)`；当前选中 item 不沿用通用暗黑卡片底色，而是单独使用 `rgba(4,45,77,1)` 作为高亮底，文本色切到 `rgba(13,148,255,1)`，避免和普通暗黑卡片层级混淆。
+13. 由于历史会话侧边栏通过 `createPortal` 挂载到 `document.body`，其暗黑样式不能依赖 `.app-container--we-agent-cui` 祖先选择器命中；移动端暗黑覆盖需直接以 `.we-agent-history-sidebar--mobile` 及其子元素为选择器作用域，避免 portal 脱离页面容器后样式失效。
+14. 创建个人助理页的自定义头像上传入口保持单图资源策略：亮暗模式统一使用 `add_icon.svg`，避免为同一功能按钮维护额外暗黑图资源与切换样式。
+15. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
+16. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
+17. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
 
 
 

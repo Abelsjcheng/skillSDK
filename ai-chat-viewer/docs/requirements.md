@@ -154,6 +154,7 @@
    - 内边距：左右 `8px`、上下 `7px`
    - 盒模型：`box-sizing: border-box`
    - 边框：`1px solid rgba(0,0,0,0.08)`
+   - 聚焦态边框高亮：`1px solid rgba(13,148,255,1)`
    - placeholder：`例如：智能助手`
    - placeholder 样式：`14px / 400 / 22px`，`rgba(204,204,204,1)`
    - 输入文字样式：`14px / 400 / 22px`，`rgba(51,51,51,1)`
@@ -172,6 +173,7 @@
    - 内边距：`8px`
    - 盒模型：`box-sizing: border-box`
    - 边框：`1px solid rgba(0,0,0,0.08)`
+   - 聚焦态边框高亮：`1px solid rgba(13,148,255,1)`
    - placeholder：`介绍助理的功能和应用场景`
    - placeholder 样式：`14px / 400 / 22px`，`rgba(204,204,204,1)`
    - 输入文字样式：`14px / 400 / 22px`，`rgba(51,51,51,1)`
@@ -223,6 +225,12 @@
    - 移动端 toast 统一通过 `HWH5.showToast({ msg, type: 'w' })` 调用宿主原生提示能力，业务侧不再自行控制页面内定位样式。
 10. 创建个人助理二维码场景：
    - 当路由 query 中 `from=qrcode` 时，即视为扫二维码打开创建个人助理第一页；扫码场景 query 会额外携带 `qrcode` 与 `channel` 参数；
+   - 扫码场景进入第一页前需先做客户端版本能力门禁：前端通过 `HWH5.getAppInfo()` 读取当前 `versionName`，并按端类型判断当前客户端是否支持“二维码进入创建个人助理”能力；
+   - `getAppInfo()` 在当前页面运行期内只调用一次，通过 `src/utils/hwext.ts` 内存缓存结果供国际化初始化与版本能力判断复用，不额外落本地存储；
+   - 版本能力判断统一收口在 `src/utils/versionCheck.ts`，通过 `canIUse.qrcodeCreateAssistant()` 暴露；业务页面不直接散落写版本号比较逻辑；
+   - 安卓、鸿蒙设备类型判断统一从 `src/constants.tsx` 导出方法复用，不在 `versionCheck.ts` 内重复手写 UA 正则；
+   - 当前最低支持版本门槛固定为：Android `5.83.0`、iOS `5.83.0`、Harmony `1.29.0`；
+   - 若二维码场景版本不支持，则第一页直接进入失效态展示，复用 `showQrcodeExpired(t('versionNotSupported'))` 展示文案；此场景不弹 toast、不继续调用 `checkCreateAssistantWhitelist`、`queryQrcodeInfo` 与 `updateQrcodeInfo`；
    - PC 端打开创建个人助理第一页时，页面组件实例需挂载 `key`，取 query 中的 `qrcode`；若未传则使用固定值 `defalut`；
    - 页面打开后需根据 `小程序JSAPI接口文档.md` 调用 `queryQrcodeInfo({ qrcode })` 查询二维码信息；
    - 二维码是否失效必须通过 `expireTime` 与当前时间戳比较判断，不以 `expired` 字段直接替代判断；
@@ -1146,7 +1154,8 @@
    - 通过 `isPcMiniApp()` 区分端类型；
    - 移动端直接调用 `window.HWH5.getAppInfo()` 并读取返回值中的 `language`；
    - PC 端直接调用 `window.localStorage?.getItem('language')` 读取语言值；
-   - `getAppInfo()` 最终统一返回 `{ language: 'zh' | 'en' }`，业务层与页面层不再区分 PC/移动语言来源。
+   - `getAppInfo()` 最终统一返回 `{ language: 'zh' | 'en', versionName?: string }`；其中 `language` 继续作为国际化唯一来源，`versionName` 供版本能力判断场景复用，业务层与页面层不再区分 PC/移动语言来源；
+   - `getAppInfo()` 的宿主调用结果在 `hwext.ts` 内通过模块级 Promise 做一次性内存缓存，应用运行期内国际化初始化与 `canIUse` 版本门禁共用同一份结果，不再重复调用宿主接口。
    - PC 端需新增运行时语言变化监听：应用初始化时注册宿主回调 `window.onReceive = (payload) => {}`，`payload='2052'` 表示中文、`payload='1033'` 表示英文；收到监听后直接更新 `i18next` 当前语言即可，不额外承担本地存储回写或其他桥接兼容逻辑。
 8. 前端 `normalizeLanguage` 继续保留为最后一道兜底兼容，兼容规则需覆盖：
    - `en` / `en-US` / `en_US` / `1033` 统一归为 `en`
@@ -1221,6 +1230,7 @@
    - 自定义上传头像块中的加号统一改为从 `src/imgs` 导入的 `add_icon.svg` 图片；
    - 名称和简介文本颜色 `rgba(220,221,221,1)`；
    - 输入框边框颜色 `rgba(255,255,255,0.05)`；
+   - 暗黑模式下名称输入框与简介输入框在 `focus/focus-within` 态时，边框高亮为 `1px solid rgba(13,148,255,1)`；
    - 输入框 placeholder 颜色 `rgba(80,84,86,1)`；
    - 输入框校验失败边框颜色 `rgba(13,148,255,1)`；
    - 暗黑模式下，当名称和简介为空时，第一页底部主按钮保持可点击，不再使用原生禁用态，也不再展示灰底禁用背景；点击后若仍未填写，则名称和简介输入框统一进入红色错误边框态；

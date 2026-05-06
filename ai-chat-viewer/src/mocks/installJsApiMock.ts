@@ -1511,7 +1511,7 @@ function ensureMockHWH5Bridge(): void {
   }
 
   if (typeof hwh5.getAppInfo !== 'function') {
-    hwh5.getAppInfo = async () => ({ language: resolveMockLanguage() });
+    hwh5.getAppInfo = async () => ({ language: resolveMockLanguage(), versionName: '5.83.0' });
   }
 
   if (typeof hwh5.getUserInfo !== 'function') {

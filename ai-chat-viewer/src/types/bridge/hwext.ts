@@ -392,6 +392,7 @@ export interface HWH5DeviceInfo {
 
 export interface HWH5AppInfo {
   language: string;
+  versionName?: string;
   [key: string]: unknown;
 }
 

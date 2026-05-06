@@ -16,6 +16,7 @@ import {
 import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
+import { canIUse } from '../utils/versionCheck';
 import '../styles/DigitalTwinCreator.less';
 
 function isExpiredByExpireTime(expireTime: string): boolean {
@@ -70,6 +71,17 @@ const CreateAssistantBasicPage: React.FC = () => {
 
     const fetchQrcodeInfo = async () => {
       try {
+        const versionSupported = await canIUse.qrcodeCreateAssistant();
+        if (cancelled) {
+          return;
+        }
+
+        if (!versionSupported) {
+          shouldUpdateQrcodeStatusRef.current = false;
+          showQrcodeExpired(t('versionNotSupported'));
+          return;
+        }
+
         const hasPermission = await checkCreateAssistantWhitelist();
         if (cancelled) {
           return;
