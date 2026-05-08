@@ -40,8 +40,7 @@
 }
 
 .start-assistant__content .switch-assistant__list {
-  height: auto;
-  max-height: 360px;
+  height: 360px;
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -83,5 +82,11 @@
 .start-assistant__action-btn--enable {
   background: rgba(13, 148, 255, 1);
   color: #ffffff;
+}
+
+.start-assistant__action-btn--enable:disabled {
+  background: rgb(206 233 255);
+  color: #ffffff;
+  cursor: not-allowed;
 }
 
