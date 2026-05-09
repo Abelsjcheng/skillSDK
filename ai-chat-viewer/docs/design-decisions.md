@@ -161,7 +161,11 @@ interface CreateDigitalTwinParams {
      - `internal`：显示 3x2 按钮组（由 `window.getAgentType()` 动态提供）；
      - `custom`：显示提示文案。
    - 内部助手数据请求过程中及空结果场景均不展示“内部助手加载中...”与“暂无可用内部助手”文案。
-4. 内容区新增第三容器用于展示插画，尺寸为 `height: 114px; width: 100%`，圆角半径 `12px`；插画与上方内容区固定间距 `20px`；插画由 `StepBrainSelect` 组件内部直接从 `src/imgs` 静态导入，按当前国际化语言切换：中文使用 `banner.png`，英文使用 `banner-en.png`，不再通过父组件 props 透传。插画本身直接使用单个 `img` 标签渲染并绑定点击打开指导文档，不再额外包裹 `a` 或 `div` 容器。
+4. 内容区新增第三容器用于展示插画，尺寸为 `height: 114px; width: 100%`，圆角半径 `12px`；插画与上方内容区固定间距 `20px`；插画由 `StepBrainSelect` 组件内部直接从 `src/imgs` 静态导入并按端类型、语言和移动端暗黑模式切换，不再通过父组件 props 透传：
+   - PC 端：中文使用 `banner-pc-zh.png`，英文使用 `banner-pc-en.png`
+   - 移动端亮色模式：中文使用 `banner-phone-zh.png`，英文使用 `banner-phone-en.png`
+   - 移动端暗黑模式：中文使用 `banner-phone-zh-dark.png`，英文使用 `banner-phone-en-dark.png`
+   插画本身直接使用单个 `img` 标签渲染并绑定点击打开指导文档，不再额外包裹 `a` 或 `div` 容器。
 5. 操作区使用 `padding: 16px 24px 12px`，按钮右对齐。
    - 按钮顺序为：取消 / 上一步 / 确定；
    - “上一步”按钮样式与“取消”一致（`64x28`、圆角 `4px`、浅灰背景）。
@@ -421,6 +425,7 @@ interface CreateDigitalTwinParams {
 13. 新增 `example/assistant-components-demo`，用于演示通过库产物（`dist/lib/index.js`）导入 `AssistantDetail` 与 `SwitchAssistant` 并进行页面切换展示。
 14. “切换助理页”与“启动助理页”共用列表布局与交互结构，提取到 `src/components/assistant/AssistantSelectionPage.tsx` 复用；两个页面仅传入不同的标题和底部按钮文案。
 15. 由于“切换助理页”与“启动助理页”都复用 `AssistantCardList`，助理头像圆形样式统一在 `SwitchAssistant.less` 中收口，避免两个页面分别维护头像圆角逻辑。
+16. 启动助理页“开始使用”按钮的禁用态继续复用现有 `disabled` 交互，不新增额外页面状态；视觉上在未选中助理时统一通过共用按钮样式覆盖为 `rgb(206 233 255)`，避免页面层重复维护按钮显隐或 class。
 
 ## 16. 启动助理页面设计
 
@@ -434,7 +439,7 @@ interface CreateDigitalTwinParams {
 6. PC 内容区内边距固定为 `padding: 36px 24px`。
 7. PC 底部操作区水平居中显示两个按钮，间距 `12px`：
    - 左按钮“创建助理”：`80x32`，圆角 `4px`，背景 `rgba(0,0,0,0.05)`；
-   - 右按钮“立即启用”：`80x32`，圆角 `4px`，背景 `rgba(13,148,255,1)`。
+   - 右按钮“立即启用”：`80x32`，圆角 `4px`，背景 `rgba(13,148,255,1)`；若未选中助理，则复用原生 `disabled` 状态，按钮背景切换为 `rgb(206 233 255)`，且不可点击。
 8. PC 与移动端按钮事件保持空实现占位，后续再接入业务逻辑。
 9. 移动端客服按钮点击后直接打开固定 `CUSTOMER_SERVICE_WEBVIEW_URI`，不再拼接 `sourceURL`；PC 端保持现有逻辑不变。
 
@@ -627,6 +632,7 @@ interface CreateDigitalTwinParams {
 15. 创建个人助理页暗黑态头像区补充细节样式：头像预览块去掉原白色边框；默认头像按钮统一使用 `box-sizing: border-box`；默认头像未选中态无边框；仅在暗黑态选中时增加 `padding: 1px`，未选中态保持无 `padding`；选中态 `padding` 区域背景保持透明，外层边框固定为 `1px solid rgba(13,148,255,1)`。
 16. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
 17. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
+18. 创建个人助理流程中若多个步骤页都需要读取系统暗黑模式，不在 `StepBasicInfo`、`StepBrainSelect` 内各自重复维护 `matchMedia('(prefers-color-scheme: dark)')` 监听；统一抽成共享 hook 复用，保证初始化逻辑、监听注册与卸载策略一致。
 
 
 

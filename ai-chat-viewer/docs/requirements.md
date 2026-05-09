@@ -358,8 +358,9 @@
 4. 插画容器距离上方内容区固定 `20px`。
 5. 插画资源由 `StepBrainSelect` 组件内部直接从 `src/imgs` 导入使用，不再通过父组件 props 透传，也不再使用内联 SVG / data URI。
 6. 插画按当前国际化语言切换：
-    - 中文使用 `src/imgs/banner.png`
-    - 英文使用 `src/imgs/banner-en.png`
+    - PC 端：中文使用 `src/imgs/banner-pc-zh.png`，英文使用 `src/imgs/banner-pc-en.png`
+    - 移动端亮色模式：中文使用 `src/imgs/banner-phone-zh.png`，英文使用 `src/imgs/banner-phone-en.png`
+    - 移动端暗黑模式：中文使用 `src/imgs/banner-phone-zh-dark.png`，英文使用 `src/imgs/banner-phone-en-dark.png`
 7. 个人助理插画需要支持点击打开指导文档；插画本身直接使用单个 `img` 标签承载点击事件，不再额外包裹 `a` 或 `div` 容器。
 
 ### 5.4 操作按钮区
@@ -930,6 +931,7 @@
    - 点击“创建助理”：通过 `react-router-dom` 导航到 `/createAssistant?from=weAgent`；
    - 路由渲染约束：统一使用 `react-router-dom` 的路由能力，不再维护自定义 `HashRouter` 实现；
    - 点击“创建助理”仅通过 `react-router` 导航处理，不再依赖手动改 `window.location.hash` 与 `window.location.reload()` 强刷页面；
+   - 移动端与 PC 端“开始使用”按钮仅在当前已选中助理时可点击；若未选中助理，则按钮背景颜色为 `rgb(206 233 255)`，并保持不可点击状态；
    - 选中某个助理后点击“立即启用”：
       - 使用选中项 `partnerAccount` 调用 `getWeAgentDetails({ partnerAccount })`（封装层按端能力适配实际入参）；
       - 组装 `openWeAgentCUI` 入参时，`weCodeUrl` 取值规则如下：
