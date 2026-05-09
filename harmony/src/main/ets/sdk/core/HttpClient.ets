@@ -131,6 +131,15 @@ export class HttpClient {
 
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
         const envelope = parsed as RestApiResponse<T>;
+        if ('code' in envelope) {
+          const code = Number(envelope.code);
+          if (code !== 0 && code !== 200) {
+            const errorMessage = String(envelope.message ?? '')
+              || String(envelope.errormsg ?? '')
+              || 'Request failed';
+            throw new SkillSdkException(Number.isNaN(code) ? 7000 : code, errorMessage);
+          }
+        }
         if ('data' in envelope) {
           return (envelope.data ?? ({} as T)) as T;
         }

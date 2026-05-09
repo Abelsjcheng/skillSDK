@@ -714,10 +714,9 @@ export class SkillSDK {
         payload,
         { expectEnvelope: false, useAssistantBaseUrl: true }
       );
-      const updateResult = this.resolveSuccessResult(result, 'updateWeAgent');
       this.weAgentStore.updateCachedDetails(partnerAccount, robotId, name, icon, description);
       return {
-        updateResult
+        updateResult: 'success'
       };
     } catch (error) {
       throw this.normalizeError('updateWeAgent', error);
@@ -735,9 +734,9 @@ export class SkillSDK {
       const context = await this.prepareDeleteWeAgentContext(
         this.buildDeleteWeAgentContext(partnerAccount, robotId)
       );
-      const deleteResult = await this.requestDeleteWeAgent(context);
-      await this.handleDeleteWeAgentResult(context, deleteResult);
-      return { deleteResult };
+      await this.requestDeleteWeAgent(context);
+      await this.handleDeleteWeAgentResult(context, 'success');
+      return { deleteResult: 'success' };
     } catch (error) {
       throw this.normalizeError('deleteWeAgent', error);
     }
@@ -832,7 +831,9 @@ export class SkillSDK {
         payload,
         { expectEnvelope: false, useAssistantBaseUrl: true }
       );
-      return this.resolveUpdateQrcodeInfoResult(result);
+      return {
+        status: 'success'
+      };
     } catch (error) {
       throw this.normalizeError('updateQrcodeInfo', error);
     }
@@ -986,12 +987,12 @@ export class SkillSDK {
 
   private async requestDeleteWeAgent(context: DeleteWeAgentContext): Promise<string> {
     const query = this.resolveAssistantIdentityQuery(context.partnerAccount, context.robotId);
-    const result = await this.httpClient.delete<Record<string, Object>>(
+    await this.httpClient.delete<Record<string, Object>>(
       '/v4-1/we-crew',
       query,
       { expectEnvelope: false, useAssistantBaseUrl: true }
     );
-    return this.resolveSuccessResult(result, 'deleteWeAgent');
+    return 'success';
   }
 
   private async prepareDeleteWeAgentContext(context: DeleteWeAgentContext): Promise<DeleteWeAgentContext> {
@@ -1301,27 +1302,6 @@ export class SkillSDK {
     };
   }
 
-  private resolveSuccessResult(result: Record<string, Object>, method: string): string {
-    const code = TypeConverter.toOptionalInteger(result.code, 'code');
-    if (code === undefined) {
-      throw new SkillSdkException(7000, `Unexpected ${method} response schema`);
-    }
-    if (code === 200) {
-      return 'success';
-    }
-    const message = TypeConverter.toOptionalString(result.message, 'message') ?? `${method} failed`;
-    throw new SkillSdkException(code, message);
-  }
-
-  private resolveUpdateQrcodeInfoResult(result: Record<string, Object>): UpdateQrcodeInfoResult {
-    const code = TypeConverter.toOptionalString(result.code, 'code');
-    if (code !== '200') {
-      throw new SkillSdkException(7000, 'updateQrcodeInfo did not return code 200');
-    }
-    return {
-      status: 'success'
-    };
-  }
 
   private resolveAssistantIdentityKey(partnerAccount?: string, robotId?: string): string {
     if (partnerAccount !== undefined) {
