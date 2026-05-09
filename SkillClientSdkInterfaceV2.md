@@ -27,7 +27,31 @@
 | `queryAssistantGraySingle` | `GET /v4-1/robot-partners/im-chat/gray-single?welinkId={welinkId}` | 查询助理单人灰度标记 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
-> 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`/`error`），并按接口语义返回业务字段（如 `message`、`content`）。
+> 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`），并按接口语义返回业务字段（如 `message`、`content`）。
+
+---
+
+## 服务端通用响应包装
+
+助理相关的服务端接口统一遵循以下通用响应包装：
+
+```typescript
+type ServerResponse<T> = {
+  code: string
+  message: string
+  data: T
+}
+```
+
+字段说明如下：
+
+| 字段名 | 类型 | 说明 |
+|---|---|---|
+| `code` | `string` | 通用状态码，`200` 表示成功，其他表示失败 |
+| `message` | `string` | 通用响应消息 |
+| `data` | `any` | 业务数据，具体类型由各接口定义 |
+
+除特别说明的 SDK 本地扩展接口外，本文档中的助理相关服务端接口均默认遵循上述响应包装；SDK 对外不透出该包装，而是按各接口语义返回业务字段。
 
 ---
 
@@ -885,8 +909,7 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 4. 服务端响应结构为：
    - `data: boolean`
    - `message: string`
-   - `code: number`
-   - `error: string`
+   - `code: string`
 5. 当异步刷新请求返回 `code = 200` 时，SDK 使用最新 `data` 覆盖更新按 `userId` 隔离的缓存对象中对应的 `welinkId` 字段，并回写缓存 key `assistant_gray_single_cache`。
 6. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={welinkId}`。
 7. 当同步请求返回 `code = 200` 时，SDK 将服务端返回的 `data` 写入按 `userId` 隔离的缓存对象中对应的 `welinkId` 字段，并返回 `{ data }`。
