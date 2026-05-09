@@ -1003,21 +1003,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                        icon:icon
                                                                 description:description
                                                                     success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        NSNumber *codeNumber = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:data[@"code"]
-                                                                                fieldName:@"code"
-                                                                             errorMessage:nil];
-        if (codeNumber == nil) {
-            [weakSelf dispatchFailure:failure code:7000 message:@"Unexpected updateWeAgent response schema."];
-            return;
-        }
-        if (codeNumber.integerValue != 200) {
-            NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]] ?: @"updateWeAgent failed.";
-            [weakSelf dispatchFailure:failure
-                                 code:codeNumber.integerValue
-                              message:message];
-            return;
-        }
         WLAgentSkillsUpdateWeAgentResult *result = [[WLAgentSkillsUpdateWeAgentResult alloc] init];
         result.updateResult = @"success";
         [[WLAgentSkillsWeAgentStore sharedStore] updateCachedWeAgentDetailsWithPartnerAccount:partnerAccount
@@ -1269,12 +1254,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                robotId:robotId
                                                                status:@(statusValue)
                                                               success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        NSString *codeString = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"code"]];
-        if (codeString == nil || ![codeString isEqualToString:@"200"]) {
-            [weakSelf dispatchFailure:failure code:7000 message:@"updateQrcodeInfo did not return code 200."];
-            return;
-        }
         WLAgentSkillsUpdateQrcodeInfoResult *result = [[WLAgentSkillsUpdateQrcodeInfoResult alloc] init];
         result.status = @"success";
         if (success) {
@@ -1841,25 +1820,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     [[WLAgentSkillsHTTPClient sharedClient] deleteWeAgentWithPartnerAccount:context.partnerAccount
                                                                     robotId:context.robotId
                                                                     success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        NSNumber *codeNumber = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:data[@"code"]
-                                                                                fieldName:@"code"
-                                                                             errorMessage:nil];
-        if (codeNumber == nil) {
-            if (failure) {
-                failure([NSError errorWithDomain:WLAgentSkillsSDKErrorDomain
-                                            code:7000
-                                        userInfo:@{NSLocalizedDescriptionKey : @"Unexpected deleteWeAgent response schema."}]);
-            }
-            return;
-        }
-        if (codeNumber.integerValue != 200) {
-            NSString *message = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"message"]] ?: @"deleteWeAgent failed.";
-            [self dispatchFailure:failure
-                             code:codeNumber.integerValue
-                          message:message];
-            return;
-        }
         WLAgentSkillsDeleteWeAgentResult *result = [[WLAgentSkillsDeleteWeAgentResult alloc] init];
         result.deleteResult = @"success";
         if (success) {

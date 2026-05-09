@@ -461,9 +461,33 @@
 - (void)handleResponseObject:(id)responseObject
                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    (void)failure;
     if ([responseObject isKindOfClass:[NSDictionary class]]) {
         NSDictionary *dict = (NSDictionary *)responseObject;
+        id codeValue = dict[@"code"];
+        if (codeValue != nil && codeValue != [NSNull null]) {
+            NSInteger errorCode = [codeValue respondsToSelector:@selector(integerValue)] ? [codeValue integerValue] : 7000;
+            if (errorCode != 0 && errorCode != 200) {
+                NSString *message = [NSString stringWithFormat:@"%@", dict[@"message"] ?: @""];
+                if (message.length == 0) {
+                    message = [NSString stringWithFormat:@"%@", dict[@"errormsg"] ?: @""];
+                }
+                if (message.length == 0) {
+                    message = @"Request failed";
+                }
+
+                NSError *wrapped = [NSError errorWithDomain:@"WLAgentSkillsSDK"
+                                                       code:errorCode
+                                                   userInfo:@{
+                    NSLocalizedDescriptionKey : message,
+                    WLAgentSkillsErrorCodeKey : @(errorCode),
+                    WLAgentSkillsErrorMessageKey : message
+                }];
+                if (failure) {
+                    failure(wrapped);
+                }
+                return;
+            }
+        }
         if ([dict.allKeys containsObject:@"data"]) {
             id payload = dict[@"data"];
             if (success) {
@@ -483,13 +507,13 @@
     if (responseData != nil && responseData.length > 0) {
         NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:nil];
         if ([json isKindOfClass:[NSDictionary class]]) {
-            NSString *message = @"Network request failed";
+            NSString *message = @"Request failed";
             NSInteger code = error.code;
 
-            if (json[@"errormsg"]) {
-                message = [json[@"errormsg"] description];
-            } else if (json[@"message"]) {
-                message = [json[@"message"] description];
+            if (json[@"message"]) {
+                message = [NSString stringWithFormat:@"%@", json[@"message"]];
+            } else if (json[@"errormsg"]) {
+                message = [NSString stringWithFormat:@"%@", json[@"errormsg"]];
             }
 
             if (json[@"code"] != nil) {
