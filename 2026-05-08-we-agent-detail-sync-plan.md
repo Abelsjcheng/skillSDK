@@ -390,6 +390,20 @@ flowchart TD
     AM --> AD
     AD -- "是" --> W
     AD -- "否" --> AN["结束"]
+
+    B -- "本端 updateWeAgent 成功" --> AO["收到服务端 code = 200"]
+    AO --> AP["按既有规则更新本地缓存"]
+    AP --> AQ{"current_we_agent_detail 是否命中当前助理"}
+    AQ -- "是" --> AR["同步更新 current_we_agent_detail 的名称/头像/简介"]
+    AQ -- "否" --> AS["跳过当前助理缓存更新"]
+    AR --> AT{"we_agent_details 是否存在对应助理缓存"}
+    AS --> AT
+    AT -- "是" --> AU["同步更新 we_agent_details 对应条目的名称/头像/简介"]
+    AT -- "否" --> AV["不新增 we_agent_details 缓存"]
+    AU --> AW["组装最新助理详情快照"]
+    AV --> AW
+    AW --> AX["回调 registerWeAgentListener(update)"]
+    AX --> AY["结束"]
 ```
 
 ## 8.2 删除时序
