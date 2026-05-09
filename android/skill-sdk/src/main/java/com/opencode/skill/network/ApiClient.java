@@ -441,49 +441,30 @@ public class ApiClient {
 
     @NonNull
     private UpdateQrcodeInfoResult resolveUpdateQrcodeInfoResult(@Nullable JsonElement result) {
-        if (result == null || result.isJsonNull() || !result.isJsonObject()) {
-            throw new SkillSdkException(7000, "Unexpected updateQrcodeInfo response schema");
-        }
-        JsonObject rootObject = result.getAsJsonObject();
-        String code = getString(rootObject, "code", "");
-        if (!"200".equals(code) && !"200.0".equals(code)) {
-            throw new SkillSdkException(7000, "updateQrcodeInfo did not return code 200");
-        }
         return new UpdateQrcodeInfoResult("success");
     }
 
     @NonNull
     private UpdateWeAgentResult resolveUpdateWeAgentResult(@Nullable JsonElement result) {
-        JsonObject rootObject = requireResponseObject(result, "updateWeAgent");
-        ensureSuccessCode(rootObject, "updateWeAgent");
         return new UpdateWeAgentResult("success");
     }
 
     @NonNull
     private DeleteWeAgentResult resolveDeleteWeAgentResult(@Nullable JsonElement result) {
-        JsonObject rootObject = requireResponseObject(result, "deleteWeAgent");
-        ensureSuccessCode(rootObject, "deleteWeAgent");
         return new DeleteWeAgentResult("success");
-    }
-
-    @NonNull
-    private JsonObject requireResponseObject(@Nullable JsonElement result, @NonNull String method) {
-        if (result == null || result.isJsonNull() || !result.isJsonObject()) {
-            throw new SkillSdkException(7000, "Unexpected " + method + " response schema");
-        }
-        return result.getAsJsonObject();
     }
 
     private void ensureSuccessCode(@NonNull JsonObject rootObject, @NonNull String method) {
         Integer code = getInteger(rootObject, "code");
-        if (code != null && code == 200) {
+        int errorCode = code == null ? 7000 : code;
+        if (errorCode == 0 || errorCode == 200) {
             return;
         }
         String message = getString(rootObject, "message", "");
-        if (code == null) {
-            throw new SkillSdkException(7000, "Unexpected " + method + " response schema");
+        if (message.isEmpty()) {
+            message = getString(rootObject, "errormsg", "");
         }
-        throw new SkillSdkException(code, message.isEmpty() ? method + " failed" : message);
+        throw new SkillSdkException(errorCode, message.isEmpty() ? "Request failed" : message);
     }
 
     public synchronized void shutdown() {
@@ -586,6 +567,9 @@ public class ApiClient {
                 JsonElement payload = root;
                 if (root.isJsonObject()) {
                     JsonObject rootObject = root.getAsJsonObject();
+                    if (rootObject.has("code")) {
+                        ensureSuccessCode(rootObject, "request");
+                    }
                     if (rootObject.has("data")) {
                         payload = rootObject.get("data");
                     }
@@ -631,7 +615,14 @@ public class ApiClient {
                     ));
                     return;
                 }
-                callback.onSuccess(response.body());
+                JsonElement root = response.body();
+                if (root != null && root.isJsonObject()) {
+                    JsonObject rootObject = root.getAsJsonObject();
+                    if (rootObject.has("code")) {
+                        ensureSuccessCode(rootObject, "request");
+                    }
+                }
+                callback.onSuccess(root);
             }
 
             @Override
