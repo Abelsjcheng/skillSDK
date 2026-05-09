@@ -18,7 +18,7 @@
 ## 2. 目标
 
 1. 当服务端主动下发“助理详情更新”或“助理删除”通知时，SDK 能自动更新本地缓存，并通过监听接口对外通知。
-2. 当客户端冷启动，或从断网离线恢复到在线时，SDK 能对 `we_agent_details` 中的所有助理做异步补偿刷新，并在检测到差异时通过监听接口对外通知。
+2. 当客户端冷启动，或从断网离线恢复到在线时，SDK 能对 `we_agent_details` 中的所有助理做异步补偿刷新，并在检测到差异或发现助理已删除时通过监听接口对外通知。
 3. 当本端主动调用 `updateWeAgent` 成功后，SDK 除了更新缓存，还要立即通过监听接口通知助理更新事件。
 4. 当本端主动调用 `deleteWeAgent` 成功后，SDK 除了更新缓存和当前助理切换状态，还要立即通过监听接口通知助理删除事件。
 5. `ai-chat-viewer` 的 `weAgentCUI` 页面在收到助理更新或删除通知后，能够及时刷新助理信息，或引导用户切换到其他助理。
@@ -94,8 +94,8 @@ type RegisterWeAgentListenerResult = {
    - 若不一致，则忽略
 3. `delete` 监听仅处理“当前聊天助理”的删除事件：
    - 若回调中的 `partnerAccount` 与当前页面助理一致，则弹窗提示用户“助理已删除”
-   - 弹窗底部左边按钮为“取消”
-   - 弹窗底部右边按钮为“切换助理”
+   - 弹窗底部按钮固定为“切换助理”
+   - 弹窗不可取消
    - 点击“切换助理”后跳转到切换助理页面
    - 若删除的不是当前页面助理，则忽略
 
@@ -123,24 +123,18 @@ type RegisterWeAgentListenerResult = {
 ### SDK 处理规则
 
 1. SDK 从通知载荷中解析助理唯一标识，优先使用 `partnerAccount`，若服务端同时提供 `robotId` 也一并保留。
-2. SDK 读取本地 `we_agent_details`，尝试拿到旧详情 `previousDetail`。
-3. SDK 调用查详情服务端接口 `GET /v1/robot-partners/{partnerAccount}` 获取最新详情。
-4. 若服务端返回非空详情：
-   - 更新 `we_agent_details[partnerAccount]`
-   - 若当前 `current_we_agent_detail` 命中同一助理，则同步覆盖为最新详情
-5. SDK 对比 `previousDetail` 与最新详情：
-   - 若旧值不存在，建议视为“新增缓存同步”，不对外通知
-   - 若旧值存在且字段有差异，则触发 `type = update` 的监听函数，并将最新 `WeAgentDetails` 作为回调内容
-   - 若旧值存在但字段无差异，则不通知
-6. 若服务端返回空详情：
-   - 不更新缓存
-   - 不删除旧缓存
-   - 不触发删除监听
+2. SDK 读取本地 `we_agent_details`，检查是否已存在该助理的缓存详情：
+   - 若存在，则使用通知中的助理更新内容覆盖更新 `we_agent_details[partnerAccount]`
+   - 若 `current_we_agent_detail` 命中同一助理，则同步覆盖为最新内容
+3. 若本地 `we_agent_details` 中不存在该助理缓存详情，则不新增缓存，不调用查详情服务端接口补拉。
+4. 该场景下不删除旧缓存，也不触发删除监听。
+5. SDK 最后通过 `registerWeAgentListener` 触发 `type = update` 的监听函数，将通知中的助理更新内容直接对外广播；缓存是否存在、是否更新成功都不影响本次广播。
 
 ### 说明
 
-- “字段有差异”建议按 `WeAgentDetails` 全量业务字段比较，至少包含 `name`、`icon`、`desc`、`weCodeUrl`、`partnerAccount`、`id`、`ownerWelinkId`、`creatorWorkId`、`bizRobotTag`、`ownerW3Account`、`creatorW3Account` 等文档字段。
-- 该场景下不直接复用通知载荷作为最终详情，而是以服务端详情接口返回结果为准，避免推送字段不全。
+- 该场景以服务端主动通知载荷作为广播与缓存更新的数据源，不再额外调用 `getWeAgentDetails` 或对应服务端查详情接口。
+- 只有本地已存在该助理缓存详情时，SDK 才更新缓存；若本地不存在，则保持“不新增缓存”的最简策略。
+- 广播触发时机固定放在缓存处理之后，且缓存处理结果不影响广播。
 
 ## 5.2 冷启动与离线恢复在线的缓存补偿刷新
 
@@ -153,19 +147,23 @@ type RegisterWeAgentListenerResult = {
 
 1. SDK 读取按 `userId` 隔离的 `we_agent_details` 缓存对象。
 2. 若缓存为空，则直接结束，不发起补偿刷新。
-3. SDK 取出所有 `partnerAccount`，异步调用 `GET /v1/robot-partners/{partnerAccount}` 获取最新详情。
-4. 对每个助理分别处理：
-   - 若服务端返回非空详情，则与旧缓存详情比较；
+3. SDK 从缓存对象中取出所有 `partnerAccount`，并按逗号拼接成字符串 `partnerAccounts`。
+4. SDK 异步调用批量查详情服务端接口：`GET /v1/robot-partners/{partnerAccounts}`，其中 `partnerAccounts` 为以逗号分隔的字符串。
+5. SDK 解析服务端返回的助理详情列表，并建立以 `partnerAccount` 为 key 的映射。
+6. 对缓存中的每个 `partnerAccount` 分别处理：
+   - 若服务端返回了对应助理详情，则与旧缓存详情比较；
    - 若存在差异，则更新 `we_agent_details[partnerAccount]`，并触发 `type = update` 的监听函数，将最新 `WeAgentDetails` 作为回调内容；
    - 若该助理同时命中 `current_we_agent_detail`，则同步覆盖当前助理缓存；
-   - 若服务端返回空详情，则不设置新缓存，也不删除旧缓存，不触发删除监听；
-   - 若请求失败，则仅记录日志，不影响其他助理继续刷新。
-5. 所有刷新任务彼此独立；单个助理刷新失败，不影响其他助理刷新结果。
+   - 若服务端未返回对应 `partnerAccount` 的助理详情，则同步删除 `we_agent_details` 中对应助理详情缓存；
+   - 若服务端未返回对应 `partnerAccount` 的助理详情，且 `we_agent_list_cache` 中存在该助理，则同步从列表缓存中删除对应助理；
+   - 若服务端未返回对应 `partnerAccount` 的助理详情，则触发 `type = delete` 的监听函数，将 `{ partnerAccount }` 作为回调内容；
+7. 若批量请求失败，则仅记录日志，不更新缓存，也不触发广播。
 
 ### 说明
 
-- 该场景只处理“详情同步”，不处理“删除判定”。
-- 删除应以服务端主动删除通知或本端 `deleteWeAgent` 成功为准，避免把“临时空返回 / 数据延迟”误判成助理被删除。
+- 该场景下，服务端未返回某个缓存中的 `partnerAccount` 时，视为该助理已删除。
+- 该场景的删除处理包含“删除本地详情缓存 + 删除列表缓存中的对应项 + 触发删除广播”；不复用 `deleteWeAgent` 的当前助理切换逻辑，也不组装 `nextUris`。
+- 若删除的是当前助理，SDK 在该场景下也不同步删除 `current_we_agent_detail`；页面侧后续如何响应，由 `registerWeAgentListener(delete)` 的消费方决定。
 
 ## 5.3 本端调用 updateWeAgent 成功后的同步
 
@@ -223,38 +221,29 @@ type RegisterWeAgentListenerResult = {
 
 ### SDK 处理原则
 
-该场景应尽量复用 `deleteWeAgent` 成功后的“本地删除后处理逻辑”，区别仅在于：
+该场景不再复用 `deleteWeAgent` 成功后的“当前助理切换”逻辑，而是采用更轻量的通知清理策略：
 
 - 不再调用删除服务端接口
-- 直接进入“删除后的缓存处理 + 当前助理切换 + 对外监听通知”阶段
+- 读取并清理本地 `we_agent_list_cache` 与 `we_agent_details`
+- 若删除的是当前助理，也不同步删除 `current_we_agent_detail`
+- 最后再触发删除广播
 
 ### SDK 处理规则
 
 1. SDK 根据通知载荷拿到删除目标标识：
    - `partnerAccount` 与 `robotId` 至少一个存在
-2. SDK 读取 `current_we_agent_detail`，判断是否命中当前助理：
-   - 若未命中，则视为“删除非当前助理”
-   - 若命中，则视为“删除当前助理”
-3. 若为“删除非当前助理”：
-   - 若存在 `we_agent_list_cache`，从列表缓存中删除对应助理并回写
-   - 若存在 `we_agent_details` 中对应助理详情缓存，则移除对应条目并回写
-   - 不修改 `current_we_agent_detail`
-   - 触发 `type = delete` 的监听函数，并将 `{ partnerAccount }` 作为回调内容
-4. 若为“删除当前助理”：
-   - 先读取 `we_agent_list_cache`；若无缓存，则调用 `getWeAgentList` 对应服务端接口获取列表
-   - 基于“删除前列表”预计算下一个助理
-   - 从删除前列表中移除当前助理，并回写新的 `we_agent_list_cache`
-   - 同时从 `we_agent_details` 中移除被删除助理条目并回写
-   - 若存在下一个助理：
-     - 优先从 `we_agent_details` 读取其详情
-     - 若缓存不存在，则调用 `GET /v1/robot-partners/{partnerAccount}` 获取详情
-     - 若获取成功，则设置到 `current_we_agent_detail`
-     - 若仍获取不到详情，则删除 `current_we_agent_detail`
-   - 若不存在下一个助理，则直接删除 `current_we_agent_detail`
-   - SDK 在内存中直接按 `getWeAgentUri` 同一套规则组装 `nextUris`
-   - 触发 `type = delete` 的监听函数，并将 `{ partnerAccount }` 作为回调内容
-5. `todo`
-   后续可继续使用 `nextUris.weAgentUri`、`nextUris.assistantDetailUri`、`nextUris.switchAssistantUri` 调用 `openWeAgentCUI`。
+2. SDK 读取本地 `we_agent_list_cache`：
+   - 若存在，则从列表缓存中删除对应助理并回写
+3. SDK 读取本地 `we_agent_details`：
+   - 若存在对应助理详情缓存，则移除对应条目并回写
+4. SDK 最后触发 `type = delete` 的监听函数，并将 `{ partnerAccount }` 作为回调内容；缓存是否存在、是否删除成功都不影响本次广播。
+
+### 说明
+
+- 该场景的核心目的是“删除广播 + 删除列表缓存 + 删除详情缓存”。
+- 与本端 `deleteWeAgent` 成功后的处理不同，该场景不做当前助理切换，不组装 `nextUris`，也不调用 `openWeAgentCUI`。
+- 该场景不读取也不修改 `current_we_agent_detail`；是否为当前助理、页面应如何响应，由 `registerWeAgentListener(delete)` 的消费方自行判断。
+- 广播触发时机固定放在缓存处理之后，且缓存处理结果不影响广播。
 
 ## 6.2 本端调用 deleteWeAgent 成功后的同步
 
@@ -290,18 +279,16 @@ type RegisterWeAgentListenerResult = {
    - 若一致，则继续处理
 3. 弹出“助理已删除”提示弹窗。
 4. 弹窗底部按钮固定为：
-   - 左边按钮：“取消”
-   - 右边按钮：“切换助理”
-5. 点击“取消”：
-   - 仅关闭弹窗
+   - “切换助理”
+5. 弹窗不可取消。
 6. 点击“切换助理”：
-   - 关闭弹窗
    - 跳转到切换助理页面
 
 ### 说明
 
 - 该弹窗只针对“当前聊天助理被删除”场景弹出。
 - 删除非当前助理时，`weAgentCUI` 页面无需做任何 UI 变化。
+- 弹窗不提供“取消”或关闭能力，用户需通过“切换助理”继续后续流程。
 - “切换助理”跳转只负责把用户带到切换助理页面，后续由切换助理页面继续承接选择和打开新助理的流程。
 
 ---
@@ -315,44 +302,38 @@ type RegisterWeAgentListenerResult = {
 建议抽成统一内部方法：
 
 ```text
-refreshWeAgentDetailAndNotify(partnerAccount)
+broadcastWeAgentDetailUpdated(payload)
 ```
 
 职责：
 
-1. 查服务端详情
-2. 比较新旧详情
-3. 更新 `we_agent_details`
+1. 解析通知中的 `partnerAccount`
+2. 检查本地 `we_agent_details` 是否存在对应助理缓存
+3. 若存在则更新 `we_agent_details`
 4. 若命中当前助理则同步更新 `current_we_agent_detail`
-5. 按需触发 `type = update` 的监听函数
+5. 最后回调 `type = update` 的监听函数
 
 该方法可复用于：
 
 - 服务端主动详情更新通知
-- 冷启动补偿刷新
-- 离线恢复在线补偿刷新
 
 ## 7.2 删除后处理公共流程
 
 建议抽成统一内部方法：
 
 ```text
-handleWeAgentDeletedAfterSuccess(partnerAccount, robotId)
+handleWeAgentDeletedByServerNotification(partnerAccount, robotId)
 ```
 
 职责：
 
-1. 判断是否删除当前助理
-2. 更新 `we_agent_list_cache`
-3. 删除 `we_agent_details` 中被删除助理条目
-4. 按需切换 `current_we_agent_detail`
-5. 组装 `nextUris`
-6. 触发 `type = delete` 的监听函数
+1. 更新 `we_agent_list_cache`
+2. 删除 `we_agent_details` 中被删除助理条目
+3. 最后触发 `type = delete` 的监听函数
 
-该方法可复用于：
+该方法仅复用于：
 
 - 服务端主动删除通知
-- 本端 `deleteWeAgent` 成功后
 
 ---
 
@@ -362,38 +343,103 @@ handleWeAgentDeletedAfterSuccess(partnerAccount, robotId)
 
 ```mermaid
 flowchart TD
-    A["服务端通知 / 冷启动 / 离线恢复 / updateWeAgent成功"] --> B["定位 partnerAccount"]
-    B --> C["读取旧缓存 previousDetail"]
-    C --> D["获取最新详情或使用本地更新后快照"]
-    D --> E{"是否拿到非空详情"}
-    E -- "否" --> F["不改缓存，不通知"]
-    E -- "是" --> G["更新 we_agent_details"]
-    G --> H{"是否命中 current_we_agent_detail"}
-    H -- "是" --> I["同步更新当前助理缓存"]
-    H -- "否" --> J["跳过当前助理缓存更新"]
-    I --> K{"新旧详情是否有差异"}
-    J --> K
-    K -- "否" --> L["结束"]
-    K -- "是" --> M["回调 registerWeAgentListener(update)"]
+    A["开始"] --> B{"触发来源"}
+    B -- "服务端主动详情更新通知" --> C["解析通知载荷"]
+    C --> D["提取 partnerAccount / robotId"]
+    D --> E["读取 we_agent_details"]
+    E --> F{"是否存在该助理缓存"}
+    F -- "否" --> G["不新增缓存"]
+    F -- "是" --> H["用通知内容覆盖 we_agent_details 对应条目"]
+    H --> I{"是否命中 current_we_agent_detail"}
+    I -- "是" --> J["同步更新 current_we_agent_detail"]
+    I -- "否" --> K["跳过当前助理缓存更新"]
+    G --> L["回调 registerWeAgentListener(update)"]
+    J --> L
+    K --> L
+    L --> M["结束"]
+
+    B -- "冷启动 / 离线恢复在线补偿刷新" --> N["读取 we_agent_details 缓存对象"]
+    N --> O{"缓存是否为空"}
+    O -- "是" --> P["直接结束"]
+    O -- "否" --> Q["提取全部 partnerAccount"]
+    Q --> R["按逗号拼接为 partnerAccounts"]
+    R --> S["异步调用 GET /v1/robot-partners/{partnerAccounts}"]
+    S --> T{"批量请求是否成功"}
+    T -- "否" --> U["记录日志并结束"]
+    T -- "是" --> V["按 partnerAccount 建立返回结果映射"]
+    V --> W["遍历缓存中的每个 partnerAccount"]
+    W --> X{"服务端是否返回该助理详情"}
+    X -- "否" --> Y["删除 we_agent_details 对应条目"]
+    Y --> Z{"we_agent_list_cache 中是否存在该助理"}
+    Z -- "是" --> AA["同步删除 we_agent_list_cache 对应条目"]
+    Z -- "否" --> AB["跳过列表缓存删除"]
+    AA --> AC["回调 registerWeAgentListener(delete)"]
+    AB --> AC
+    AC --> AD{"是否还有未处理 partnerAccount"}
+    X -- "是" --> AE["取出 latestDetail"]
+    AE --> AF["与旧缓存详情比较"]
+    AF --> AG{"是否存在差异"}
+    AG -- "否" --> AH["跳过更新广播"]
+    AG -- "是" --> AI["更新 we_agent_details 对应条目"]
+    AI --> AJ{"是否命中 current_we_agent_detail"}
+    AJ -- "是" --> AK["同步更新 current_we_agent_detail"]
+    AJ -- "否" --> AL["跳过当前助理缓存更新"]
+    AK --> AM["回调 registerWeAgentListener(update)"]
+    AL --> AM
+    AH --> AD
+    AM --> AD
+    AD -- "是" --> W
+    AD -- "否" --> AN["结束"]
 ```
 
 ## 8.2 删除时序
 
 ```mermaid
 flowchart TD
-    A["服务端删除通知 / deleteWeAgent成功"] --> B["识别删除目标"]
-    B --> C["判断是否命中当前助理"]
-    C -- "否" --> D["更新 we_agent_list_cache"]
-    D --> E["删除 we_agent_details 对应条目"]
-    E --> F["回调 registerWeAgentListener(delete)"]
-    C -- "是" --> G["读取删除前助理列表"]
-    G --> H["预计算下一个助理"]
-    H --> I["更新 we_agent_list_cache"]
-    I --> J["删除 we_agent_details 对应条目"]
-    J --> K["获取 nextDetail 或清空当前助理缓存"]
-    K --> L["组装 nextUris"]
-    L --> M["回调 registerWeAgentListener(delete)"]
-    M --> N["TODO: openWeAgentCUI"]
+    A["开始"] --> B{"触发来源"}
+    B -- "服务端主动删除通知" --> C["解析通知载荷"]
+    C --> D["识别 partnerAccount / robotId"]
+    D --> E["读取 we_agent_list_cache"]
+    E --> F{"列表缓存是否存在"}
+    F -- "是" --> G["删除 we_agent_list_cache 中对应助理并回写"]
+    F -- "否" --> H["跳过列表缓存处理"]
+    G --> I["读取 we_agent_details"]
+    H --> I
+    I --> J{"详情缓存是否存在对应助理"}
+    J -- "是" --> K["删除 we_agent_details 中对应条目并回写"]
+    J -- "否" --> L["跳过详情缓存处理"]
+    K --> M["回调 registerWeAgentListener(delete)"]
+    L --> M
+    M --> N["结束"]
+
+    B -- "本端 deleteWeAgent 成功" --> O["调用方收到 code = 200"]
+    O --> P["读取 current_we_agent_detail"]
+    P --> Q{"删除目标是否命中当前助理"}
+    Q -- "否" --> R["尝试更新 we_agent_list_cache"]
+    R --> S["删除 we_agent_details 中对应条目"]
+    S --> T["回调 registerWeAgentListener(delete)"]
+    T --> U["结束"]
+    Q -- "是" --> V["优先读取 we_agent_list_cache"]
+    V --> W{"列表缓存是否存在"}
+    W -- "否" --> X["调用 getWeAgentList 对应服务端接口获取列表"]
+    W -- "是" --> Y["使用本地列表缓存"]
+    X --> Z["基于删除前列表预计算下一个助理"]
+    Y --> Z
+    Z --> AA["从列表缓存中移除被删除助理并回写"]
+    AA --> AB{"是否存在下一个助理"}
+    AB -- "否" --> AC["删除 current_we_agent_detail"]
+    AB -- "是" --> AD["优先从 we_agent_details 读取 nextDetail"]
+    AD --> AE{"本地是否存在 nextDetail"}
+    AE -- "是" --> AF["设置 current_we_agent_detail = nextDetail"]
+    AE -- "否" --> AG["调用 GET /v1/robot-partners/{partnerAccount} 获取 nextDetail"]
+    AG --> AH{"是否成功获取 nextDetail"}
+    AH -- "是" --> AF
+    AH -- "否" --> AC
+    AF --> AI["删除 we_agent_details 中被删除助理条目"]
+    AC --> AI
+    AI --> AJ["按 fallback 规则组装 nextUris"]
+    AJ --> AK["回调 registerWeAgentListener(delete)"]
+    AK --> AL["结束"]
 ```
 
 ---
