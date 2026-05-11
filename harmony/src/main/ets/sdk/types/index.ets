@@ -90,6 +90,7 @@ export class SkillSdkException extends Error implements SDKError {
 
 export interface RestApiResponse<T> {
   code: number;
+  message?: string;
   errormsg: string;
   data: T | null;
 }
@@ -518,6 +519,14 @@ export interface UpdateQrcodeInfoParams {
 
 export interface UpdateQrcodeInfoResult {
   status: string;
+}
+
+export interface QueryAssistantGraySingleParams {
+  partnerAccount: string;
+}
+
+export interface QueryAssistantGraySingleResult {
+  data: boolean;
 }
 
 export interface WeAgent {

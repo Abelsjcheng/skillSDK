@@ -35,6 +35,8 @@ import {
   QrcodeInfo,
   QueryWeAgentParams,
   QueryQrcodeInfoParams,
+  QueryAssistantGraySingleParams,
+  QueryAssistantGraySingleResult,
   RegisterSessionListenerParams,
   RegisterSessionListenerResult,
   RegenerateAnswerParams,
@@ -839,6 +841,35 @@ export class SkillSDK {
     }
   }
 
+  // 27. queryAssistantGraySingle
+  async queryAssistantGraySingle(
+    params: QueryAssistantGraySingleParams
+  ): Promise<QueryAssistantGraySingleResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
+      const cached = this.weAgentStore.loadAssistantGraySingle(partnerAccount);
+      if (cached !== null) {
+        void this.refreshAssistantGraySingleCache(partnerAccount);
+        return {
+          data: cached
+        };
+      }
+
+      const data = await this.httpClient.get<boolean>(
+        '/v4-1/robot-partners/im-chat/gray-single',
+        { welinkId: partnerAccount },
+        { useAssistantBaseUrl: true }
+      );
+      this.weAgentStore.saveAssistantGraySingle(partnerAccount, data);
+      return {
+        data
+      };
+    } catch (error) {
+      throw this.normalizeError('queryAssistantGraySingle', error);
+    }
+  }
+
   private async fetchServerMessages(
     welinkSessionId: string,
     page: number,
@@ -901,6 +932,19 @@ export class SkillSDK {
       await this.fetchAndCacheWeAgentDetails(partnerAccount, false);
     } catch (error) {
       this.logger.warn('getAssistantDetails background refresh failed');
+    }
+  }
+
+  private async refreshAssistantGraySingleCache(partnerAccount: string): Promise<void> {
+    try {
+      const data = await this.httpClient.get<boolean>(
+        '/v4-1/robot-partners/im-chat/gray-single',
+        { welinkId: partnerAccount },
+        { useAssistantBaseUrl: true }
+      );
+      this.weAgentStore.saveAssistantGraySingle(partnerAccount, data);
+    } catch (error) {
+      this.logger.warn('queryAssistantGraySingle background refresh failed');
     }
   }
 

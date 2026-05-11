@@ -7,6 +7,7 @@ const STORE_NAME_PREFIX = 'skill_sdk_we_agent_';
 const KEY_CURRENT_DETAIL = 'current_we_agent_detail';
 const KEY_LIST_CACHE = 'we_agent_list_cache';
 const KEY_DETAILS_CACHE = 'we_agent_details';
+const KEY_ASSISTANT_GRAY_SINGLE_CACHE = 'assistant_gray_single_cache';
 
 /**
  * Preferences-backed store for V2 assistant cache.
@@ -131,9 +132,26 @@ export class WeAgentStore {
     }
   }
 
+  saveAssistantGraySingle(partnerAccount: string, value: boolean): void {
+    const cache = this.loadAssistantGraySingleCache();
+    cache[partnerAccount] = value;
+    this.putJson(KEY_ASSISTANT_GRAY_SINGLE_CACHE, cache);
+  }
+
+  loadAssistantGraySingle(partnerAccount: string): boolean | null {
+    const cache = this.loadAssistantGraySingleCache();
+    const value = cache[partnerAccount];
+    return typeof value === 'boolean' ? value : null;
+  }
+
   private putJson(
     key: string,
-    value: WeAgentDetails | WeAgent[] | WeAgentDetailsArray | Record<string, WeAgentDetails>
+    value:
+      WeAgentDetails
+      | WeAgent[]
+      | WeAgentDetailsArray
+      | Record<string, WeAgentDetails>
+      | Record<string, boolean>
   ): void {
     const encoded = JSON.stringify(value);
     const pref = this.getPreferencesInstance();
@@ -194,6 +212,29 @@ export class WeAgentStore {
         const value = (parsed as Record<string, Object>)[key];
         if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
           result[key] = value as WeAgentDetails;
+        }
+      });
+      return result;
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  private loadAssistantGraySingleCache(): Record<string, boolean> {
+    const raw = this.getString(KEY_ASSISTANT_GRAY_SINGLE_CACHE);
+    if (raw === null || raw.trim() === '') {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+      }
+      const result: Record<string, boolean> = {};
+      Object.keys(parsed as Record<string, Object>).forEach((key: string) => {
+        const value = (parsed as Record<string, Object>)[key];
+        if (typeof value === 'boolean') {
+          result[key] = value;
         }
       });
       return result;
