@@ -29,6 +29,7 @@ public final class WeAgentStorage {
     private static final String KEY_CURRENT_WE_AGENT_DETAIL = "current_we_agent_detail";
     private static final String KEY_WE_AGENT_LIST_CACHE = "we_agent_list_cache";
     private static final String KEY_WE_AGENT_DETAILS = "we_agent_details";
+    private static final String KEY_ASSISTANT_GRAY_SINGLE_CACHE = "assistant_gray_single_cache";
 
     @NonNull
     private final Gson gson = new Gson();
@@ -156,6 +157,19 @@ public final class WeAgentStorage {
         }
     }
 
+    public synchronized void saveAssistantGraySingle(@NonNull String partnerAccount, boolean value) {
+        SharedPreferences prefs = resolveSharedPreferencesIfNeeded();
+        Map<String, Boolean> cache = loadAssistantGraySingleCache();
+        cache.put(partnerAccount, value);
+        putValue(prefs, KEY_ASSISTANT_GRAY_SINGLE_CACHE, gson.toJson(cache));
+    }
+
+    @Nullable
+    public synchronized Boolean getAssistantGraySingle(@NonNull String partnerAccount) {
+        Map<String, Boolean> cache = loadAssistantGraySingleCache();
+        return cache.get(partnerAccount);
+    }
+
     @Nullable
     private SharedPreferences resolveSharedPreferencesIfNeeded() {
         if (sharedPreferences != null) {
@@ -217,6 +231,21 @@ public final class WeAgentStorage {
             }
         }
         return memoryFallback.get(key);
+    }
+
+    @NonNull
+    private Map<String, Boolean> loadAssistantGraySingleCache() {
+        String raw = readValue(resolveSharedPreferencesIfNeeded(), KEY_ASSISTANT_GRAY_SINGLE_CACHE);
+        if (raw == null || raw.trim().isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            Type mapType = TypeToken.getParameterized(Map.class, String.class, Boolean.class).getType();
+            Map<String, Boolean> parsed = gson.fromJson(raw, mapType);
+            return parsed == null ? new HashMap<>() : new HashMap<>(parsed);
+        } catch (Exception ignored) {
+            return new HashMap<>();
+        }
     }
 
     @NonNull

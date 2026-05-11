@@ -49,4 +49,7 @@ public interface AssistantApiService {
 
     @PUT("v4-1/we-crew/im-register/qrcode")
     Call<JsonElement> updateQrcodeInfo(@Body UpdateQrcodeInfoBody body);
+
+    @GET("v4-1/robot-partners/im-chat/gray-single")
+    Call<JsonElement> queryAssistantGraySingle(@Query("welinkId") String welinkId);
 }

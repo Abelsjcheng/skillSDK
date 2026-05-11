@@ -39,6 +39,8 @@ import com.opencode.skill.model.OpenAssistantEditPageResult;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.PageParams;
 import com.opencode.skill.model.QrcodeInfo;
+import com.opencode.skill.model.QueryAssistantGraySingleParams;
+import com.opencode.skill.model.QueryAssistantGraySingleResult;
 import com.opencode.skill.model.QueryWeAgentParams;
 import com.opencode.skill.model.QueryQrcodeInfoParams;
 import com.opencode.skill.model.RegisterSessionListenerParams;
@@ -1252,6 +1254,48 @@ public final class SkillSDK {
         });
     }
 
+    // 27. queryAssistantGraySingle
+    public void queryAssistantGraySingle(@NonNull QueryAssistantGraySingleParams params,
+            @NonNull SkillCallback<QueryAssistantGraySingleResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        Boolean cached = weAgentStorage.getAssistantGraySingle(partnerAccount);
+        if (cached != null) {
+            callback.onSuccess(new QueryAssistantGraySingleResult(cached));
+            refreshAssistantGraySingleCache(partnerAccount);
+            return;
+        }
+
+        apiClient.queryAssistantGraySingle(partnerAccount, new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean result) {
+                boolean resolved = result != null && result;
+                weAgentStorage.saveAssistantGraySingle(partnerAccount, resolved);
+                callback.onSuccess(new QueryAssistantGraySingleResult(resolved));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
     public synchronized void shutdown() {
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.shutdown();
@@ -1303,6 +1347,23 @@ public final class SkillSDK {
             @Override
             public void onError(@NonNull Throwable error) {
                 // Ignore background refresh failures.
+            }
+        });
+    }
+
+    private void refreshAssistantGraySingleCache(@NonNull String partnerAccount) {
+        apiClient.queryAssistantGraySingle(partnerAccount, new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean result) {
+                if (result == null) {
+                    return;
+                }
+                weAgentStorage.saveAssistantGraySingle(partnerAccount, result);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                // Ignore async refresh failure and keep old cache.
             }
         });
     }

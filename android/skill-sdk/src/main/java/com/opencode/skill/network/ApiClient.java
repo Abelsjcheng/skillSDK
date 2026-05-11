@@ -286,6 +286,14 @@ public class ApiClient {
         });
     }
 
+    public void queryAssistantGraySingle(
+            @NonNull String partnerAccount,
+            @NonNull SkillCallback<Boolean> callback
+    ) {
+        AssistantApiService service = requireAssistantApiService();
+        enqueueEnvelope(service.queryAssistantGraySingle(partnerAccount), Boolean.class, callback);
+    }
+
     @NonNull
     private List<WeAgentDetails> parseWeAgentDetails(@Nullable JsonElement payload) {
         if (payload == null || payload.isJsonNull()) {
