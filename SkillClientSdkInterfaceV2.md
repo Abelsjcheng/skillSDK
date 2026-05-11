@@ -24,7 +24,7 @@
 | `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
 | `queryQrcodeInfo` | `GET /v4-1/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
 | `updateQrcodeInfo` | `PUT /v4-1/we-crew/im-register/qrcode` | 更新二维码信息 |
-| `queryAssistantGraySingle` | `GET /v4-1/robot-partners/im-chat/gray-single?welinkId={welinkId}` | 查询助理单人灰度标记 |
+| `queryAssistantGraySingle` | `GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}` | 查询助理单人灰度标记 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`），并按接口语义返回业务字段（如 `message`、`content`）。
@@ -65,7 +65,7 @@ type ServerResponse<T> = {
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
    - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
    - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情对象（`WeAgentDetails`）
-   - `assistant_gray_single_cache`：助理单人灰度缓存对象，key 为 `welinkId`，value 为对应灰度布尔值
+   - `assistant_gray_single_cache`：助理单人灰度缓存对象，key 为 `partnerAccount`，value 为对应灰度布尔值
 6. SP 持久化文档路径：待填写。
 
 ---
@@ -859,13 +859,13 @@ Skill 小程序调用
 
 ### 接口说明
 
-根据 `welinkId` 查询当前用户是否命中助理单人灰度。
+根据 `partnerAccount` 查询当前用户是否命中助理单人灰度，并将 `partnerAccount` 作为 `welinkId` 传给服务端。
 
 该接口需要做本地缓存：
 
-- 若本地已存在该 `welinkId` 的缓存结果，则优先返回缓存
+- 若本地已存在该 `partnerAccount` 的缓存结果，则优先返回缓存
 - 返回缓存后，SDK 异步调用服务端接口刷新缓存
-- 若本地不存在该 `welinkId` 的缓存结果，则调用服务端接口获取并写入缓存
+- 若本地不存在该 `partnerAccount` 的缓存结果，则调用服务端接口获取并写入缓存
 
 ### 接口名
 
@@ -877,13 +877,13 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `welinkId` | `string` | 是 | 用户 welinkId |
+| `partnerAccount` | `string` | 是 | 助理账号 ID，调用服务端时作为 `welinkId` 传递 |
 
 ### 入参示例
 
 ```json
 {
-  "welinkId": "x12345678"
+  "partnerAccount": "x12345678"
 }
 ```
 
@@ -903,16 +903,16 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 
 ### 实现方法
 
-1. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `assistant_gray_single_cache`（`userId` 当前使用 mock 值：`mock_user_id`），并从中按 `welinkId` 读取对应缓存值。
-2. 若读取到对应 `welinkId` 的缓存值，则 SDK 立即返回 `{ data: cachedValue }`。
-3. 在返回缓存后，SDK 异步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={welinkId}`。
+1. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `assistant_gray_single_cache`（`userId` 当前使用 mock 值：`mock_user_id`），并从中按 `partnerAccount` 读取对应缓存值。
+2. 若读取到对应 `partnerAccount` 的缓存值，则 SDK 立即返回 `{ data: cachedValue }`。
+3. 在返回缓存后，SDK 异步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}`。
 4. 服务端响应结构为：
    - `data: boolean`
    - `message: string`
    - `code: string`
-5. 当异步刷新请求返回 `code = 200` 时，SDK 使用最新 `data` 覆盖更新按 `userId` 隔离的缓存对象中对应的 `welinkId` 字段，并回写缓存 key `assistant_gray_single_cache`。
-6. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={welinkId}`。
-7. 当同步请求返回 `code = 200` 时，SDK 将服务端返回的 `data` 写入按 `userId` 隔离的缓存对象中对应的 `welinkId` 字段，并返回 `{ data }`。
+5. 当异步刷新请求返回 `code = 200` 时，SDK 使用最新 `data` 覆盖更新按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并回写缓存 key `assistant_gray_single_cache`。
+6. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}`。
+7. 当同步请求返回 `code = 200` 时，SDK 将服务端返回的 `data` 写入按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并返回 `{ data }`。
 8. 当服务端返回非 `200` 时，SDK 抛出异常，并透传服务端 `code` 与 `message`。
 9. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 不删除旧缓存，可记录日志用于排查。
 
@@ -1158,7 +1158,7 @@ type UpdateQrcodeInfoResult = {
 
 ```typescript
 type QueryAssistantGraySingleParams = {
-  welinkId: string
+  partnerAccount: string
 }
 ```
 

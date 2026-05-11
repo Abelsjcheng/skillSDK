@@ -9,7 +9,7 @@
 - `updateWeAgent`：更新助理信息，并同步更新本地缓存
 - `deleteWeAgent`：删除助理，并在删除当前助理时处理切换逻辑
 
-由于存在多端同时操作同一个助理的场景，SDK 还需要补齐“服务端主动通知 + 本地缓存刷新 + 对外监听回调”的统一同步机制，保证宿主能及时感知助理详情更新和助理删除。
+由于存在多端同时操作同一个助理的场景，SDK 还需要补齐“服务端主动通知 + 本地缓存刷新 + 对外广播通知”的统一同步机制，保证宿主能及时感知助理详情更新和助理删除。
 
 > 说明：以下方案默认“服务端主动通知”通过 SDK 已接入的长连接/推送通道下发。若后续服务端采用其他通知通道，仅替换通知接入层，缓存处理与对外回调规则保持不变。
 
@@ -17,10 +17,10 @@
 
 ## 2. 目标
 
-1. 当服务端主动下发“助理详情更新”或“助理删除”通知时，SDK 能自动更新本地缓存，并通过监听接口对外通知。
-2. 当客户端冷启动，或从断网离线恢复到在线时，SDK 能对 `we_agent_details` 中的所有助理做异步补偿刷新，并在检测到差异或发现助理已删除时通过监听接口对外通知。
-3. 当本端主动调用 `updateWeAgent` 成功后，SDK 除了更新缓存，还要立即通过监听接口通知助理更新事件。
-4. 当本端主动调用 `deleteWeAgent` 成功后，SDK 除了更新缓存和当前助理切换状态，还要立即通过监听接口通知助理删除事件。
+1. 当服务端主动下发“助理详情更新”或“助理删除”通知时，SDK 能自动更新本地缓存，并通过客户端已有广播机制对外通知。
+2. 当客户端冷启动，或从断网离线恢复到在线时，SDK 能对 `we_agent_details` 中的所有助理做异步补偿刷新，并在检测到差异或发现助理已删除时通过客户端已有广播机制对外通知。
+3. 当本端主动调用 `updateWeAgent` 成功后，SDK 除了更新缓存，还要立即通过客户端已有广播机制通知助理更新事件。
+4. 当本端主动调用 `deleteWeAgent` 成功后，SDK 除了更新缓存和当前助理切换状态，还要立即通过客户端已有广播机制通知助理删除事件。
 5. `ai-chat-viewer` 的 `weAgentCUI` 页面在收到助理更新或删除通知后，能够及时刷新助理信息，或引导用户切换到其他助理。
 
 ---
@@ -40,75 +40,52 @@
 
 ---
 
-## 4. 对外监听机制
+## 4. 对外广播机制
 
-建议 SDK 新增统一监听接口：
+SDK 不新增统一监听接口，直接复用客户端已有广播机制。
 
-```typescript
-registerWeAgentListener(params: RegisterWeAgentListenerParams): Promise<RegisterWeAgentListenerResult>
-```
+> 说明：客户端已有广播机制的导入方式当前先 `todo`，方案中统一以 `WeBroadCast(eventName, data)` 表示广播调用。
 
-### 4.1 入参
+### 4.1 广播约定
 
-| 参数名 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `type` | `string` | 是 | 生命周期事件类型，合法值：`update`（助理更新）、`delete`（助理删除） |
-| `func` | `function` | 是 | 对应事件回调函数 |
+| 场景 | eventName | data |
+|---|---|---|
+| 助理详情更新 | `updateWeAgentDetailEvent` | 更新后的助理详情数据，即 `WeAgentDetails` 对象 |
+| 助理删除 | `deleteWeAgentEvent` | 删除助理数据，当前最小载荷为 `{ partnerAccount }` |
 
-### 4.2 回调载荷
+### 4.2 广播规则
 
-- 当 `type = update` 时：
-  `func` 的回调内容为助理更新后的详情数据，即 `WeAgentDetails` 对象。
-- 当 `type = delete` 时：
-  `func` 的回调内容为一个对象，仅包含 `partnerAccount` 字段。
+1. 若场景触发了助理更新，SDK 调用 `WeBroadCast('updateWeAgentDetailEvent', detailData)` 对外广播。
+2. 若场景触发了助理删除，SDK 调用 `WeBroadCast('deleteWeAgentEvent', deleteData)` 对外广播。
+3. 广播触发时机固定放在本地缓存处理之后，且缓存处理结果不影响广播。
 
-### 4.3 注册规则
-
-1. SDK 内部按 `type` 维度维护监听函数集合。
-2. `update` 类型监听只接收助理更新通知。
-3. `delete` 类型监听只接收助理删除通知。
-4. 若场景触发了助理更新或助理删除，SDK 需通过 `registerWeAgentListener` 注册的监听函数将事件回调出去。
-
-### 4.4 类型定义建议
-
-```typescript
-type RegisterWeAgentListenerParams = {
-  type: 'update' | 'delete'
-  func: (payload: WeAgentDetails | { partnerAccount: string }) => void
-}
-
-type RegisterWeAgentListenerResult = {
-  status: 'success'
-}
-```
-
-### 4.5 ai-chat-viewer 页面消费规则
+### 4.3 ai-chat-viewer 页面消费规则
 
 `ai-chat-viewer` 中的 `weAgentCUI` 页面应作为当前助理生命周期事件的主要消费方：
 
-1. 页面初始化后，分别调用两次 `registerWeAgentListener`：
-   - 一次注册 `type = update`
-   - 一次注册 `type = delete`
-2. `update` 监听仅处理“当前聊天助理”的更新事件：
-   - 若回调中的 `partnerAccount` 与当前页面助理一致，则更新页面中的助理名称、简介、头像等信息
+1. 页面初始化后，接入客户端已有广播消费机制，分别订阅两个事件：
+   - `updateWeAgentDetailEvent`
+   - `deleteWeAgentEvent`
+2. `updateWeAgentDetailEvent` 仅处理“当前聊天助理”的更新事件：
+   - 若广播数据中的 `partnerAccount` 与当前页面助理一致，则更新页面中的助理名称、简介、头像等信息
    - 若不一致，则忽略
-3. `delete` 监听仅处理“当前聊天助理”的删除事件：
-   - 若回调中的 `partnerAccount` 与当前页面助理一致，则弹窗提示用户“助理已删除”
+3. `deleteWeAgentEvent` 仅处理“当前聊天助理”的删除事件：
+   - 若广播数据中的 `partnerAccount` 与当前页面助理一致，则弹窗提示用户“助理已删除”
    - 弹窗底部按钮固定为“切换助理”
    - 弹窗不可取消
    - 点击“切换助理”后跳转到切换助理页面
    - 若删除的不是当前页面助理，则忽略
 
-### 4.6 weAgentCUI 页面更新范围
+### 4.4 weAgentCUI 页面更新范围
 
-当 `weAgentCUI` 页面收到当前助理的 `update` 通知时，建议至少同步以下展示字段：
+当 `weAgentCUI` 页面收到当前助理的 `updateWeAgentDetailEvent` 广播时，建议至少同步以下展示字段：
 
 - 助理名称
 - 助理简介
 - 助理头像
 - 页面内依赖助理详情展示的其他轻量信息
 
-页面不需要再次主动调用 `getWeAgentDetails`，可直接使用 `registerWeAgentListener(update)` 回调返回的最新 `WeAgentDetails` 更新 UI。
+页面不需要再次主动调用 `getWeAgentDetails`，可直接使用广播返回的最新 `WeAgentDetails` 更新 UI。
 
 ---
 
@@ -127,8 +104,8 @@ type RegisterWeAgentListenerResult = {
    - 若存在，则使用通知中的助理更新内容覆盖更新 `we_agent_details[partnerAccount]`
    - 若 `current_we_agent_detail` 命中同一助理，则同步覆盖为最新内容
 3. 若本地 `we_agent_details` 中不存在该助理缓存详情，则不新增缓存，不调用查详情服务端接口补拉。
-4. 该场景下不删除旧缓存，也不触发删除监听。
-5. SDK 最后通过 `registerWeAgentListener` 触发 `type = update` 的监听函数，将通知中的助理更新内容直接对外广播；缓存是否存在、是否更新成功都不影响本次广播。
+4. 该场景下不删除旧缓存，也不触发删除广播。
+5. SDK 最后调用 `WeBroadCast('updateWeAgentDetailEvent', detailData)`，将通知中的助理更新内容直接对外广播；缓存是否存在、是否更新成功都不影响本次广播。
 
 ### 说明
 
@@ -152,18 +129,18 @@ type RegisterWeAgentListenerResult = {
 5. SDK 解析服务端返回的助理详情列表，并建立以 `partnerAccount` 为 key 的映射。
 6. 对缓存中的每个 `partnerAccount` 分别处理：
    - 若服务端返回了对应助理详情，则与旧缓存详情比较；
-   - 若存在差异，则更新 `we_agent_details[partnerAccount]`，并触发 `type = update` 的监听函数，将最新 `WeAgentDetails` 作为回调内容；
+   - 若存在差异，则更新 `we_agent_details[partnerAccount]`，并调用 `WeBroadCast('updateWeAgentDetailEvent', detailData)`，将最新 `WeAgentDetails` 作为广播数据；
    - 若该助理同时命中 `current_we_agent_detail`，则同步覆盖当前助理缓存；
    - 若服务端未返回对应 `partnerAccount` 的助理详情，则同步删除 `we_agent_details` 中对应助理详情缓存；
    - 若服务端未返回对应 `partnerAccount` 的助理详情，且 `we_agent_list_cache` 中存在该助理，则同步从列表缓存中删除对应助理；
-   - 若服务端未返回对应 `partnerAccount` 的助理详情，则触发 `type = delete` 的监听函数，将 `{ partnerAccount }` 作为回调内容；
+   - 若服务端未返回对应 `partnerAccount` 的助理详情，则调用 `WeBroadCast('deleteWeAgentEvent', { partnerAccount })` 进行删除广播；
 7. 若批量请求失败，则仅记录日志，不更新缓存，也不触发广播。
 
 ### 说明
 
 - 该场景下，服务端未返回某个缓存中的 `partnerAccount` 时，视为该助理已删除。
 - 该场景的删除处理包含“删除本地详情缓存 + 删除列表缓存中的对应项 + 触发删除广播”；不复用 `deleteWeAgent` 的当前助理切换逻辑，也不组装 `nextUris`。
-- 若删除的是当前助理，SDK 在该场景下也不同步删除 `current_we_agent_detail`；页面侧后续如何响应，由 `registerWeAgentListener(delete)` 的消费方决定。
+- 若删除的是当前助理，SDK 在该场景下也不同步删除 `current_we_agent_detail`；页面侧后续如何响应，由广播消费方决定。
 
 ## 5.3 本端调用 updateWeAgent 成功后的同步
 
@@ -179,26 +156,26 @@ type RegisterWeAgentListenerResult = {
 2. 组装“最新助理详情快照”：
    - 优先使用更新后的本地缓存对象；
    - 若本地没有命中缓存，则本次不新增缓存，但仍可基于入参组装一个最小详情对象用于通知。
-3. 触发 `type = update` 的监听函数，并将最新 `WeAgentDetails` 作为回调内容。
+3. 调用 `WeBroadCast('updateWeAgentDetailEvent', detailData)`，并将最新 `WeAgentDetails` 作为广播数据。
 
 ### 说明
 
 - 该通知不依赖 `notifyAssistantDetailUpdated`。
-- `notifyAssistantDetailUpdated` 仍只负责 `openAssistantEditPage` 的本地编辑页回调，不替代宿主级监听通知。
+- `notifyAssistantDetailUpdated` 仍只负责 `openAssistantEditPage` 的本地编辑页回调，不替代宿主级广播通知。
 
 ## 5.4 weAgentCUI 页面收到更新通知后的处理
 
 ### 触发条件
 
-`weAgentCUI` 页面已注册 `type = update` 监听，且 SDK 回调了助理更新事件。
+`weAgentCUI` 页面已接入 `updateWeAgentDetailEvent` 广播，且 SDK 触发了助理更新事件。
 
 ### 页面处理规则
 
 1. 页面读取当前聊天助理的 `partnerAccount`。
-2. 将回调载荷中的 `partnerAccount` 与当前页面助理做比对：
+2. 将广播数据中的 `partnerAccount` 与当前页面助理做比对：
    - 若不一致，则直接忽略
    - 若一致，则继续处理
-3. 使用回调中的最新 `WeAgentDetails` 更新页面内存态：
+3. 使用广播中的最新 `WeAgentDetails` 更新页面内存态：
    - 助理名称
    - 助理简介
    - 助理头像
@@ -236,13 +213,13 @@ type RegisterWeAgentListenerResult = {
    - 若存在，则从列表缓存中删除对应助理并回写
 3. SDK 读取本地 `we_agent_details`：
    - 若存在对应助理详情缓存，则移除对应条目并回写
-4. SDK 最后触发 `type = delete` 的监听函数，并将 `{ partnerAccount }` 作为回调内容；缓存是否存在、是否删除成功都不影响本次广播。
+4. SDK 最后调用 `WeBroadCast('deleteWeAgentEvent', { partnerAccount })`；缓存是否存在、是否删除成功都不影响本次广播。
 
 ### 说明
 
 - 该场景的核心目的是“删除广播 + 删除列表缓存 + 删除详情缓存”。
 - 与本端 `deleteWeAgent` 成功后的处理不同，该场景不做当前助理切换，不组装 `nextUris`，也不调用 `openWeAgentCUI`。
-- 该场景不读取也不修改 `current_we_agent_detail`；是否为当前助理、页面应如何响应，由 `registerWeAgentListener(delete)` 的消费方自行判断。
+- 该场景不读取也不修改 `current_we_agent_detail`；是否为当前助理、页面应如何响应，由广播消费方自行判断。
 - 广播触发时机固定放在缓存处理之后，且缓存处理结果不影响广播。
 
 ## 6.2 本端调用 deleteWeAgent 成功后的同步
@@ -258,7 +235,7 @@ type RegisterWeAgentListenerResult = {
    - 删除当前助理：执行下一个助理定位、当前助理缓存切换、`nextUris` 组装
 2. 在既有逻辑基础上，补充两点：
    - 若 `we_agent_details` 中存在被删除助理条目，同步删除对应详情缓存
-   - 删除逻辑结束后，触发 `type = delete` 的监听函数，并将 `{ partnerAccount }` 作为回调内容
+   - 删除逻辑结束后，调用 `WeBroadCast('deleteWeAgentEvent', { partnerAccount })`
 
 ### 说明
 
@@ -269,12 +246,12 @@ type RegisterWeAgentListenerResult = {
 
 ### 触发条件
 
-`weAgentCUI` 页面已注册 `type = delete` 监听，且 SDK 回调了助理删除事件。
+`weAgentCUI` 页面已接入 `deleteWeAgentEvent` 广播，且 SDK 触发了助理删除事件。
 
 ### 页面处理规则
 
 1. 页面读取当前聊天助理的 `partnerAccount`。
-2. 将回调载荷中的 `partnerAccount` 与当前页面助理做比对：
+2. 将广播数据中的 `partnerAccount` 与当前页面助理做比对：
    - 若不一致，则直接忽略
    - 若一致，则继续处理
 3. 弹出“助理已删除”提示弹窗。
@@ -311,7 +288,7 @@ broadcastWeAgentDetailUpdated(payload)
 2. 检查本地 `we_agent_details` 是否存在对应助理缓存
 3. 若存在则更新 `we_agent_details`
 4. 若命中当前助理则同步更新 `current_we_agent_detail`
-5. 最后回调 `type = update` 的监听函数
+5. 最后调用 `WeBroadCast('updateWeAgentDetailEvent', detailData)`
 
 该方法可复用于：
 
@@ -329,7 +306,7 @@ handleWeAgentDeletedByServerNotification(partnerAccount, robotId)
 
 1. 更新 `we_agent_list_cache`
 2. 删除 `we_agent_details` 中被删除助理条目
-3. 最后触发 `type = delete` 的监听函数
+3. 最后调用 `WeBroadCast('deleteWeAgentEvent', { partnerAccount })`
 
 该方法仅复用于：
 
@@ -353,7 +330,7 @@ flowchart TD
     H --> I{"是否命中 current_we_agent_detail"}
     I -- "是" --> J["同步更新 current_we_agent_detail"]
     I -- "否" --> K["跳过当前助理缓存更新"]
-    G --> L["回调 registerWeAgentListener(update)"]
+    G --> L["调用 WeBroadCast(updateWeAgentDetailEvent, detailData)"]
     J --> L
     K --> L
     L --> M["结束"]
@@ -373,7 +350,7 @@ flowchart TD
     Y --> Z{"we_agent_list_cache 中是否存在该助理"}
     Z -- "是" --> AA["同步删除 we_agent_list_cache 对应条目"]
     Z -- "否" --> AB["跳过列表缓存删除"]
-    AA --> AC["回调 registerWeAgentListener(delete)"]
+    AA --> AC["调用 WeBroadCast(deleteWeAgentEvent, { partnerAccount })"]
     AB --> AC
     AC --> AD{"是否还有未处理 partnerAccount"}
     X -- "是" --> AE["取出 latestDetail"]
@@ -384,7 +361,7 @@ flowchart TD
     AI --> AJ{"是否命中 current_we_agent_detail"}
     AJ -- "是" --> AK["同步更新 current_we_agent_detail"]
     AJ -- "否" --> AL["跳过当前助理缓存更新"]
-    AK --> AM["回调 registerWeAgentListener(update)"]
+    AK --> AM["调用 WeBroadCast(updateWeAgentDetailEvent, detailData)"]
     AL --> AM
     AH --> AD
     AM --> AD
@@ -402,7 +379,7 @@ flowchart TD
     AT -- "否" --> AV["不新增 we_agent_details 缓存"]
     AU --> AW["组装最新助理详情快照"]
     AV --> AW
-    AW --> AX["回调 registerWeAgentListener(update)"]
+    AW --> AX["调用 WeBroadCast(updateWeAgentDetailEvent, detailData)"]
     AX --> AY["结束"]
 ```
 
@@ -422,7 +399,7 @@ flowchart TD
     I --> J{"详情缓存是否存在对应助理"}
     J -- "是" --> K["删除 we_agent_details 中对应条目并回写"]
     J -- "否" --> L["跳过详情缓存处理"]
-    K --> M["回调 registerWeAgentListener(delete)"]
+    K --> M["调用 WeBroadCast(deleteWeAgentEvent, { partnerAccount })"]
     L --> M
     M --> N["结束"]
 
@@ -431,7 +408,7 @@ flowchart TD
     P --> Q{"删除目标是否命中当前助理"}
     Q -- "否" --> R["尝试更新 we_agent_list_cache"]
     R --> S["删除 we_agent_details 中对应条目"]
-    S --> T["回调 registerWeAgentListener(delete)"]
+    S --> T["调用 WeBroadCast(deleteWeAgentEvent, { partnerAccount })"]
     T --> U["结束"]
     Q -- "是" --> V["优先读取 we_agent_list_cache"]
     V --> W{"列表缓存是否存在"}
@@ -452,7 +429,7 @@ flowchart TD
     AF --> AI["删除 we_agent_details 中被删除助理条目"]
     AC --> AI
     AI --> AJ["按 fallback 规则组装 nextUris"]
-    AJ --> AK["回调 registerWeAgentListener(delete)"]
+    AJ --> AK["调用 WeBroadCast(deleteWeAgentEvent, { partnerAccount })"]
     AK --> AL["结束"]
 ```
 
@@ -468,14 +445,14 @@ flowchart TD
 - `deleteWeAgent`
 - `notifyAssistantDetailUpdated`
 
-本方案是在其基础上补齐“跨端同步”和“宿主感知”的处理流程，并新增 `registerWeAgentListener` 作为统一的对外通知接口。
+本方案是在其基础上补齐“跨端同步”和“宿主感知”的处理流程，并复用客户端已有广播机制作为统一的对外通知方式。
 
 ---
 
 ## 10. 落地建议
 
-1. 先在文档层确认 `registerWeAgentListener` 的入参、监听回调载荷、注册规则。
+1. 先在文档层确认 `WeBroadCast(eventName, data)` 的事件名、广播载荷与导入方式（导入方式当前先 `todo`）。
 2. 三端内部各自抽出统一的“详情刷新并通知”和“删除后处理并通知”公共方法，避免重复分支。
 3. 先接入服务端主动通知，再补冷启动/离线恢复在线的补偿刷新。
-4. `ai-chat-viewer` 优先在 `weAgentCUI` 页面接入 `registerWeAgentListener`，先打通“当前聊天助理更新/删除”的页面联动。
-5. 最后将 `registerWeAgentListener` 正式补充到 SDK 接口文档中。
+4. `ai-chat-viewer` 优先在 `weAgentCUI` 页面接入客户端已有广播消费机制，先打通“当前聊天助理更新/删除”的页面联动。
+5. 三端 SDK 在触发更新/删除场景时统一调用 `WeBroadCast(eventName, data)`，不新增独立监听接口。
