@@ -211,6 +211,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @implementation WLAgentSkillsUpdateQrcodeInfoParams
 @end
 
+@implementation WLAgentSkillsQueryAssistantGraySingleParams
+@end
+
 #pragma mark - Data Models
 
 @implementation WLAgentSkillsSkillSession
@@ -1128,6 +1131,16 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 - (NSDictionary *)toDictionary {
     return @{
         @"status" : self.status ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsQueryAssistantGraySingleResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"data" : @(self.data)
     };
 }
 

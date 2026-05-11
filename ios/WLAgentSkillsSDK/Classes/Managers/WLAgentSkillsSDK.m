@@ -1265,6 +1265,53 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }];
 }
 
+#pragma mark - 27. queryAssistantGraySingle
+
+- (void)queryAssistantGraySingle:(WLAgentSkillsQueryAssistantGraySingleParams *)params
+                         success:(void (^)(WLAgentSkillsQueryAssistantGraySingleResult *result))success
+                         failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
+                                                                         fieldName:@"partnerAccount"
+                                                                      errorMessage:&errorMessage];
+    if (partnerAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSNumber *cachedValue = [[WLAgentSkillsWeAgentStore sharedStore] loadAssistantGraySingleForPartnerAccount:partnerAccount];
+    if (cachedValue != nil) {
+        WLAgentSkillsQueryAssistantGraySingleResult *result = [[WLAgentSkillsQueryAssistantGraySingleResult alloc] init];
+        result.data = cachedValue.boolValue;
+        if (success) {
+            success(result);
+        }
+        [self refreshAssistantGraySingleCacheForPartnerAccount:partnerAccount];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] queryAssistantGraySingleWithPartnerAccount:partnerAccount
+                                                                               success:^(id  _Nullable responseObject) {
+        BOOL grayValue = [responseObject respondsToSelector:@selector(boolValue)] ? [responseObject boolValue] : NO;
+        [[WLAgentSkillsWeAgentStore sharedStore] saveAssistantGraySingle:grayValue
+                                                       forPartnerAccount:partnerAccount];
+        WLAgentSkillsQueryAssistantGraySingleResult *result = [[WLAgentSkillsQueryAssistantGraySingleResult alloc] init];
+        result.data = grayValue;
+        if (success) {
+            success(result);
+        }
+    }
+                                                                               failure:^(NSError * _Nonnull error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
 #pragma mark - WLAgentSkillsWebSocketManagerDelegate
 
 - (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
@@ -1640,6 +1687,22 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                  updateCurrentDetail:NO];
     }
                                                                          failure:^(NSError * _Nonnull error) {
+        // Ignore background refresh failures.
+    }];
+}
+
+- (void)refreshAssistantGraySingleCacheForPartnerAccount:(NSString *)partnerAccount {
+    if (partnerAccount.length == 0) {
+        return;
+    }
+
+    [[WLAgentSkillsHTTPClient sharedClient] queryAssistantGraySingleWithPartnerAccount:partnerAccount
+                                                                               success:^(id  _Nullable responseObject) {
+        BOOL grayValue = [responseObject respondsToSelector:@selector(boolValue)] ? [responseObject boolValue] : NO;
+        [[WLAgentSkillsWeAgentStore sharedStore] saveAssistantGraySingle:grayValue
+                                                       forPartnerAccount:partnerAccount];
+    }
+                                                                               failure:^(NSError * _Nonnull error) {
         // Ignore background refresh failures.
     }];
 }

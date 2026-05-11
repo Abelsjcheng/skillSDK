@@ -9,6 +9,7 @@ static NSString * const WLAgentSkillsMockUserId = @"mock_user_id";
 static NSString * const WLAgentSkillsCurrentDetailKey = @"current_we_agent_detail";
 static NSString * const WLAgentSkillsListCacheKey = @"we_agent_list_cache";
 static NSString * const WLAgentSkillsDetailsCacheKey = @"we_agent_details";
+static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_gray_single_cache";
 
 @interface WLAgentSkillsWeAgentStore ()
 
@@ -181,6 +182,36 @@ static NSString * const WLAgentSkillsDetailsCacheKey = @"we_agent_details";
     if (!updated) {
         return;
     }
+    [defaults setObject:cache forKey:key];
+    [defaults synchronize];
+}
+
+- (nullable NSNumber *)loadAssistantGraySingleForPartnerAccount:(NSString *)partnerAccount {
+    if (partnerAccount.length == 0) {
+        return nil;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsAssistantGraySingleCacheKey];
+    id value = [defaults objectForKey:key];
+    if (![value isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id grayValue = ((NSDictionary *)value)[partnerAccount];
+    return [grayValue isKindOfClass:[NSNumber class]] ? (NSNumber *)grayValue : nil;
+}
+
+- (void)saveAssistantGraySingle:(BOOL)value forPartnerAccount:(NSString *)partnerAccount {
+    if (partnerAccount.length == 0) {
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsAssistantGraySingleCacheKey];
+    NSMutableDictionary *cache = [NSMutableDictionary dictionary];
+    id rawValue = [defaults objectForKey:key];
+    if ([rawValue isKindOfClass:[NSDictionary class]]) {
+        [cache addEntriesFromDictionary:(NSDictionary *)rawValue];
+    }
+    cache[partnerAccount] = @(value);
     [defaults setObject:cache forKey:key];
     [defaults synchronize];
 }

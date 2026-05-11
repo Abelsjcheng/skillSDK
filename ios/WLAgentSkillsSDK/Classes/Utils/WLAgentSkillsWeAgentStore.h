@@ -26,6 +26,8 @@ NS_ASSUME_NONNULL_BEGIN
                                                 name:(NSString *)name
                                                 icon:(NSString *)icon
                                          description:(NSString *)description;
+- (nullable NSNumber *)loadAssistantGraySingleForPartnerAccount:(NSString *)partnerAccount;
+- (void)saveAssistantGraySingle:(BOOL)value forPartnerAccount:(NSString *)partnerAccount;
 
 @end
 

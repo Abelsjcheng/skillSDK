@@ -195,6 +195,10 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, strong, nullable) id status;
 @end
 
+@interface WLAgentSkillsQueryAssistantGraySingleParams : NSObject
+@property (nonatomic, strong, nullable) id partnerAccount;
+@end
+
 #pragma mark - Data Models
 
 @interface WLAgentSkillsSkillSession : NSObject
@@ -550,6 +554,12 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 
 @interface WLAgentSkillsUpdateQrcodeInfoResult : NSObject
 @property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsQueryAssistantGraySingleResult : NSObject
+@property (nonatomic, assign) BOOL data;
 
 - (NSDictionary *)toDictionary;
 @end

@@ -147,6 +147,11 @@ NS_ASSUME_NONNULL_BEGIN
                  success:(void (^)(WLAgentSkillsUpdateQrcodeInfoResult *result))success
                  failure:(void (^)(NSError *error))failure;
 
+#pragma mark - 27. queryAssistantGraySingle
+- (void)queryAssistantGraySingle:(WLAgentSkillsQueryAssistantGraySingleParams *)params
+                         success:(void (^)(WLAgentSkillsQueryAssistantGraySingleResult *result))success
+                         failure:(void (^)(NSError *error))failure;
+
 @end
 
 NS_ASSUME_NONNULL_END

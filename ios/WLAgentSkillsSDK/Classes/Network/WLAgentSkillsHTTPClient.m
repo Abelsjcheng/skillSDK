@@ -221,6 +221,16 @@
          failure:failure];
 }
 
+- (void)queryAssistantGraySingleWithPartnerAccount:(NSString *)partnerAccount
+                                           success:(WLAgentSkillsHTTPSuccessBlock)success
+                                           failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self GET:@"/v4-1/robot-partners/im-chat/gray-single"
+    parameters:@{ @"welinkId" : partnerAccount }
+  useAssistantBaseURL:YES
+         success:success
+         failure:failure];
+}
+
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak
                                                         status:(nullable NSString *)status

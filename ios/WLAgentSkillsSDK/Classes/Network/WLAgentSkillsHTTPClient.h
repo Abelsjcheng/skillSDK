@@ -75,6 +75,10 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                             success:(WLAgentSkillsHTTPSuccessBlock)success
                             failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
+- (void)queryAssistantGraySingleWithPartnerAccount:(NSString *)partnerAccount
+                                           success:(WLAgentSkillsHTTPSuccessBlock)success
+                                           failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak
                                                         status:(nullable NSString *)status
