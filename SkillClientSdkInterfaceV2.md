@@ -43,7 +43,7 @@
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
    - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
    - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情对象（`WeAgentDetails`）
-   - `isShowWeAgent`：是否展示助理 tab，布尔值
+   - `isShowWeAgent`：是否展示助理 tab，布尔值；该值通过基座 `saveSettings` / `getSettings` 维护
 6. SP 持久化文档路径：待填写。
 
 ---
@@ -565,11 +565,11 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 ### 调用方
 
-Skill 小程序调用
+设置页面、助理 tab 页面调用
 
 ### 接口说明
 
-设置 `isShowWeAgent` 持久化缓存，并同步触发基座助理 tab 的打开或关闭。
+设置 `isShowWeAgent` 持久化配置，并同步触发基座助理 tab 的打开或关闭。
 
 该接口为 SDK 本地扩展接口，无对应服务端接口。
 
@@ -610,16 +610,20 @@ setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult
 ### 实现方法
 
 1. SDK 接收入参 `isShowWeAgent`，并校验其为 `boolean` 类型。
-2. SDK 按 `userId`（当前 mock 值：`mock_user_id`）将持久化缓存 `isShowWeAgent` 设置为对应布尔值。
-3. 当 `isShowWeAgent = true` 时：
-   - SDK 调用 `getWeAgentUri()` 获取 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`；
-   - `todo`：调用外部导入使用的基座方法打开助理 tab；
-   - `todo`：调用外部导入使用的 `openWeAgentCUI` 方法，并传入 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，打开助理。
-4. 当 `isShowWeAgent = false` 时：
-   - `todo`：调用外部导入使用的基座方法关闭助理 tab；
-   - 该场景下不调用 `getWeAgentUri`；
-   - 该场景下不调用 `openWeAgentCUI`。
-5. SDK 返回 `SetIsShowWeAgentResult`，其中 `status` 固定为 `success`。
+2. `todo`：调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent` 对应配置值。
+3. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
+4. 当 `isShowWeAgent = true` 时：
+    - `todo`：调用外部导入使用的基座方法打开助理 tab；
+5. 当 `isShowWeAgent = false` 时：
+    - `todo`：调用外部导入使用的基座方法关闭助理 tab；
+6. SDK 返回 `SetIsShowWeAgentResult`，其中 `status` 固定为 `success`。
+
+### 错误码（参考）
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `1000` | 无效的参数 | `isShowWeAgent` 缺失或类型错误 |
+| `5000` | 内部错误 | `saveSettings` 调用失败、基座广播失败，或打开/关闭助理 tab 失败 |
 
 ---
 
@@ -627,11 +631,11 @@ setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult
 
 ### 调用方
 
-Skill 小程序调用
+设置页面调用
 
 ### 接口说明
 
-获取本地持久化缓存 `isShowWeAgent` 的值。
+获取基座配置中的 `isShowWeAgent` 值。
 
 该接口为 SDK 本地扩展接口，无对应服务端接口。
 
@@ -649,7 +653,7 @@ getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `isShowWeAgent` | `boolean` | 是否展示助理 tab；若本地未命中缓存则默认返回 `false` |
+| `isShowWeAgent` | `boolean` | 是否展示助理 tab；若基座未返回有效值则默认返回 `false` |
 
 ### 出参示例
 
@@ -661,9 +665,20 @@ getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
 
 ### 实现方法
 
-1. SDK 按 `userId`（当前 mock 值：`mock_user_id`）读取本地持久化缓存 `isShowWeAgent`。
+1. `todo`：SDK 调用基座提供的 `getSettings` 方法获取 `isShowWeAgent` 对应配置值。
 2. 若读取到有效布尔值，则直接返回该值。
-3. 若本地未命中缓存，则默认返回 `false`。
+3. 若基座未返回有效值，则默认返回 `false`，并返回：
+   ```json
+   {
+     "isShowWeAgent": false
+   }
+   ```
+
+### 错误码（参考）
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `5000` | 内部错误 | `getSettings` 调用失败，或基座返回结果异常 |
 
 ---
 
@@ -671,7 +686,7 @@ getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
 
 ### 调用方
 
-Skill 小程序调用
+IM 模块调用
 
 ### 接口说明
 
@@ -716,18 +731,27 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 ### 实现方法
 
 1. SDK 接收入参 `partnerAccount`，并校验其为非空字符串。
-2. SDK 优先调用 `getWeAgentDetails` 对应的服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`，尝试获取指定助理详情。
-3. SDK 解析返回 `data[]`，并取首个助理详情对象作为当前目标助理详情；若服务端未返回有效助理详情，或接口调用失败，SDK 不抛出异常，继续按兜底规则组装 URI。
-4. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，URI 组装规则如下：
-   - 若已成功获取到助理详情，则与 `getWeAgentUri` 保持一致：
-     - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
-     - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。
-   - 若未获取到助理详情，或获取详情失败，则 `weAgentUri` 按 `getWeAgentUri` 的 fallback 规则组装为：`h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`。
-   - 无论是否成功获取到助理详情，`assistantDetailUri` 均组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`。
-   - 无论是否成功获取到助理详情，`switchAssistantUri` 均组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
-5. `todo`：调用基座方法打开助理 tab，并使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理 CUI。
-6. 当助理打开成功后，SDK 需按 `userId`（当前 mock 值：`mock_user_id`）将持久化缓存 `isShowWeAgent` 设置为 `true`。
-7. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
+2. `todo`：SDK 调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent = true`。
+3. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
+4. SDK 调用 `getAssistantDetails(params: QueryWeAgentParams)` 获取指定助理详情。
+5. 若成功获取到助理详情，则 SDK 取首个助理详情对象作为当前目标助理详情，并校验其中 `weCodeUrl` 为非空字符串；若 `weCodeUrl` 为空，则 SDK 抛出 `7000` 异常。
+6. 当目标助理详情有效且 `weCodeUrl` 非空时，SDK 将该助理详情设置到 `current_we_agent_detail` 缓存中。
+7. 若服务端未返回有效助理详情，或接口调用失败，则 SDK 抛出异常。
+8. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，URI 组装规则与 `getWeAgentUri` 保持一致：
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；
+   - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；
+   - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
+9. `todo`：调用基座方法打开助理 tab，并使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理 CUI。
+10. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
+
+### 错误码（参考）
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `1000` | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| `5000` | 内部错误 | `saveSettings` 调用失败、基座广播失败、打开助理 tab 失败，或 `openWeAgentCUI` 调用失败 |
+| `7000` | 服务端错误 | `getAssistantDetails` 调用失败、服务端未返回有效助理详情、助理详情中的 `weCodeUrl` 为空，或返回结构异常 |
 
 ---
 

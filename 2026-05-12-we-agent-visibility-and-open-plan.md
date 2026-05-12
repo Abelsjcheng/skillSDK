@@ -28,7 +28,7 @@
 
 建议使用以下缓存 key：
 
-- `isShowWeAgent`：布尔值，表示是否展示助理 tab
+- `isShowWeAgent`：布尔值，表示是否展示助理 tab；该值后续通过基座 `saveSettings` / `getSettings` 维护，当前阶段仅在 SDK 接口实现中预留 `todo`
 - `current_we_agent_detail`：当前助理详情
 - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`
 - `we_agent_list_cache`：助理列表缓存
@@ -38,19 +38,17 @@
 - `isShowWeAgent` 只负责表达“助理 tab 是否显示”
 - 当前打开哪个助理由 `current_we_agent_detail` 和 URI 组装逻辑共同决定
 
----
-
 ## 三、接口设计
 
 ## 1. 设置是否展示助理接口
 
 ### 调用方
 
-Skill 小程序调用
+设置页面、助理 tab 页面调用
 
 ### 接口说明
 
-设置本地持久化缓存 `isShowWeAgent`，并同步触发基座助理 tab 的显示或隐藏。
+设置基座配置中的 `isShowWeAgent`，并同步触发基座助理 tab 的显示或隐藏。
 
 该接口为 SDK 本地扩展接口，无对应服务端接口。
 
@@ -91,16 +89,13 @@ setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult
 ### 实现方法
 
 1. SDK 接收入参 `isShowWeAgent`，并校验其为 `boolean` 类型。
-2. SDK 先按 `userId` 维度持久化写入 `isShowWeAgent`。
-3. 当 `isShowWeAgent = true` 时：
-   - SDK 调用 `getWeAgentUri()` 获取 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`；
-   - `todo`：调用外部导入使用的基座方法打开助理 tab；
-   - `todo`：调用外部导入使用的 `openWeAgentCUI` 方法，并传入 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，打开当前助理。
-4. 当 `isShowWeAgent = false` 时：
-   - `todo`：调用外部导入使用的基座方法关闭助理 tab；
-   - 该场景下不调用 `getWeAgentUri`；
-   - 该场景下不调用 `openWeAgentCUI`。
-5. SDK 返回 `SetIsShowWeAgentResult`，其中 `status` 固定为 `success`。
+2. `todo`：在 SDK 接口实现中调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent` 对应配置值。
+3. `todo`：在 SDK 接口实现中调用基座广播接口，广播 `{ isShowWeAgent: true }`。
+4. 当 `isShowWeAgent = true` 时：
+    - `todo`：调用外部导入使用的基座方法打开助理 tab；
+5. 当 `isShowWeAgent = false` 时：
+    - `todo`：调用外部导入使用的基座方法关闭助理 tab；
+6. SDK 返回 `SetIsShowWeAgentResult`，其中 `status` 固定为 `success`。
 
 ---
 
@@ -108,11 +103,11 @@ setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult
 
 ### 调用方
 
-Skill 小程序调用
+设置页面调用
 
 ### 接口说明
 
-获取本地持久化缓存 `isShowWeAgent` 的值。
+获取基座配置中的 `isShowWeAgent` 值。
 
 该接口为 SDK 本地扩展接口，无对应服务端接口。
 
@@ -130,7 +125,7 @@ getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `isShowWeAgent` | `boolean` | 是否展示助理 tab；若本地未命中缓存则默认返回 `false` |
+| `isShowWeAgent` | `boolean` | 是否展示助理 tab；若基座未返回有效值则默认返回 `false` |
 
 ### 出参示例
 
@@ -142,9 +137,15 @@ getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
 
 ### 实现方法
 
-1. SDK 按 `userId` 维度读取本地缓存 `isShowWeAgent`。
+1. `todo`：在 SDK 接口实现中调用基座提供的 `getSettings` 方法获取 `isShowWeAgent` 对应配置值。
 2. 若读取到有效布尔值，则直接返回该值。
-3. 若本地未命中缓存，则默认返回 `false`。
+3. 当前阶段若尚未接入基座 `getSettings`，则默认返回 `false`，并返回：
+
+```json
+{
+  "isShowWeAgent": false
+}
+```
 
 ---
 
@@ -152,13 +153,13 @@ getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
 
 ### 调用方
 
-Skill 小程序调用
+IM 模块调用
 
 ### 接口说明
 
 根据 `partnerAccount` 打开指定助理。
 
-该接口内部会优先获取助理详情，并组装打开助理所需 URI；若未获取到助理详情，也会按兜底规则继续打开助理。
+该接口内部会优先通过 `getAssistantDetails` 获取助理详情，并组装打开助理所需 URI；若无法获取助理详情，则接口抛出异常。
 
 ### 接口名
 
@@ -197,19 +198,18 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 ### 实现方法
 
 1. SDK 接收入参 `partnerAccount`，并校验其为非空字符串。
-2. SDK 优先调用服务端接口 `GET /v1/robot-partners/{partnerAccount}`，尝试获取指定助理详情。
-3. 若成功获取到助理详情，则按 `getWeAgentUri` 相同规则组装：
+2. `todo`：在 SDK 接口实现中调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent = true`。
+3. `todo`：在 SDK 接口实现中调用基座广播接口，广播 `{ isShowWeAgent: true }`。
+4. SDK 调用 `getAssistantDetails({ partnerAccount })` 获取指定助理详情。
+5. 若成功获取到助理详情，则取首个助理详情对象作为当前目标助理详情，并校验其中 `weCodeUrl` 为非空字符串；若 `weCodeUrl` 为空，则接口抛出 `7000` 异常。
+6. 当目标助理详情有效且 `weCodeUrl` 非空时，将其设置到 `current_we_agent_detail` 缓存中；随后按 `getWeAgentUri` 相同规则组装：
    - `weAgentUri`
    - `assistantDetailUri`
    - `switchAssistantUri`
-4. 若助理详情为空，或获取详情失败，则继续按兜底规则组装：
-   - `weAgentUri = h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`
-   - `assistantDetailUri = h5://S008623/index.html?partnerAccount={partnerAccount}#assistantDetail`
-   - `switchAssistantUri = h5://S008623/index.html?partnerAccount={partnerAccount}#switchAssistant`
-5. `todo`：调用外部导入使用的基座方法打开助理 tab。
-6. `todo`：调用外部导入使用的 `openWeAgentCUI` 方法，并传入 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`。
-7. 当助理打开成功后，SDK 按 `userId` 将本地持久化缓存 `isShowWeAgent` 设置为 `true`。
-8. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
+7. 若服务端未返回有效助理详情，或接口调用失败，则接口抛出异常，不继续执行后续打开逻辑。
+8. `todo`：在 SDK 接口实现中调用外部导入使用的基座方法打开助理 tab。
+9. `todo`：在 SDK 接口实现中调用外部导入使用的 `openWeAgentCUI` 方法，并传入 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`。
+10. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
 
 ---
 
@@ -218,9 +218,8 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 ### 1. `setIsShowWeAgent(true)` 与 `openWeAgent` 的区别
 
 - `setIsShowWeAgent(true)`：
-  - 面向“显示助理 tab 并打开当前助理”
+  - 面向“显示助理 tab”
   - 不指定 `partnerAccount`
-  - 依赖 `getWeAgentUri()` 返回当前助理 URI
 
 - `openWeAgent(partnerAccount)`：
   - 面向“打开指定助理”
@@ -230,8 +229,8 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 ### 2. 两者共同点
 
 - 最终都需要打开助理 tab
-- 最终都需要调用 `openWeAgentCUI`
-- 最终都需要将 `isShowWeAgent` 维持为 `true`
+- `setIsShowWeAgent(true)` 仅负责展示助理 tab
+- `openWeAgent` 负责打开指定助理，并将 `isShowWeAgent` 维持为 `true`
 
 ---
 
@@ -244,8 +243,6 @@ sequenceDiagram
     participant AssistantTab as "助理Tab页面"
     participant MiniApp as "小程序/页面层"
     participant SDK as "Skill SDK"
-    participant Cache as "本地缓存"
-    participant Server as "服务端"
     participant Host as "基座Tab能力"
     participant CUI as "openWeAgentCUI"
 
@@ -253,28 +250,30 @@ sequenceDiagram
         Note over IM,CUI: 场景A：IM页面点击“打开助理导航按钮”
         IM->>MiniApp: 点击“打开助理导航按钮”
         MiniApp->>SDK: openWeAgent({ partnerAccount })
-        SDK->>Server: GET /v1/robot-partners/{partnerAccount}
+        SDK->>SDK: todo saveSettings(isShowWeAgent = true)
+        SDK->>Host: todo 基座广播 {isShowWeAgent: true}
+        SDK->>SDK: getAssistantDetails({ partnerAccount })
         alt 获取到助理详情
-            Server-->>SDK: 返回助理详情
+            SDK-->>SDK: 返回助理详情
+            SDK->>SDK: 写入 current_we_agent_detail
             SDK->>SDK: 组装 weAgentUri / assistantDetailUri / switchAssistantUri
+            SDK->>Host: todo 打开助理tab
+            SDK->>CUI: todo openWeAgentCUI(weAgentUri, assistantDetailUri, switchAssistantUri)
+            SDK-->>MiniApp: { status: "success" }
         else 助理详情为空或请求失败
-            Server-->>SDK: 空结果或失败
-            SDK->>SDK: 按 fallback 规则组装 URI
+            SDK-->>MiniApp: 抛出异常
         end
-        SDK->>Host: todo 打开助理tab
-        SDK->>CUI: todo openWeAgentCUI(weAgentUri, assistantDetailUri, switchAssistantUri)
-        SDK->>Cache: 持久化写入 isShowWeAgent = true
-        SDK-->>MiniApp: { status: "success" }
     end
 
     rect rgb(255, 250, 240)
         Note over IM,CUI: 场景B：设置页或助理Tab页打开“显示助手导航/助手导航”开关
         Settings->>MiniApp: 开关切到 true
         MiniApp->>SDK: setIsShowWeAgent({ isShowWeAgent: true })
-        SDK->>Cache: 持久化写入 isShowWeAgent = true
-        SDK->>SDK: getWeAgentUri()
+        SDK->>SDK: todo saveSettings(isShowWeAgent = true)
+        SDK->>Host: todo 基座广播 {isShowWeAgent: true}
         SDK->>Host: todo 打开助理tab
-        SDK->>CUI: todo openWeAgentCUI(weAgentUri, assistantDetailUri, switchAssistantUri)
+        Host-->>Settings: 广播 isShowWeAgent = true
+        Settings->>Settings: 同步更新开关状态为打开
         SDK-->>MiniApp: { status: "success" }
     end
 
@@ -282,34 +281,25 @@ sequenceDiagram
         Note over IM,CUI: 场景C：设置页或助理Tab页关闭“显示助手导航/助手导航”开关
         AssistantTab->>MiniApp: 开关切到 false
         MiniApp->>SDK: setIsShowWeAgent({ isShowWeAgent: false })
-        SDK->>Cache: 持久化写入 isShowWeAgent = false
+        SDK->>SDK: todo saveSettings(isShowWeAgent = false)
+        SDK->>Host: todo 基座广播 {isShowWeAgent: false}
         SDK->>Host: todo 关闭助理tab
+        Host-->>Settings: 广播 isShowWeAgent = false
+        Settings->>Settings: 同步更新开关状态为关闭
         SDK-->>MiniApp: { status: "success" }
     end
 
     rect rgb(245, 250, 245)
-        Note over IM,CUI: 场景D：页面初始化读取开关状态
+        Note over IM,CUI: 场景D：设置页初始化读取并监听开关状态
         Settings->>MiniApp: 进入设置页面
         MiniApp->>SDK: getIsShowWeAgent()
-        SDK->>Cache: 读取 isShowWeAgent
-        alt 命中缓存
-            Cache-->>SDK: true / false
-        else 未命中缓存
-            Cache-->>SDK: null
-            SDK->>SDK: 默认值 false
-        end
+        SDK->>SDK: todo getSettings(isShowWeAgent)
+        SDK->>SDK: 未接入基座时默认值 false
         SDK-->>MiniApp: { isShowWeAgent }
-
-        AssistantTab->>MiniApp: 进入助理Tab页面
-        MiniApp->>SDK: getIsShowWeAgent()
-        SDK->>Cache: 读取 isShowWeAgent
-        alt 命中缓存
-            Cache-->>SDK: true / false
-        else 未命中缓存
-            Cache-->>SDK: null
-            SDK->>SDK: 默认值 false
-        end
-        SDK-->>MiniApp: { isShowWeAgent }
+        MiniApp->>Settings: 初始化开关状态
+        MiniApp->>Host: todo 注册 isShowWeAgent 变化广播监听
+        Host-->>Settings: 后续广播 isShowWeAgent 变化
+        Settings->>Settings: 收到广播后同步修改开关状态
     end
 ```
 
@@ -329,7 +319,11 @@ IM 页面中点击“打开助理导航按钮”。
 
 - 打开助理 tab
 - 打开对应助理页面
-- 助理打开成功后写入 `isShowWeAgent = true`
+- `todo`：先调用基座 `saveSettings` 保存 `isShowWeAgent = true`
+- `todo`：调用基座广播 `{ isShowWeAgent: true }`
+- 再调用 `getAssistantDetails` 获取目标助理详情
+- 获取到助理详情后，设置 `current_we_agent_detail` 缓存并组装打开参数
+- 若服务端未返回有效助理详情、助理详情中的 `weCodeUrl` 为空，或接口调用失败，则接口抛出异常
 
 适用原因：
 
@@ -347,22 +341,25 @@ IM 页面中点击“打开助理导航按钮”。
 
 预期行为：
 
-- 持久化写入 `isShowWeAgent = false`
+- `todo`：调用基座 `saveSettings` 保存 `isShowWeAgent = false`
+- `todo`：调用基座广播 `{ isShowWeAgent: false }`
 - 调用基座关闭助理 tab
 
 ---
 
 ### 场景 3
 
-进入助手设置页面，显示“显示助手导航”的开关按钮状态。
+进入助手设置页面，显示“显示助手导航”的开关按钮状态，并在 `isShowWeAgent` 变化时同步更新开关状态。
 
 调用方式：
 
 - 调用 `getIsShowWeAgent()`
+- `todo`：注册监听 `isShowWeAgent` 变化的基座广播
 
 预期行为：
 
 - 将返回的 `isShowWeAgent` 作为设置页开关状态
+- 当监听到 `isShowWeAgent` 变化时，同步修改“显示助手导航”开关按钮状态
 
 ---
 
@@ -377,22 +374,12 @@ IM 页面中点击“打开助理导航按钮”。
 
 预期行为：
 
-- 打开时显示助理 tab，并打开当前助理页面
+- 打开时通过 `saveSettings` 保存 `isShowWeAgent = true`
+- `todo`：调用基座广播 `{ isShowWeAgent: true }`
+- 打开时显示助理 tab
+- 关闭时通过 `saveSettings` 保存 `isShowWeAgent = false`
+- `todo`：调用基座广播 `{ isShowWeAgent: false }`
 - 关闭时隐藏助理 tab
-
----
-
-### 场景 5
-
-进入助理 tab 页面，显示“助手导航”开关按钮状态。
-
-调用方式：
-
-- 调用 `getIsShowWeAgent()`
-
-预期行为：
-
-- 将返回的 `isShowWeAgent` 作为助理 tab 页面导航栏开关状态
 
 ---
 
@@ -406,11 +393,12 @@ IM 页面中点击“打开助理导航按钮”。
 ### 2. 助手设置页面
 
 - 页面进入时调用 `getIsShowWeAgent`
+- 页面进入时 `todo`：注册监听 `isShowWeAgent` 变化的基座广播
+- 监听到 `isShowWeAgent` 变化时，同步刷新“显示助手导航”开关状态
 - 用户切换开关时调用 `setIsShowWeAgent`
 
 ### 3. 助理 tab 页面
 
-- 页面进入时调用 `getIsShowWeAgent`
 - 点击导航栏开关时调用 `setIsShowWeAgent`
 
 ---
@@ -430,4 +418,3 @@ IM 页面中点击“打开助理导航按钮”。
 - 基座打开助理 tab 的方法名与签名
 - 基座关闭助理 tab 的方法名与签名
 - `openWeAgentCUI` 的导入方式与方法签名
-- `setIsShowWeAgent(true)` 打开当前助理时，对“当前助理为空”的最终产品策略是否继续沿用 `getWeAgentUri` fallback
