@@ -20,6 +20,9 @@
 | `getAssistantDetails` | `GET /v1/robot-partners/{partnerAccount}` | 优先返回缓存助理详情，并异步刷新缓存 |
 | `updateWeAgent` | `PUT /v4-1/we-crew` | 更新个人助理信息 |
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
+| `setIsShowWeAgent` | 无（SDK 本地扩展能力） | 设置是否展示助理 tab 的持久化缓存并同步基座展示态 |
+| `getIsShowWeAgent` | 无（SDK 本地扩展能力） | 获取是否展示助理 tab 的持久化缓存值 |
+| `openWeAgent` | 无（SDK 本地扩展能力） | 根据助理账号打开助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
 | `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
 | `queryQrcodeInfo` | `GET /v4-1/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
@@ -40,6 +43,7 @@
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
    - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
    - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情对象（`WeAgentDetails`）
+   - `isShowWeAgent`：是否展示助理 tab，布尔值
 6. SP 持久化文档路径：待填写。
 
 ---
@@ -557,7 +561,177 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 ---
 
-## 7. 打开助理编辑页面接口
+## 7. 设置是否展示助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+设置 `isShowWeAgent` 持久化缓存，并同步触发基座助理 tab 的打开或关闭。
+
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `isShowWeAgent` | `boolean` | 是 | 是否展示助理 tab |
+
+### 入参示例
+
+```json
+{
+  "isShowWeAgent": true
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收入参 `isShowWeAgent`，并校验其为 `boolean` 类型。
+2. SDK 按 `userId`（当前 mock 值：`mock_user_id`）将持久化缓存 `isShowWeAgent` 设置为对应布尔值。
+3. 当 `isShowWeAgent = true` 时：
+   - SDK 调用 `getWeAgentUri()` 获取 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`；
+   - `todo`：调用外部导入使用的基座方法打开助理 tab；
+   - `todo`：调用外部导入使用的 `openWeAgentCUI` 方法，并传入 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，打开助理。
+4. 当 `isShowWeAgent = false` 时：
+   - `todo`：调用外部导入使用的基座方法关闭助理 tab；
+   - 该场景下不调用 `getWeAgentUri`；
+   - 该场景下不调用 `openWeAgentCUI`。
+5. SDK 返回 `SetIsShowWeAgentResult`，其中 `status` 固定为 `success`。
+
+---
+
+## 8. 获取是否展示助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+获取本地持久化缓存 `isShowWeAgent` 的值。
+
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
+```
+
+### 入参
+
+无
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `isShowWeAgent` | `boolean` | 是否展示助理 tab；若本地未命中缓存则默认返回 `false` |
+
+### 出参示例
+
+```json
+{
+  "isShowWeAgent": false
+}
+```
+
+### 实现方法
+
+1. SDK 按 `userId`（当前 mock 值：`mock_user_id`）读取本地持久化缓存 `isShowWeAgent`。
+2. 若读取到有效布尔值，则直接返回该值。
+3. 若本地未命中缓存，则默认返回 `false`。
+
+---
+
+## 9. 打开助理接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据 `partnerAccount` 获取指定助理详情，并组装打开助理所需的 URI 信息。
+
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "x00_1"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收入参 `partnerAccount`，并校验其为非空字符串。
+2. SDK 优先调用 `getWeAgentDetails` 对应的服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`，尝试获取指定助理详情。
+3. SDK 解析返回 `data[]`，并取首个助理详情对象作为当前目标助理详情；若服务端未返回有效助理详情，或接口调用失败，SDK 不抛出异常，继续按兜底规则组装 URI。
+4. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，URI 组装规则如下：
+   - 若已成功获取到助理详情，则与 `getWeAgentUri` 保持一致：
+     - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
+     - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。
+   - 若未获取到助理详情，或获取详情失败，则 `weAgentUri` 按 `getWeAgentUri` 的 fallback 规则组装为：`h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`。
+   - 无论是否成功获取到助理详情，`assistantDetailUri` 均组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`。
+   - 无论是否成功获取到助理详情，`switchAssistantUri` 均组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
+5. `todo`：调用基座方法打开助理 tab，并使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理 CUI。
+6. 当助理打开成功后，SDK 需按 `userId`（当前 mock 值：`mock_user_id`）将持久化缓存 `isShowWeAgent` 设置为 `true`。
+7. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
+
+---
+
+## 10. 打开助理编辑页面接口
 
 ### 调用方
 
@@ -623,7 +797,7 @@ openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistan
 
 ---
 
-## 8. 通知助理详情更新接口
+## 11. 通知助理详情更新接口
 
 ### 调用方
 
@@ -688,7 +862,7 @@ notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promis
 
 ---
 
-## 9. 查询二维码信息接口
+## 12. 查询二维码信息接口
 
 ### 调用方
 
@@ -765,7 +939,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
 
 ---
 
-## 10. 更新二维码信息接口
+## 13. 更新二维码信息接口
 
 ### 调用方
 
@@ -825,7 +999,7 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 
 ---
 
-## 11. 获取当前 WeAgentUri 接口
+## 14. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -971,6 +1145,46 @@ type DeleteWeAgentParams = {
 ```typescript
 type DeleteWeAgentResult = {
   deleteResult: string
+}
+```
+
+### SetIsShowWeAgentParams
+
+```typescript
+type SetIsShowWeAgentParams = {
+  isShowWeAgent: boolean
+}
+```
+
+### SetIsShowWeAgentResult
+
+```typescript
+type SetIsShowWeAgentResult = {
+  status: string
+}
+```
+
+### GetIsShowWeAgentResult
+
+```typescript
+type GetIsShowWeAgentResult = {
+  isShowWeAgent: boolean
+}
+```
+
+### OpenWeAgentParams
+
+```typescript
+type OpenWeAgentParams = {
+  partnerAccount: string
+}
+```
+
+### OpenWeAgentResult
+
+```typescript
+type OpenWeAgentResult = {
+  status: string
 }
 ```
 
