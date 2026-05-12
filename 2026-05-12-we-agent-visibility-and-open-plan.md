@@ -263,15 +263,13 @@ sequenceDiagram
     participant IM as "IM页面"
     participant Settings as "设置页面"
     participant AssistantTab as "助理Tab页面"
-    participant MiniApp as "小程序/页面层"
     participant SDK as "Skill SDK"
     participant Host as "基座Tab能力"
     participant CUI as "openWeAgentCUI"
 
     rect rgb(245, 247, 253)
         Note over IM,CUI: 场景A：IM页面点击“打开助理导航按钮”
-        IM->>MiniApp: 点击“打开助理导航按钮”
-        MiniApp->>SDK: openWeAgent({ partnerAccount })
+        IM->>SDK: openWeAgent({ partnerAccount })
         SDK->>SDK: todo saveSettings(isShowWeAgent = true)
         SDK->>Host: todo 基座广播 {isShowWeAgent: true}
         SDK->>SDK: getAssistantDetails({ partnerAccount })
@@ -281,45 +279,42 @@ sequenceDiagram
             SDK->>SDK: 组装 weAgentUri / assistantDetailUri / switchAssistantUri
             SDK->>Host: todo 打开助理tab
             SDK->>CUI: todo openWeAgentCUI(weAgentUri, assistantDetailUri, switchAssistantUri)
-            SDK-->>MiniApp: { status: "success" }
+            SDK-->>IM: { status: "success" }
         else 助理详情为空或请求失败
-            SDK-->>MiniApp: 抛出异常
+            SDK-->>IM: 抛出异常
         end
     end
 
     rect rgb(255, 250, 240)
         Note over IM,CUI: 场景B：设置页或助理Tab页打开“显示助手导航/助手导航”开关
-        Settings->>MiniApp: 开关切到 true
-        MiniApp->>SDK: setIsShowWeAgent({ isShowWeAgent: true })
+        Settings->>SDK: setIsShowWeAgent({ isShowWeAgent: true })
         SDK->>SDK: todo saveSettings(isShowWeAgent = true)
         SDK->>Host: todo 基座广播 {isShowWeAgent: true}
         SDK->>Host: todo 打开助理tab
         Host-->>Settings: 广播 isShowWeAgent = true
         Settings->>Settings: 同步更新开关状态为打开
-        SDK-->>MiniApp: { status: "success" }
+        SDK-->>Settings: { status: "success" }
     end
 
     rect rgb(250, 245, 245)
         Note over IM,CUI: 场景C：设置页或助理Tab页关闭“显示助手导航/助手导航”开关
-        AssistantTab->>MiniApp: 开关切到 false
-        MiniApp->>SDK: setIsShowWeAgent({ isShowWeAgent: false })
+        AssistantTab->>SDK: setIsShowWeAgent({ isShowWeAgent: false })
         SDK->>SDK: todo saveSettings(isShowWeAgent = false)
         SDK->>Host: todo 基座广播 {isShowWeAgent: false}
         SDK->>Host: todo 关闭助理tab
         Host-->>Settings: 广播 isShowWeAgent = false
         Settings->>Settings: 同步更新开关状态为关闭
-        SDK-->>MiniApp: { status: "success" }
+        SDK-->>AssistantTab: { status: "success" }
     end
 
     rect rgb(245, 250, 245)
         Note over IM,CUI: 场景D：设置页初始化读取并监听开关状态
-        Settings->>MiniApp: 进入设置页面
-        MiniApp->>SDK: getIsShowWeAgent()
+        Settings->>SDK: getIsShowWeAgent()
         SDK->>SDK: todo getSettings(isShowWeAgent)
         SDK->>SDK: 未接入基座时默认值 false
-        SDK-->>MiniApp: { isShowWeAgent }
-        MiniApp->>Settings: 初始化开关状态
-        MiniApp->>Host: todo 注册 isShowWeAgent 变化广播监听
+        SDK-->>Settings: { isShowWeAgent }
+        Settings->>Settings: 初始化开关状态
+        Settings->>Host: todo 注册 isShowWeAgent 变化广播监听
         Host-->>Settings: 后续广播 isShowWeAgent 变化
         Settings->>Settings: 收到广播后同步修改开关状态
     end
