@@ -23,6 +23,7 @@ import {
   DeleteWeAgentResult,
   GetSessionMessageParams,
   GetSessionMessageHistoryParams,
+  GetIsShowWeAgentResult,
   HistorySessionsParams,
   NotifyAssistantDetailUpdatedParams,
   NotifyAssistantDetailUpdatedResult,
@@ -30,6 +31,8 @@ import {
   OnSkillWecodeStatusChangeParams,
   OpenAssistantEditPageParams,
   OpenAssistantEditPageResult,
+  OpenWeAgentParams,
+  OpenWeAgentResult,
   PageParams,
   PageResult,
   QrcodeInfo,
@@ -44,6 +47,8 @@ import {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
+  SetIsShowWeAgentParams,
+  SetIsShowWeAgentResult,
   SessionMessage,
   SessionStatus,
   SkillSDKConfig,
@@ -743,7 +748,75 @@ export class SkillSDK {
     }
   }
 
-  // 23. openAssistantEditPage
+  // 23. setIsShowWeAgent
+  async setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      if (typeof params.isShowWeAgent !== 'boolean') {
+        throw new SkillSdkException(1000, 'isShowWeAgent must be a boolean');
+      }
+
+      const isShowWeAgent = params.isShowWeAgent;
+      // TODO: save isShowWeAgent by calling host saveSettings.
+      // TODO: broadcast isShowWeAgent change to host.
+      if (isShowWeAgent) {
+        // TODO: open we-agent tab by calling host capability.
+      } else {
+        // TODO: close we-agent tab by calling host capability.
+      }
+
+      return {
+        status: 'success'
+      };
+    } catch (error) {
+      throw this.normalizeError('setIsShowWeAgent', error);
+    }
+  }
+
+  // 24. getIsShowWeAgent
+  async getIsShowWeAgent(): Promise<GetIsShowWeAgentResult> {
+    try {
+      // TODO: read isShowWeAgent by calling host getSettings.
+      return {
+        isShowWeAgent: false
+      };
+    } catch (error) {
+      throw this.normalizeError('getIsShowWeAgent', error);
+    }
+  }
+
+  // 25. openWeAgent
+  async openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
+
+      // TODO: save isShowWeAgent = true by calling host saveSettings.
+      // TODO: broadcast isShowWeAgent = true to host.
+      const result = await this.getAssistantDetails({ partnerAccount });
+      const targetDetail = result.weAgentDetailsArray.length > 0 ? result.weAgentDetailsArray[0] : undefined;
+      if (targetDetail === undefined) {
+        throw new SkillSdkException(7000, 'getAssistantDetails returned empty detail');
+      }
+      const weCodeUrl = this.normalizeOptionalString(targetDetail.weCodeUrl);
+      if (weCodeUrl === undefined) {
+        throw new SkillSdkException(7000, 'getAssistantDetails returned empty weCodeUrl');
+      }
+
+      this.weAgentStore.saveCurrentDetail(targetDetail);
+      const uris = this.buildWeAgentUriResult(targetDetail);
+      void uris;
+      // TODO: open we-agent tab by calling host capability.
+      // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
+      return {
+        status: 'success'
+      };
+    } catch (error) {
+      throw this.normalizeError('openWeAgent', error);
+    }
+  }
+
+  // 26. openAssistantEditPage
   async openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistantEditPageResult> {
     try {
       Validator.requireObject(params, 'params');
@@ -768,7 +841,7 @@ export class SkillSDK {
     }
   }
 
-  // 24. notifyAssistantDetailUpdated
+  // 27. notifyAssistantDetailUpdated
   async notifyAssistantDetailUpdated(
     params: NotifyAssistantDetailUpdatedParams
   ): Promise<NotifyAssistantDetailUpdatedResult> {
@@ -797,7 +870,7 @@ export class SkillSDK {
     }
   }
 
-  // 25. queryQrcodeInfo
+  // 28. queryQrcodeInfo
   async queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo> {
     try {
       Validator.requireObject(params, 'params');
@@ -812,7 +885,7 @@ export class SkillSDK {
     }
   }
 
-  // 26. updateQrcodeInfo
+  // 29. updateQrcodeInfo
   async updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
     try {
       Validator.requireObject(params, 'params');
