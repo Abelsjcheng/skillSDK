@@ -1103,6 +1103,36 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
+@implementation WLAgentSkillsSetIsShowWeAgentResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"status" : self.status ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsGetIsShowWeAgentResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"isShowWeAgent" : @(self.isShowWeAgent)
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsOpenWeAgentResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"status" : self.status ?: @""
+    };
+}
+
+@end
+
 @implementation WLAgentSkillsOpenAssistantEditPageResult
 
 - (NSDictionary *)toDictionary {

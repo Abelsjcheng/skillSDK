@@ -1082,7 +1082,111 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }];
 }
 
-#pragma mark - 23. openAssistantEditPage
+#pragma mark - 23. setIsShowWeAgent
+
+- (void)setIsShowWeAgent:(WLAgentSkillsSetIsShowWeAgentParams *)params
+                 success:(void (^)(WLAgentSkillsSetIsShowWeAgentResult *result))success
+                 failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+    if (![params.isShowWeAgent isKindOfClass:[NSNumber class]]
+        || strcmp([(NSNumber *)params.isShowWeAgent objCType], @encode(BOOL)) != 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: isShowWeAgent must be a boolean."];
+        return;
+    }
+
+    BOOL isShowWeAgent = [(NSNumber *)params.isShowWeAgent boolValue];
+    // TODO: save isShowWeAgent by calling host saveSettings.
+    // TODO: broadcast isShowWeAgent change to host.
+    if (isShowWeAgent) {
+        // TODO: open we-agent tab by calling host capability.
+    } else {
+        // TODO: close we-agent tab by calling host capability.
+    }
+
+    WLAgentSkillsSetIsShowWeAgentResult *result = [[WLAgentSkillsSetIsShowWeAgentResult alloc] init];
+    result.status = @"success";
+    if (success) {
+        success(result);
+    }
+}
+
+#pragma mark - 24. getIsShowWeAgent
+
+- (void)getIsShowWeAgent:(void (^)(WLAgentSkillsGetIsShowWeAgentResult *result))success
+                 failure:(void (^)(NSError *error))failure {
+    (void)failure;
+    // TODO: read isShowWeAgent by calling host getSettings.
+    WLAgentSkillsGetIsShowWeAgentResult *result = [[WLAgentSkillsGetIsShowWeAgentResult alloc] init];
+    result.isShowWeAgent = NO;
+    if (success) {
+        success(result);
+    }
+}
+
+#pragma mark - 25. openWeAgent
+
+- (void)openWeAgent:(WLAgentSkillsOpenWeAgentParams *)params
+            success:(void (^)(WLAgentSkillsOpenWeAgentResult *result))success
+            failure:(void (^)(NSError *error))failure {
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
+                                                                          fieldName:@"partnerAccount"
+                                                                       errorMessage:&errorMessage];
+    if (partnerAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    // TODO: save isShowWeAgent = true by calling host saveSettings.
+    // TODO: broadcast isShowWeAgent = true to host.
+    __weak typeof(self) weakSelf = self;
+    WLAgentSkillsQueryWeAgentParams *queryParams = [[WLAgentSkillsQueryWeAgentParams alloc] init];
+    queryParams.partnerAccount = partnerAccount;
+    [self getAssistantDetails:queryParams
+                      success:^(WLAgentSkillsWeAgentDetailsArrayResult *result) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+
+        WLAgentSkillsWeAgentDetails *targetDetail =
+            result.weAgentDetailsArray.count > 0 ? result.weAgentDetailsArray.firstObject : nil;
+        if (targetDetail == nil) {
+            [strongSelf dispatchFailure:failure code:7000 message:@"getAssistantDetails returned empty detail."];
+            return;
+        }
+        NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:targetDetail.weCodeUrl];
+        if (weCodeUrl == nil) {
+            [strongSelf dispatchFailure:failure code:7000 message:@"getAssistantDetails returned empty weCodeUrl."];
+            return;
+        }
+
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[targetDetail toDictionary]];
+        WLAgentSkillsWeAgentUriResult *uris = [strongSelf weAgentUriResultFromDetails:targetDetail];
+        (void)uris;
+        // TODO: open we-agent tab by calling host capability.
+        // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
+
+        WLAgentSkillsOpenWeAgentResult *openResult = [[WLAgentSkillsOpenWeAgentResult alloc] init];
+        openResult.status = @"success";
+        if (success) {
+            success(openResult);
+        }
+    }
+                      failure:^(NSError *error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
+}
+
+#pragma mark - 26. openAssistantEditPage
 
 - (void)openAssistantEditPage:(WLAgentSkillsOpenAssistantEditPageParams *)params
                       success:(void (^)(WLAgentSkillsOpenAssistantEditPageResult *result))success
@@ -1140,7 +1244,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     });
 }
 
-#pragma mark - 24. notifyAssistantDetailUpdated
+#pragma mark - 27. notifyAssistantDetailUpdated
 
 - (void)notifyAssistantDetailUpdated:(WLAgentSkillsNotifyAssistantDetailUpdatedParams *)params
                              success:(void (^)(WLAgentSkillsNotifyAssistantDetailUpdatedResult *result))success
@@ -1204,7 +1308,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }
 }
 
-#pragma mark - 25. queryQrcodeInfo
+#pragma mark - 28. queryQrcodeInfo
 
 - (void)queryQrcodeInfo:(WLAgentSkillsQueryQrcodeInfoParams *)params
                 success:(void (^)(WLAgentSkillsQrcodeInfo *result))success
@@ -1237,7 +1341,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }];
 }
 
-#pragma mark - 26. updateQrcodeInfo
+#pragma mark - 29. updateQrcodeInfo
 
 - (void)updateQrcodeInfo:(WLAgentSkillsUpdateQrcodeInfoParams *)params
                  success:(void (^)(WLAgentSkillsUpdateQrcodeInfoResult *result))success

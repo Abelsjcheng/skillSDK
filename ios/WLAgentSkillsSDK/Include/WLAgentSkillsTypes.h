@@ -168,6 +168,14 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, strong, nullable) id robotId;
 @end
 
+@interface WLAgentSkillsSetIsShowWeAgentParams : NSObject
+@property (nonatomic, strong, nullable) id isShowWeAgent;
+@end
+
+@interface WLAgentSkillsOpenWeAgentParams : NSObject
+@property (nonatomic, strong, nullable) id partnerAccount;
+@end
+
 @interface WLAgentSkillsOpenAssistantEditPageParams : NSObject
 @property (nonatomic, strong, nullable) id partnerAccount;
 @property (nonatomic, strong, nullable) id robotId;
@@ -532,6 +540,24 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 
 @interface WLAgentSkillsDeleteWeAgentResult : NSObject
 @property (nonatomic, copy) NSString *deleteResult;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsSetIsShowWeAgentResult : NSObject
+@property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsGetIsShowWeAgentResult : NSObject
+@property (nonatomic, assign) BOOL isShowWeAgent;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsOpenWeAgentResult : NSObject
+@property (nonatomic, copy) NSString *status;
 
 - (NSDictionary *)toDictionary;
 @end
