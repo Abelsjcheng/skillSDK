@@ -304,7 +304,93 @@ PC 端运行形态是“PC 端 App + 插件独立容器 + 宿主内 Skill SDK”
 
 ---
 
-## 7. 缓存与状态关系
+## 7. ai-chat-viewer、端侧 Skill SDK 与服务端时序图
+
+为避免把移动端 `window.HWH5EXT` 和 PC 端 `Pedestal.callMethod(...)` 分开重复描述，下面时序图统一抽象为“宿主桥接 / JSAPI”。它在移动端对应小程序到宿主 App 的桥，在 PC 端对应插件容器到宿主 App 的桥，桥后面承接的都是端侧 Skill SDK。
+
+### 7.1 聊天会话初始化与消息收发
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Viewer as ai-chat-viewer 页面
+    participant Bridge as 宿主桥接 / JSAPI
+    participant SDK as 端侧 Skill SDK
+    participant Cache as 本地缓存 / 会话状态
+    participant REST as 服务端接口
+    participant WS as 服务端流式通道
+
+    Viewer->>Bridge: 发起聊天页初始化请求
+    Bridge->>SDK: 转发页面能力请求
+    SDK->>Cache: 读取助理、会话与消息缓存
+    SDK->>REST: 拉取助理信息与会话数据
+    REST-->>SDK: 返回初始化数据
+    SDK->>Cache: 更新本地状态
+    SDK-->>Bridge: 返回页面初始化结果
+    Bridge-->>Viewer: 渲染聊天页面
+
+    Viewer->>Bridge: 发送用户消息
+    Bridge->>SDK: 转发消息请求
+    SDK->>REST: 提交消息与会话指令
+    REST-->>SDK: 返回受理结果
+    SDK-->>Bridge: 返回发送结果
+    Bridge-->>Viewer: 更新发送状态
+
+    SDK->>WS: 建立或复用流式通道
+    WS-->>SDK: 推送回复内容、状态变更
+    SDK->>Cache: 增量更新消息与会话状态
+    SDK-->>Bridge: 回调消息流事件
+    Bridge-->>Viewer: 增量刷新聊天界面
+
+    opt 用户中断或处理权限类交互
+        Viewer->>Bridge: 发起控制操作
+        Bridge->>SDK: 转发控制指令
+        SDK->>REST: 同步控制结果到服务端
+        REST-->>SDK: 返回处理结果
+        SDK-->>Bridge: 返回控制结果
+        Bridge-->>Viewer: 更新页面状态
+    end
+```
+
+### 7.2 助理创建并打开聊天页
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Viewer as ai-chat-viewer 页面
+    participant Bridge as 宿主桥接 / JSAPI
+    participant SDK as 端侧 Skill SDK
+    participant Cache as 本地缓存 / 助理状态
+    participant REST as 服务端接口
+
+    Viewer->>Bridge: 提交助理创建信息
+    Bridge->>SDK: 转发创建请求
+    SDK->>REST: 创建助理
+    REST-->>SDK: 返回助理标识与基础信息
+    SDK->>Cache: 更新助理列表与当前助理状态
+    SDK-->>Bridge: 返回创建结果
+    Bridge-->>Viewer: 进入创建成功态
+
+    Viewer->>Bridge: 请求打开助理聊天页
+    Bridge->>SDK: 转发打开请求
+    SDK->>REST: 拉取助理最新详情
+    REST-->>SDK: 返回助理详情
+    SDK->>Cache: 更新当前助理缓存
+    SDK-->>Bridge: 返回打开页所需信息
+    Bridge-->>Viewer: 打开聊天页面
+
+    Viewer->>Bridge: 进入聊天主链路
+    Bridge->>SDK: 切换到会话能力流程
+```
+
+这两条时序基本覆盖了当前文档中的 V1 会话能力和 V2 助理管理能力：
+
+- 7.1 对应 `App.tsx` 中的聊天初始化、发送消息、流式回调与中断控制。
+- 7.2 对应 `createAssistantBasic.tsx`、`selectBrainAssistant.tsx` 与 `assistantSelection.ts` 中的创建助理后进入聊天页流程。
+
+---
+
+## 8. 缓存与状态关系
 
 根据 V2 文档，助理相关状态主要由 SDK 持有：
 
@@ -323,7 +409,7 @@ PC 端运行形态是“PC 端 App + 插件独立容器 + 宿主内 Skill SDK”
 
 ---
 
-## 8. 结论
+## 9. 结论
 
 可以把当前架构概括成一句话：
 
