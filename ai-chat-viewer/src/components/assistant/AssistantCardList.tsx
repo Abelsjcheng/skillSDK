@@ -1,6 +1,8 @@
 import React from 'react';
 import AvatarImage from '../AvatarImage';
 import defaultAvatar from '../../imgs/defaultAvatar.png';
+import noSelectionIcon from '../../imgs/no_selection_icon.svg';
+import selectionIcon from '../../imgs/selection_icon.svg';
 import type { AssistantCardListProps } from '../../types/components';
 
 const AssistantCardList: React.FC<AssistantCardListProps> = ({
@@ -34,6 +36,13 @@ const AssistantCardList: React.FC<AssistantCardListProps> = ({
           role="button"
           aria-pressed={selectedAssistantId === assistant.id}
         >
+          <span className="switch-assistant__radio" aria-hidden="true">
+            <img
+              src={selectedAssistantId === assistant.id ? selectionIcon : noSelectionIcon}
+              alt=""
+              className="switch-assistant__radio-icon"
+            />
+          </span>
           <div className="switch-assistant__avatar">
             <AvatarImage
               src={assistant.icon}

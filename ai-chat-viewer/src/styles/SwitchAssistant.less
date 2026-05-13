@@ -59,7 +59,23 @@
 }
 
 .switch-assistant__card--selected {
-  border-color: rgba(13, 148, 255, 1);
+  border-color: transparent;
+}
+
+.switch-assistant__radio {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+}
+
+.switch-assistant__radio-icon {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .switch-assistant__avatar {
@@ -189,7 +205,7 @@
   }
 
   .switch-assistant:not(.switch-assistant--pc) .switch-assistant__card--selected {
-    border-color: var(--ai-dark-border-strong);
+    border-color: transparent;
   }
 
   .switch-assistant:not(.switch-assistant--pc) .switch-assistant__name {

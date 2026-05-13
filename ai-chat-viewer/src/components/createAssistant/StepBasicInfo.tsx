@@ -290,6 +290,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                   aria-labelledby="digital-twin-name-label"
                   className={`digital-twin__input ${nameIsInvalid ? 'is-invalid' : ''}`.trim()}
                   type="text"
+                  maxLength={50}
                   value={name}
                   placeholder={t('createAssistant.namePlaceholder')}
                   onChange={(event) => setName(event.target.value)}
@@ -317,6 +318,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                   id="digital-twin-description"
                   aria-labelledby="digital-twin-description-label"
                   className={`digital-twin__textarea ${descriptionIsInvalid ? 'is-invalid' : ''}`.trim()}
+                  maxLength={250}
                   value={description}
                   placeholder={t('createAssistant.descriptionPlaceholder')}
                   onChange={(event) => setDescription(event.target.value)}
