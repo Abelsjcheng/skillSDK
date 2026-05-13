@@ -576,7 +576,12 @@ public class ApiClient {
                 if (root.isJsonObject()) {
                     JsonObject rootObject = root.getAsJsonObject();
                     if (rootObject.has("code")) {
-                        ensureSuccessCode(rootObject, "request");
+                        try {
+                            ensureSuccessCode(rootObject, "request");
+                        } catch (SkillSdkException exception) {
+                            callback.onError(exception);
+                            return;
+                        }
                     }
                     if (rootObject.has("data")) {
                         payload = rootObject.get("data");
@@ -627,7 +632,12 @@ public class ApiClient {
                 if (root != null && root.isJsonObject()) {
                     JsonObject rootObject = root.getAsJsonObject();
                     if (rootObject.has("code")) {
-                        ensureSuccessCode(rootObject, "request");
+                        try {
+                            ensureSuccessCode(rootObject, "request");
+                        } catch (SkillSdkException exception) {
+                            callback.onError(exception);
+                            return;
+                        }
                     }
                 }
                 callback.onSuccess(root);
