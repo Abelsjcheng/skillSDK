@@ -20,6 +20,9 @@
 | `getAssistantDetails` | `GET /v1/robot-partners/{partnerAccount}` | 优先返回缓存助理详情，并异步刷新缓存 |
 | `updateWeAgent` | `PUT /v4-1/we-crew` | 更新个人助理信息 |
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
+| `setIsShowWeAgent` | 无（SDK 本地扩展能力） | 设置是否展示助理 tab 的持久化缓存并同步基座展示态 |
+| `getIsShowWeAgent` | 无（SDK 本地扩展能力） | 获取是否展示助理 tab 的持久化缓存值 |
+| `openWeAgent` | 无（SDK 本地扩展能力） | 根据助理账号打开助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
 | `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
 | `queryQrcodeInfo` | `GET /v4-1/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
@@ -65,6 +68,7 @@ type ServerResponse<T> = {
    - `current_we_agent_detail`：当前助理详情（`WeAgentDetails`）
    - `we_agent_list_cache`：个人助理列表缓存（`WeAgentList`）
    - `we_agent_details`：助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情对象（`WeAgentDetails`）
+   - `isShowWeAgent`：是否展示助理 tab，布尔值；该值通过基座 `saveSettings` / `getSettings` 维护
    - `assistant_gray_single_cache`：助理单人灰度缓存对象，key 为 `partnerAccount`，value 为对应灰度布尔值
 6. SP 持久化文档路径：待填写。
 
@@ -583,7 +587,201 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 ---
 
-## 7. 打开助理编辑页面接口
+## 7. 设置是否展示助理接口
+
+### 调用方
+
+设置页面、助理 tab 页面调用
+
+### 接口说明
+
+设置 `isShowWeAgent` 持久化配置，并同步触发基座助理 tab 的打开或关闭。
+
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+setIsShowWeAgent(params: SetIsShowWeAgentParams): Promise<SetIsShowWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `isShowWeAgent` | `boolean` | 是 | 是否展示助理 tab |
+
+### 入参示例
+
+```json
+{
+  "isShowWeAgent": true
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收入参 `isShowWeAgent`，并校验其为 `boolean` 类型。
+2. `todo`：调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent` 对应配置值。
+3. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
+4. 当 `isShowWeAgent = true` 时：
+    - `todo`：调用外部导入使用的基座方法打开助理 tab；
+5. 当 `isShowWeAgent = false` 时：
+    - `todo`：调用外部导入使用的基座方法关闭助理 tab；
+6. SDK 返回 `SetIsShowWeAgentResult`，其中 `status` 固定为 `success`。
+
+### 错误码（参考）
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `1000` | 无效的参数 | `isShowWeAgent` 缺失或类型错误 |
+| `5000` | 内部错误 | `saveSettings` 调用失败、基座广播失败，或打开/关闭助理 tab 失败 |
+
+---
+
+## 8. 获取是否展示助理接口
+
+### 调用方
+
+设置页面调用
+
+### 接口说明
+
+获取基座配置中的 `isShowWeAgent` 值。
+
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+getIsShowWeAgent(): Promise<GetIsShowWeAgentResult>
+```
+
+### 入参
+
+无
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `isShowWeAgent` | `boolean` | 是否展示助理 tab；若基座未返回有效值则默认返回 `false` |
+
+### 出参示例
+
+```json
+{
+  "isShowWeAgent": false
+}
+```
+
+### 实现方法
+
+1. `todo`：SDK 调用基座提供的 `getSettings` 方法获取 `isShowWeAgent` 对应配置值。
+2. 若读取到有效布尔值，则直接返回该值。
+3. 若基座未返回有效值，则默认返回 `false`，并返回：
+   ```json
+   {
+     "isShowWeAgent": false
+   }
+   ```
+
+### 错误码（参考）
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `5000` | 内部错误 | `getSettings` 调用失败，或基座返回结果异常 |
+
+---
+
+## 9. 打开助理接口
+
+### 调用方
+
+IM 模块调用
+
+### 接口说明
+
+根据 `partnerAccount` 获取指定助理详情，并组装打开助理所需的 URI 信息。
+
+该接口为 SDK 本地扩展接口，无对应服务端接口。
+
+### 接口名
+
+```typescript
+openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "x00_1"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 接收入参 `partnerAccount`，并校验其为非空字符串。
+2. `todo`：SDK 调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent = true`。
+3. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
+4. SDK 调用 `getAssistantDetails(params: QueryWeAgentParams)` 获取指定助理详情。
+5. 若成功获取到助理详情，则 SDK 取首个助理详情对象作为当前目标助理详情，并校验其中 `weCodeUrl` 为非空字符串；若 `weCodeUrl` 为空，则 SDK 抛出 `7000` 异常。
+6. 当目标助理详情有效且 `weCodeUrl` 非空时，SDK 将该助理详情设置到 `current_we_agent_detail` 缓存中。
+7. 若服务端未返回有效助理详情，或接口调用失败，则 SDK 抛出异常。
+8. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，URI 组装规则与 `getWeAgentUri` 保持一致：
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；
+   - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；
+   - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
+9. `todo`：调用基座方法打开助理 tab，并使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理 CUI。
+10. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
+
+### 错误码（参考）
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `1000` | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| `5000` | 内部错误 | `saveSettings` 调用失败、基座广播失败、打开助理 tab 失败，或 `openWeAgentCUI` 调用失败 |
+| `7000` | 服务端错误 | `getAssistantDetails` 调用失败、服务端未返回有效助理详情、助理详情中的 `weCodeUrl` 为空，或返回结构异常 |
+
+---
+
+## 10. 打开助理编辑页面接口
 
 ### 调用方
 
@@ -649,7 +847,7 @@ openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistan
 
 ---
 
-## 8. 通知助理详情更新接口
+## 11. 通知助理详情更新接口
 
 ### 调用方
 
@@ -714,7 +912,7 @@ notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promis
 
 ---
 
-## 9. 查询二维码信息接口
+## 12. 查询二维码信息接口
 
 ### 调用方
 
@@ -791,7 +989,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
 
 ---
 
-## 10. 更新二维码信息接口
+## 13. 更新二维码信息接口
 
 ### 调用方
 
@@ -851,7 +1049,7 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 
 ---
 
-## 11. 查询助理单人灰度接口
+## 14. 查询助理单人灰度接口
 
 ### 调用方
 
@@ -918,7 +1116,7 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 
 ---
 
-## 12. 获取当前 WeAgentUri 接口
+## 15. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -1064,6 +1262,46 @@ type DeleteWeAgentParams = {
 ```typescript
 type DeleteWeAgentResult = {
   deleteResult: string
+}
+```
+
+### SetIsShowWeAgentParams
+
+```typescript
+type SetIsShowWeAgentParams = {
+  isShowWeAgent: boolean
+}
+```
+
+### SetIsShowWeAgentResult
+
+```typescript
+type SetIsShowWeAgentResult = {
+  status: string
+}
+```
+
+### GetIsShowWeAgentResult
+
+```typescript
+type GetIsShowWeAgentResult = {
+  isShowWeAgent: boolean
+}
+```
+
+### OpenWeAgentParams
+
+```typescript
+type OpenWeAgentParams = {
+  partnerAccount: string
+}
+```
+
+### OpenWeAgentResult
+
+```typescript
+type OpenWeAgentResult = {
+  status: string
 }
 ```
 

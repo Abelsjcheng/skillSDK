@@ -470,6 +470,26 @@ export interface DeleteWeAgentResult {
   deleteResult: string;
 }
 
+export interface SetIsShowWeAgentParams {
+  isShowWeAgent: boolean;
+}
+
+export interface SetIsShowWeAgentResult {
+  status: string;
+}
+
+export interface GetIsShowWeAgentResult {
+  isShowWeAgent: boolean;
+}
+
+export interface OpenWeAgentParams {
+  partnerAccount: string;
+}
+
+export interface OpenWeAgentResult {
+  status: string;
+}
+
 export interface AssistantDetailUpdatedPayload {
   name: string;
   icon: string;

@@ -29,6 +29,7 @@ import com.opencode.skill.model.DeleteWeAgentParams;
 import com.opencode.skill.model.DeleteWeAgentResult;
 import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
+import com.opencode.skill.model.GetIsShowWeAgentResult;
 import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.NotifyAssistantDetailUpdatedParams;
 import com.opencode.skill.model.NotifyAssistantDetailUpdatedResult;
@@ -36,6 +37,8 @@ import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OpenAssistantEditPageParams;
 import com.opencode.skill.model.OpenAssistantEditPageResult;
+import com.opencode.skill.model.OpenWeAgentParams;
+import com.opencode.skill.model.OpenWeAgentResult;
 import com.opencode.skill.model.PageResult;
 import com.opencode.skill.model.PageParams;
 import com.opencode.skill.model.QrcodeInfo;
@@ -61,6 +64,8 @@ import com.opencode.skill.model.SkillWecodeStatusResult;
 import com.opencode.skill.model.StopSkillParams;
 import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.StreamMessage;
+import com.opencode.skill.model.SetIsShowWeAgentParams;
+import com.opencode.skill.model.SetIsShowWeAgentResult;
 import com.opencode.skill.model.UnregisterSessionListenerParams;
 import com.opencode.skill.model.UnregisterSessionListenerResult;
 import com.opencode.skill.model.UpdateQrcodeInfoParams;
@@ -1098,7 +1103,96 @@ public final class SkillSDK {
         });
     }
 
-    // 23. openAssistantEditPage
+    // 23. setIsShowWeAgent
+    public void setIsShowWeAgent(@NonNull SetIsShowWeAgentParams params,
+            @NonNull SkillCallback<SetIsShowWeAgentResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        boolean isShowWeAgent = params.isShowWeAgent();
+        // TODO: save isShowWeAgent by calling host saveSettings.
+        // TODO: broadcast isShowWeAgent change to host.
+        if (isShowWeAgent) {
+            // TODO: open we-agent tab by calling host capability.
+        } else {
+            // TODO: close we-agent tab by calling host capability.
+        }
+        callback.onSuccess(new SetIsShowWeAgentResult("success"));
+    }
+
+    // 24. getIsShowWeAgent
+    public void getIsShowWeAgent(@NonNull SkillCallback<GetIsShowWeAgentResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (callback == null) {
+            throw new IllegalArgumentException("callback == null");
+        }
+
+        // TODO: read isShowWeAgent by calling host getSettings.
+        callback.onSuccess(new GetIsShowWeAgentResult(false));
+    }
+
+    // 25. openWeAgent
+    public void openWeAgent(@NonNull OpenWeAgentParams params,
+            @NonNull SkillCallback<OpenWeAgentResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (params == null) {
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
+            return;
+        }
+
+        // TODO: save isShowWeAgent = true by calling host saveSettings.
+        // TODO: broadcast isShowWeAgent = true to host.
+        getAssistantDetails(new QueryWeAgentParams(partnerAccount), new SkillCallback<WeAgentDetailsArrayResult>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
+                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
+                WeAgentDetails targetDetail = resolved.getWeAgentDetailsArray().isEmpty()
+                        ? null
+                        : resolved.getWeAgentDetailsArray().get(0);
+                if (targetDetail == null) {
+                    callback.onError(error(7000, "getAssistantDetails returned empty detail"));
+                    return;
+                }
+                String weCodeUrl = normalizeOptionalString(targetDetail.getWeCodeUrl());
+                if (weCodeUrl == null) {
+                    callback.onError(error(7000, "getAssistantDetails returned empty weCodeUrl"));
+                    return;
+                }
+                weAgentStorage.saveCurrentWeAgentDetail(targetDetail);
+                WeAgentUriResult uris = buildWeAgentUriResult(targetDetail);
+                // TODO: open we-agent tab by calling host capability.
+                // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
+                callback.onSuccess(new OpenWeAgentResult("success"));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    // 26. openAssistantEditPage
     public void openAssistantEditPage(@NonNull OpenAssistantEditPageParams params,
             @NonNull SkillCallback<OpenAssistantEditPageResult> callback) {
         if (!isInitialized()) {
@@ -1185,7 +1279,7 @@ public final class SkillSDK {
         callback.onSuccess(new NotifyAssistantDetailUpdatedResult("success"));
     }
 
-    // 25. queryQrcodeInfo
+    // 28. queryQrcodeInfo
     public void queryQrcodeInfo(@NonNull QueryQrcodeInfoParams params,
             @NonNull SkillCallback<QrcodeInfo> callback) {
         if (!isInitialized()) {
@@ -1218,7 +1312,7 @@ public final class SkillSDK {
         });
     }
 
-    // 26. updateQrcodeInfo
+    // 29. updateQrcodeInfo
     public void updateQrcodeInfo(@NonNull UpdateQrcodeInfoParams params,
             @NonNull SkillCallback<UpdateQrcodeInfoResult> callback) {
         if (!isInitialized()) {

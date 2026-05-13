@@ -127,22 +127,36 @@ NS_ASSUME_NONNULL_BEGIN
               success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
               failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 23. openAssistantEditPage
+#pragma mark - 23. setIsShowWeAgent
+- (void)setIsShowWeAgent:(WLAgentSkillsSetIsShowWeAgentParams *)params
+                 success:(void (^)(WLAgentSkillsSetIsShowWeAgentResult *result))success
+                 failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 24. getIsShowWeAgent
+- (void)getIsShowWeAgent:(void (^)(WLAgentSkillsGetIsShowWeAgentResult *result))success
+                 failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 25. openWeAgent
+- (void)openWeAgent:(WLAgentSkillsOpenWeAgentParams *)params
+            success:(void (^)(WLAgentSkillsOpenWeAgentResult *result))success
+            failure:(void (^)(NSError *error))failure;
+
+#pragma mark - 26. openAssistantEditPage
 - (void)openAssistantEditPage:(WLAgentSkillsOpenAssistantEditPageParams *)params
                       success:(void (^)(WLAgentSkillsOpenAssistantEditPageResult *result))success
                       failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 24. notifyAssistantDetailUpdated
+#pragma mark - 27. notifyAssistantDetailUpdated
 - (void)notifyAssistantDetailUpdated:(WLAgentSkillsNotifyAssistantDetailUpdatedParams *)params
                              success:(void (^)(WLAgentSkillsNotifyAssistantDetailUpdatedResult *result))success
                              failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 25. queryQrcodeInfo
+#pragma mark - 28. queryQrcodeInfo
 - (void)queryQrcodeInfo:(WLAgentSkillsQueryQrcodeInfoParams *)params
                 success:(void (^)(WLAgentSkillsQrcodeInfo *result))success
                 failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 26. updateQrcodeInfo
+#pragma mark - 29. updateQrcodeInfo
 - (void)updateQrcodeInfo:(WLAgentSkillsUpdateQrcodeInfoParams *)params
                  success:(void (^)(WLAgentSkillsUpdateQrcodeInfoResult *result))success
                  failure:(void (^)(NSError *error))failure;
