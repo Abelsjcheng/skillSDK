@@ -731,11 +731,11 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 ### 实现方法
 
 1. SDK 接收入参 `partnerAccount`，并校验其为非空字符串。
-2. `todo`：SDK 调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent = true`。
-3. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
-4. SDK 调用 `getAssistantDetails(params: QueryWeAgentParams)` 获取指定助理详情。
-5. 若成功获取到助理详情，则 SDK 取首个助理详情对象作为当前目标助理详情，并校验其中 `weCodeUrl` 为非空字符串；若 `weCodeUrl` 为空，则 SDK 抛出 `7000` 异常。
-6. 当目标助理详情有效且 `weCodeUrl` 非空时，SDK 将该助理详情设置到 `current_we_agent_detail` 缓存中。
+2. SDK 调用 `getAssistantDetails(params: QueryWeAgentParams)` 获取指定助理详情。
+3. 若成功获取到助理详情，则 SDK 取首个助理详情对象作为当前目标助理详情，并校验其中 `weCodeUrl` 为非空字符串；若 `weCodeUrl` 为空，则 SDK 抛出 `7000` 异常。
+4. 当目标助理详情有效且 `weCodeUrl` 非空时，SDK 将该助理详情设置到 `current_we_agent_detail` 缓存中。
+5. `todo`：SDK 调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent = true`。
+6. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
 7. 若服务端未返回有效助理详情，或接口调用失败，则 SDK 抛出异常。
 8. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，URI 组装规则与 `getWeAgentUri` 保持一致：
    - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
