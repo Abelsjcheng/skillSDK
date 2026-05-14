@@ -293,10 +293,64 @@ interface QuestionAnswerSubmission {
      - 写入 `subtask.subParts`
      - 冒泡为主对话流中的交互卡片
    - 将 `permission.reply` / `question completed` 结果同步回：
-     - 冒泡卡片
-     - `subtask.subParts`
+   - 冒泡卡片
+   - `subtask.subParts`
 
-### 5.3.3 subtask 状态维护
+### 5.3.3 渲染 subagent 时序图
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Skill Server / Gateway
+    participant B as 宿主桥接层
+    participant A as App.tsx
+    participant SA as StreamAssembler
+    participant M as 主消息 Store
+    participant SB as SubtaskBlock
+    participant C as 主对话流卡片
+    participant U as 用户
+
+    S->>B: 推送主消息普通流事件
+    B->>A: onMessage(StreamMessage)
+    A->>SA: 普通 part 进入 assembler
+    SA->>M: 更新 assistant 主消息 parts
+    M->>SB: 渲染已有 subtask 容器或占位
+
+    S->>B: 推送 subagent 事件(subagentSessionId)
+    B->>A: onMessage(StreamMessage)
+    A->>A: handleSubagentMessage(msg)
+    A->>M: 用 messageId/sourceMessageId 定位主消息
+    A->>M: upsertSubtaskBlock(subagentSessionId)
+
+    alt text / thinking / tool / file
+        A->>M: 追加到 subtask.subParts
+        M->>SB: 刷新折叠块内容与状态
+    else question / permission.ask
+        A->>M: 写入 subtask.subParts
+        A->>M: 冒泡交互卡片到主对话流
+        M->>SB: subtask 内显示只读记录
+        M->>C: 渲染可操作 QuestionCard / PermissionCard
+        U->>C: 回答问题或授权
+        alt question
+            C->>A: onAnswered(answer, toolCallId, subagentSessionId)
+            A->>B: sendMessage({ content, toolCallId, subagentSessionId })
+        else permission
+            C->>A: onPermissionResolved(permId, response, subagentSessionId)
+            A->>B: replyPermission({ permId, response, subagentSessionId })
+        end
+        B->>S: 路由回对应 subagent session
+    end
+
+    S->>B: 推送后续结果或 completed/error
+    B->>A: onMessage(StreamMessage)
+    A->>M: 更新 subtask.subParts / subtaskStatus
+    M->>SB: 渲染 completed / error 状态
+    M->>C: 同步更新主对话流冒泡卡片
+```
+
+该时序图对应的关键约束是：普通主消息仍走 `StreamAssembler`，而带 `subagentSessionId` 的事件在 `App.tsx` 外层分流处理，最终同时驱动 `SubtaskBlock` 折叠渲染和主对话流交互冒泡。
+
+### 5.3.4 subtask 状态维护
 
 根据设计文档，前端要维护 subtask 状态，建议规则：
 
