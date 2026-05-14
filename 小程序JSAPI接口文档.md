@@ -260,6 +260,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 | header | string \| null | question 分组标题 |
 | question | string \| null | 问题正文 |
 | options | string[] \| null | 选项 |
+| multiSelect | boolean \| null | 是否多选（question running 阶段可选） |
+| questions | object[] \| null | 多题结构（question running 阶段可选） |
+| extParam | object \| null | question 云端透传扩展字段 |
 | permissionId | string \| null | 权限请求 ID |
 | permType | string \| null | 权限类型 |
 | metadata | object \| null | 权限元数据 |
@@ -268,6 +271,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 | fileName | string \| null | 文件名 |
 | fileUrl | string \| null | 文件 URL |
 | fileMime | string \| null | 文件 MIME |
+| subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议作为子任务分组主键 |
+| subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
 
 ### 错误处理
 
@@ -388,6 +393,7 @@ window.HWH5EXT.getSessionMessageHistory({
 - 同一个 `welinkSessionId` 只允许注册一次监听器。
 - 重复注册不会报错，SDK 会 no-op，并返回成功语义。
 - 可在任意时机注册，SDK 保证时序安全，不因注册时机导致漏消息。
+- WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外没有外层 envelope。
 
 ### 调用方式
 
@@ -433,9 +439,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | type | string | 事件类型 |
-| seq | number \| null | 递增序列号（部分事件可能无） |
-| welinkSessionId | string | 所属会话 ID |
-| emittedAt | string \| null | 事件产生时间，ISO-8601（部分事件可能无） |
+| seq | number \| null | 递增序列号；大部分事件都有，个别极简事件也可能省略 |
+| welinkSessionId | string | 所属会话 ID；`agent.online` / `agent.offline` 不携带 |
+| emittedAt | string \| null | 事件产生时间，ISO-8601；`permission.reply` / `agent.online` / `agent.offline` / `error` 通常不携带 |
 
 #### 消息级字段（按事件返回）
 
@@ -444,14 +450,18 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | messageId | string \| null | 稳定消息 ID |
 | sourceMessageId | string \| null | 源消息 ID |
 | messageSeq | number \| null | 会话内消息顺序 |
-| role | string \| null | 当前服务端返回值为 `user` / `assistant` |
+| role | string \| null | 当前服务端返回值为 `user` / `assistant`；常见于 Part 级事件、`message.user`、`streaming`、`permission.reply` |
 
 #### Part级字段（按事件返回）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | partId | string \| null | Part 唯一 ID |
-| partSeq | number \| null | Part 顺序 |
+| partSeq | number \| null | Part 顺序；`permission.ask` / `permission.reply` 可能缺失 |
+
+说明：
+- `question` 是两阶段事件：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段前端应按 `partId` 关联此前的问题状态。
+- `permission.reply` 是极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
 
 #### 常用附加字段（按事件返回）
 
@@ -468,6 +478,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | header | string \| null | question 分组标题 |
 | question | string \| null | question 正文 |
 | options | string[] \| null | question 选项 |
+| multiSelect | boolean \| null | question 是否多选 |
+| questions | object[] \| null | question 多题结构 |
+| extParam | object \| null | question 云端透传字段 |
 | permissionId | string \| null | 权限请求 ID |
 | permType | string \| null | 权限类型 |
 | metadata | object \| null | 权限元数据 |
@@ -479,12 +492,23 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | cost | number \| null | 本步骤费用 |
 | reason | string \| null | 结束原因 |
 | sessionStatus | string \| null | 服务端原始状态：`busy` / `idle` / `retry` |
+| keywords | string[] \| null | `searching` 事件关键词列表 |
+| searchResults | object[] \| null | `search_result` 事件搜索结果列表 |
+| references | object[] \| null | `reference` 事件引用列表 |
+| askMoreQuestions | string[] \| null | `ask_more` 事件追问建议列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照 |
 | parts | array \| null | `streaming` 携带的进行中消息部件 |
+| subagentSessionId | string \| null | 子 agent 的真实会话 ID，仅出现在 Part 级事件及恢复态 part 中 |
+| subagentName | string \| null | 子 agent 显示名，仅用于展示 |
 
 ### 事件类型
 
-`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming`
+`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
+
+恢复态说明：
+- 重连恢复时，服务端会先推送 `snapshot`，再推送 `streaming`。
+- 当 `streaming.sessionStatus = idle` 时，客户端应将当前所有 streaming part 视为已完成，避免残留流式展示状态。
+- `search_result` 的字段名严格是 `searchResults`，`ask_more` 的字段名严格是 `askMoreQuestions`。
 
 ### 错误处理
 
@@ -500,14 +524,49 @@ const onMessage = (message) => {
     case 'text.delta':
       console.log('AI 响应片段:', message.content);
       break;
+    case 'text.done':
+      console.log('AI 响应完成:', message.content);
+      break;
     case 'tool.update':
       console.log('工具状态:', message.toolName, message.status);
       break;
     case 'question':
-      console.log('AI 提问:', message.question, message.toolCallId);
+      if (message.status === 'running') {
+        console.log('AI 提问:', message.question, message.options);
+      } else {
+        console.log('AI 提问已完成:', message.toolCallId, message.output);
+      }
+      break;
+    case 'permission.ask':
+      console.log('权限请求:', message.permissionId, message.title);
+      break;
+    case 'permission.reply':
+      console.log('权限请求已应答:', message.permissionId, message.response);
+      break;
+    case 'message.user':
+      console.log('收到用户消息回放:', message.content);
       break;
     case 'snapshot':
       console.log('断线恢复快照消息数:', message.messages?.length || 0);
+      break;
+    case 'streaming':
+      console.log('收到进行中流状态:', message.sessionStatus, message.parts?.length || 0);
+      break;
+    case 'searching':
+      console.log('搜索中:', message.keywords);
+      break;
+    case 'search_result':
+      console.log('搜索结果:', message.searchResults);
+      break;
+    case 'reference':
+      console.log('引用列表:', message.references);
+      break;
+    case 'ask_more':
+      console.log('追问建议:', message.askMoreQuestions);
+      break;
+    case 'agent.online':
+    case 'agent.offline':
+      console.log('Agent 状态事件:', message.type);
       break;
     case 'error':
     case 'session.error':
@@ -604,6 +663,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessag
 | welinkSessionId | string | 是 | 会话 ID |
 | content | string | 是 | 用户输入内容 |
 | toolCallId | string | 否 | 回答 AI `question` 时携带的工具调用 ID |
+| subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 `question` 时，必须回传事件中的真实子会话 ID |
 
 ### 返回值
 
@@ -632,6 +692,10 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessag
 | 7000 | 服务端错误 | 服务端处理失败 |
 | 7001 | AI 网关错误 | AI Gateway 调度失败 |
 
+### 说明
+
+- 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`，否则服务端会把应答路由到主对话。
+
 ### 调用示例
 
 ```javascript
@@ -642,6 +706,19 @@ window.HWH5EXT.sendMessage({
   console.log('消息发送成功:', result.id);
 }).catch((error) => {
   console.error('发送消息失败:', error.errorCode, error.errorMessage);
+});
+```
+
+```javascript
+window.HWH5EXT.sendMessage({
+  welinkSessionId: '42',
+  content: '继续执行',
+  toolCallId: 'call_q_1',
+  subagentSessionId: 'child-session-001'
+}).then((result) => {
+  console.log('子 agent 应答发送成功:', result.id);
+}).catch((error) => {
+  console.error('发送子 agent 应答失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -657,6 +734,7 @@ window.HWH5EXT.sendMessage({
 - 仅中止当前轮执行。
 - 不关闭会话，不断开 WebSocket。
 - 停止后仍可继续发送新消息触发下一轮。
+- subagent 场景下可只中止指定子 agent 链路。
 
 ### 调用方式
 
@@ -675,6 +753,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'stopSkill'
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
+| subagentSessionId | string | 否 | subagent 场景必传。传入时仅中止指定子 agent 链路；不传则中止主会话当前回答 |
 
 ### 返回值
 
@@ -708,6 +787,19 @@ window.HWH5EXT.stopSkill({
 });
 ```
 
+```javascript
+window.HWH5EXT.stopSkill({
+  welinkSessionId: '42',
+  subagentSessionId: 'child-session-001'
+}).then((result) => {
+  if (result.status === 'aborted') {
+    console.log('子 agent 当前轮已停止');
+  }
+}).catch((error) => {
+  console.error('停止子 agent 失败:', error.errorCode, error.errorMessage);
+});
+```
+
 ---
 
 ## 8. replyPermission
@@ -735,6 +827,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'replyPermi
 | welinkSessionId | string | 是 | 会话 ID |
 | permId | string | 是 | 权限请求 ID |
 | response | string | 是 | `once` / `always` / `reject` |
+| subagentSessionId | string | 否 | subagent 场景必传。回复子 agent 发起的 `permission.ask` 时，必须回传事件中的真实子会话 ID |
 
 ### response 值说明
 
@@ -753,6 +846,10 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'replyPermi
 | welinkSessionId | string | 会话 ID |
 | permissionId | string | 权限请求 ID |
 | response | string | 回复值 |
+
+### 说明
+
+- 若收到的 `permission.ask` 事件带有 `subagentSessionId`，则调用 `replyPermission` 时必须原样回传，否则服务端会把授权路由到主对话。
 
 ### 错误处理
 
@@ -775,6 +872,19 @@ window.HWH5EXT.replyPermission({
   console.log('权限确认结果:', result.response);
 }).catch((error) => {
   console.error('回复权限确认失败:', error.errorCode, error.errorMessage);
+});
+```
+
+```javascript
+window.HWH5EXT.replyPermission({
+  welinkSessionId: '42',
+  permId: 'perm_1',
+  response: 'once',
+  subagentSessionId: 'child-session-001'
+}).then((result) => {
+  console.log('子 agent 权限确认结果:', result.response);
+}).catch((error) => {
+  console.error('回复子 agent 权限确认失败:', error.errorCode, error.errorMessage);
 });
 ```
 

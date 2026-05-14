@@ -262,6 +262,7 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | `welinkSessionId` | string | 是 | 会话 ID |
+| `subagentSessionId` | string | 否 | subagent 场景必传。传入时仅中止指定子 agent 链路；不传则中止主会话当前回答 |
 
 ### 出参
 
@@ -284,6 +285,12 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
 2. 调用服务端 REST API：
    - **URL**: `POST /api/skill/sessions/{welinkSessionId}/abort`
+   - **请求体**:
+     ```json
+     {
+       "subagentSessionId": "child-session-001"
+     }
+     ```
 3. SDK收到成功响应后，触发 `onSessionStatusChange` 的 `stopped` 状态
 
 ### 错误处理
@@ -300,12 +307,16 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 在与其他接口组合调用时：
 1. 若 `stopSkill` 失败，不影响会话的其他操作
 2. 停止后，仍可以继续发送新消息触发新一轮 AI 执行
+3. 若当前只想中止子 agent，而不是整条主对话链路，则必须透传原始 `subagentSessionId`
 
 ### 调用示例
 
 ```typescript
 try {
-  const result = await stopSkill({ welinkSessionId: "42" });
+  const result = await stopSkill({
+    welinkSessionId: "42",
+    subagentSessionId: "child-session-001"
+  });
 
   if (result.status === "aborted") {
     console.log("当前轮回答已停止");
@@ -994,6 +1005,16 @@ try {
 }
 ```
 
+### Subagent 支持说明（V1 增量）
+
+为支持 OpenCode subagent / task 场景，V1 在现有主会话协议之上补充以下约定：
+
+1. SDK 仍以主会话 `welinkSessionId` 为监听与查询入口，不新增第二条 WebSocket 监听通道。
+2. 当服务端事件来自子 agent 时，会在 `StreamMessage`、`SessionMessagePart`、`snapshot.messages[].parts[]`、`streaming.parts[]` 中附带 subagent 扩展字段。
+3. 客户端可按 `subagentSessionId` 对子 agent 产生的 `text` / `thinking` / `tool` / `file` / `permission` / `question` 进行分组展示。
+4. 当用户回复子 agent 发起的 `permission.ask` 或 `question` 时，应在 `replyPermission` 或 `sendMessage` 中透传 `subagentSessionId`，用于服务端路由到真实子会话。
+5. 所有 subagent 扩展字段均为可选字段；未携带时，按普通主会话消息处理，保持与旧版本兼容。
+
 ---
 
 ## 9. 注册会话监听器接口
@@ -1014,18 +1035,26 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - 提问交互：`question`
 - 权限交互：`permission.ask` / `permission.reply`
 - 附件：`file`
+- 用户消息回放：`message.user`
+- 推理步骤：`step.start` / `step.done`
 - 会话状态：`session.status` / `session.title` / `session.error`
 - 断线恢复：`snapshot` / `streaming`
+- 云端扩展：`planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
 - 系统事件：`agent.online` / `agent.offline` / `error`
 
 #### 字段对齐说明（重要）
 
+- WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外**没有外层 envelope**
 - `snapshot.messages[].id` 类型为 `string`（稳定消息 ID）
 - `snapshot.messages[].seq` 类型为 `number | null`（数据库排序序号，用户消息可能为 `null`）
 - `snapshot.messages[].messageSeq` 类型为 `number | null`（会话内消息序号）
 - `snapshot.messages[].contentType` 类型为 `string`（`plain` / `markdown`）
 - `streaming.messageId` 类型为 `string | null`（仅 `parts` 非空时出现）
 - `streaming.parts[].status` 为工具状态字段（字段名为 `status`）
+- `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
+- `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
+- `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`
+- `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
 - `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
 
 ### 接口名
@@ -1105,20 +1134,52 @@ try {
       case "text.delta":
         console.log("AI响应片段:", message.content);
         break;
+      case "text.done":
+        console.log("AI响应完成:", message.content);
+        break;
       case "tool.update":
         console.log("工具状态:", message.toolName, message.status);
         break;
       case "question":
-        console.log("AI提问:", message.question);
+        if (message.status === "running") {
+          console.log("AI提问:", message.question, message.options);
+        } else {
+          console.log("AI提问已完成:", message.toolCallId, message.output);
+        }
         break;
       case "permission.ask":
         console.log("权限请求:", message.permissionId, message.title);
+        break;
+      case "permission.reply":
+        console.log("权限请求已应答:", message.permissionId, message.response);
+        break;
+      case "message.user":
+        console.log("收到用户消息回放:", message.content);
         break;
       case "session.status":
         console.log("原始会话状态:", message.sessionStatus);
         break;
       case "snapshot":
-        console.log("收到断线恢复快照，消息数:", message.messages.length);
+        console.log("收到断线恢复快照，消息数:", message.messages?.length ?? 0);
+        break;
+      case "streaming":
+        console.log("收到进行中流状态:", message.sessionStatus, message.parts?.length ?? 0);
+        break;
+      case "searching":
+        console.log("搜索中:", message.keywords);
+        break;
+      case "search_result":
+        console.log("搜索结果:", message.searchResults);
+        break;
+      case "reference":
+        console.log("引用列表:", message.references);
+        break;
+      case "ask_more":
+        console.log("追问建议:", message.askMoreQuestions);
+        break;
+      case "agent.online":
+      case "agent.offline":
+        console.log("Agent状态事件:", message.type);
         break;
       case "session.error":
       case "error":
@@ -1232,6 +1293,7 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 | welinkSessionId | string | 是 | 会话 ID |
 | content | string | 是 | 用户输入的消息内容 |
 | toolCallId | string | 否 | 回答 AI `question` 时携带对应的工具调用 ID |
+| subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 `question` 时，必须回传事件中的真实子会话 ID |
 
 ### 出参
 
@@ -1259,11 +1321,13 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
      ```json
      {
        "content": "请帮我重构登录模块的校验逻辑",
-       "toolCallId": "call_2"
+       "toolCallId": "call_2",
+       "subagentSessionId": "child-session-001"
      }
      ```
 3. AI 流式响应由 WebSocket 推送到 SDK，再通过监听器分发
 4. 对于首次发送消息的场景，此接口会触发首轮 AI 执行
+5. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`，否则服务端会把应答路由到主对话
 
 ### 错误处理
 
@@ -1281,6 +1345,7 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 1. 若 `sendMessage` 失败，不影响会话的其他操作
 2. 建议在 `createSession` 成功后再调用 `sendMessage`，确保能正常发送消息
 3. 发送消息后，应注册 `registerSessionListener` 来接收 AI 的响应
+4. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`
 
 ### 调用示例
 
@@ -1324,6 +1389,23 @@ try {
 }
 ```
 
+#### 示例 3：回复子 agent 发起的 question
+
+```typescript
+try {
+  const result = await sendMessage({
+    welinkSessionId: "42",
+    content: "继续执行",
+    toolCallId: "call_q_1",
+    subagentSessionId: "child-session-001"
+  });
+
+  console.log("子 agent 应答发送成功:", result.id);
+} catch (error) {
+  console.error("发送子 agent 应答失败:", error.errorCode, error.errorMessage);
+}
+```
+
 ---
 
 ## 12. 权限确认接口
@@ -1347,6 +1429,7 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 | `welinkSessionId` | string | 是 | 会话 ID |
 | `permId` | String | 是 | 权限请求 ID |
 | `response` | String | 是 | `once` / `always` / `reject` |
+| `subagentSessionId` | String | 否 | subagent 场景必传。回复子 agent 发起的 `permission.ask` 时，必须回传事件中的真实子会话 ID |
 
 ### 出参
 
@@ -1364,9 +1447,11 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
    - **请求体**:
      ```json
      {
-       "response": "once"
+       "response": "once",
+       "subagentSessionId": "child-session-001"
      }
      ```
+3. 若收到的 `permission.ask` 事件带有 `subagentSessionId`，则该字段必须原样回传，否则服务端会把授权路由到主对话
 
 ### 错误处理
 
@@ -1383,6 +1468,7 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 在与其他接口组合调用时：
 1. 建议在收到 `permission.ask` 事件后再调用 `replyPermission`，确保权限请求有效
 2. 若 `replyPermission` 失败，可重试发送，但需注意避免重复处理
+3. 若权限请求来自子 agent，调用时必须透传 `subagentSessionId`
 
 ### 调用示例
 
@@ -1391,7 +1477,8 @@ try {
   const result = await replyPermission({
     welinkSessionId: "42",
     permId: "perm_1",
-    response: "once"
+    response: "once",
+    subagentSessionId: "child-session-001"
   });
 
   console.log("权限确认结果:", result.response);
@@ -1943,6 +2030,15 @@ try {
 | fileUrl | string \| null | 文件 URL（`file` 类型） |
 | fileMime | string \| null | 文件 MIME 类型（`file` 类型） |
 
+#### SessionMessagePart 的 Subagent 扩展字段
+
+> 以下字段均为可选；仅当当前 Part 来源于子 agent 时返回。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议客户端作为子任务分组主键 |
+| subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
+
 ### SessionStatusResult
 
 | 字段 | 类型 | 说明 |
@@ -1988,9 +2084,9 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | type | string | 事件类型 |
-| seq | number \| null | 递增序列号（部分事件可能无，如 `permission.reply`） |
-| welinkSessionId | string | 所属会话 ID |
-| emittedAt | string \| null | 事件产生时间，ISO-8601（部分事件可能无） |
+| seq | number \| null | 递增序列号；大部分事件都有，个别极简事件也可能省略 |
+| welinkSessionId | string | 所属会话 ID；`agent.online` / `agent.offline` 不携带 |
+| emittedAt | string \| null | 事件产生时间，ISO-8601；`permission.reply` / `agent.online` / `agent.offline` / `error` 通常不携带 |
 
 #### 消息级字段
 
@@ -2001,14 +2097,27 @@ try {
 | messageId | string \| null | 稳定消息 ID |
 | sourceMessageId | string \| null | 源消息 ID（服务端转译链路原始消息 ID） |
 | messageSeq | number \| null | 会话内消息顺序 |
-| role | string \| null | 当前服务端返回值为 `user` / `assistant` |
+| role | string \| null | 当前服务端返回值为 `user` / `assistant`；常见于 Part 级事件、`message.user`、`streaming`、`permission.reply` |
 
 #### Part级字段
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | partId | string \| null | Part 唯一 ID（仅 part 类事件出现） |
-| partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现） |
+| partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现；`permission.ask` / `permission.reply` 可能缺失） |
+
+> 说明：
+> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。
+> - `permission.reply` 为极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
+
+#### StreamMessage 的 Subagent 扩展字段
+
+> 以下字段均为可选；仅出现在 Part 级事件，以及 `snapshot.messages[].parts[]` 和 `streaming.parts[]` 中。`session.status`、`session.title`、`session.error`、`agent.online`、`agent.offline`、`error`、`message.user` 等会话级事件不携带这些字段。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议客户端作为子任务分组主键 |
+| subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
 
 #### `snapshot` 事件字段（`type = snapshot`）
 
@@ -2025,6 +2134,9 @@ try {
 | messages[].createdAt | string | 创建时间，ISO-8601 |
 | messages[].meta | object \| null | 元信息（可选） |
 | messages[].parts | array | Part 列表（可选） |
+
+> 说明：若 `messages[].parts[]` 中存在 `subagentSessionId`，表示该 Part 属于某个子 agent；客户端恢复快照时应按 `subagentSessionId` 重新分组展示，而不是简单平铺到主消息流。
+> 恢复场景下，服务端会先推送 `snapshot`，再推送 `streaming`；客户端不应在完整 `snapshot` 到达前按零散增量恢复界面。
 
 #### `streaming` 事件字段（`type = streaming`）
 
@@ -2049,6 +2161,9 @@ try {
 | parts[].header | string | question 分组标题（可选） |
 | parts[].question | string | question 正文（可选） |
 | parts[].options | string[] | question 选项（可选） |
+| parts[].multiSelect | boolean | question 是否多选（可选） |
+| parts[].questions | object[] | question 多题结构（可选） |
+| parts[].extParam | object | question 云端透传字段（可选） |
 | parts[].permissionId | string | 权限请求 ID（可选） |
 | parts[].permType | string | 权限类型（可选） |
 | parts[].metadata | object | 权限元数据（可选） |
@@ -2056,6 +2171,9 @@ try {
 | parts[].fileName | string | 文件名（可选） |
 | parts[].fileUrl | string | 文件 URL（可选） |
 | parts[].fileMime | string | 文件 MIME 类型（可选） |
+
+> 说明：`streaming.parts[]` 同样可能携带 `subagentSessionId` / `subagentName`；断线恢复补流时建议继续按子 agent 维度聚合当前进行中的 Part。
+> 当 `streaming.sessionStatus = idle` 时，客户端应将当前所有 streaming part 视为已完成，避免残留流式展示状态。
 
 #### 支持的事件类型
 
@@ -2066,13 +2184,14 @@ try {
 | `thinking.delta` | 思维链增量 | `content` |
 | `thinking.done` | 思维链完成 | `content` |
 | `tool.update` | 工具调用状态更新 | `toolName` `toolCallId` `status` `input` `output` `error` `title` |
-| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` |
+| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` `multiSelect` `questions` `extParam` |
 | `file` | 文件或图片附件 | `fileName` `fileUrl` `fileMime` |
 | `step.start` | 推理步骤开始 | 无额外必填字段 |
 | `step.done` | 推理步骤结束 | `tokens` `cost` `reason` |
 | `session.status` | 会话状态变化 | `sessionStatus` |
 | `session.title` | 会话标题变化 | `title` |
 | `session.error` | 会话级错误 | `error` |
+| `message.user` | 用户消息回放 | `content` `messageId` `messageSeq` `role` |
 | `permission.ask` | 权限请求 | `permissionId` `permType` `title` `metadata` |
 | `permission.reply` | 权限响应结果 | `permissionId` `response` |
 | `agent.online` | Agent 上线 | 无额外字段 |
@@ -2080,6 +2199,55 @@ try {
 | `error` | 非会话级错误 | `error` |
 | `snapshot` | 断线恢复快照 | `messages` |
 | `streaming` | 断线恢复中的进行中消息 | `sessionStatus` `messageId` `messageSeq` `role` `parts` |
+| `planning.delta` | 规划增量（云端扩展） | `content` |
+| `planning.done` | 规划完成（云端扩展） | `content` |
+| `searching` | 搜索中（云端扩展） | `keywords` |
+| `search_result` | 搜索结果（云端扩展） | `searchResults` |
+| `reference` | 引用列表（云端扩展） | `references` |
+| `ask_more` | 追问建议（云端扩展） | `askMoreQuestions` |
+
+#### Subagent 事件处理约定
+
+1. SDK 监听器仍然只监听主会话 `welinkSessionId`，子 agent 相关事件不会额外开启独立通道。
+2. 当事件、`snapshot.messages[].parts[]` 或 `streaming.parts[]` 中存在 `subagentSessionId` 时，表示该内容属于对应子 agent 上下文。
+3. `text` / `thinking` / `tool` / `file` 等内容建议按 `subagentSessionId` 聚合成独立子任务块展示，而不是直接混排到主会话正文。
+4. `permission.ask` 与 `question` 可以在主界面中承载交互，但客户端回复时必须透传原始 `subagentSessionId`，否则服务端无法路由到真实子会话。
+5. 处理 `snapshot` 与 `streaming` 断线恢复数据时，也应延续同样的分组规则，避免恢复后子任务内容错挂到主消息。
+6. 客户端必须以 `subagentSessionId` 作为聚合主键，`subagentName` 仅用于展示，不能作为唯一 key。
+7. 若 `subagentName` 存在嵌套层级，应保留服务端约定的 `" > "` 路径分隔符，不要替换为 `/`、`->` 等其他符号。
+
+#### Subagent 事件示例
+
+`tool.update`（子 agent 任务执行中）：
+
+```json
+{
+  "type": "tool.update",
+  "welinkSessionId": "parent-session-001",
+  "messageId": "msg_1001",
+  "partId": "part_task_1",
+  "toolName": "task",
+  "status": "running",
+  "subagentSessionId": "child-session-001",
+  "subagentName": "代码审查 > 设计"
+}
+```
+
+`permission.ask`（子 agent 发起权限确认）：
+
+```json
+{
+  "type": "permission.ask",
+  "welinkSessionId": "parent-session-001",
+  "messageId": "msg_1001",
+  "partId": "perm_1",
+  "permissionId": "perm_xxx",
+  "permType": "file_write",
+  "title": "Request to modify src/auth/login.ts",
+  "subagentSessionId": "child-session-001",
+  "subagentName": "代码审查"
+}
+```
 
 #### 常用附加字段
 
