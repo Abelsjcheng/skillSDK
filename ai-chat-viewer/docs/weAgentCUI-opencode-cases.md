@@ -63,6 +63,9 @@
 | C14 | `streaming` | 是 | 从已有 part 快照恢复流式消息 | 不依赖提示词，通常由重连/补流触发 |
 | C15 | `session.title` | 否 | 当前无 UI 变化 | 不建议作为有效联调用例 |
 | C16 | `agent.online` / `agent.offline` | 否 | 当前无 UI 变化 | 不建议作为有效联调用例 |
+| C17 | `subagent` + `thinking/tool/text` | 是 | 主流程消息中出现可折叠子任务块，展示子 agent 的分析、工具执行与结论 | `mock-subagent` |
+| C18 | `subagent` + `question` | 是 | 子 agent 发起追问，卡片会冒泡到主流程，回答时会带 `subagentSessionId` 回传 | `mock-subagent-question` |
+| C19 | `subagent` + `permission.ask/reply` | 是 | 子 agent 发起权限申请，权限卡片会冒泡到主流程，授权回填也会携带 `subagentSessionId` | `mock-subagent-permission` |
 
 ## 4. 详细 Case
 
@@ -725,33 +728,192 @@ error
 不建议作为当前有效联调用例；即使返回，页面也不会有可见变化。
 ```
 
+---
+
+## C17. Subagent 基础展示
+
+### 适用场景
+
+主 agent 将局部任务委托给子 agent 执行，前端需要把同一条消息中的子任务内容聚合成可折叠的 `subtask` 展示块，同时保留主流程总结。
+
+### 事件序列
+
+```json
+[
+  { "type": "session.status", "sessionStatus": "busy" },
+  { "type": "text.done", "partId": "text_intro", "content": "主流程先说明：已拆分给子 agent 处理。" },
+  {
+    "type": "thinking.done",
+    "partId": "thinking_sub_1",
+    "content": "子 agent 正在分析渲染链路。",
+    "subagentSessionId": "subagent_basic_xxx",
+    "subagentName": "Code Indexer"
+  },
+  {
+    "type": "tool.update",
+    "partId": "tool_sub_1",
+    "toolName": "code_search",
+    "toolCallId": "call_sub_1",
+    "status": "completed",
+    "title": "Inspect subagent rendering pipeline",
+    "output": "Matched MessageBubble.tsx and utils/message.ts",
+    "subagentSessionId": "subagent_basic_xxx",
+    "subagentName": "Code Indexer"
+  },
+  {
+    "type": "text.done",
+    "partId": "text_sub_1",
+    "content": "子 agent 已确认渲染时分组逻辑。",
+    "subagentSessionId": "subagent_basic_xxx",
+    "subagentName": "Code Indexer"
+  },
+  { "type": "text.done", "partId": "text_summary", "content": "主流程继续输出最终总结。" },
+  { "type": "session.status", "sessionStatus": "idle" }
+]
+```
+
+### 推荐提示词
+
+```text
+mock-subagent
+```
+
+### 预期 UI
+
+- 主消息中先出现一段普通说明文字
+- 带同一个 `subagentSessionId` 的 `thinking/tool/text` 会被聚合到一个子任务块里
+- 子任务块默认折叠，可展开查看子 agent 内部过程
+- 子任务块之外仍保留主流程总结正文
+
+### 校验点
+
+- `groupMessagePartsForDisplay` 会按 `subagentSessionId` 聚合 part
+- 子任务块标题显示 `subagentName`
+- 子任务块中的工具数量与实际 `tool` part 数量一致
+
+---
+
+## C18. Subagent 追问冒泡
+
+### 适用场景
+
+子 agent 在执行过程中需要用户补充信息。前端既要在子任务块中保留原始 `question`，也要把可交互的追问卡片冒泡到主流程，保证用户不必先展开子任务再回答。
+
+### 事件序列
+
+```json
+[
+  { "type": "text.done", "partId": "text_intro", "content": "主流程说明：子 agent 需要确认平台偏好。" },
+  {
+    "type": "question",
+    "partId": "question_sub_1",
+    "toolCallId": "call_sub_question_1",
+    "header": "Subagent needs your input",
+    "question": "Which platform should the follow-up implementation plan prioritize?",
+    "options": [
+      { "label": "Android" },
+      { "label": "iOS" },
+      { "label": "HarmonyOS" }
+    ],
+    "subagentSessionId": "subagent_question_xxx",
+    "subagentName": "Platform Planner"
+  }
+]
+```
+
+### 推荐提示词
+
+```text
+mock-subagent-question
+```
+
+### 预期 UI
+
+- 页面出现一个子任务块，内部保留原始 `question`
+- 主流程位置同时出现一个可点击的追问卡片
+- 卡片顶部显示 “来自 Platform Planner”
+- 用户点击选项或提交自定义答案后，SDK 侧 `sendMessage` 会带上 `subagentSessionId`
+
+### 校验点
+
+- 冒泡卡片和子任务内部卡片指向同一个 `subagentSessionId`
+- 回答后会继续收到一轮子 agent 的工具更新和文本总结
+- 主流程最终会补一段普通总结文本，表示平台偏好已记录
+
+---
+
+## C19. Subagent 权限申请与回填
+
+### 适用场景
+
+子 agent 想执行写文件、跑命令等动作，需要单独向用户申请权限。前端需要让权限卡片在主流程可见，同时把授权结果按 `subagentSessionId` 回填给子 agent。
+
+### 事件序列
+
+```json
+[
+  { "type": "text.done", "partId": "text_intro", "content": "主流程说明：子 agent 正准备生成 case 文档。" },
+  {
+    "type": "permission.ask",
+    "partId": "perm_sub_1",
+    "permissionId": "perm_sub_write_1",
+    "permType": "file_write",
+    "toolName": "write_case_markdown",
+    "title": "Subagent wants to write a case file",
+    "content": "The subagent plans to generate a markdown case under docs/subagent-cases/.",
+    "subagentSessionId": "subagent_permission_xxx",
+    "subagentName": "Workspace Writer"
+  },
+  {
+    "type": "permission.reply",
+    "permissionId": "perm_sub_write_1",
+    "response": "once",
+    "subagentSessionId": "subagent_permission_xxx",
+    "subagentName": "Workspace Writer"
+  }
+]
+```
+
+### 推荐提示词
+
+```text
+mock-subagent-permission
+```
+
+### 预期 UI
+
+- 页面出现一个子任务块，内部保留原始权限申请
+- 主流程同时出现可交互的权限卡片
+- 卡片顶部显示 “来自 Workspace Writer”
+- 用户授权后，卡片进入已处理态，并继续收到一段子 agent 的结果回填
+
+### 校验点
+
+- `replyPermission` 调用会携带 `subagentSessionId`
+- `permission.reply` 既能回填卡片状态，也会驱动后续子 agent 文本结果
+- 当响应是 `reject` 时，子 agent 总结文案会体现流程被中止
+
 ## 5. 建议补齐的 mock 场景
 
-当前本地 [`installJsApiMock.ts`](../src/mocks/installJsApiMock.ts) 只稳定覆盖了：
+当前本地 [`installJsApiMock.ts`](../src/mocks/installJsApiMock.ts) 已覆盖基础流式、工具、追问、权限、文件、恢复态，以及本次新增的 subagent 联调场景。
 
-- 普通 `text.delta` / `text.done`
-- `session.status`
-- `session.error`
-- `error`
+本轮新增的 subagent mock 触发词如下：
 
-如果要让 `weAgentCUI` 的联调和设计回归更完整，建议继续补以下 mock 触发词：
+- `mock-subagent`
+  目标：返回一条同时包含主流程文本、子 agent `thinking/tool/text` 的复合消息
+- `mock-subagent-question`
+  目标：返回子 agent 追问，并在回答后继续下发子 agent 工具更新与总结
+- `mock-subagent-permission`
+  目标：返回子 agent 权限申请，并在授权后继续下发子 agent 结果回填
 
-- `mock-thinking`
-  目标：返回 `thinking.delta` + `thinking.done` + `text.done`
-- `mock-tool`
-  目标：返回一组 `tool.update` 状态流转
-- `mock-question`
-  目标：返回 `question` 卡片
-- `mock-permission`
-  目标：返回 `permission.ask`，点击按钮后再下发 `permission.reply`
-- `mock-file`
-  目标：返回 `file`
-- `mock-snapshot`
-  目标：返回 `snapshot`
-- `mock-streaming`
-  目标：返回 `streaming`
-- `mock-step`
-  目标：返回 `step.start` + `step.done`
+后续如果还要进一步增强回归集，优先考虑补这些场景：
+
+- `mock-subagent-stop`
+  目标：验证仅停止某个子 agent 任务时的 UI 收尾效果
+- `mock-subagent-multi`
+  目标：验证同一条主消息里并行出现多个 `subagentSessionId` 时的分组表现
+- `mock-subagent-history`
+  目标：验证带 `subagentSessionId` 的历史消息、快照恢复与补流恢复一致性
 
 ## 6. 推荐回归顺序
 
@@ -761,6 +923,7 @@ error
 2. 再验证 C11、C12，确认异常收尾和消息内错误块正常
 3. 再验证 C03、C04、C06、C07、C08，确认复杂 part 渲染正常
 4. 最后验证 C13、C14，确认断线恢复和补流场景正常
+5. 在基础场景稳定后，补充验证 C17、C18、C19，确认 subagent 分组、交互冒泡与回传链路正常
 
 ## 7. Mock 输入触发文案
 
@@ -778,6 +941,9 @@ error
 | Step 元数据 | `mock-step` | 触发 `step.start/step.done`，并附带 `tokens/cost` |
 | 快照恢复 | `mock-snapshot` | 触发 `snapshot` 并替换当前消息列表 |
 | 补流恢复 | `mock-streaming` | 触发 `streaming` 后继续补发 `thinking/text` |
+| Subagent 基础展示 | `mock-subagent` | 触发主流程文本 + 子 agent 的 `thinking/tool/text`，渲染可折叠子任务块 |
+| Subagent 追问 | `mock-subagent-question` | 触发子 agent `question`，回答时自动带上 `subagentSessionId` |
+| Subagent 权限 | `mock-subagent-permission` | 触发子 agent `permission.ask`，授权回填时自动带上 `subagentSessionId` |
 | 会话标题 | `mock-session-title` | 触发 `session.title`，当前页面无可见专属 UI |
 | Agent 在线 | `mock-agent-online` | 触发 `agent.online`，当前页面无可见专属 UI |
 | Agent 离线 | `mock-agent-offline` | 触发 `agent.offline`，当前页面无可见专属 UI |
@@ -795,6 +961,9 @@ error
 - `触发step`
 - `触发snapshot`
 - `触发streaming`
+- `触发subagent`
+- `触发subagent-question`
+- `触发subagent-permission`
 - `触发session.title`
 - `触发agent.online`
 - `触发agent.offline`

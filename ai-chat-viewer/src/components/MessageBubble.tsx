@@ -12,10 +12,12 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
+import { SubtaskBlock } from './SubtaskBlock';
 import { createMarkdownComponents } from './markdownComponents';
 import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
+  groupMessagePartsForDisplay,
   normalizeRole,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
@@ -79,7 +81,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     </ReactMarkdown>
   );
 
-  const renderPart = (part: MessagePart) => {
+  const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
     switch (part.type) {
       case 'thinking':
         return <ThinkingBlock key={part.partId} part={part} />;
@@ -124,6 +126,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       case 'error':
         return <ErrorBlock key={part.partId} part={part} />;
 
+      case 'subtask':
+        return (
+          <SubtaskBlock key={part.partId} part={part}>
+            <div className="subtask-block__parts">
+              {(part.subParts ?? [])
+                .filter(shouldRenderMessagePart)
+                .map((subPart) => renderPart(subPart, true))}
+            </div>
+          </SubtaskBlock>
+        );
+
       case 'text':
       default:
         return (
@@ -136,12 +149,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const renderContent = () => {
     const normalizedParts = message.parts
-      ? syncToolCallIdForQuestionParts(message.parts).filter(shouldRenderMessagePart)
+      ? groupMessagePartsForDisplay(syncToolCallIdForQuestionParts(message.parts)).filter(shouldRenderMessagePart)
       : undefined;
     if (normalizedParts && normalizedParts.length > 0) {
       return (
         <div className="message-parts">
-          {normalizedParts.map((part) => renderPart(part))}
+          {normalizedParts.map((part) => renderPart(part, false))}
         </div>
       );
     }

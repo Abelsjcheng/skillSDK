@@ -128,6 +128,121 @@
     margin: 0;
   }
 
+  .question-card__source,
+  .permission-card__source {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(232, 244, 255, 1);
+    color: rgba(22, 115, 246, 1);
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .subtask-block {
+    width: 100%;
+    border: 1px solid rgba(223, 230, 238, 1);
+    border-radius: 16px;
+    background: rgba(248, 250, 252, 1);
+    overflow: hidden;
+  }
+
+  .subtask-block__header {
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .subtask-block__meta {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .subtask-block__status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .subtask-block__status--running {
+    background: rgba(22, 115, 246, 1);
+  }
+
+  .subtask-block__status--completed {
+    background: rgba(47, 168, 80, 1);
+  }
+
+  .subtask-block__status--error {
+    background: rgba(235, 87, 87, 1);
+  }
+
+  .subtask-block__name {
+    color: rgba(25, 25, 25, 1);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 22px;
+  }
+
+  .subtask-block__summary {
+    min-width: 0;
+    color: rgba(89, 89, 89, 1);
+    font-size: 12px;
+    line-height: 18px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .subtask-block__side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .subtask-block__tools {
+    color: rgba(102, 102, 102, 1);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .subtask-block__chevron {
+    color: rgba(102, 102, 102, 1);
+    font-size: 16px;
+    line-height: 16px;
+    transition: transform 0.2s ease;
+  }
+
+  .subtask-block__chevron.is-open {
+    transform: rotate(180deg);
+  }
+
+  .subtask-block__body {
+    padding: 0 14px 14px;
+    border-top: 1px solid rgba(223, 230, 238, 1);
+  }
+
+  .subtask-block__parts {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 12px;
+  }
+
   .we-agent-message__pending {
     display: inline-flex;
     align-items: center;

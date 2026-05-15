@@ -24,14 +24,29 @@ export type StreamMessageType =
   | 'message.user'
   | 'error'
   | 'snapshot'
-  | 'streaming';
+  | 'streaming'
+  | 'planning.delta'
+  | 'planning.done'
+  | 'searching'
+  | 'search_result'
+  | 'reference'
+  | 'ask_more';
 
-export type MessagePartType = 'text' | 'thinking' | 'tool' | 'question' | 'permission' | 'file' | 'error';
+export type MessagePartType =
+  | 'text'
+  | 'thinking'
+  | 'tool'
+  | 'question'
+  | 'permission'
+  | 'file'
+  | 'error'
+  | 'subtask';
 export type PartStatus = 'pending' | 'running' | 'completed' | 'error';
 export type PermissionResponse = 'once' | 'always' | 'reject';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type BackendMessageRole = 'user' | 'assistant' | 'system' | 'tool' | string;
 export type BackendContentType = 'plain' | 'markdown' | string | null;
+export type SubagentStatus = 'running' | 'completed' | 'error';
 export interface QuestionOption {
   label: string;
   description?: string;
@@ -40,9 +55,16 @@ export interface QuestionOption {
 export interface QuestionAnswerSubmission {
   answer: string;
   toolCallId?: string;
+  subagentSessionId?: string;
 }
 
 export type QuestionOptionInput = string | QuestionOption;
+
+export interface QuestionItemInput {
+  header?: string;
+  question?: string;
+  options?: QuestionOptionInput[] | null;
+}
 
 interface ToolPartFields<TValue, TStatus> {
   toolName?: TValue;
@@ -58,6 +80,9 @@ interface QuestionPartFields<TValue, TOptions> {
   header?: TValue;
   question?: TValue;
   options?: TOptions;
+  multiSelect?: boolean | null;
+  questions?: QuestionItemInput[] | null;
+  extParam?: object | null;
 }
 
 interface PermissionCoreFields<TValue> {
@@ -85,8 +110,8 @@ export interface StreamMessage
   // transport-level fields
   type: StreamMessageType;
   seq: number | null;
-  welinkSessionId: string;
-  emittedAt: string | null;
+  welinkSessionId?: string | null;
+  emittedAt?: string | null;
   raw?: object;
 
   // message-level fields
@@ -116,6 +141,12 @@ export interface StreamMessage
   // snapshot/streaming fields
   messages?: SessionMessageSnapshot[] | null;
   parts?: MessagePartSnapshot[] | null;
+  keywords?: string[] | null;
+  searchResults?: object[] | null;
+  references?: object[] | null;
+  askMoreQuestions?: string[] | null;
+  subagentSessionId?: string | null;
+  subagentName?: string | null;
 }
 
 // ============================================================
@@ -144,6 +175,8 @@ export interface SessionMessagePart
   partSeq: number;
   type: MessagePartType;
   content: string | null;
+  subagentSessionId?: string | null;
+  subagentName?: string | null;
 }
 
 // ============================================================
@@ -162,6 +195,12 @@ export interface MessagePart
   isStreaming: boolean;
   answered?: boolean;
   permResolved?: boolean;
+  subagentSessionId?: string;
+  subagentName?: string;
+  subagentPrompt?: string;
+  subagentStatus?: SubagentStatus;
+  subParts?: MessagePart[];
+  bubbleToMainFlow?: boolean;
 }
 
 /** A single message in the conversation */
@@ -214,6 +253,8 @@ export interface MessagePartSnapshot
   partSeq?: number;
   type: MessagePartType;
   content?: string | null;
+  subagentSessionId?: string | null;
+  subagentName?: string | null;
 }
 
 // ============================================================

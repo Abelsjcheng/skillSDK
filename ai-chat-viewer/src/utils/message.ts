@@ -9,6 +9,7 @@ import type {
   SessionMessage,
   SessionMessagePart,
   SessionMessageSnapshot,
+  SubagentStatus,
 } from '../types';
 
 export type RawMessagePart = SessionMessagePart | MessagePartSnapshot;
@@ -224,6 +225,11 @@ export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: bo
     fileName: rawPart.fileName ?? undefined,
     fileUrl: rawPart.fileUrl ?? undefined,
     fileMime: rawPart.fileMime ?? undefined,
+    multiSelect: rawPart.multiSelect ?? undefined,
+    questions: rawPart.questions ?? undefined,
+    extParam: rawPart.extParam ?? undefined,
+    subagentSessionId: rawPart.subagentSessionId ?? undefined,
+    subagentName: rawPart.subagentName ?? undefined,
   };
 }
 
@@ -268,6 +274,10 @@ export function shouldRenderMessagePart(part: MessagePart): boolean {
       return hasVisibleText(part.content)
         || hasVisibleText(part.fileName)
         || hasVisibleText(part.fileUrl);
+    case 'subtask':
+      return hasVisibleText(part.subagentName)
+        || hasVisibleText(part.subagentPrompt)
+        || Boolean(part.subParts?.some(shouldRenderMessagePart));
     default:
       return hasVisibleText(part.content);
   }
@@ -358,4 +368,112 @@ export function syncToolCallIdForQuestionParts(parts: MessagePart[]): MessagePar
       toolCallId: currentToolCallId,
     };
   });
+}
+
+function extractSubtaskPreview(part: MessagePart): string | undefined {
+  switch (part.type) {
+    case 'text':
+    case 'thinking':
+    case 'error':
+      return hasVisibleText(part.content) ? part.content.trim() : undefined;
+    case 'tool':
+      if (hasVisibleText(part.title)) return part.title!.trim();
+      if (hasVisibleText(part.toolName)) return part.toolName!.trim();
+      if (hasVisibleText(part.output)) return part.output!.trim();
+      return undefined;
+    case 'file':
+      return hasVisibleText(part.fileName) ? part.fileName!.trim() : undefined;
+    case 'question':
+      return hasVisibleText(part.question) ? part.question!.trim() : undefined;
+    case 'permission':
+      return hasVisibleText(part.content) ? part.content.trim() : undefined;
+    default:
+      return undefined;
+  }
+}
+
+function resolveSubagentStatus(parts: MessagePart[]): SubagentStatus {
+  const hasError = parts.some((part) =>
+    part.type === 'error'
+    || part.status === 'error'
+    || (part.type === 'tool' && hasVisibleText(part.content))
+  );
+  if (hasError) {
+    return 'error';
+  }
+
+  const isRunning = parts.some((part) =>
+    part.isStreaming
+    || part.status === 'pending'
+    || part.status === 'running'
+    || (part.type === 'question' && !part.answered)
+    || (part.type === 'permission' && !part.permResolved)
+  );
+  return isRunning ? 'running' : 'completed';
+}
+
+function createSubtaskContainer(subagentSessionId: string, subagentName?: string): MessagePart {
+  return {
+    partId: `subtask_${subagentSessionId}`,
+    type: 'subtask',
+    content: '',
+    isStreaming: false,
+    subagentSessionId,
+    subagentName,
+    subParts: [],
+  };
+}
+
+export function groupMessagePartsForDisplay(parts: MessagePart[]): MessagePart[] {
+  const groupedParts: MessagePart[] = [];
+  const subtasks = new Map<string, MessagePart>();
+
+  for (const part of parts) {
+    const subagentSessionId = part.subagentSessionId?.trim();
+    if (!subagentSessionId) {
+      groupedParts.push(part);
+      continue;
+    }
+
+    let subtask = subtasks.get(subagentSessionId);
+    if (!subtask) {
+      subtask = createSubtaskContainer(subagentSessionId, part.subagentName);
+      subtasks.set(subagentSessionId, subtask);
+      groupedParts.push(subtask);
+    }
+
+    if (!subtask.subagentName && part.subagentName) {
+      subtask.subagentName = part.subagentName;
+    }
+
+    const subParts = subtask.subParts ?? [];
+    subParts.push(part);
+    subtask.subParts = subParts;
+    subtask.isStreaming = subParts.some((item) => item.isStreaming);
+
+    if (!subtask.subagentPrompt) {
+      const preview = extractSubtaskPreview(part);
+      if (preview) {
+        subtask.subagentPrompt = preview;
+      }
+    }
+
+    if (part.type === 'question' || part.type === 'permission') {
+      groupedParts.push({
+        ...part,
+        partId: `${part.partId}__bubble`,
+        bubbleToMainFlow: true,
+      });
+    }
+  }
+
+  for (const subtask of subtasks.values()) {
+    const subParts = subtask.subParts ?? [];
+    subtask.subagentStatus = resolveSubagentStatus(subParts);
+    if (!subtask.subagentPrompt) {
+      subtask.subagentPrompt = subtask.subagentName;
+    }
+  }
+
+  return groupedParts;
 }

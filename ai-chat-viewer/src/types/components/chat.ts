@@ -1,4 +1,4 @@
-import type { ImgHTMLAttributes } from 'react';
+import type { ImgHTMLAttributes, ReactNode } from 'react';
 import type { Message, MessagePart, PendingAssistantPreview, QuestionAnswerSubmission } from '../index';
 
 export interface AppProps {
@@ -59,6 +59,11 @@ export interface ToolCardProps {
 
 export interface ErrorBlockProps {
   part: MessagePart;
+}
+
+export interface SubtaskBlockProps {
+  part: MessagePart;
+  children?: ReactNode;
 }
 
 export interface PendingAssistantBubbleProps {

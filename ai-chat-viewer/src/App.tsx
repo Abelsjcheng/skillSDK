@@ -279,7 +279,11 @@ function App({ assistantAccount = '' }: AppProps) {
     }
   }, [finalizeStreamingMessage]);
 
-  const sendUserMessage = useCallback(async (content: string, toolCallId?: string) => {
+  const sendUserMessage = useCallback(async (
+    content: string,
+    toolCallId?: string,
+    subagentSessionId?: string,
+  ) => {
     if (!welinkSessionId) {
       showToast(t('weAgent.sendMessageWithoutSessionFailed'));
       return null;
@@ -289,6 +293,7 @@ function App({ assistantAccount = '' }: AppProps) {
       welinkSessionId,
       content: content?.trim(),
       ...(toolCallId ? { toolCallId } : {}),
+      ...(subagentSessionId ? { subagentSessionId } : {}),
     });
     const userMessage = messageOperationToMessage(result);
 
@@ -329,14 +334,19 @@ function App({ assistantAccount = '' }: AppProps) {
   const handleQuestionAnswered = useCallback(async ({
     answer,
     toolCallId,
+    subagentSessionId,
   }: QuestionAnswerSubmission) => {
     finalizeStreamingMessage();
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId);
+      await sendUserMessage(answer, toolCallId, subagentSessionId);
     } catch (err) {
-      WeLog(`App sendMessage failed | extra=${JSON.stringify({ welinkSessionId, toolCallId })} | error=${JSON.stringify(err)}`);
+      WeLog(`App sendMessage failed | extra=${JSON.stringify({
+        welinkSessionId,
+        toolCallId,
+        subagentSessionId,
+      })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
       showToast(t('weAgent.submitAnswerFailed'));
       throw err;

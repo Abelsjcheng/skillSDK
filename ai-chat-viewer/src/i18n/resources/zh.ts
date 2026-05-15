@@ -55,6 +55,8 @@ export const zh = {
   'permission.processFailed': '权限处理失败',
   'permission.toolLabel': '工具',
   'question.customPlaceholder': '请输入自定义回答...',
+  'question.customOptionLabel': '自定义',
+  'question.customAnswerPlaceholder': '请输出自定义答案',
   'question.answered': '已回答',
   'thinking.title': '思考过程',
   'thinking.streaming': '思考中...',

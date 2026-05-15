@@ -26,6 +26,11 @@ export class StreamAssembler {
     return part;
   }
 
+  private syncSubagentFields(part: MessagePart, msg: StreamMessage): void {
+    part.subagentSessionId = msg.subagentSessionId ?? part.subagentSessionId;
+    part.subagentName = msg.subagentName ?? part.subagentName;
+  }
+
   handleMessage(msg: StreamMessage): void {
     if (this.completed) return;
 
@@ -33,6 +38,7 @@ export class StreamAssembler {
       case 'text.delta': {
         const id = msg.partId || this.findActivePartId('text') || this.genPartId('text');
         const part = this.getOrCreatePart(id, 'text');
+        this.syncSubagentFields(part, msg);
         part.content += msg.content ?? '';
         part.isStreaming = true;
         break;
@@ -43,12 +49,14 @@ export class StreamAssembler {
         if (id) {
           const part = this.parts.get(id);
           if (part) {
+            this.syncSubagentFields(part, msg);
             if (msg.content) part.content = msg.content;
             part.isStreaming = false;
           }
         } else {
           const newId = this.genPartId('text');
           const part = this.getOrCreatePart(newId, 'text');
+          this.syncSubagentFields(part, msg);
           part.content = msg.content ?? '';
           part.isStreaming = false;
         }
@@ -58,6 +66,7 @@ export class StreamAssembler {
       case 'thinking.delta': {
         const id = msg.partId || this.findActivePartId('thinking') || this.genPartId('thinking');
         const part = this.getOrCreatePart(id, 'thinking');
+        this.syncSubagentFields(part, msg);
         part.content += msg.content ?? '';
         part.isStreaming = true;
         break;
@@ -68,12 +77,14 @@ export class StreamAssembler {
         if (id) {
           const part = this.parts.get(id);
           if (part) {
+            this.syncSubagentFields(part, msg);
             if (msg.content) part.content = msg.content;
             part.isStreaming = false;
           }
         } else {
           const newId = this.genPartId('thinking');
           const part = this.getOrCreatePart(newId, 'thinking');
+          this.syncSubagentFields(part, msg);
           part.content = msg.content ?? '';
           part.isStreaming = false;
         }
@@ -83,6 +94,7 @@ export class StreamAssembler {
       case 'tool.update': {
         const id = msg.partId || this.genPartId('tool');
         const part = this.getOrCreatePart(id, 'tool');
+        this.syncSubagentFields(part, msg);
         part.toolName = msg.toolName ?? undefined;
         part.toolCallId = msg.toolCallId ?? undefined;
         const status = msg.status;
@@ -105,6 +117,7 @@ export class StreamAssembler {
         const questionFields = extractQuestionFields(msg.input ?? questionPart?.input);
         const id = msg.partId || questionPart?.partId || this.genPartId('question');
         const part = this.getOrCreatePart(id, 'question');
+        this.syncSubagentFields(part, msg);
         part.toolName = msg.toolName ?? questionPart?.toolName ?? part.toolName;
         part.toolCallId = msg.toolCallId ?? questionPart?.toolCallId ?? part.toolCallId;
 
@@ -122,6 +135,9 @@ export class StreamAssembler {
           questionFields.options
           ?? normalizeQuestionOptions(msg.options ?? questionPart?.options)
           ?? part.options;
+        part.multiSelect = msg.multiSelect ?? questionPart?.multiSelect ?? part.multiSelect;
+        part.questions = msg.questions ?? questionPart?.questions ?? part.questions;
+        part.extParam = msg.extParam ?? questionPart?.extParam ?? part.extParam;
         if (status === 'completed' || status === 'error') {
           part.answered = true;
         }
@@ -136,6 +152,7 @@ export class StreamAssembler {
       case 'permission.ask': {
         const id = msg.partId || msg.permissionId || this.genPartId('perm');
         const part = this.getOrCreatePart(id, 'permission');
+        this.syncSubagentFields(part, msg);
         part.permissionId = msg.permissionId ?? undefined;
         part.permType = msg.permType ?? undefined;
         part.toolName = msg.toolName ?? undefined;
@@ -149,6 +166,7 @@ export class StreamAssembler {
       case 'permission.reply': {
         const id = this.findPermissionPartId(msg.permissionId) || msg.partId || msg.permissionId || this.genPartId('perm');
         const part = this.getOrCreatePart(id, 'permission');
+        this.syncSubagentFields(part, msg);
         part.permissionId = msg.permissionId ?? part.permissionId;
         part.response = msg.response ?? part.response;
         part.permResolved = true;
@@ -159,6 +177,7 @@ export class StreamAssembler {
       case 'file': {
         const id = msg.partId || this.genPartId('file');
         const part = this.getOrCreatePart(id, 'file');
+        this.syncSubagentFields(part, msg);
         part.fileName = msg.fileName ?? undefined;
         part.fileUrl = msg.fileUrl ?? undefined;
         part.fileMime = msg.fileMime ?? undefined;

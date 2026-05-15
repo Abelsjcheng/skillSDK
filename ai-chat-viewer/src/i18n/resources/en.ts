@@ -58,6 +58,8 @@ export const en = {
   'permission.processFailed': 'Failed to handle permission',
   'permission.toolLabel': 'Tool',
   'question.customPlaceholder': 'Enter a custom answer...',
+  'question.customOptionLabel': 'Custom',
+  'question.customAnswerPlaceholder': 'Please enter a custom answer',
   'question.answered': 'Answered',
   'thinking.title': 'Thought Process',
   'thinking.streaming': 'Thinking...',

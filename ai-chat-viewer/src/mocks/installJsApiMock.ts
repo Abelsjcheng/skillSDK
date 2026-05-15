@@ -76,6 +76,11 @@ interface SessionListener {
   onClose?: RegisterSessionListenerParams['onClose'];
 }
 
+interface SubagentMockContext {
+  subagentSessionId: string;
+  subagentName: string;
+}
+
 type MockReplyScenario =
   | {
     type: 'normal';
@@ -150,6 +155,37 @@ type MockReplyScenario =
   | {
     type: 'agent.online' | 'agent.offline';
     assistantContent: string;
+  }
+  | {
+    type: 'subagent.basic';
+    introContent: string;
+    finalContent: string;
+    subagent: SubagentMockContext;
+    thinkingContent: string;
+    toolName: string;
+    toolTitle: string;
+    toolInput: Record<string, unknown>;
+    toolOutput: string;
+    subagentContent: string;
+  }
+  | {
+    type: 'subagent.question';
+    introContent: string;
+    subagent: SubagentMockContext;
+    toolCallId: string;
+    header: string;
+    question: string;
+    options: Array<{ label: string; description?: string }>;
+  }
+  | {
+    type: 'subagent.permission';
+    introContent: string;
+    subagent: SubagentMockContext;
+    permissionId: string;
+    permType: string;
+    toolName: string;
+    title: string;
+    content: string;
   };
 
 declare global {
@@ -163,6 +199,9 @@ const BASE_PAGE_URI = `${HOST()}/index.html`;
 const DEFAULT_ASSISTANT_ACCOUNT = 'mock_assistant_001';
 const MOCK_UID = 'mock_uid_10001';
 const DEFAULT_PAGE_SIZE = 50;
+const SUBAGENT_BASIC_PREFIX = 'subagent_basic';
+const SUBAGENT_QUESTION_PREFIX = 'subagent_question';
+const SUBAGENT_PERMISSION_PREFIX = 'subagent_permission';
 
 let idCounter = 0;
 let currentAssistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
@@ -250,23 +289,46 @@ function splitReplyContent(content: string): string[] {
   return chunks.length > 0 ? chunks : [content];
 }
 
-function buildTextPart(partId: string, content: string): SessionMessage['parts'] {
+function buildTextPart(
+  partId: string,
+  content: string,
+  partSeq = 1,
+  subagent?: SubagentMockContext,
+  status: 'completed' | 'running' = 'completed',
+): SessionMessage['parts'] {
   return [{
     partId,
-    partSeq: 1,
+    partSeq,
     type: 'text',
     content,
-    status: 'completed',
+    status,
+    ...(subagent
+      ? {
+        subagentSessionId: subagent.subagentSessionId,
+        subagentName: subagent.subagentName,
+      }
+      : {}),
   }];
 }
 
-function buildThinkingPart(partId: string, content: string, partSeq = 1): NonNullable<SessionMessage['parts']>[number] {
+function buildThinkingPart(
+  partId: string,
+  content: string,
+  partSeq = 1,
+  subagent?: SubagentMockContext,
+): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
     partSeq,
     type: 'thinking',
     content,
     status: 'completed',
+    ...(subagent
+      ? {
+        subagentSessionId: subagent.subagentSessionId,
+        subagentName: subagent.subagentName,
+      }
+      : {}),
   };
 }
 
@@ -278,6 +340,7 @@ function buildToolPart(
   output: string,
   toolCallId: string,
   partSeq = 1,
+  subagent?: SubagentMockContext,
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -290,6 +353,12 @@ function buildToolPart(
     toolCallId,
     input,
     output,
+    ...(subagent
+      ? {
+        subagentSessionId: subagent.subagentSessionId,
+        subagentName: subagent.subagentName,
+      }
+      : {}),
   };
 }
 
@@ -300,6 +369,7 @@ function buildQuestionPart(
   question: string,
   options: Array<{ label: string; description?: string }>,
   partSeq = 1,
+  subagent?: SubagentMockContext,
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -311,6 +381,12 @@ function buildQuestionPart(
     header,
     question,
     options,
+    ...(subagent
+      ? {
+        subagentSessionId: subagent.subagentSessionId,
+        subagentName: subagent.subagentName,
+      }
+      : {}),
   };
 }
 
@@ -323,6 +399,7 @@ function buildPermissionPart(
   content: string,
   response?: ReplyPermissionParams['response'],
   partSeq = 1,
+  subagent?: SubagentMockContext,
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -335,6 +412,12 @@ function buildPermissionPart(
     toolName,
     title,
     response,
+    ...(subagent
+      ? {
+        subagentSessionId: subagent.subagentSessionId,
+        subagentName: subagent.subagentName,
+      }
+      : {}),
   };
 }
 
@@ -344,6 +427,7 @@ function buildFilePart(
   fileUrl: string,
   fileMime: string,
   partSeq = 1,
+  subagent?: SubagentMockContext,
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -354,6 +438,12 @@ function buildFilePart(
     fileName,
     fileUrl,
     fileMime,
+    ...(subagent
+      ? {
+        subagentSessionId: subagent.subagentSessionId,
+        subagentName: subagent.subagentName,
+      }
+      : {}),
   };
 }
 
@@ -438,6 +528,27 @@ function buildMockFileUrl(fileName: string): string {
 
 function matchesMockKeyword(normalized: string, keywords: string[]): boolean {
   return keywords.some((keyword) => normalized.includes(keyword));
+}
+
+function createSubagentContext(prefix: string, subagentName: string): SubagentMockContext {
+  return {
+    subagentSessionId: nextId(prefix),
+    subagentName,
+  };
+}
+
+function matchesSubagentSession(subagentSessionId: string | undefined, prefix: string): boolean {
+  return Boolean(subagentSessionId && subagentSessionId.startsWith(`${prefix}_`));
+}
+
+function resolveSubagentName(subagentSessionId: string): string {
+  if (matchesSubagentSession(subagentSessionId, SUBAGENT_QUESTION_PREFIX)) {
+    return 'Platform Planner';
+  }
+  if (matchesSubagentSession(subagentSessionId, SUBAGENT_PERMISSION_PREFIX)) {
+    return 'Workspace Writer';
+  }
+  return 'Code Indexer';
 }
 
 function resolveMockReplyScenario(content: string): MockReplyScenario {
@@ -540,6 +651,56 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
       },
       toolOutput: 'Matched src/pages/weAgentCUI.tsx, src/App.tsx, src/protocol/StreamAssembler.ts, src/components/MessageBubble.tsx',
       assistantContent: 'Tool execution finished. The core flow has been located and summarized.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-subagent-question', 'trigger-subagent-question', '触发subagent-question'])) {
+    return {
+      type: 'subagent.question',
+      introContent: 'I am delegating platform confirmation to a subagent before continuing the main task.',
+      subagent: createSubagentContext(SUBAGENT_QUESTION_PREFIX, 'Platform Planner'),
+      toolCallId: nextId('tool_call_subagent_question'),
+      header: 'Subagent needs your input',
+      question: 'Which platform should the follow-up implementation plan prioritize?',
+      options: [
+        { label: 'Android', description: 'Continue with Java/Kotlin implementation details' },
+        { label: 'iOS', description: 'Continue with Objective-C/Swift implementation details' },
+        { label: 'HarmonyOS', description: 'Continue with ArkTS implementation details' },
+      ],
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-subagent-permission', 'trigger-subagent-permission', '触发subagent-permission'])) {
+    return {
+      type: 'subagent.permission',
+      introContent: 'I delegated file generation to a subagent and it is now requesting write permission.',
+      subagent: createSubagentContext(SUBAGENT_PERMISSION_PREFIX, 'Workspace Writer'),
+      permissionId: nextId('perm_subagent_write'),
+      permType: 'file_write',
+      toolName: 'write_case_markdown',
+      title: 'Subagent wants to write a case file',
+      content: 'The subagent plans to generate a markdown case under docs/subagent-cases/.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-subagent', 'trigger-subagent', '触发subagent'])) {
+    return {
+      type: 'subagent.basic',
+      introContent: 'I split this request into a dedicated subagent to inspect the UI rendering path.',
+      finalContent: 'The subagent finished its inspection and the main flow can continue with the summarized result.',
+      subagent: createSubagentContext(SUBAGENT_BASIC_PREFIX, 'Code Indexer'),
+      thinkingContent: [
+        '1. Locate the message render path.',
+        '2. Group subagent-tagged parts into a visual subtask block.',
+        '3. Bubble interactive cards back to the main flow when required.',
+      ].join('\n'),
+      toolName: 'code_search',
+      toolTitle: 'Inspect subagent rendering pipeline',
+      toolInput: {
+        query: 'MessageBubble groupMessagePartsForDisplay SubtaskBlock',
+      },
+      toolOutput: 'Matched MessageBubble.tsx, utils/message.ts, and SubtaskBlock.tsx.',
+      subagentContent: 'The subagent confirmed that subagent-tagged parts are grouped at render time and remain compatible with history and streaming recovery.',
     };
   }
 
@@ -775,6 +936,176 @@ function updateStoredPermissionResponse(
   }
 }
 
+function scheduleSubagentQuestionReply(
+  record: SessionRecord,
+  subagentSessionId: string,
+  answer: string,
+): void {
+  clearSessionTimers(record);
+
+  const sessionId = record.session.welinkSessionId;
+  const assistantMessageId = nextId('msg_assistant_subagent_question_reply');
+  const subagent: SubagentMockContext = {
+    subagentSessionId,
+    subagentName: resolveSubagentName(subagentSessionId),
+  };
+  const toolPartId = nextId('part_subagent_question_tool');
+  const subagentTextPartId = nextId('part_subagent_question_text');
+  const summaryPartId = nextId('part_subagent_question_summary');
+  const toolCallId = nextId('tool_call_subagent_answer');
+  const toolOutput = `User selected ${answer}. Continue downstream implementation on that platform.`;
+  const subagentContent = `The subagent locked the implementation focus to ${answer} and updated its execution notes.`;
+  const finalContent = `Platform preference recorded: ${answer}. The main flow can now continue with a focused implementation plan.`;
+
+  scheduleRecordTimer(record, 40, () => {
+    emit(sessionId, {
+      type: 'session.status',
+      sessionStatus: 'busy',
+    });
+  });
+
+  scheduleRecordTimer(record, 120, () => {
+    emit(sessionId, {
+      type: 'tool.update',
+      messageId: assistantMessageId,
+      role: 'assistant',
+      partId: toolPartId,
+      toolName: 'platform_router',
+      toolCallId,
+      status: 'running',
+      title: 'Confirm platform preference',
+      input: { answer },
+      subagentSessionId: subagent.subagentSessionId,
+      subagentName: subagent.subagentName,
+    });
+  });
+
+  scheduleRecordTimer(record, 220, () => {
+    emit(sessionId, {
+      type: 'tool.update',
+      messageId: assistantMessageId,
+      role: 'assistant',
+      partId: toolPartId,
+      toolName: 'platform_router',
+      toolCallId,
+      status: 'completed',
+      title: 'Confirm platform preference',
+      input: { answer },
+      output: toolOutput,
+      subagentSessionId: subagent.subagentSessionId,
+      subagentName: subagent.subagentName,
+    });
+  });
+
+  scheduleRecordTimer(record, 320, () => {
+    emit(sessionId, {
+      type: 'text.done',
+      messageId: assistantMessageId,
+      role: 'assistant',
+      partId: subagentTextPartId,
+      content: subagentContent,
+      subagentSessionId: subagent.subagentSessionId,
+      subagentName: subagent.subagentName,
+    });
+  });
+
+  scheduleRecordTimer(record, 420, () => {
+    emit(sessionId, {
+      type: 'text.done',
+      messageId: assistantMessageId,
+      role: 'assistant',
+      partId: summaryPartId,
+      content: finalContent,
+    });
+    finalizeAssistantMessage(record, finalContent, [
+      buildToolPart(
+        toolPartId,
+        'platform_router',
+        'Confirm platform preference',
+        { answer },
+        toolOutput,
+        toolCallId,
+        1,
+        subagent,
+      ),
+      {
+        ...buildTextPart(subagentTextPartId, subagentContent, 2, subagent)![0],
+      },
+      {
+        ...buildTextPart(summaryPartId, finalContent, 3)![0],
+      },
+    ]);
+    emit(sessionId, {
+      type: 'session.status',
+      sessionStatus: 'idle',
+    });
+    clearSessionTimers(record);
+  });
+}
+
+function scheduleSubagentPermissionReply(
+  record: SessionRecord,
+  subagentSessionId: string,
+  response: ReplyPermissionParams['response'],
+): void {
+  clearSessionTimers(record);
+
+  const sessionId = record.session.welinkSessionId;
+  const assistantMessageId = nextId('msg_assistant_subagent_permission_reply');
+  const subagent: SubagentMockContext = {
+    subagentSessionId,
+    subagentName: resolveSubagentName(subagentSessionId),
+  };
+  const subagentTextPartId = nextId('part_subagent_permission_text');
+  const summaryPartId = nextId('part_subagent_permission_summary');
+  const subagentContent = `The subagent received permission response "${response}" and updated its file-writing workflow.`;
+  const finalContent = response === 'reject'
+    ? 'The subagent stopped the file generation flow because permission was rejected.'
+    : 'The subagent can continue the file generation flow after the permission approval.';
+
+  scheduleRecordTimer(record, 40, () => {
+    emit(sessionId, {
+      type: 'session.status',
+      sessionStatus: 'busy',
+    });
+  });
+
+  scheduleRecordTimer(record, 160, () => {
+    emit(sessionId, {
+      type: 'text.done',
+      messageId: assistantMessageId,
+      role: 'assistant',
+      partId: subagentTextPartId,
+      content: subagentContent,
+      subagentSessionId: subagent.subagentSessionId,
+      subagentName: subagent.subagentName,
+    });
+  });
+
+  scheduleRecordTimer(record, 280, () => {
+    emit(sessionId, {
+      type: 'text.done',
+      messageId: assistantMessageId,
+      role: 'assistant',
+      partId: summaryPartId,
+      content: finalContent,
+    });
+    finalizeAssistantMessage(record, finalContent, [
+      {
+        ...buildTextPart(subagentTextPartId, subagentContent, 1, subagent)![0],
+      },
+      {
+        ...buildTextPart(summaryPartId, finalContent, 2)![0],
+      },
+    ]);
+    emit(sessionId, {
+      type: 'session.status',
+      sessionStatus: 'idle',
+    });
+    clearSessionTimers(record);
+  });
+}
+
 function scheduleAssistantReply(record: SessionRecord, userContent: string): void {
   clearSessionTimers(record);
 
@@ -961,6 +1292,230 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
           ...buildTextPart(textPartId, scenario.assistantContent)![0],
           partSeq: 2,
         },
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'subagent.basic') {
+    const introPartId = nextId('part_subagent_intro');
+    const thinkingPartId = nextId('part_subagent_thinking');
+    const toolPartId = nextId('part_subagent_tool');
+    const subagentTextPartId = nextId('part_subagent_text');
+    const summaryPartId = nextId('part_subagent_summary');
+    const toolCallId = nextId('tool_call_subagent');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: introPartId,
+        content: scenario.introContent,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'thinking.done',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: thinkingPartId,
+        content: scenario.thinkingContent,
+        subagentSessionId: scenario.subagent.subagentSessionId,
+        subagentName: scenario.subagent.subagentName,
+      });
+    });
+
+    scheduleRecordTimer(record, 320, () => {
+      emit(sessionId, {
+        type: 'tool.update',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: toolPartId,
+        toolName: scenario.toolName,
+        toolCallId,
+        status: 'pending',
+        title: scenario.toolTitle,
+        input: scenario.toolInput,
+        subagentSessionId: scenario.subagent.subagentSessionId,
+        subagentName: scenario.subagent.subagentName,
+      });
+    });
+
+    scheduleRecordTimer(record, 420, () => {
+      emit(sessionId, {
+        type: 'tool.update',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: toolPartId,
+        toolName: scenario.toolName,
+        toolCallId,
+        status: 'completed',
+        title: scenario.toolTitle,
+        input: scenario.toolInput,
+        output: scenario.toolOutput,
+        subagentSessionId: scenario.subagent.subagentSessionId,
+        subagentName: scenario.subagent.subagentName,
+      });
+    });
+
+    scheduleRecordTimer(record, 520, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: subagentTextPartId,
+        content: scenario.subagentContent,
+        subagentSessionId: scenario.subagent.subagentSessionId,
+        subagentName: scenario.subagent.subagentName,
+      });
+    });
+
+    scheduleRecordTimer(record, 620, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: summaryPartId,
+        content: scenario.finalContent,
+      });
+      finalizeAssistantMessage(record, scenario.finalContent, [
+        {
+          ...buildTextPart(introPartId, scenario.introContent, 1)![0],
+        },
+        buildThinkingPart(thinkingPartId, scenario.thinkingContent, 2, scenario.subagent),
+        buildToolPart(
+          toolPartId,
+          scenario.toolName,
+          scenario.toolTitle,
+          scenario.toolInput,
+          scenario.toolOutput,
+          toolCallId,
+          3,
+          scenario.subagent,
+        ),
+        {
+          ...buildTextPart(subagentTextPartId, scenario.subagentContent, 4, scenario.subagent)![0],
+        },
+        {
+          ...buildTextPart(summaryPartId, scenario.finalContent, 5)![0],
+        },
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'subagent.question') {
+    const introPartId = nextId('part_subagent_question_intro');
+    const questionPartId = nextId('part_subagent_question');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: introPartId,
+        content: scenario.introContent,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'question',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: questionPartId,
+        toolCallId: scenario.toolCallId,
+        header: scenario.header,
+        question: scenario.question,
+        options: scenario.options,
+        status: 'running',
+        subagentSessionId: scenario.subagent.subagentSessionId,
+        subagentName: scenario.subagent.subagentName,
+      });
+    });
+
+    scheduleRecordTimer(record, 320, () => {
+      finalizeAssistantMessage(record, scenario.introContent, [
+        {
+          ...buildTextPart(introPartId, scenario.introContent, 1)![0],
+        },
+        buildQuestionPart(
+          questionPartId,
+          scenario.toolCallId,
+          scenario.header,
+          scenario.question,
+          scenario.options,
+          2,
+          scenario.subagent,
+        ),
+      ]);
+      emit(sessionId, {
+        type: 'session.status',
+        sessionStatus: 'idle',
+      });
+      clearSessionTimers(record);
+    });
+    return;
+  }
+
+  if (scenario.type === 'subagent.permission') {
+    const introPartId = nextId('part_subagent_permission_intro');
+    const permissionPartId = nextId('part_subagent_permission');
+
+    scheduleRecordTimer(record, 120, () => {
+      emit(sessionId, {
+        type: 'text.done',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: introPartId,
+        content: scenario.introContent,
+      });
+    });
+
+    scheduleRecordTimer(record, 220, () => {
+      emit(sessionId, {
+        type: 'permission.ask',
+        messageId: assistantMessageId,
+        role: 'assistant',
+        partId: permissionPartId,
+        permissionId: scenario.permissionId,
+        permType: scenario.permType,
+        toolName: scenario.toolName,
+        title: scenario.title,
+        content: scenario.content,
+        subagentSessionId: scenario.subagent.subagentSessionId,
+        subagentName: scenario.subagent.subagentName,
+      });
+    });
+
+    scheduleRecordTimer(record, 320, () => {
+      finalizeAssistantMessage(record, scenario.introContent, [
+        {
+          ...buildTextPart(introPartId, scenario.introContent, 1)![0],
+        },
+        buildPermissionPart(
+          permissionPartId,
+          scenario.permissionId,
+          scenario.permType,
+          scenario.toolName,
+          scenario.title,
+          scenario.content,
+          undefined,
+          2,
+          scenario.subagent,
+        ),
       ]);
       emit(sessionId, {
         type: 'session.status',
@@ -1653,6 +2208,10 @@ function buildMockApi(): HWH5EXT {
       );
       record.nextMessageSeq += 1;
       upsertSessionRecord(record, userMessage);
+      if (matchesSubagentSession(params.subagentSessionId, SUBAGENT_QUESTION_PREFIX)) {
+        scheduleSubagentQuestionReply(record, params.subagentSessionId!, params.content);
+        return toSendMessageResponse(userMessage);
+      }
       scheduleAssistantReply(record, params.content);
       return toSendMessageResponse(userMessage);
     },
@@ -1677,7 +2236,16 @@ function buildMockApi(): HWH5EXT {
         type: 'permission.reply',
         permissionId: params.permId,
         response: params.response,
+        ...(params.subagentSessionId
+          ? {
+            subagentSessionId: params.subagentSessionId,
+            subagentName: resolveSubagentName(params.subagentSessionId),
+          }
+          : {}),
       });
+      if (matchesSubagentSession(params.subagentSessionId, SUBAGENT_PERMISSION_PREFIX)) {
+        scheduleSubagentPermissionReply(record, params.subagentSessionId!, params.response);
+      }
       return {
         welinkSessionId: params.welinkSessionId,
         permissionId: params.permId,

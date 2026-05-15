@@ -34,6 +34,7 @@ export interface SendMessageParams {
   welinkSessionId: string;
   content: string;
   toolCallId?: string;
+  subagentSessionId?: string;
 }
 
 export interface GetSessionMessageParams {
@@ -51,6 +52,7 @@ export interface GetSessionMessageHistoryParams {
 
 export interface StopSkillParams {
   welinkSessionId: string;
+  subagentSessionId?: string;
 }
 
 export interface SendMessageToIMParams {
@@ -63,6 +65,7 @@ export interface ReplyPermissionParams {
   welinkSessionId: string;
   permId: string;
   response: 'once' | 'always' | 'reject';
+  subagentSessionId?: string;
 }
 
 export interface RegenerateAnswerParams {

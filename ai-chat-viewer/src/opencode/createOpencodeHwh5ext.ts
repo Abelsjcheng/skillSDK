@@ -605,6 +605,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
           body: JSON.stringify({
             content: params.content,
             ...(params.toolCallId ? { toolCallId: params.toolCallId } : {}),
+            ...(params.subagentSessionId ? { subagentSessionId: params.subagentSessionId } : {}),
           }),
         },
       );
@@ -615,7 +616,12 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
       return requestJson<StopSkillResponse>(
         config,
         `/api/skill/sessions/${encodeURIComponent(params.welinkSessionId)}/abort`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          ...(params.subagentSessionId
+            ? { body: JSON.stringify({ subagentSessionId: params.subagentSessionId }) }
+            : {}),
+        },
       );
     },
 
@@ -625,7 +631,10 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         `/api/skill/sessions/${encodeURIComponent(params.welinkSessionId)}/permissions/${encodeURIComponent(params.permId)}`,
         {
           method: 'POST',
-          body: JSON.stringify({ response: params.response }),
+          body: JSON.stringify({
+            response: params.response,
+            ...(params.subagentSessionId ? { subagentSessionId: params.subagentSessionId } : {}),
+          }),
         },
       );
     },

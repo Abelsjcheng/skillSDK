@@ -87,6 +87,8 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
         window.open(uri, '_blank', 'noopener,noreferrer');
       },
       navigateBack: () => window.history.back(),
+      onCheckForUpdate: async () => undefined,
+      onUpdateReady: async () => undefined,
     };
   }
 
