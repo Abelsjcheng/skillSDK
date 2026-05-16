@@ -356,7 +356,7 @@ public final class SkillSDK {
                             callback.onError(error(4002, "No user message to regenerate"));
                             return;
                         }
-                        sendMessageInternal(params.getWelinkSessionId(), latest, null, callback);
+                        sendMessageInternal(params.getWelinkSessionId(), latest, null, null, callback);
                     }
 
                     @Override
@@ -616,7 +616,13 @@ public final class SkillSDK {
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean result) {
-                sendMessageInternal(params.getWelinkSessionId(), params.getContent(), params.getToolCallId(), callback);
+                sendMessageInternal(
+                        params.getWelinkSessionId(),
+                        params.getContent(),
+                        params.getToolCallId(),
+                        params.getSubagentSessionId(),
+                        callback
+                );
             }
 
             @Override
@@ -645,7 +651,11 @@ public final class SkillSDK {
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean connected) {
-                apiClient.replyPermission(params.getWelinkSessionId(), params.getPermId(), params.getResponse(),
+                apiClient.replyPermission(
+                        params.getWelinkSessionId(),
+                        params.getPermId(),
+                        params.getResponse(),
+                        params.getSubagentSessionId(),
                         new SkillCallback<ReplyPermissionResult>() {
                             @Override
                             public void onSuccess(@Nullable ReplyPermissionResult result) {
@@ -1771,10 +1781,14 @@ public final class SkillSDK {
         }
     }
 
-    private void sendMessageInternal(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,
+    private void sendMessageInternal(
+            @NonNull String welinkSessionId,
+            @NonNull String content,
+            @Nullable String toolCallId,
+            @Nullable String subagentSessionId,
             @NonNull SkillCallback<SendMessageResult> callback) {
         awaitingExecutingBySession.put(welinkSessionId, Boolean.TRUE);
-        apiClient.sendMessage(welinkSessionId, content, toolCallId, new SkillCallback<SendMessageResult>() {
+        apiClient.sendMessage(welinkSessionId, content, toolCallId, subagentSessionId, new SkillCallback<SendMessageResult>() {
             @Override
             public void onSuccess(@Nullable SendMessageResult result) {
                 if (result == null) {

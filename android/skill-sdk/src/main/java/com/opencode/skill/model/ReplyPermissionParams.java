@@ -2,6 +2,7 @@
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 @Keep
 public class ReplyPermissionParams {
@@ -11,11 +12,23 @@ public class ReplyPermissionParams {
     private final String permId;
     @NonNull
     private final String response;
+    @Nullable
+    private final String subagentSessionId;
 
     public ReplyPermissionParams(@NonNull String welinkSessionId, @NonNull String permId, @NonNull String response) {
+        this(welinkSessionId, permId, response, null);
+    }
+
+    public ReplyPermissionParams(
+            @NonNull String welinkSessionId,
+            @NonNull String permId,
+            @NonNull String response,
+            @Nullable String subagentSessionId
+    ) {
         this.welinkSessionId = welinkSessionId;
         this.permId = permId;
         this.response = response;
+        this.subagentSessionId = subagentSessionId;
     }
 
     @NonNull
@@ -31,5 +44,10 @@ public class ReplyPermissionParams {
     @NonNull
     public String getResponse() {
         return response;
+    }
+
+    @Nullable
+    public String getSubagentSessionId() {
+        return subagentSessionId;
     }
 }

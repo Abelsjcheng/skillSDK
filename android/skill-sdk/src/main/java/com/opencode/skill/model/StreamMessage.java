@@ -81,6 +81,10 @@ public class StreamMessage {
     @Nullable
     private String response;
     @Nullable
+    private String subagentSessionId;
+    @Nullable
+    private String subagentName;
+    @Nullable
     private JsonArray messages;
     @Nullable
     private JsonArray parts;
@@ -380,6 +384,24 @@ public class StreamMessage {
 
     public void setResponse(@Nullable String response) {
         this.response = response;
+    }
+
+    @Nullable
+    public String getSubagentSessionId() {
+        return subagentSessionId;
+    }
+
+    public void setSubagentSessionId(@Nullable String subagentSessionId) {
+        this.subagentSessionId = subagentSessionId;
+    }
+
+    @Nullable
+    public String getSubagentName() {
+        return subagentName;
+    }
+
+    public void setSubagentName(@Nullable String subagentName) {
+        this.subagentName = subagentName;
     }
 
     @Nullable

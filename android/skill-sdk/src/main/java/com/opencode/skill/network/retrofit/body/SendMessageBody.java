@@ -10,10 +10,21 @@ public final class SendMessageBody {
     private final String content;
     @Nullable
     private final String toolCallId;
+    @Nullable
+    private final String subagentSessionId;
 
     public SendMessageBody(@NonNull String content, @Nullable String toolCallId) {
+        this(content, toolCallId, null);
+    }
+
+    public SendMessageBody(
+            @NonNull String content,
+            @Nullable String toolCallId,
+            @Nullable String subagentSessionId
+    ) {
         this.content = content;
         this.toolCallId = toolCallId;
+        this.subagentSessionId = subagentSessionId;
     }
 
     @NonNull
@@ -24,5 +35,10 @@ public final class SendMessageBody {
     @Nullable
     public String getToolCallId() {
         return toolCallId;
+    }
+
+    @Nullable
+    public String getSubagentSessionId() {
+        return subagentSessionId;
     }
 }

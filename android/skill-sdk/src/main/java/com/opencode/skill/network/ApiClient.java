@@ -347,11 +347,19 @@ public class ApiClient {
         enqueueEnvelope(requireSkillApiService().getSession(welinkSessionId), SkillSession.class, callback);
     }
 
-    public void sendMessage(@NonNull String welinkSessionId, @NonNull String content, @Nullable String toolCallId,
+    public void sendMessage(
+            @NonNull String welinkSessionId,
+            @NonNull String content,
+            @Nullable String toolCallId,
+            @Nullable String subagentSessionId,
             @NonNull SkillCallback<SendMessageResult> callback) {
         enqueueEnvelope(requireSkillApiService().sendMessage(
                 welinkSessionId,
-                new SendMessageBody(content, normalizeNonBlank(toolCallId))
+                new SendMessageBody(
+                        content,
+                        normalizeNonBlank(toolCallId),
+                        normalizeNonBlank(subagentSessionId)
+                )
         ), SendMessageResult.class, callback);
     }
 
@@ -379,12 +387,16 @@ public class ApiClient {
         enqueueEnvelope(requireSkillApiService().getMessagesHistory(welinkSessionId, beforeSeq, size), type, callback);
     }
 
-    public void replyPermission(@NonNull String welinkSessionId, @NonNull String permId, @NonNull String response,
+    public void replyPermission(
+            @NonNull String welinkSessionId,
+            @NonNull String permId,
+            @NonNull String response,
+            @Nullable String subagentSessionId,
             @NonNull SkillCallback<ReplyPermissionResult> callback) {
         enqueueEnvelope(requireSkillApiService().replyPermission(
                 welinkSessionId,
                 permId,
-                new ReplyPermissionBody(response)
+                new ReplyPermissionBody(response, normalizeNonBlank(subagentSessionId))
         ), ReplyPermissionResult.class, callback);
     }
 

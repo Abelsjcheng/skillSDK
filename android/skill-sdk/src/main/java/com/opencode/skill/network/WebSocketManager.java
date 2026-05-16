@@ -263,6 +263,8 @@ public final class WebSocketManager {
         message.setPermType(getString(json, "permType"));
         message.setMetadata(getObject(json, "metadata"));
         message.setResponse(getString(json, "response"));
+        message.setSubagentSessionId(getString(json, "subagentSessionId"));
+        message.setSubagentName(getString(json, "subagentName"));
         message.setMessages(getArray(json, "messages"));
         message.setParts(getArray(json, "parts"));
         return message;
