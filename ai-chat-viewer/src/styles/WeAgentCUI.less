@@ -144,103 +144,90 @@
 
   .subtask-block {
     width: 100%;
-    border: 1px solid rgba(223, 230, 238, 1);
-    border-radius: 16px;
-    background: rgba(248, 250, 252, 1);
-    overflow: hidden;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(106, 123, 156, 0.04);
+    box-sizing: border-box;
   }
 
   .subtask-block__header {
     width: 100%;
-    padding: 12px 14px;
     border: none;
     background: transparent;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    min-height: 22px;
+    padding: 0;
     text-align: left;
     cursor: pointer;
   }
 
-  .subtask-block__meta {
+  .subtask-block__title {
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    flex: 1;
   }
 
-  .subtask-block__status {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+  .subtask-block__icon {
+    width: 20px;
+    height: 20px;
+    display: block;
     flex-shrink: 0;
   }
 
-  .subtask-block__status--running {
-    background: rgba(22, 115, 246, 1);
-  }
-
-  .subtask-block__status--completed {
-    background: rgba(47, 168, 80, 1);
-  }
-
-  .subtask-block__status--error {
-    background: rgba(235, 87, 87, 1);
-  }
-
   .subtask-block__name {
-    color: rgba(25, 25, 25, 1);
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 22px;
-  }
-
-  .subtask-block__summary {
+    margin-left: 12px;
     min-width: 0;
-    color: rgba(89, 89, 89, 1);
-    font-size: 12px;
-    line-height: 18px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: rgba(51, 51, 51, 1);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
   }
 
   .subtask-block__side {
     display: flex;
     align-items: center;
-    gap: 8px;
+    margin-left: 12px;
     flex-shrink: 0;
   }
 
-  .subtask-block__tools {
-    color: rgba(102, 102, 102, 1);
-    font-size: 12px;
-    line-height: 18px;
+  .subtask-block__status-text {
+    color: rgba(51, 51, 51, 1);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
   }
 
   .subtask-block__chevron {
-    color: rgba(102, 102, 102, 1);
-    font-size: 16px;
-    line-height: 16px;
-    transition: transform 0.2s ease;
+    display: block;
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    flex-shrink: 0;
+    transition: transform 0.2s;
   }
 
-  .subtask-block__chevron.is-open {
+  .subtask-block__chevron.is-collapsed {
     transform: rotate(180deg);
   }
 
   .subtask-block__body {
-    padding: 0 14px 14px;
-    border-top: 1px solid rgba(223, 230, 238, 1);
+    margin-top: 12px;
   }
 
   .subtask-block__parts {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding-top: 12px;
+
+    > * + * {
+      margin-top: 12px;
+    }
   }
 
   .we-agent-message__pending {

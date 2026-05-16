@@ -1,15 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
+import arrowUpIcon from '../imgs/arrow_up_icon.svg';
+import starIcon from '../imgs/star_icon.svg';
 import type { SubtaskBlockProps } from '../types/components';
 
-function countToolParts(subParts: NonNullable<SubtaskBlockProps['part']['subParts']>): number {
-  return subParts.filter((part) => part.type === 'tool').length;
-}
+const statusLabels: Record<string, string> = {
+  pending: 'Pending',
+  running: 'Running',
+  completed: 'Completed',
+  error: 'Error',
+};
 
 export const SubtaskBlock: React.FC<SubtaskBlockProps> = ({ part, children }) => {
   const [expanded, setExpanded] = useState(false);
-  const toolCount = useMemo(() => countToolParts(part.subParts ?? []), [part.subParts]);
   const status = part.subagentStatus ?? 'running';
-  const summary = part.subagentPrompt ?? '';
+  const statusLabel = statusLabels[status] ?? status;
 
   return (
     <div className={`subtask-block subtask-block--${status}`}>
@@ -18,14 +22,28 @@ export const SubtaskBlock: React.FC<SubtaskBlockProps> = ({ part, children }) =>
         className="subtask-block__header"
         onClick={() => setExpanded((prev) => !prev)}
       >
-        <div className="subtask-block__meta">
-          <span className={`subtask-block__status subtask-block__status--${status}`} />
+        <div className="subtask-block__title">
+          <img
+            className="subtask-block__icon"
+            src={starIcon}
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+          />
           <span className="subtask-block__name">{part.subagentName ?? 'Subagent'}</span>
-          <span className="subtask-block__summary">{summary}</span>
         </div>
         <div className="subtask-block__side">
-          <span className="subtask-block__tools">{toolCount} tools</span>
-          <span className={`subtask-block__chevron ${expanded ? 'is-open' : ''}`}>{'>'}</span>
+          <span className="subtask-block__status-text">{statusLabel}</span>
+          <img
+            className={[
+              'subtask-block__chevron',
+              !expanded ? 'is-collapsed' : '',
+            ].filter(Boolean).join(' ')}
+            src={arrowUpIcon}
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+          />
         </div>
       </button>
 

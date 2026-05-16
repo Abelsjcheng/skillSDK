@@ -110,9 +110,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
   return (
     <div className={`question-card ${answered ? 'question-card--answered' : ''}`}>
-      {part.subagentName ? (
-        <div className="question-card__source">来自 {part.subagentName}</div>
-      ) : null}
       {part.header ? (
         <div className="question-card__header">{part.header}</div>
       ) : null}

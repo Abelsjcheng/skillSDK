@@ -1,7 +1,15 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import type { Components } from 'react-markdown';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import errorIcon from '../imgs/error_icon.svg';
 import successIcon from '../imgs/success_icon.svg';
+import { createMarkdownComponents } from './markdownComponents';
 import type { ToolCardProps } from '../types/components';
 
 const statusLabels: Record<string, string> = {
@@ -23,6 +31,23 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
   const status = part.status ?? 'pending';
   const statusLabel = statusLabels[status] ?? status;
   const statusIcon = statusIcons[status] ?? successIcon;
+  const markdownComponents: Components = useMemo(
+    () => createMarkdownComponents(true),
+    [],
+  );
+  const inputContent = typeof (part.input as { content?: unknown } | null)?.content === 'string'
+    ? ((part.input as { content: string }).content)
+    : '';
+
+  const renderMarkdown = (content: string) => (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+      rehypePlugins={[rehypeRaw, rehypeKatex]}
+      components={markdownComponents}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 
   return (
     <div className={`tool-card tool-card--${status}`}>
@@ -60,22 +85,22 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
 
       {expanded && (
         <div className="tool-card__body">
-          {part.input && (
+          {inputContent && (
             <div className="tool-card__section">
               <div className="tool-card__section-title">Input</div>
-              <pre className="tool-card__code">{JSON.stringify(part.input, null, 2)}</pre>
+              <div className="tool-card__code">{renderMarkdown(inputContent)}</div>
             </div>
           )}
           {part.output && (
             <div className="tool-card__section">
               <div className="tool-card__section-title">Output</div>
-              <pre className="tool-card__code">{part.output}</pre>
+              <div className="tool-card__code">{renderMarkdown(part.output)}</div>
             </div>
           )}
           {status === 'error' && part.content && (
             <div className="tool-card__section tool-card__error">
               <div className="tool-card__section-title">Error</div>
-              <pre className="tool-card__code">{part.content}</pre>
+              <div className="tool-card__code">{renderMarkdown(part.content)}</div>
             </div>
           )}
         </div>

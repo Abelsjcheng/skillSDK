@@ -137,9 +137,6 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
         isPc ? 'permission-card--pc' : '',
       ].filter(Boolean).join(' ')}
     >
-      {part.subagentName ? (
-        <div className="permission-card__source">来自 {part.subagentName}</div>
-      ) : null}
       <div className="permission-card__header">
         <img className="permission-card__icon" src={lockIcon} alt="" aria-hidden="true" draggable="false" />
         <span className="permission-card__type">{typeLabel}</span>
