@@ -474,6 +474,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
     _metadata = [dictionary[@"metadata"] isKindOfClass:[NSDictionary class]] ? dictionary[@"metadata"] : nil;
     _response = WLAgentSkillsStringValue(dictionary[@"response"], nil);
+    _subagentSessionId = WLAgentSkillsStringValue(dictionary[@"subagentSessionId"], nil);
+    _subagentName = WLAgentSkillsStringValue(dictionary[@"subagentName"], nil);
     _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
     _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
     _fileMime = WLAgentSkillsStringValue(dictionary[@"fileMime"], nil);
@@ -536,6 +538,12 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     }
     if (self.response != nil && self.response.length > 0) {
     dictionary[@"response"] = self.response;
+    }
+    if (self.subagentSessionId != nil && self.subagentSessionId.length > 0) {
+    dictionary[@"subagentSessionId"] = self.subagentSessionId;
+    }
+    if (self.subagentName != nil && self.subagentName.length > 0) {
+    dictionary[@"subagentName"] = self.subagentName;
     }
     if (self.fileName != nil && self.fileName.length > 0) {
     dictionary[@"fileName"] = self.fileName;
@@ -819,6 +827,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
     _metadata = [dictionary[@"metadata"] isKindOfClass:[NSDictionary class]] ? dictionary[@"metadata"] : nil;
     _response = WLAgentSkillsStringValue(dictionary[@"response"], nil);
+    _subagentSessionId = WLAgentSkillsStringValue(dictionary[@"subagentSessionId"], nil);
+    _subagentName = WLAgentSkillsStringValue(dictionary[@"subagentName"], nil);
     _messages = [dictionary[@"messages"] isKindOfClass:[NSArray class]] ? dictionary[@"messages"] : nil;
     _parts = [dictionary[@"parts"] isKindOfClass:[NSArray class]] ? dictionary[@"parts"] : nil;
     }
@@ -860,6 +870,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"permType" : WLAgentSkillsNullObject(self.permType),
         @"metadata" : WLAgentSkillsNullObject(self.metadata),
         @"response" : WLAgentSkillsNullObject(self.response),
+        @"subagentSessionId" : WLAgentSkillsNullObject(self.subagentSessionId),
+        @"subagentName" : WLAgentSkillsNullObject(self.subagentName),
         @"messages" : WLAgentSkillsNullObject(self.messages),
         @"parts" : WLAgentSkillsNullObject(self.parts)
     };

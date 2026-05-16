@@ -262,6 +262,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [weakSelf sendMessageWithSessionId:params.welinkSessionId
                                                                 content:content
                                                         toolCallId:nil
+                                                subagentSessionId:nil
                                                                 success:success
                                                                 failure:failure];
     }
@@ -489,6 +490,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     [self sendMessageWithSessionId:params.welinkSessionId
                                                     content:params.content
                                             toolCallId:params.toolCallId
+                                    subagentSessionId:params.subagentSessionId
                                                     success:success
                                                     failure:failure];
 }
@@ -521,6 +523,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     [[WLAgentSkillsHTTPClient sharedClient] replyPermissionWithSessionId:params.welinkSessionId
                                                                                                                                     permId:params.permId
                                                                                                                                 response:params.response
+                                                                                                                    subagentSessionId:params.subagentSessionId
                                                                                                                                 success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsReplyPermissionResult *result = [[WLAgentSkillsReplyPermissionResult alloc] initWithDictionary:data];
@@ -1437,6 +1440,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId
+                                    subagentSessionId:(nullable NSString *)subagentSessionId
                                                     success:(void (^)(WLAgentSkillsSendMessageResult *result))success
                                                     failure:(void (^)(NSError *error))failure {
     [self setSendMessageTriggered:YES sessionId:welinkSessionId];
@@ -1446,6 +1450,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:welinkSessionId
                                                                                                                         content:content
                                                                                                                     toolCallId:toolCallId
+                                                                                                            subagentSessionId:subagentSessionId
                                                                                                                         success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] initWithDictionary:data];

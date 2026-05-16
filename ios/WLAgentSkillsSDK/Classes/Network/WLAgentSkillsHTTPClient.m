@@ -330,12 +330,16 @@
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId
+                                    subagentSessionId:(nullable NSString *)subagentSessionId
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", welinkSessionId];
     NSMutableDictionary *parameters = [@{ @"content" : content } mutableCopy];
     if (toolCallId != nil && toolCallId.length > 0) {
         parameters[@"toolCallId"] = toolCallId;
+    }
+    if (subagentSessionId != nil && subagentSessionId.length > 0) {
+        parameters[@"subagentSessionId"] = subagentSessionId;
     }
     [self POST:path parameters:parameters success:success failure:failure];
 }
@@ -350,10 +354,14 @@
 - (void)replyPermissionWithSessionId:(NSString *)welinkSessionId
                                                             permId:(NSString *)permId
                                                         response:(NSString *)response
+                                            subagentSessionId:(nullable NSString *)subagentSessionId
                                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/permissions/%@", welinkSessionId, permId];
-    NSDictionary *parameters = @{ @"response" : response };
+    NSMutableDictionary *parameters = [@{ @"response" : response } mutableCopy];
+    if (subagentSessionId != nil && subagentSessionId.length > 0) {
+        parameters[@"subagentSessionId"] = subagentSessionId;
+    }
     [self POST:path parameters:parameters success:success failure:failure];
 }
 

@@ -116,6 +116,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId
+                                    subagentSessionId:(nullable NSString *)subagentSessionId
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
@@ -126,6 +127,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 - (void)replyPermissionWithSessionId:(NSString *)welinkSessionId
                                                             permId:(NSString *)permId
                                                         response:(NSString *)response
+                                            subagentSessionId:(nullable NSString *)subagentSessionId
                                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                                             failure:(WLAgentSkillsHTTPFailureBlock)failure;
 

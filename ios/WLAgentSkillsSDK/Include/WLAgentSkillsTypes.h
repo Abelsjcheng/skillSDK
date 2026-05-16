@@ -119,12 +119,14 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *content;
 @property (nonatomic, copy, nullable) NSString *toolCallId;
+@property (nonatomic, copy, nullable) NSString *subagentSessionId;
 @end
 
 @interface WLAgentSkillsReplyPermissionParams : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *permId;
 @property (nonatomic, copy) NSString *response;
+@property (nonatomic, copy, nullable) NSString *subagentSessionId;
 @end
 
 @interface WLAgentSkillsControlSkillWeCodeParams : NSObject
@@ -247,6 +249,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *permType;
 @property (nonatomic, strong, nullable) NSDictionary *metadata;
 @property (nonatomic, copy, nullable) NSString *response;
+@property (nonatomic, copy, nullable) NSString *subagentSessionId;
+@property (nonatomic, copy, nullable) NSString *subagentName;
 @property (nonatomic, copy, nullable) NSString *fileName;
 @property (nonatomic, copy, nullable) NSString *fileUrl;
 @property (nonatomic, copy, nullable) NSString *fileMime;
@@ -437,6 +441,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *permType;
 @property (nonatomic, strong, nullable) NSDictionary *metadata;
 @property (nonatomic, copy, nullable) NSString *response;
+@property (nonatomic, copy, nullable) NSString *subagentSessionId;
+@property (nonatomic, copy, nullable) NSString *subagentName;
 @property (nonatomic, strong, nullable) NSArray *messages;
 @property (nonatomic, strong, nullable) NSArray *parts;
 
