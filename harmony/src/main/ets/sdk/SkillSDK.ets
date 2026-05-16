@@ -418,6 +418,9 @@ export class SkillSDK {
       if (params.toolCallId !== undefined) {
         Validator.requireString(params.toolCallId, 'toolCallId');
       }
+      if (params.subagentSessionId !== undefined) {
+        Validator.requireString(params.subagentSessionId, 'subagentSessionId');
+      }
 
       if (!this.wsManager.isConnected()) {
         await this.wsManager.connect();
@@ -429,6 +432,9 @@ export class SkillSDK {
       };
       if (params.toolCallId !== undefined) {
         payload.toolCallId = params.toolCallId;
+      }
+      if (params.subagentSessionId !== undefined) {
+        payload.subagentSessionId = params.subagentSessionId;
       }
 
       const result = await this.httpClient.post<SendMessageResult>(
@@ -452,12 +458,16 @@ export class SkillSDK {
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
       Validator.requireString(params.permId, 'permId');
       Validator.requireEnum(params.response, ['once', 'always', 'reject'], 'response');
+      if (params.subagentSessionId !== undefined) {
+        Validator.requireString(params.subagentSessionId, 'subagentSessionId');
+      }
       await this.ensureWebSocketConnected();
 
       return await this.httpClient.post<ReplyPermissionResult>(
         `/api/skill/sessions/${params.welinkSessionId}/permissions/${params.permId}`,
         {
-          response: params.response
+          response: params.response,
+          ...(params.subagentSessionId !== undefined ? { subagentSessionId: params.subagentSessionId } : {})
         }
       );
     } catch (error) {

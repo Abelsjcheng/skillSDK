@@ -133,6 +133,8 @@ export interface SessionMessagePart {
   permType?: string;
   metadata?: Record<string, Object>;
   response?: PermissionResponse;
+  subagentSessionId?: string;
+  subagentName?: string;
   status?: 'pending' | 'running' | 'completed' | 'error';
   fileName?: string;
   fileUrl?: string;
@@ -203,6 +205,8 @@ export interface StreamingPart {
   permType?: string;
   metadata?: Record<string, Object>;
   response?: PermissionResponse;
+  subagentSessionId?: string;
+  subagentName?: string;
   fileName?: string;
   fileUrl?: string;
   fileMime?: string;
@@ -253,6 +257,8 @@ export interface StreamMessage {
   permType?: string | null;
   metadata?: Record<string, Object> | null;
   response?: PermissionResponse | null;
+  subagentSessionId?: string;
+  subagentName?: string;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
 }
@@ -380,6 +386,7 @@ export interface SendMessageParams {
   welinkSessionId: string;
   content: string;
   toolCallId?: string;
+  subagentSessionId?: string;
 }
 
 export interface SendMessageResult {
@@ -399,6 +406,7 @@ export interface ReplyPermissionParams {
   welinkSessionId: string;
   permId: string;
   response: PermissionResponse;
+  subagentSessionId?: string;
 }
 
 export interface ReplyPermissionResult {
