@@ -457,14 +457,6 @@ export function groupMessagePartsForDisplay(parts: MessagePart[]): MessagePart[]
         subtask.subagentPrompt = preview;
       }
     }
-
-    if (part.type === 'question' || part.type === 'permission') {
-      groupedParts.push({
-        ...part,
-        partId: `${part.partId}__bubble`,
-        bubbleToMainFlow: true,
-      });
-    }
   }
 
   for (const subtask of subtasks.values()) {

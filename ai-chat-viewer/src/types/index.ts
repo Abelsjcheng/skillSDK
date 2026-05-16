@@ -200,7 +200,6 @@ export interface MessagePart
   subagentPrompt?: string;
   subagentStatus?: SubagentStatus;
   subParts?: MessagePart[];
-  bubbleToMainFlow?: boolean;
 }
 
 /** A single message in the conversation */
