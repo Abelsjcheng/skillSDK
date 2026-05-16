@@ -463,12 +463,16 @@ export class SkillSDK {
       }
       await this.ensureWebSocketConnected();
 
+      const payload: Record<string, Object> = {
+        response: params.response
+      };
+      if (params.subagentSessionId !== undefined) {
+        payload.subagentSessionId = params.subagentSessionId;
+      }
+
       return await this.httpClient.post<ReplyPermissionResult>(
         `/api/skill/sessions/${params.welinkSessionId}/permissions/${params.permId}`,
-        {
-          response: params.response,
-          ...(params.subagentSessionId !== undefined ? { subagentSessionId: params.subagentSessionId } : {})
-        }
+        payload
       );
     } catch (error) {
       throw this.normalizeError('replyPermission', error);
