@@ -31,6 +31,25 @@ export class StreamAssembler {
     part.subagentName = msg.subagentName ?? part.subagentName;
   }
 
+  hydrate(parts: MessagePart[]): void {
+    this.parts.clear();
+    this.partOrder = [];
+    this.completed = false;
+    this.partIdCounter = parts.length;
+
+    for (const part of parts) {
+      if (!part.partId) {
+        continue;
+      }
+
+      this.parts.set(part.partId, {
+        ...part,
+        isStreaming: part.isStreaming || part.type === 'text' || part.type === 'thinking',
+      });
+      this.partOrder.push(part.partId);
+    }
+  }
+
   handleMessage(msg: StreamMessage): void {
     if (this.completed) return;
 

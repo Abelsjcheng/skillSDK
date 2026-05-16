@@ -276,6 +276,10 @@ function App({ assistantAccount = '' }: AppProps) {
     if (streamingMsgIdRef.current !== messageId) {
       assemblerRef.current.reset();
       streamingMsgIdRef.current = messageId;
+      const existingMessage = messagesRef.current.find((message) => message.id === messageId);
+      if (existingMessage?.parts?.length) {
+        assemblerRef.current.hydrate(existingMessage.parts);
+      }
     }
   }, [finalizeStreamingMessage]);
 
@@ -782,6 +786,9 @@ function App({ assistantAccount = '' }: AppProps) {
 
           const nextRole = normalizeRole(msg.role);
           const nextParts = mapRawParts(msg.parts, true);
+          if (nextParts?.length) {
+            assemblerRef.current.hydrate(nextParts);
+          }
           upsertAssistantMessage(messageId, (current) => ({
             id: messageId,
             role: nextRole,
