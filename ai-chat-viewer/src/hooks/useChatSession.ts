@@ -57,6 +57,12 @@ export function useChatSession({
   const isLoadingHistoryRef = useRef(false);
   const activeWelinkSessionIdRef = useRef<string | null>(welinkSessionId || null);
   const historyEpochRef = useRef(0);
+  const agentOfflineHandledRef = useRef(false);
+  const onSessionTitleChangeRef = useRef(onSessionTitleChange);
+  const aiReplyFailedTextRef = useRef(t('weAgent.aiReplyFailed'));
+
+  onSessionTitleChangeRef.current = onSessionTitleChange;
+  aiReplyFailedTextRef.current = t('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
     setPendingAssistantPreview((prev) => (
@@ -78,6 +84,7 @@ export function useChatSession({
     historyEpochRef.current += 1;
     assemblerRef.current.reset();
     streamingMsgIdRef.current = null;
+    agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
     nextBeforeSeqRef.current = null;
@@ -504,8 +511,19 @@ export function useChatSession({
           break;
         case 'session.title':
           if (msg.welinkSessionId && msg.title) {
-            onSessionTitleChange?.(msg.welinkSessionId, msg.title);
+            onSessionTitleChangeRef.current?.(msg.welinkSessionId, msg.title);
           }
+          break;
+        case 'agent.online':
+          agentOfflineHandledRef.current = false;
+          break;
+        case 'agent.offline':
+          if (agentOfflineHandledRef.current) {
+            break;
+          }
+          agentOfflineHandledRef.current = true;
+          setSessionStatus('idle');
+          appendAssistantErrorBlock('agent已离线', 'agent已离线');
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
@@ -519,11 +537,11 @@ export function useChatSession({
           break;
         case 'session.error':
           setSessionStatus('error');
-          appendAssistantErrorBlock(msg.error ?? '', t('weAgent.aiReplyFailed'));
+          appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'error':
           setSessionStatus('error');
-          appendAssistantErrorBlock(msg.error ?? '', t('weAgent.aiReplyFailed'));
+          appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'snapshot':
           assemblerRef.current.reset();
@@ -595,8 +613,6 @@ export function useChatSession({
     finalizeStreamingMessage,
     hidePendingAssistantPreview,
     mode,
-    onSessionTitleChange,
-    t,
     upsertAssistantMessage,
     welinkSessionId,
   ]);

@@ -16,7 +16,7 @@ import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
 import { SubtaskBlock } from './SubtaskBlock';
-import { createMarkdownComponents } from './markdownComponents';
+import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
 import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
@@ -88,7 +88,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
       components={markdownComponents}
     >
-      {content}
+      {normalizeMarkdownHtml(content)}
     </ReactMarkdown>
   );
 

@@ -9,7 +9,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { ThinkingBlockProps } from '../types/components';
-import { createMarkdownComponents } from './markdownComponents';
+import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
 
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
   const { t } = useTranslation();
@@ -56,7 +56,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
             rehypePlugins={[rehypeRaw, rehypeKatex]}
             components={markdownComponents.current}
           >
-            {part.content}
+            {normalizeMarkdownHtml(part.content)}
           </ReactMarkdown>
         </div>
       )}

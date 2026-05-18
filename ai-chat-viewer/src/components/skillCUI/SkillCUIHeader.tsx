@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
+import closeIcon from '../../imgs/close_icon.png';
 import hideIcon from '../../imgs/hide_icon.svg';
-import starIcon from '../../imgs/star_icon.svg';
+import starIcon from '../../imgs/star_head_icon.png';
 import { controlSkillWeCode } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
 
@@ -10,6 +11,16 @@ export const SkillCUIHeader: React.FC = () => {
       await controlSkillWeCode({ action: 'minimize' });
     } catch (err) {
       WeLog(`SkillCUIHeader minimize failed | error=${JSON.stringify(err)}`);
+    } finally {
+      window.HWH5?.close?.();
+    }
+  }, []);
+
+  const handleClose = useCallback(async () => {
+    try {
+      await controlSkillWeCode({ action: 'close' });
+    } catch (err) {
+      WeLog(`SkillCUIHeader close failed | error=${JSON.stringify(err)}`);
     } finally {
       window.HWH5?.close?.();
     }
@@ -37,6 +48,16 @@ export const SkillCUIHeader: React.FC = () => {
           aria-label="最小化"
         >
           <img className="skill-cui-header__icon" src={hideIcon} alt="" draggable="false" />
+        </button>
+        <button
+          type="button"
+          className="skill-cui-header__btn"
+          onClick={() => {
+            void handleClose();
+          }}
+          aria-label="关闭"
+        >
+          <img className="skill-cui-header__icon" src={closeIcon} alt="" draggable="false" />
         </button>
       </div>
     </div>

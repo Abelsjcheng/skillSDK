@@ -10,6 +10,7 @@ import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
 import type { SkillSession, WeAgentDetails } from './types/bridge';
+import type { HWH5UserInfo } from './types/bridge/hwext';
 import type { AppProps } from './types/components';
 import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
@@ -65,6 +66,10 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const assistantAccountRef = useRef(assistantAccount);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
+  const userInfoRef = useRef<HWH5UserInfo | null>(null);
+  const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
+
+  initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
 
   const session = useChatSession({
     mode: 'weAgentCUI',
@@ -112,11 +117,15 @@ function App({ assistantAccount = '' }: AppProps) {
     };
   }, [isIosKeyboardLiftEnabled]);
 
+  const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
+    setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
+  }, [shouldUseEnglishUserName]);
+
   const resolveAssistantDetail = useCallback(async (currentAssistantAccount: string) => {
     const detailsResult = await getWeAgentDetails({ partnerAccount: currentAssistantAccount });
     const detail = detailsResult.weAgentDetailsArray?.[0];
     if (!detail) {
-      throw new Error(t('weAgent.missingAssistantDetail'));
+      throw new Error('missing assistant detail');
     }
 
     setWeAgentAssistantName(detail.name ?? '');
@@ -124,7 +133,7 @@ function App({ assistantAccount = '' }: AppProps) {
     setWeAgentAssistantAvatar(resolveAssistantIconUrl(detail.icon));
     assistantDetailRef.current = detail;
     return detail;
-  }, [t]);
+  }, []);
 
   const createSessionForAssistant = useCallback(async (
     currentAssistantAccount: string,
@@ -143,6 +152,7 @@ function App({ assistantAccount = '' }: AppProps) {
   useEffect(() => {
     assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
+    userInfoRef.current = null;
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setWelinkSessionId(null);
@@ -150,6 +160,14 @@ function App({ assistantAccount = '' }: AppProps) {
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
   }, [assistantAccount]);
+
+  useEffect(() => {
+    const userInfo = userInfoRef.current;
+    if (!userInfo) {
+      return;
+    }
+    updateWeAgentUserName(userInfo);
+  }, [updateWeAgentUserName]);
 
   useEffect(() => {
     const currentAssistantAccount = assistantAccountRef.current;
@@ -163,8 +181,9 @@ function App({ assistantAccount = '' }: AppProps) {
     const initializeWeAgentSession = async () => {
       try {
         const userInfo = await getUserInfo();
+        userInfoRef.current = userInfo;
         if (!disposed) {
-          setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
+          updateWeAgentUserName(userInfo);
           setWeAgentUserAvatar(buildCorpUserAvatar(userInfo.corpUserId));
         }
 
@@ -185,7 +204,7 @@ function App({ assistantAccount = '' }: AppProps) {
       } catch (err) {
         WeLog(`App initializeWeAgentSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
         if (!disposed) {
-          showToast(t('weAgent.initSessionFailed'));
+          showToast(initSessionFailedTextRef.current);
         }
       }
     };
@@ -195,7 +214,7 @@ function App({ assistantAccount = '' }: AppProps) {
     return () => {
       disposed = true;
     };
-  }, [assistantAccount, createSessionForAssistant, resolveAssistantDetail, shouldUseEnglishUserName, t]);
+  }, [assistantAccount, createSessionForAssistant, resolveAssistantDetail, updateWeAgentUserName]);
 
   const handleCreateSession = useCallback(async () => {
     const currentAssistantAccount = assistantAccountRef.current;
@@ -280,6 +299,7 @@ function App({ assistantAccount = '' }: AppProps) {
               <button
                 type="button"
                 className="we-agent-cui-actions__button"
+                data-tooltip={isPc ? '新建会话' : undefined}
                 onClick={(event) => {
                   runButtonClickWithDebounce(event, () => {
                     void handleCreateSession();

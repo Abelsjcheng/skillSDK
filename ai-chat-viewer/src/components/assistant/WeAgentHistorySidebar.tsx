@@ -324,6 +324,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       <button
         type="button"
         className="we-agent-cui-actions__button"
+        data-tooltip={isPc ? '历史会话' : undefined}
         onClick={(event) => {
           runButtonClickWithDebounce(event, () => {
             void handleOpen();

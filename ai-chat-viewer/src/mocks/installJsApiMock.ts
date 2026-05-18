@@ -797,7 +797,7 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
   if (matchesMockKeyword(normalized, ['mock-agent-offline', 'trigger-agent-offline', '触发agent.offline'])) {
     return {
       type: 'agent.offline',
-      assistantContent: 'An agent.offline event has been emitted. The current page does not render this event yet.',
+      assistantContent: 'An agent.offline event has been emitted. The page will render an assistant error block and stop generating.',
     };
   }
 

@@ -62,7 +62,7 @@
 | C13 | `snapshot` | 是 | 重建整段消息列表 | 不依赖提示词，通常由重连/恢复触发 |
 | C14 | `streaming` | 是 | 从已有 part 快照恢复流式消息 | 不依赖提示词，通常由重连/补流触发 |
 | C15 | `session.title` | 否 | 当前无 UI 变化 | 不建议作为有效联调用例 |
-| C16 | `agent.online` / `agent.offline` | 否 | 当前无 UI 变化 | 不建议作为有效联调用例 |
+| C16 | `agent.online` / `agent.offline` | 部分 | `agent.offline` 首次触发时会追加“agent已离线”错误块并结束生成态，重复事件去重 | `mock-agent-offline` |
 | C17 | `subagent` + `thinking/tool/text` | 是 | 主流程消息中出现可折叠子任务块，展示子 agent 的分析、工具执行与结论 | `mock-subagent` |
 | C18 | `subagent` + `question` | 是 | 子 agent 发起追问，卡片会冒泡到主流程，回答时会带 `subagentSessionId` 回传 | `mock-subagent-question` |
 | C19 | `subagent` + `permission.ask/reply` | 是 | 子 agent 发起权限申请，权限卡片会冒泡到主流程，授权回填也会携带 `subagentSessionId` | `mock-subagent-permission` |
@@ -710,22 +710,24 @@ error
 
 ### 适用场景
 
-服务端想表达 agent 在线状态切换。
+服务端用于表达 agent 在线状态切换，其中 `agent.offline` 需要给用户明确的异常提示。
 
 ### 当前实现情况
 
-- 类型已定义
-- `App.tsx` 无消费逻辑
-- 当前不会有 UI 提示
+- `agent.online` 当前仅作为状态复位事件消费，不产生可见 UI
+- `agent.offline` 首次到达时会在当前 AI 消息内追加错误块，文案固定为 `agent已离线`
+- 同一轮 `onmessage` 如果多次返回 `agent.offline`，前端会去重，不重复插入错误块
+- 收到 `agent.offline` 后会立即取消生成中状态，隐藏“输出中”，停止按钮恢复为发送按钮
 
 ### 推荐处理
 
-- 如需支持，可新增顶部状态条或输入框禁用策略
+- 联调时重点验证 `agent.offline` 是否只展示一次错误块
+- 同时验证生成中的会话是否会立刻回到可发送状态
 
 ### 推荐提示词
 
 ```text
-不建议作为当前有效联调用例；即使返回，页面也不会有可见变化。
+mock-agent-offline
 ```
 
 ---
@@ -946,7 +948,7 @@ mock-subagent-permission
 | Subagent 权限 | `mock-subagent-permission` | 触发子 agent `permission.ask`，授权回填时自动带上 `subagentSessionId` |
 | 会话标题 | `mock-session-title` | 触发 `session.title`，当前页面无可见专属 UI |
 | Agent 在线 | `mock-agent-online` | 触发 `agent.online`，当前页面无可见专属 UI |
-| Agent 离线 | `mock-agent-offline` | 触发 `agent.offline`，当前页面无可见专属 UI |
+| Agent 离线 | `mock-agent-offline` | 触发 `agent.offline`，追加“agent已离线”错误块并结束生成态 |
 | 会话错误 | `mock-session-error` | 触发 `session.error` |
 | 通用错误 | `mock-error` | 触发 `error` |
 

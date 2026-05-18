@@ -3,6 +3,9 @@ import type { Components } from 'react-markdown';
 import { CodeBlock } from './CodeBlock';
 import { openH5Webview } from '../utils/hwext';
 
+const INVALID_HTML_TAG_PATTERN = /<\/?([^\s>/]+)(?=[\s>/])/g;
+const VALID_HTML_TAG_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9-]*$/;
+
 function isSafeLink(href?: string): href is string {
   if (!href) {
     return false;
@@ -10,6 +13,18 @@ function isSafeLink(href?: string): href is string {
 
   const normalizedHref = href.trim().toLowerCase();
   return normalizedHref !== '' && !normalizedHref.startsWith('javascript:');
+}
+
+export function normalizeMarkdownHtml(content: string): string {
+  if (!content || content.indexOf('<') === -1) {
+    return content;
+  }
+
+  return content.replace(INVALID_HTML_TAG_PATTERN, (match, tagName: string) => (
+    VALID_HTML_TAG_NAME_PATTERN.test(tagName)
+      ? match
+      : match.replace('<', '&lt;')
+  ));
 }
 
 export function createMarkdownComponents(includeCodeBlock = false): Components {

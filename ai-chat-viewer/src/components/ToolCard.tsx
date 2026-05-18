@@ -9,7 +9,7 @@ import type { Components } from 'react-markdown';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import errorIcon from '../imgs/error_icon.svg';
 import successIcon from '../imgs/success_icon.svg';
-import { createMarkdownComponents } from './markdownComponents';
+import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
 import type { ToolCardProps } from '../types/components';
 
 const statusLabels: Record<string, string> = {
@@ -45,7 +45,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
       rehypePlugins={[rehypeRaw, rehypeKatex]}
       components={markdownComponents}
     >
-      {content}
+      {normalizeMarkdownHtml(content)}
     </ReactMarkdown>
   );
 

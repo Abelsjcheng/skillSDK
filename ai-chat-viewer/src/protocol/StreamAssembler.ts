@@ -47,12 +47,10 @@ export class StreamAssembler {
       case 'text.done': {
         const id = msg.partId || this.findActivePartId('text');
         if (id) {
-          const part = this.parts.get(id);
-          if (part) {
-            this.syncSubagentFields(part, msg);
-            if (msg.content) part.content = msg.content;
-            part.isStreaming = false;
-          }
+          const part = this.getOrCreatePart(id, 'text');
+          this.syncSubagentFields(part, msg);
+          if (msg.content) part.content = msg.content;
+          part.isStreaming = false;
         } else {
           const newId = this.genPartId('text');
           const part = this.getOrCreatePart(newId, 'text');

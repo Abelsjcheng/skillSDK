@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
 import { Content } from '../components/Content';
 import { SkillCUIFooter } from '../components/skillCUI/SkillCUIFooter';
 import { SkillCUIHeader } from '../components/skillCUI/SkillCUIHeader';
+import { isPcMiniApp } from '../constants';
 import { useChatSession } from '../hooks/useChatSession';
 import type { SkillCUIProps } from '../types/pages';
 import { getQueryParam } from '../utils/hwext';
@@ -10,13 +10,12 @@ import { showToast } from '../utils/toast';
 import '../styles/App.less';
 import '../styles/SkillCUI.less';
 
-const SkillCUI: React.FC<SkillCUIProps> = ({ welinkSessionId: welinkSessionIdProp }) => {
-  const location = useLocation();
+  const SkillCUI: React.FC<SkillCUIProps> = ({ welinkSessionId: welinkSessionIdProp }) => {
   const emptySessionToastShownRef = useRef(false);
-  const welinkSessionId = useMemo(
-    () => welinkSessionIdProp?.trim() || getQueryParam('welinkSessionId', location.search)?.trim() || '',
-    [location.search, welinkSessionIdProp],
-  );
+  const isPc = isPcMiniApp();
+  const welinkSessionId = isPc
+    ? (welinkSessionIdProp?.trim() || '')
+    : (getQueryParam('welinkSessionId')?.trim() || '');
   const session = useChatSession({ mode: 'skillCUI', welinkSessionId });
 
   useEffect(() => {
