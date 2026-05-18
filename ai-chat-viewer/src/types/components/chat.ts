@@ -9,11 +9,16 @@ export interface ContentProps {
   messages: Message[];
   pendingAssistantPreview: PendingAssistantPreview;
   welinkSessionId: string;
+  messageVariant?: 'weAgent' | 'plain';
+  showMessageActions?: boolean;
+  showWelcome?: boolean;
   scrollToBottomSignal?: number;
   isLoadingHistory: boolean;
   hasMoreHistory: boolean;
   onLoadMoreHistory: () => void;
   onQuestionAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
+  onCopy?: (content: string) => Promise<void> | void;
+  onSendToIM?: (content: string) => Promise<void> | void;
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
@@ -46,7 +51,11 @@ export interface ThinkingBlockProps {
 export interface MessageBubbleProps {
   message: Message;
   welinkSessionId: string;
+  variant?: 'weAgent' | 'plain';
+  showActions?: boolean;
   onQuestionAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
+  onCopy?: (content: string) => Promise<void> | void;
+  onSendToIM?: (content: string) => Promise<void> | void;
   weAgentUserName?: string;
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;

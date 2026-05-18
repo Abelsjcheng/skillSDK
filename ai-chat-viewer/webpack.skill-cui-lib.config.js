@@ -9,12 +9,12 @@ const {
 module.exports = {
   mode: 'production',
   target: WEBPACK_ES5_TARGET,
-  entry: './src/lib/index.ts',
+  entry: './src/lib/skillCUI.ts',
   output: createEs5Output({
     path: path.resolve(__dirname, 'dist/lib'),
-    filename: 'index.js',
+    filename: 'skill-cui.js',
     library: {
-      name: 'AIChatViewer',
+      name: 'AISkillCUI',
       type: 'umd',
     },
     globalObject: 'this',
@@ -51,6 +51,6 @@ module.exports = {
     minimize: false,
     usedExports: true,
   },
-  devtool: "source-map",
+  devtool: 'source-map',
   performance: { hints: false },
 };

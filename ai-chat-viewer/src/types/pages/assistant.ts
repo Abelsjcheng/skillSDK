@@ -10,6 +10,10 @@ export interface AssistantDetailProps {
   partnerAccount?: string;
 }
 
+export interface SkillCUIProps {
+  welinkSessionId?: string;
+}
+
 export type AssistantDetailOverlay = 'none' | 'action-sheet' | 'delete-modal';
 
 export type AssistantDetailPcView = 'detail' | 'edit';

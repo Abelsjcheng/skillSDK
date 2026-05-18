@@ -202,9 +202,11 @@ const DEFAULT_PAGE_SIZE = 50;
 const SUBAGENT_BASIC_PREFIX = 'subagent_basic';
 const SUBAGENT_QUESTION_PREFIX = 'subagent_question';
 const SUBAGENT_PERMISSION_PREFIX = 'subagent_permission';
+const DEFAULT_SKILL_CUI_WELINK_SESSION_ID = 'mock_skill_cui_session_001';
 
 let idCounter = 0;
 let currentAssistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
+let defaultSkillCUIWelinkSessionId = DEFAULT_SKILL_CUI_WELINK_SESSION_ID;
 
 const assistantDetailsStore = new Map<string, WeAgentDetails>();
 const sessionStore = new Map<string, SessionRecord>();
@@ -1876,6 +1878,24 @@ function createSession(params: CreateNewSessionParams): SkillSession {
   };
 }
 
+function createFixedSession(params: CreateNewSessionParams, welinkSessionId: string): SkillSession {
+  const createdAt = nowIso();
+  return {
+    welinkSessionId,
+    userId: 'mock_user_id',
+    ak: params.ak,
+    title: params.title ?? welinkSessionId,
+    bussinessDomain: params.bussinessDomain,
+    bussinessType: params.bussinessType,
+    bussinessId: params.bussinessId,
+    assistantAccount: params.assistantAccount,
+    status: 'ACTIVE',
+    toolSessionId: null,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
 function seedMockData(): void {
   if (assistantDetailsStore.size > 0) {
     return;
@@ -1938,14 +1958,14 @@ function seedMockData(): void {
   assistantDetailsStore.set(internalAssistant.partnerAccount, internalAssistant);
   assistantDetailsStore.set(customAssistant.partnerAccount, customAssistant);
 
-  const seedSession = createSession({
+  const seedSession = createFixedSession({
     ak: internalAssistant.appKey,
     title: 'mock-initial-session',
     bussinessDomain: 'miniapp',
     bussinessType: 'direct',
     assistantAccount: internalAssistant.partnerAccount,
     bussinessId: MOCK_UID,
-  });
+  }, DEFAULT_SKILL_CUI_WELINK_SESSION_ID);
 
   const seedRecord: SessionRecord = {
     session: seedSession,
@@ -1975,6 +1995,7 @@ function seedMockData(): void {
   upsertSessionRecord(seedRecord, firstAssistantMessage);
 
   sessionStore.set(seedSession.welinkSessionId, seedRecord);
+  defaultSkillCUIWelinkSessionId = seedSession.welinkSessionId;
 }
 
 function ensureDefaultMockRouteQueryInHash(): void {
@@ -1993,6 +2014,12 @@ function ensureDefaultMockRouteQueryInHash(): void {
   if (hashUrl.pathname === '/weAgentCUI' && !hashUrl.searchParams.get('assistantAccount')) {
     nextQuery.assistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
     window.location.hash = toRouteHash('/weAgentCUI', nextQuery);
+    return;
+  }
+
+  if (hashUrl.pathname === '/skillCUI' && !hashUrl.searchParams.get('welinkSessionId')) {
+    nextQuery.welinkSessionId = defaultSkillCUIWelinkSessionId;
+    window.location.hash = toRouteHash('/skillCUI', nextQuery);
     return;
   }
 

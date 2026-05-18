@@ -9,6 +9,7 @@ import CreateAssistantBasicPage from '../pages/createAssistantBasic';
 import EditAssistant from '../pages/editAssistant';
 import SelectAssistant from '../pages/selectAssistant';
 import SelectBrainAssistantPage from '../pages/selectBrainAssistant';
+import SkillCUI from '../pages/skillCUI';
 import SwitchAssistant from '../pages/switchAssistant';
 import WeAgentCUI from '../pages/weAgentCUI';
 import { rebootApp, registerCommonForUpdate, registerTabForUpdate } from '../utils/hwext';
@@ -50,6 +51,7 @@ export const AppRouter: React.FC = () => {
     <>
       <Routes>
         <Route path="/weAgentCUI" element={<WeAgentCUI />} />
+        <Route path="/skillCUI" element={<SkillCUI />} />
         <Route
           path="/createAssistant"
           element={(

@@ -14,6 +14,7 @@
     "build": "webpack --mode production --env isProEnv=true",
     "build:uat": "webpack --mode production --env isProEnv=false",
     "build:lib": "webpack --config webpack.lib.config.js --mode production && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:skill-cui-lib": "webpack --config webpack.skill-cui-lib.config.js --mode production && tsc --emitDeclarationOnly --declaration --outDir dist",
     "build:all": "npm run build && npm run build:lib",
     "build:require-demo": "npm run build:lib && webpack --config example/require-demo/webpack.config.js --mode production",
     "build:create-assistant-page": "webpack --config webpack.create-assistant-page.config.js --mode production",

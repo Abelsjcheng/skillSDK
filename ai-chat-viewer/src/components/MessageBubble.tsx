@@ -7,6 +7,9 @@ import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
 import AvatarImage from './AvatarImage';
+import { copyTextToClipboard } from '../utils/clipboard';
+import copyIcon from '../imgs/icon-copy.svg';
+import sendImIcon from '../imgs/send_icon.svg';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
@@ -24,6 +27,8 @@ import {
 } from '../utils/message';
 import defaultAvatar from '../imgs/defaultAvatar.png';
 import 'katex/dist/katex.min.css';
+import { showToast } from '../utils/toast';
+import { WeLog } from '../utils/logger';
 
 function formatMessageTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -55,7 +60,11 @@ const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   welinkSessionId,
+  variant = 'weAgent',
+  showActions = false,
   onQuestionAnswered,
+  onCopy,
+  onSendToIM,
   weAgentUserName = '',
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
@@ -65,6 +74,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUser = normalizedRole === 'user';
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
+  const isPlainVariant = variant === 'plain';
+  const canRenderActions = showActions && !isUser;
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -169,6 +180,59 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
   };
 
+  const handleCopy = () => {
+    if (onCopy) {
+      void onCopy(message.content);
+      return;
+    }
+
+    void copyTextToClipboard(message.content)
+      .then(() => {
+        showToast('复制成功');
+      })
+      .catch((error) => {
+        WeLog(`MessageBubble copy failed | error=${JSON.stringify(error)}`);
+        showToast('复制失败');
+      });
+  };
+
+  const handleSendToIM = () => {
+    void onSendToIM?.(message.content);
+  };
+
+  const renderActions = () => {
+    if (!canRenderActions || message.isStreaming || !message.content) {
+      return null;
+    }
+
+    return (
+      <div className="message-actions">
+        {onCopy ? (
+          <button
+            type="button"
+            className="action-btn copy-btn"
+            onClick={handleCopy}
+            title="复制内容"
+          >
+            <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
+            <span className="action-btn__text">复制</span>
+          </button>
+        ) : null}
+        {onSendToIM ? (
+          <button
+            type="button"
+            className="action-btn send-btn"
+            onClick={handleSendToIM}
+            title="发送到聊天"
+          >
+            <img className="action-btn__icon" src={sendImIcon} alt="" aria-hidden="true" draggable="false" />
+            <span className="action-btn__text">发送</span>
+          </button>
+        ) : null}
+      </div>
+    );
+  };
+
   const messageContent = renderContent();
   if (messageContent === null) {
     return null;
@@ -177,6 +241,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const userName = weAgentUserName.trim();
   const assistantName = weAgentAssistantName.trim();
   const messageMetaText = `${isUser ? userName : assistantName} ${messageTimeText}`.trim();
+
+  if (isPlainVariant) {
+    return (
+      <div className={`message-block ${isUser ? 'message-user' : 'message-assistant'}`}>
+        <div className="message-content">{messageContent}</div>
+        {renderActions()}
+      </div>
+    );
+  }
 
   return (
     <div className={`message-block message-we-agent ${isUser ? 'message-user' : 'message-assistant'}`}>

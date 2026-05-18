@@ -15,11 +15,16 @@ export const Content: React.FC<ContentProps> = ({
   messages,
   pendingAssistantPreview,
   welinkSessionId,
+  messageVariant = 'weAgent',
+  showMessageActions = false,
+  showWelcome = true,
   scrollToBottomSignal = 0,
   isLoadingHistory,
   hasMoreHistory,
   onLoadMoreHistory,
   onQuestionAnswered,
+  onCopy,
+  onSendToIM,
   weAgentUserName = '',
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
@@ -135,6 +140,10 @@ export const Content: React.FC<ContentProps> = ({
   }, [scrollToBottom, scrollToBottomSignal]);
 
   if (visibleMessages.length === 0 && !pendingAssistantPreview.visible) {
+    if (!showWelcome) {
+      return <div className="content content--we-agent-cui" ref={containerRef} />;
+    }
+
     return (
       <div className="content content--we-agent-cui">
         <div className="we-agent-cui-welcome">
@@ -165,7 +174,11 @@ export const Content: React.FC<ContentProps> = ({
             <MessageBubble
               message={message}
               welinkSessionId={welinkSessionId}
+              variant={messageVariant}
+              showActions={showMessageActions}
               onQuestionAnswered={onQuestionAnswered}
+              onCopy={onCopy}
+              onSendToIM={onSendToIM}
               weAgentUserName={weAgentUserName}
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}

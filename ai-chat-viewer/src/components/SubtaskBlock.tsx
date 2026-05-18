@@ -11,7 +11,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export const SubtaskBlock: React.FC<SubtaskBlockProps> = ({ part, children }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const status = part.subagentStatus ?? 'running';
   const statusLabel = statusLabels[status] ?? status;
 

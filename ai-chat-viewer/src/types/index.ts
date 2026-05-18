@@ -331,3 +331,5 @@ export interface RegenerateAnswerResponse extends MessageOperationResponseBase {
 export interface ControlSkillWeCodeResponse {
   status: 'success' | 'failed';
 }
+
+export * from './hooks';
