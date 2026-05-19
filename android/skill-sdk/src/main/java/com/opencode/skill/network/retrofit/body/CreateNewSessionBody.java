@@ -6,25 +6,25 @@ import androidx.annotation.Nullable;
 
 @Keep
 public final class CreateNewSessionBody {
-    @NonNull
+    @Nullable
     private final String ak;
-    @NonNull
+    @Nullable
     private final String bussinessDomain;
-    @NonNull
+    @Nullable
     private final String bussinessType;
     @NonNull
     private final String bussinessId;
-    @NonNull
+    @Nullable
     private final String assistantAccount;
     @Nullable
     private final String title;
 
     public CreateNewSessionBody(
-            @NonNull String ak,
-            @NonNull String bussinessDomain,
-            @NonNull String bussinessType,
+            @Nullable String ak,
+            @Nullable String bussinessDomain,
+            @Nullable String bussinessType,
             @NonNull String bussinessId,
-            @NonNull String assistantAccount,
+            @Nullable String assistantAccount,
             @Nullable String title
     ) {
         this.ak = ak;
@@ -35,17 +35,17 @@ public final class CreateNewSessionBody {
         this.title = title;
     }
 
-    @NonNull
+    @Nullable
     public String getAk() {
         return ak;
     }
 
-    @NonNull
+    @Nullable
     public String getBussinessDomain() {
         return bussinessDomain;
     }
 
-    @NonNull
+    @Nullable
     public String getBussinessType() {
         return bussinessType;
     }
@@ -55,7 +55,7 @@ public final class CreateNewSessionBody {
         return bussinessId;
     }
 
-    @NonNull
+    @Nullable
     public String getAssistantAccount() {
         return assistantAccount;
     }

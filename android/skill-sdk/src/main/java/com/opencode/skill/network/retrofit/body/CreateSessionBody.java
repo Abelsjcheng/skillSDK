@@ -1,6 +1,7 @@
 package com.opencode.skill.network.retrofit.body;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 @Keep
@@ -10,12 +11,28 @@ public final class CreateSessionBody {
     @Nullable
     private final String title;
     @Nullable
-    private final String imGroupId;
+    private final String bussinessDomain;
+    @NonNull
+    private final String bussinessId;
+    @Nullable
+    private final String bussinessType;
+    @Nullable
+    private final String assistantAccount;
 
-    public CreateSessionBody(@Nullable String ak, @Nullable String title, @Nullable String imGroupId) {
+    public CreateSessionBody(
+            @Nullable String ak,
+            @Nullable String title,
+            @Nullable String bussinessDomain,
+            @NonNull String bussinessId,
+            @Nullable String bussinessType,
+            @Nullable String assistantAccount
+    ) {
         this.ak = ak;
         this.title = title;
-        this.imGroupId = imGroupId;
+        this.bussinessDomain = bussinessDomain;
+        this.bussinessId = bussinessId;
+        this.bussinessType = bussinessType;
+        this.assistantAccount = assistantAccount;
     }
 
     @Nullable
@@ -29,7 +46,22 @@ public final class CreateSessionBody {
     }
 
     @Nullable
-    public String getImGroupId() {
-        return imGroupId;
+    public String getBussinessDomain() {
+        return bussinessDomain;
+    }
+
+    @NonNull
+    public String getBussinessId() {
+        return bussinessId;
+    }
+
+    @Nullable
+    public String getBussinessType() {
+        return bussinessType;
+    }
+
+    @Nullable
+    public String getAssistantAccount() {
+        return assistantAccount;
     }
 }

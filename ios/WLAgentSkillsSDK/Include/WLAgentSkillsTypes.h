@@ -46,16 +46,19 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @interface WLAgentSkillsCreateSessionParams : NSObject
 @property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
-@property (nonatomic, copy) NSString *imGroupId;
+@property (nonatomic, copy, nullable) NSString *bussinessDomain;
+@property (nonatomic, copy) NSString *bussinessId;
+@property (nonatomic, copy, nullable) NSString *bussinessType;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
 @end
 
 @interface WLAgentSkillsCreateNewSessionParams : NSObject
-@property (nonatomic, copy) NSString *ak;
+@property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
-@property (nonatomic, copy) NSString *bussinessDomain;
-@property (nonatomic, copy) NSString *bussinessType;
+@property (nonatomic, copy, nullable) NSString *bussinessDomain;
+@property (nonatomic, copy, nullable) NSString *bussinessType;
 @property (nonatomic, copy) NSString *bussinessId;
-@property (nonatomic, copy) NSString *assistantAccount;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
 @end
 
 @interface WLAgentSkillsHistorySessionsParams : NSObject

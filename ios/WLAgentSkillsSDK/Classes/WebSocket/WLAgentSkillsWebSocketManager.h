@@ -34,6 +34,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)removeAllListenersForSessionId:(NSString *)welinkSessionId;
 - (BOOL)hasListenerForSessionId:(NSString *)welinkSessionId;
+- (void)clearRoundBufferForSessionId:(NSString *)welinkSessionId;
+- (void)clearAllRoundBuffers;
 
 @end
 

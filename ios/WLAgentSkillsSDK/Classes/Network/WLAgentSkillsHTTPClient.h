@@ -18,16 +18,19 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 
 - (void)createSessionWithAK:(nullable NSString *)ak
                                             title:(nullable NSString *)title
-                                    imGroupId:(NSString *)imGroupId
+                            bussinessDomain:(nullable NSString *)bussinessDomain
+                                bussinessType:(nullable NSString *)bussinessType
+                                    bussinessId:(NSString *)bussinessId
+                            assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)createNewSessionWithAK:(NSString *)ak
+- (void)createNewSessionWithAK:(nullable NSString *)ak
                                         title:(nullable NSString *)title
-                            bussinessDomain:(NSString *)bussinessDomain
-                                bussinessType:(NSString *)bussinessType
+                            bussinessDomain:(nullable NSString *)bussinessDomain
+                                bussinessType:(nullable NSString *)bussinessType
                                     bussinessId:(NSString *)bussinessId
-                            assistantAccount:(NSString *)assistantAccount
+                            assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 

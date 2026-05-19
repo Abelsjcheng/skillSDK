@@ -113,18 +113,21 @@ public class ApiClient {
         enqueueEnvelope(service.createSession(new CreateSessionBody(
                 normalizeNonBlank(params.getAk()),
                 normalizeNonBlank(params.getTitle()),
-                normalizeNonBlank(params.getImGroupId())
+                normalizeNonBlank(params.getBussinessDomain()),
+                params.getBussinessId().trim(),
+                normalizeNonBlank(params.getBussinessType()),
+                normalizeNonBlank(params.getAssistantAccount())
         )), SkillSession.class, callback);
     }
 
     public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
         SkillApiService service = requireSkillApiService();
         enqueueEnvelope(service.createNewSession(new CreateNewSessionBody(
-                params.getAk().trim(),
-                params.getBussinessDomain().trim(),
-                params.getBussinessType().trim(),
+                normalizeNonBlank(params.getAk()),
+                normalizeNonBlank(params.getBussinessDomain()),
+                normalizeNonBlank(params.getBussinessType()),
                 params.getBussinessId().trim(),
-                params.getAssistantAccount().trim(),
+                normalizeNonBlank(params.getAssistantAccount()),
                 normalizeNonBlank(params.getTitle())
         )), SkillSession.class, callback);
     }

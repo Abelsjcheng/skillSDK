@@ -28,7 +28,7 @@ export enum SkillWeCodeAction {
 export type PermissionResponse = 'once' | 'always' | 'reject';
 export type SessionRecordStatus = 'ACTIVE' | 'IDLE' | 'CLOSED';
 export type SessionRuntimeStatus = 'busy' | 'idle' | 'retry';
-export type BusinessSessionDomain = 'miniapp' | 'im';
+export type BusinessSessionDomain = 'miniapp' | 'im' | 'skill';
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
 
@@ -282,16 +282,19 @@ export interface SessionListener {
 export interface CreateSessionParams {
   ak?: string;
   title?: string;
-  imGroupId: string;
+  bussinessDomain?: string;
+  bussinessId: string;
+  bussinessType?: string;
+  assistantAccount?: string;
 }
 
 export interface CreateNewSessionParams {
-  ak: string;
+  ak?: string;
   title?: string;
-  bussinessDomain: string;
-  bussinessType: string;
+  bussinessDomain?: string;
+  bussinessType?: string;
   bussinessId: string;
-  assistantAccount: string;
+  assistantAccount?: string;
 }
 
 export interface HistorySessionsParams {

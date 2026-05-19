@@ -11,9 +11,22 @@ import {
 
 type MessageHandler = (message: StreamMessage) => void;
 
+interface SessionRoundBuffer {
+  welinkSessionId: string;
+  events: StreamMessage[];
+  status: 'active' | 'completed';
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface ReplayState {
+  replaying: boolean;
+  pendingLiveEvents: StreamMessage[];
+}
+
 /**
- * Singleton WebSocket manager.
- * One connection is shared by all sessions and listeners.
+ * WebSocket 单例管理器。
+ * 所有会话共用同一条长连接，并按 welinkSessionId 将 onmessage 事件路由给对应监听器。
  */
 export class WebSocketManager {
   private static instance: WebSocketManager | null = null;
@@ -24,6 +37,8 @@ export class WebSocketManager {
   private connected: boolean = false;
   private messageHandler: MessageHandler | null = null;
   private listenersBySession: Map<string, SessionListener> = new Map();
+  private roundBuffersBySession: Map<string, SessionRoundBuffer> = new Map();
+  private replayStatesBySession: Map<string, ReplayState> = new Map();
 
   private constructor(config: SkillSDKConfig) {
     this.wsUrl = this.resolveWsUrl(config);
@@ -115,7 +130,20 @@ export class WebSocketManager {
     if (this.listenersBySession.has(key)) {
       return;
     }
+    const state = this.getOrCreateReplayState(key);
+    const buffer = this.roundBuffersBySession.get(key);
+    let shouldReplay = false;
+    if (buffer !== undefined && buffer.status === 'active' && !state.replaying) {
+      // 在监听器正式接收实时消息前，先进入“补发缓存”状态。
+      // 这样如果补发启动前后刚好有新的实时消息到达，这些消息会先进入待发送队列，
+      // 等缓存补发结束后再继续透传，保证页面拿到的事件顺序稳定不乱序。
+      state.replaying = true;
+      shouldReplay = true;
+    }
     this.listenersBySession.set(key, listener);
+    if (shouldReplay) {
+      this.replayBufferedEventsIfNeeded(key, state);
+    }
   }
 
   unregisterSessionListener(sessionId: string): void {
@@ -125,6 +153,16 @@ export class WebSocketManager {
 
   clearAllListeners(): void {
     this.listenersBySession.clear();
+  }
+
+  clearRoundBuffer(sessionId: string): void {
+    this.roundBuffersBySession.delete(sessionId);
+    this.replayStatesBySession.delete(sessionId);
+  }
+
+  clearAllRoundBuffers(): void {
+    this.roundBuffersBySession.clear();
+    this.replayStatesBySession.clear();
   }
 
   private setupSocketEventHandlers(socket: webSocket.WebSocket): void {
@@ -159,8 +197,17 @@ export class WebSocketManager {
       if (rawSessionId === undefined || rawSessionId === null || String(rawSessionId) === '') {
         return;
       }
-      const listener = this.listenersBySession.get(String(rawSessionId));
+      const sessionId = String(rawSessionId);
+      this.appendToRoundBuffer(sessionId, parsed);
+      if (this.isRoundTerminationMessage(parsed)) {
+        this.markRoundCompleted(sessionId);
+      }
+
+      const listener = this.listenersBySession.get(sessionId);
       if (listener === undefined) {
+        return;
+      }
+      if (this.enqueueLiveEventDuringReplay(sessionId, parsed)) {
         return;
       }
       try {
@@ -211,6 +258,111 @@ export class WebSocketManager {
         }
       }
     }
+  }
+
+  private replayBufferedEventsIfNeeded(sessionId: string, state: ReplayState): void {
+    const buffer = this.roundBuffersBySession.get(sessionId);
+    if (buffer === undefined || buffer.status !== 'active') {
+      state.replaying = false;
+      return;
+    }
+    // 复制一份快照用于补发，避免补发过程中实时事件继续写入 events，
+    // 影响当前这次补发的遍历内容和顺序。
+    const snapshot = buffer.events.slice();
+    const listener = this.listenersBySession.get(sessionId);
+    if (listener === undefined) {
+      state.replaying = false;
+      return;
+    }
+
+    snapshot.forEach((message: StreamMessage) => {
+      listener.onMessage(message);
+    });
+    this.flushPendingLiveEvents(sessionId);
+  }
+
+  private flushPendingLiveEvents(sessionId: string): void {
+    const state = this.replayStatesBySession.get(sessionId);
+    if (state === undefined) {
+      return;
+    }
+
+    while (state.pendingLiveEvents.length > 0) {
+      const listener = this.listenersBySession.get(sessionId);
+      if (listener === undefined) {
+        state.replaying = false;
+        return;
+      }
+      const pendingMessages = state.pendingLiveEvents.splice(0, state.pendingLiveEvents.length);
+      pendingMessages.forEach((message: StreamMessage) => {
+        listener.onMessage(message);
+      });
+    }
+    // 只有确认补发期间积压的实时消息已经全部清空，才结束 replaying 状态。
+    // 这样可以避免在“准备结束补发”这一瞬间新到的实时消息丢失发送时机。
+    state.replaying = false;
+  }
+
+  private enqueueLiveEventDuringReplay(sessionId: string, message: StreamMessage): boolean {
+    const state = this.replayStatesBySession.get(sessionId);
+    if (state === undefined || !state.replaying) {
+      return false;
+    }
+    // 页面层希望收到的是一条连续、有序的事件流。
+    // 因此补发期间的新实时消息先暂存，待补发结束后立即继续透传。
+    state.pendingLiveEvents.push(message);
+    return true;
+  }
+
+  private appendToRoundBuffer(sessionId: string, message: StreamMessage): void {
+    let buffer = this.roundBuffersBySession.get(sessionId);
+    if (buffer === undefined || buffer.status === 'completed') {
+      buffer = {
+        welinkSessionId: sessionId,
+        events: [],
+        status: 'active',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      this.roundBuffersBySession.set(sessionId, buffer);
+    }
+    // SDK 仅缓存服务端原始 onmessage 事件，不在这里做消息聚合。
+    // 页面重新注册监听时，先补发这批原始事件，再继续消费后续实时事件，
+    // 从而复用现有页面侧的消息拼装与渲染逻辑。
+    buffer.events.push(message);
+    buffer.updatedAt = Date.now();
+  }
+
+  private markRoundCompleted(sessionId: string): void {
+    const buffer = this.roundBuffersBySession.get(sessionId);
+    if (buffer === undefined) {
+      return;
+    }
+    // 轮次结束后仅保留完成态标记，不再对后续 registerSessionListener 补发这轮缓存。
+    // 若页面此时才打开，应通过历史消息接口获取完整结果。
+    buffer.status = 'completed';
+    buffer.updatedAt = Date.now();
+  }
+
+  private isRoundTerminationMessage(message: StreamMessage): boolean {
+    if (message.type === 'session.status') {
+      return message.sessionStatus === 'idle';
+    }
+    return message.type === 'session.error'
+      || message.type === 'error'
+      || message.type === 'agent.offline';
+  }
+
+  private getOrCreateReplayState(sessionId: string): ReplayState {
+    let state = this.replayStatesBySession.get(sessionId);
+    if (state === undefined) {
+      state = {
+        replaying: false,
+        pendingLiveEvents: []
+      };
+      this.replayStatesBySession.set(sessionId, state);
+    }
+    return state;
   }
 
   private resolveWsUrl(config: SkillSDKConfig, fallback?: string): string {
