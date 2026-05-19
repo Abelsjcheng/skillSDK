@@ -68,12 +68,36 @@ interface SessionRecord {
   nextMessageSeq: number;
   nextStreamSeq: number;
   timerIds: number[];
+  continuationScheduled?: boolean;
+  activeReplayDraft?: ActiveReplayDraft | null;
 }
 
 interface SessionListener {
   onMessage: RegisterSessionListenerParams['onMessage'];
   onError?: RegisterSessionListenerParams['onError'];
   onClose?: RegisterSessionListenerParams['onClose'];
+}
+
+interface ActiveReplayDraft {
+  messageId: string;
+  thinkingPartId: string;
+  textPartId: string;
+  thinkingContent: string;
+  partialText: string;
+  finalText: string;
+}
+
+interface SessionRoundBuffer {
+  welinkSessionId: string;
+  events: StreamMessage[];
+  createdAt: number;
+  updatedAt: number;
+  completed: boolean;
+}
+
+interface ReplayState {
+  replaying: boolean;
+  pendingLiveEvents: StreamMessage[];
 }
 
 interface SubagentMockContext {
@@ -203,6 +227,7 @@ const SUBAGENT_BASIC_PREFIX = 'subagent_basic';
 const SUBAGENT_QUESTION_PREFIX = 'subagent_question';
 const SUBAGENT_PERMISSION_PREFIX = 'subagent_permission';
 const DEFAULT_SKILL_CUI_WELINK_SESSION_ID = 'mock_skill_cui_session_001';
+const DEFAULT_SKILL_CUI_REPLAY_WELINK_SESSION_ID = 'mock_skill_cui_replay_session_001';
 
 let idCounter = 0;
 let currentAssistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
@@ -211,6 +236,8 @@ let defaultSkillCUIWelinkSessionId = DEFAULT_SKILL_CUI_WELINK_SESSION_ID;
 const assistantDetailsStore = new Map<string, WeAgentDetails>();
 const sessionStore = new Map<string, SessionRecord>();
 const listeners = new Map<string, SessionListener>();
+const roundBufferStore = new Map<string, SessionRoundBuffer>();
+const replayStateStore = new Map<string, ReplayState>();
 
 function cloneAssistantDetail(detail: WeAgentDetails): WeAgentDetails {
   return { ...detail };
@@ -859,18 +886,163 @@ type MockEmitPayload = Omit<StreamMessage, 'welinkSessionId' | 'seq' | 'emittedA
   emittedAt?: StreamMessage['emittedAt'];
 };
 
+function getOrCreateReplayState(sessionId: string): ReplayState {
+  const existing = replayStateStore.get(sessionId);
+  if (existing) {
+    return existing;
+  }
+
+  const nextState: ReplayState = {
+    replaying: false,
+    pendingLiveEvents: [],
+  };
+  replayStateStore.set(sessionId, nextState);
+  return nextState;
+}
+
+function getOrCreateRoundBuffer(sessionId: string): SessionRoundBuffer {
+  const existing = roundBufferStore.get(sessionId);
+  if (existing && !existing.completed) {
+    return existing;
+  }
+
+  const timestamp = Date.now();
+  const nextBuffer: SessionRoundBuffer = {
+    welinkSessionId: sessionId,
+    events: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    completed: false,
+  };
+  roundBufferStore.set(sessionId, nextBuffer);
+  return nextBuffer;
+}
+
+function shouldCompleteCurrentRound(message: StreamMessage): boolean {
+  if (message.type === 'session.status') {
+    return message.sessionStatus === 'idle';
+  }
+
+  return message.type === 'session.error'
+    || message.type === 'error'
+    || message.type === 'agent.offline';
+}
+
+function appendToRoundBuffer(sessionId: string, message: StreamMessage): void {
+  const buffer = getOrCreateRoundBuffer(sessionId);
+  buffer.events.push(message);
+  buffer.updatedAt = Date.now();
+}
+
+function markRoundCompleted(sessionId: string): void {
+  const buffer = roundBufferStore.get(sessionId);
+  if (!buffer) {
+    return;
+  }
+
+  buffer.completed = true;
+  buffer.updatedAt = Date.now();
+}
+
+function dispatchToSessionListener(listener: SessionListener, message: StreamMessage): void {
+  try {
+    listener.onMessage(message);
+  } catch (callbackError) {
+    listener.onError?.({
+      code: 'CALLBACK_ERROR',
+      message: callbackError instanceof Error ? callbackError.message : 'Session listener callback failed',
+      timestamp: Date.now(),
+    });
+  }
+}
+
+function flushPendingReplayEvents(sessionId: string): void {
+  const replayState = replayStateStore.get(sessionId);
+  if (!replayState) {
+    return;
+  }
+
+  while (true) {
+    const listener = listeners.get(sessionId);
+    if (!listener) {
+      replayState.replaying = false;
+      return;
+    }
+
+    if (replayState.pendingLiveEvents.length === 0) {
+      replayState.replaying = false;
+      return;
+    }
+
+    const pendingMessages = replayState.pendingLiveEvents.splice(0, replayState.pendingLiveEvents.length);
+    pendingMessages.forEach((message) => {
+      dispatchToSessionListener(listener, message);
+    });
+  }
+}
+
+function replayBufferedEventsIfNeeded(sessionId: string): void {
+  const buffer = roundBufferStore.get(sessionId);
+  const replayState = replayStateStore.get(sessionId);
+  if (!replayState) {
+    return;
+  }
+
+  if (!buffer || buffer.completed) {
+    replayState.replaying = false;
+    return;
+  }
+
+  const listener = listeners.get(sessionId);
+  if (!listener) {
+    replayState.replaying = false;
+    return;
+  }
+
+  const snapshot = buffer.events.slice();
+  snapshot.forEach((message) => {
+    dispatchToSessionListener(listener, message);
+  });
+  flushPendingReplayEvents(sessionId);
+}
+
+function enqueueLiveEventDuringReplay(sessionId: string, message: StreamMessage): boolean {
+  const replayState = replayStateStore.get(sessionId);
+  if (!replayState || !replayState.replaying) {
+    return false;
+  }
+
+  replayState.pendingLiveEvents.push(message);
+  return true;
+}
+
 function emit(sessionId: string, payload: MockEmitPayload): void {
   const record = sessionStore.get(sessionId);
-  const listener = listeners.get(sessionId);
-  if (!record || !listener) return;
+  if (!record) return;
 
   record.nextStreamSeq += 1;
-  listener.onMessage({
+  const message: StreamMessage = {
     ...payload,
     welinkSessionId: sessionId,
     seq: record.nextStreamSeq,
     emittedAt: payload.emittedAt ?? nowIso(),
-  });
+  };
+
+  appendToRoundBuffer(sessionId, message);
+  if (shouldCompleteCurrentRound(message)) {
+    markRoundCompleted(sessionId);
+  }
+
+  const listener = listeners.get(sessionId);
+  if (!listener) {
+    return;
+  }
+
+  if (enqueueLiveEventDuringReplay(sessionId, message)) {
+    return;
+  }
+
+  dispatchToSessionListener(listener, message);
 }
 
 function clearSessionTimers(record: SessionRecord): void {
@@ -911,6 +1083,57 @@ function finalizeAssistantMessage(
   );
   record.nextMessageSeq += 1;
   upsertSessionRecord(record, assistantMessage);
+}
+
+function scheduleReplayDraftContinuation(record: SessionRecord): void {
+  const draft = record.activeReplayDraft;
+  if (!draft || record.continuationScheduled) {
+    return;
+  }
+
+  record.continuationScheduled = true;
+  const sessionId = record.session.welinkSessionId;
+
+  scheduleRecordTimer(record, 160, () => {
+    emit(sessionId, {
+      type: 'thinking.done',
+      messageId: draft.messageId,
+      role: 'assistant',
+      partId: draft.thinkingPartId,
+      content: draft.thinkingContent,
+    });
+    emit(sessionId, {
+      type: 'text.delta',
+      messageId: draft.messageId,
+      role: 'assistant',
+      partId: draft.textPartId,
+      content: '\nContinuing after listener replay...',
+    });
+  });
+
+  scheduleRecordTimer(record, 320, () => {
+    emit(sessionId, {
+      type: 'text.done',
+      messageId: draft.messageId,
+      role: 'assistant',
+      partId: draft.textPartId,
+      content: draft.finalText,
+    });
+    finalizeAssistantMessage(record, draft.finalText, [
+      buildThinkingPart(draft.thinkingPartId, draft.thinkingContent, 1),
+      {
+        ...buildTextPart(draft.textPartId, draft.finalText)![0],
+        partSeq: 2,
+      },
+    ]);
+    emit(sessionId, {
+      type: 'session.status',
+      sessionStatus: 'idle',
+    });
+    clearSessionTimers(record);
+    record.activeReplayDraft = null;
+    record.continuationScheduled = false;
+  });
 }
 
 function updateStoredPermissionResponse(
@@ -1973,6 +2196,8 @@ function seedMockData(): void {
     nextMessageSeq: 1,
     nextStreamSeq: 0,
     timerIds: [],
+    continuationScheduled: false,
+    activeReplayDraft: null,
   };
 
   const firstUserMessage = createMessage(
@@ -1996,6 +2221,105 @@ function seedMockData(): void {
 
   sessionStore.set(seedSession.welinkSessionId, seedRecord);
   defaultSkillCUIWelinkSessionId = seedSession.welinkSessionId;
+
+  const replaySession = createFixedSession({
+    ak: internalAssistant.appKey,
+    title: 'mock-replay-session',
+    bussinessDomain: 'miniapp',
+    bussinessType: 'direct',
+    assistantAccount: internalAssistant.partnerAccount,
+    bussinessId: MOCK_UID,
+  }, DEFAULT_SKILL_CUI_REPLAY_WELINK_SESSION_ID);
+
+  const replayRecord: SessionRecord = {
+    session: replaySession,
+    messages: [],
+    nextMessageSeq: 1,
+    nextStreamSeq: 0,
+    timerIds: [],
+    continuationScheduled: false,
+    activeReplayDraft: null,
+  };
+
+  const replayHistoryUser = createMessage(
+    replaySession.welinkSessionId,
+    'user',
+    'Show me how listener replay restores cached streaming events.',
+    replayRecord.nextMessageSeq,
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayHistoryUser);
+
+  const replayHistoryAssistant = createAssistantMessage(
+    replaySession.welinkSessionId,
+    'History messages are loaded from getSessionMessageHistory first.',
+    replayRecord.nextMessageSeq,
+    buildTextPart(nextId('part_replay_history'), 'History messages are loaded from getSessionMessageHistory first.'),
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayHistoryAssistant);
+
+  const replayCurrentUser = createMessage(
+    replaySession.welinkSessionId,
+    'user',
+    'Continue the answer even if the page opens late.',
+    replayRecord.nextMessageSeq,
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayCurrentUser);
+
+  const replayDraftMessageId = nextId('msg_replay_stream');
+  const replayThinkingPartId = nextId('part_replay_thinking');
+  const replayTextPartId = nextId('part_replay_text');
+  const replayThinkingContent = [
+    '1. The page opens after the current round already started.',
+    '2. SDK replays cached raw stream events for the unfinished round.',
+    '3. After replay, new live events continue in order.',
+  ].join('\n');
+  const replayPartialText = 'Recovered partial assistant output from cached listener events.';
+  const replayFinalText = [
+    'Recovered partial assistant output from cached listener events.',
+    '',
+    'This tail is delivered after replay finishes, proving that cached events and live events stay ordered.',
+  ].join('\n');
+
+  replayRecord.activeReplayDraft = {
+    messageId: replayDraftMessageId,
+    thinkingPartId: replayThinkingPartId,
+    textPartId: replayTextPartId,
+    thinkingContent: replayThinkingContent,
+    partialText: replayPartialText,
+    finalText: replayFinalText,
+  };
+
+  sessionStore.set(replaySession.welinkSessionId, replayRecord);
+
+  emit(replaySession.welinkSessionId, {
+    type: 'session.status',
+    sessionStatus: 'busy',
+  });
+  emit(replaySession.welinkSessionId, {
+    type: 'streaming',
+    messageId: replayDraftMessageId,
+    role: 'assistant',
+    sessionStatus: 'busy',
+    parts: [
+      {
+        partId: replayThinkingPartId,
+        partSeq: 1,
+        type: 'thinking',
+        content: replayThinkingContent,
+        status: 'running',
+      },
+      {
+        partId: replayTextPartId,
+        partSeq: 2,
+        type: 'text',
+        content: replayPartialText,
+        status: 'running',
+      },
+    ],
+  });
 }
 
 function ensureDefaultMockRouteQueryInHash(): void {
@@ -2211,14 +2535,30 @@ function buildMockApi(): HWH5EXT {
     },
 
     registerSessionListener: (params: RegisterSessionListenerParams): void => {
-      if (listeners.has(params.welinkSessionId)) {
-        return;
+      const replayState = getOrCreateReplayState(params.welinkSessionId);
+      const buffer = roundBufferStore.get(params.welinkSessionId);
+      let shouldReplay = false;
+
+      if (buffer && !buffer.completed && !replayState.replaying) {
+        replayState.replaying = true;
+        shouldReplay = true;
       }
+
       listeners.set(params.welinkSessionId, {
         onMessage: params.onMessage,
         onError: params.onError,
         onClose: params.onClose,
       });
+
+      if (shouldReplay) {
+        window.setTimeout(() => {
+          replayBufferedEventsIfNeeded(params.welinkSessionId);
+          const record = sessionStore.get(params.welinkSessionId);
+          if (record?.activeReplayDraft) {
+            scheduleReplayDraftContinuation(record);
+          }
+        }, 0);
+      }
     },
 
     unregisterSessionListener: (params: UnregisterSessionListenerParams): void => {
