@@ -14,6 +14,7 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
 @interface WLAgentSkillsWeAgentStore ()
 
 @property (nonatomic, copy) NSString *prefix;
+@property (nonatomic, strong) dispatch_queue_t assistantGraySingleQueue;
 
 @end
 
@@ -32,8 +33,13 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
     self = [super init];
     if (self) {
         _prefix = [NSString stringWithFormat:@"skill_sdk_we_agent_%@_", WLAgentSkillsMockUserId];
+        _assistantGraySingleQueue = dispatch_queue_create("com.opencode.skill.assistantGraySingleQueue", DISPATCH_QUEUE_SERIAL);
     }
     return self;
+}
+
+- (dispatch_queue_t)assistantGraySingleQueue {
+    return _assistantGraySingleQueue;
 }
 
 - (void)saveCurrentWeAgentDetailDictionary:(nullable NSDictionary *)dictionary {
@@ -190,30 +196,38 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
     if (partnerAccount.length == 0) {
         return nil;
     }
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsAssistantGraySingleCacheKey];
-    id value = [defaults objectForKey:key];
-    if (![value isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-    id grayValue = ((NSDictionary *)value)[partnerAccount];
-    return [grayValue isKindOfClass:[NSNumber class]] ? (NSNumber *)grayValue : nil;
+    __block NSNumber *result = nil;
+    dispatch_sync(self.assistantGraySingleQueue, ^{
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsAssistantGraySingleCacheKey];
+        id value = [defaults objectForKey:key];
+        if (![value isKindOfClass:[NSDictionary class]]) {
+            return;
+        }
+        id grayValue = ((NSDictionary *)value)[partnerAccount];
+        if ([grayValue isKindOfClass:[NSNumber class]]) {
+            result = (NSNumber *)grayValue;
+        }
+    });
+    return result;
 }
 
 - (void)saveAssistantGraySingle:(BOOL)value forPartnerAccount:(NSString *)partnerAccount {
     if (partnerAccount.length == 0) {
         return;
     }
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsAssistantGraySingleCacheKey];
-    NSMutableDictionary *cache = [NSMutableDictionary dictionary];
-    id rawValue = [defaults objectForKey:key];
-    if ([rawValue isKindOfClass:[NSDictionary class]]) {
-        [cache addEntriesFromDictionary:(NSDictionary *)rawValue];
-    }
-    cache[partnerAccount] = @(value);
-    [defaults setObject:cache forKey:key];
-    [defaults synchronize];
+    dispatch_sync(self.assistantGraySingleQueue, ^{
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsAssistantGraySingleCacheKey];
+        NSMutableDictionary *cache = [NSMutableDictionary dictionary];
+        id rawValue = [defaults objectForKey:key];
+        if ([rawValue isKindOfClass:[NSDictionary class]]) {
+            [cache addEntriesFromDictionary:(NSDictionary *)rawValue];
+        }
+        cache[partnerAccount] = @(value);
+        [defaults setObject:cache forKey:key];
+        [defaults synchronize];
+    });
 }
 
 - (NSDictionary<NSString *, NSDictionary *> *)loadWeAgentDetailsCacheDictionary {

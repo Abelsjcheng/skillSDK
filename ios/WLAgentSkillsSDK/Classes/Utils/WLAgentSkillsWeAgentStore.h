@@ -11,6 +11,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)sharedStore;
 
+- (dispatch_queue_t)assistantGraySingleQueue;
+
 - (void)saveCurrentWeAgentDetailDictionary:(nullable NSDictionary *)dictionary;
 - (nullable NSDictionary *)loadCurrentWeAgentDetailDictionary;
 
