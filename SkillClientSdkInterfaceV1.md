@@ -45,12 +45,12 @@ IM 客户端调用
 
 ### 接口说明
 
-创建 Skill 会话，建立 SDK 与 Skill 服务端之间的 WebSocket 长连接。支持基于 `imGroupId` 一个群可以创建多个会话。
+创建 Skill 会话。
 
 ### 接口名
 
 ```typescript
-createSession(params: CreateSessionParams): Promise<SkillSession>
+createSession(params: CreateNewSessionParams): Promise<Session>
 ```
 
 ### 入参
@@ -59,7 +59,10 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 |--------|------|------|------|
 | ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| imGroupId | String | 是 | 关联的 IM 群组 ID |
+| bussinessDomain | String | 否 | 会话关联场域。`createSession` 调用时传入值 `skill` |
+| bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
+| bussinessType | String | 否 | 会话类型。`createSession` 调用时传入值 `skill` |
+| assistantAccount | String | 否 | 助理ID |
 
 ### 入参示例
 
@@ -67,7 +70,10 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 {
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "imGroupId": "group_abc123"
+  "bussinessDomain": "skill",
+  "bussinessType": "skill",
+  "assistantAccount": "x00_1",
+  "bussinessId": "x00123456"
 }
 ```
 
@@ -79,7 +85,10 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 | `userId` | String | 用户 ID（从 Cookie 解析） |
 | `ak` | String \| null | Access Key，未关联 Agent 时为 `null` |
 | `title` | String \| null | 会话标题，未设置时为 `null` |
-| `imGroupId` | String \| null | IM 群组 ID，未设置时为 `null` |
+| `bussinessDomain` | String \| null | 会话关联场域 |
+| `bussinessType` | String \| null | 会话类型 |
+| `bussinessId` | String \| null | 单聊场景为对话所属人Id，群里则为群Id |
+| `assistantAccount` | String \| null | 助理Id |
 | `status` | String | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | `toolSessionId` | String \| null | OpenCode Session ID，创建时可为 `null`，后续异步填充 |
 | `createdAt` | String | 创建时间，ISO-8601 |
@@ -93,7 +102,10 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
   "userId": "10001",
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "imGroupId": "group_abc123",
+  "bussinessDomain": "skill",
+  "bussinessType": "skill",
+  "bussinessId": "x00123456",
+  "assistantAccount": "group_abc123",
   "status": "ACTIVE",
   "toolSessionId": null,
   "createdAt": "2026-03-08T00:15:00",
@@ -106,29 +118,34 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 1. 建立 WebSocket 连接，若当前用户已有连接则复用，否则新建：
    - **URL**: `ws://host/ws/skill/stream`
    - 用于接收服务端推送的完整事件流
-2. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连；然后查询会话列表：
-   - **URL**: `GET /api/skill/sessions`
+2. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连；然后请求服务端接口 `GET /api/skill/sessions` 查询历史会话列表：
+   - **服务端 URL**: `GET /api/skill/sessions`
    - **查询参数**:
      ```json
      {
-        "imGroupId": "group_abc123",
         "ak": "ak_xxxxxxxx",
-        "status": "ACTIVE"
+        "bussinessId": "group_abc123",
+        "businessSessionDomain": "skill",
+        "page": 0,
+        "size": 50,
+        "assistantAccount": "x001_1"
      }
      ```
-   - 若 `createSession` 传入了 `ak`，查询时必须使用 `imGroupId + ak + status=ACTIVE` 组合条件
-   - 若 `createSession` 未传入 `ak`，则按 `imGroupId + status=ACTIVE` 查询
-3. 对查询结果 `content` 按 `updatedAt` 倒序排序，取最新的一条活跃会话作为当前会话：
-   - 排序字段：`updatedAt`（ISO-8601 时间）
-   - 排序规则：最新时间优先（降序）
-   - 若查询结果为空，则进入新建流程
-4. 若不存在可复用的活跃会话，则调用 `POST /api/skill/sessions` 新建会话：
+   - 查询会话列表透传 `createSession` 中含有的对应查询参数即可
+   - `businessSessionDomain` 直接取 `createSession` 入参中的 `bussinessDomain`
+   - 若 `bussinessDomain` 未传，则查询时不传 `businessSessionDomain`
+   - `createSession` 查询时不传 `status`
+3. 若历史会话列表不为空，则先根据 `status !== CLOSED` 筛选出未关闭的会话，再根据 `updatedAt` 取最新的会话作为当前会话
+4. 若不存在可复用会话（历史列表为空，或筛选后无未关闭会话），则调用 `POST /api/skill/sessions` 新建会话：
    - **请求体**:
      ```json
      {
        "ak": "ak_xxxxxxxx",
        "title": "帮我创建一个React项目",
-       "imGroupId": "group_abc123"
+       "bussinessDomain": "skill",
+       "bussinessType": "skill",
+       "assistantAccount": "x00_1",
+       "bussinessId": "x00123456"
      }
      ```
 5. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
@@ -156,7 +173,10 @@ try {
   const session = await createSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    imGroupId: "group_abc123"
+    bussinessDomain: "skill",
+    bussinessType: "skill",
+    assistantAccount: "x00_1",
+    bussinessId: "x00123456"
   });
 
   console.log("会话创建成功:", session.welinkSessionId);
@@ -1027,6 +1047,8 @@ we码调用
 
 同一个 `welinkSessionId` 只允许注册一次监听；若已注册，再次注册不做任何处理，仍返回 `status: success`。
 
+为支持“页面未打开时，客户端已提前发起对话，服务端正在持续流式返回”的场景，SDK 在本地按 `welinkSessionId` 缓存当前未完成轮次的全部原始 `onmessage` 事件。当调用 `registerSessionListener` 时，若该会话存在未完成轮次缓存，则 SDK 会先按原始到达顺序通过 `onMessage` 逐条补发缓存事件，再继续回调后续实时事件。
+
 SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，覆盖以下事件：
 
 - 文本流：`text.delta` / `text.done`
@@ -1053,7 +1075,7 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - `streaming.parts[].status` 为工具状态字段（字段名为 `status`）
 - `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
 - `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
-- `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`
+- `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
 - `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
 - `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
 
@@ -1102,10 +1124,67 @@ interface SessionError {
 
 1. SDK 内部维护每个会话唯一监听器（`onMessage`/`onError`/`onClose`）记录
 2. 同一 `welinkSessionId` 仅允许注册一次；重复注册不做任何处理并返回 `status: success`
-3. 若 WebSocket 已建立，则监听器立即生效
-4. 若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
-5. 连接错误时触发 `onError`
-6. 连接关闭时触发 `onClose`
+3. SDK 在本地按 `welinkSessionId` 维护“当前未完成轮次”的原始 `StreamMessage` 缓存：
+   - 缓存内容为当前轮次收到的全部原始 `onmessage` 事件
+   - 不区分事件类型，不做消息聚合，不改写字段结构
+   - 事件写入缓存时必须保持原始到达顺序
+4. 当某会话当前不存在未完成轮次缓存时，收到新的 `onmessage` 事件后，SDK 应创建新的当前轮次缓存；后续事件持续追加到该缓存中
+5. 以下事件视为当前轮次结束；终止事件本身也需要写入当前轮次缓存，确保前端在补发场景中也能收到完整结束信号：
+   - `session.status` 且 `sessionStatus = idle`
+   - `session.error`
+   - `error`
+   - `agent.offline`
+6. 调用 `registerSessionListener` 时：
+   - 若该 `welinkSessionId` 存在当前未完成轮次缓存，则 SDK 必须先按原始到达顺序，通过 `onMessage` 逐条补发缓存中的全部事件
+   - 若该轮次缓存已结束，则不应再通过 `registerSessionListener` 回放该轮次缓存；此时页面应以 `getSessionMessageHistory` 返回的服务端历史为准恢复最终消息内容
+   - 当前轮次缓存补发完成后，再开始回调后续实时事件
+7. 若缓存补发期间又收到新的实时事件，SDK 需先将这些事件暂存到内部待发队列，待缓存补发完成后，再按顺序继续回调，保证前端接收到的始终是一条严格有序的事件流
+8. 若 WebSocket 已建立，则监听器立即生效；若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
+9. 连接错误时触发 `onError`
+10. 连接关闭时触发 `onClose`
+
+#### 当前未完成轮次缓存说明
+
+1. 缓存粒度为 `welinkSessionId`
+2. 缓存内容为当前轮次的全部原始 `StreamMessage` 事件，不新增包装结构，不生成聚合消息
+3. `unregisterSessionListener` 仅移除当前监听器，不应主动清空该会话的当前未完成轮次缓存
+4. 若同一 `welinkSessionId` 在上一轮缓存已结束后再次收到新事件，SDK 应先清理上一轮已结束缓存，再开启下一轮新的未完成轮次缓存
+5. 调用 `closeSkill`、`shutdown`、`destroyInstance` 或 SDK 实例销毁时，应立即清理该会话对应缓存，避免无效残留
+6. 仅处于未完成状态的当前轮次缓存参与 `registerSessionListener` 回放；已结束轮次缓存不再作为回放源
+7. 该机制的目标是保证页面在未注册监听期间错过的流式事件，能够在后续注册监听时通过同一套 `onMessage` 回调链路补回给前端，由前端继续复用既有渲染逻辑
+
+#### 场景化实现说明
+
+##### 场景 1：页面已打开后，在页面内继续发送消息
+
+1. 页面首次调用 `registerSessionListener` 时，SDK 若发现该 `welinkSessionId` 存在当前未完成轮次缓存，应先回放这轮缓存中的全部原始事件
+2. 缓存回放完成后，SDK 再继续向该监听器转发后续实时事件
+3. 页面在已注册监听的状态下继续调用 `sendMessage` 发起新消息时：
+   - 后续服务端返回的实时事件继续写入当前未完成轮次缓存
+   - 同时继续实时回调给当前监听器
+4. 同一个活跃监听器注册周期内，SDK 不应重复回放同一轮缓存，避免前端对同一批事件重复渲染
+5. 由于前端复用同一套 `onMessage` 渲染链路，缓存回放事件与后续实时事件对页面来说行为一致，不需要额外区分
+
+##### 场景 2：流式返回过程中，页面打开后又关闭，再再次打开
+
+1. 第一次打开页面时，SDK 先回放当前未完成轮次缓存，再继续回调后续实时事件
+2. 页面关闭时调用 `unregisterSessionListener`，SDK 仅移除监听器，不清理当前未完成轮次缓存
+3. 页面关闭后，若服务端仍持续返回当前轮次事件，SDK 仍需继续将这些实时事件追加写入当前未完成轮次缓存
+4. 页面再次打开并重新调用 `registerSessionListener` 时，SDK 应再次回放该 `welinkSessionId` 当前未完成轮次缓存中的全量原始事件，再继续回调后续实时事件
+5. 为保证第二次打开页面时能完整恢复当前流式状态，SDK 缓存的必须是“当前未完成轮次的全量原始事件”，而不能仅缓存页面未打开期间漏掉的那一部分事件
+
+##### 场景 3：当前轮流式已结束，页面打开时历史接口已能拿到最终消息
+
+1. 若当前轮次已收到结束事件，并且页面打开时可通过 `getSessionMessageHistory` 获取该轮最终消息，则页面应以服务端历史消息为准恢复最终内容
+2. 此时 SDK 不应再通过 `registerSessionListener` 回放该已结束轮次缓存，避免前端对同一轮已完成消息重复执行 `text.delta` / `text.done` / `step.done` 等渲染链路
+3. 已结束轮次缓存可保留到下一轮开始、会话关闭或实例销毁时再清理，但不再作为监听注册时的回放来源
+
+##### 回放与实时衔接要求
+
+1. 缓存回放期间，若 SDK 又收到新的实时事件，不应直接插入回调给前端
+2. 这些实时事件应先进入内部待发队列
+3. 当前轮次缓存回放完成后，再按顺序继续回调待发队列中的实时事件
+4. 通过上述串行策略，保证前端始终接收到一条严格有序的事件流，避免 `text.delta`、`text.done`、`question`、`permission.reply` 等事件顺序错乱
 
 ### 错误处理
 
@@ -1116,7 +1195,7 @@ interface SessionError {
 ### 组合调用场景
 
 在与其他接口组合调用时：
-1. 建议在 `createSession` 成功后再注册监听器，确保能接收到完整的消息流
+1. 若页面可能晚于会话开始时机打开，建议在页面初始化阶段尽早调用 `registerSessionListener`，由 SDK 先补发当前未完成轮次缓存，再接收后续实时事件
 2. 若 `registerSessionListener` 失败，不影响其他接口的调用
 
 ### 注意事项
@@ -1124,6 +1203,8 @@ interface SessionError {
 - 回调注册是异步安全的，可在任何时机调用
 - 同一个 `welinkSessionId` 重复注册时，SDK 不做任何处理并返回 `status: success`
 - 如需替换监听器，需先调用 `unregisterSessionListener({ welinkSessionId })` 清理后再注册
+- `registerSessionListener` 补发的缓存事件与实时事件共用同一个 `onMessage` 回调，前端不需要区分“补发事件”与“实时事件”
+- `getSessionMessageHistory` 仅返回服务端已落库历史消息；页面晚打开场景中未监听期间丢失的流式内容，应依赖 `registerSessionListener` 的缓存补发能力恢复
 
 ### 调用示例
 
@@ -1357,7 +1438,10 @@ try {
   const session = await createSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    imGroupId: "group_abc123"
+    bussinessDomain: "skill",
+    bussinessType: "skill",
+    assistantAccount: "x00_1",
+    bussinessId: "x00123456"
   });
 
   // 然后发送首条消息
@@ -1581,12 +1665,12 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| ak | String | 是 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
+| ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| bussinessDomain | String | 是 | 会话关联场域，默认值"miniapp" |
+| bussinessDomain | String | 否 | 会话关联场域，默认值"miniapp" |
 | bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| bussinessType | String | 是 | 会话类型,默认值"direct" |
-| assistantAccount | String | 是 | 助理ID |
+| bussinessType | String | 否 | 会话类型,默认值"direct" |
+| assistantAccount | String | 否 | 助理ID |
 
 ### 入参示例
 
@@ -1819,38 +1903,16 @@ try {
 > - `StreamMessage` 与服务端 WebSocket 事件模型保持对齐
 > - 本文档仅修订客户端契约；未在服务端文档中补齐的接口，仍需后续与服务端统一
 
-### SkillSession
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| welinkSessionId | string | 会话 ID |
-| userId | string | 用户 ID |
-| ak | string \| null | Access Key，未关联 Agent 时为 `null` |
-| title | string \| null | 会话标题，未设置时为 `null` |
-| imGroupId | string \| null | IM 群组 ID，未设置时为 `null` |
-| status | string | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
-| toolSessionId | string \| null | OpenCode Session ID |
-| createdAt | string | 创建时间，ISO-8601 |
-| updatedAt | string | 更新时间，ISO-8601 |
-
-### CreateSessionParams
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| ak | String | 否 | Agent Plugin 对应的 Access Key |
-| title | String | 否 | 会话标题 |
-| imGroupId | String | 否 | 关联的 IM 群组 ID |
-
 ### CreateNewSessionParams
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| ak | String | 是 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
+| ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| bussinessDomain | String | 是 | 会话关联场域，默认值"miniapp" |
+| bussinessDomain | String | 否 | 会话关联场域，默认值"miniapp" |
 | bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| bussinessType | String | 是 | 会话类型,默认值"direct" |
-| assistantAccount | String | 是 | 助理ID |
+| bussinessType | String | 否 | 会话类型,默认值"direct" |
+| assistantAccount | String | 否 | 助理ID |
 
 ### StopSkillParams
 
@@ -2195,7 +2257,7 @@ try {
 | `permission.ask` | 权限请求 | `permissionId` `permType` `title` `metadata` |
 | `permission.reply` | 权限响应结果 | `permissionId` `response` |
 | `agent.online` | Agent 上线 | 无额外字段 |
-| `agent.offline` | Agent 下线 | 无额外字段 |
+| `agent.offline` | Agent 下线 | 无额外字段；前端建议去重处理，并在首次收到时结束生成态、展示错误消息 `agent已离线` |
 | `error` | 非会话级错误 | `error` |
 | `snapshot` | 断线恢复快照 | `messages` |
 | `streaming` | 断线恢复中的进行中消息 | `sessionStatus` `messageId` `messageSeq` `role` `parts` |
