@@ -36,6 +36,8 @@ export function useChatSession({
   onSessionTitleChange,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingAssistantPreview, setPendingAssistantPreview] = useState<PendingAssistantPreview>({
     visible: false,
@@ -59,25 +61,13 @@ export function useChatSession({
   const historyEpochRef = useRef(0);
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
-  const aiReplyFailedTextRef = useRef(t('weAgent.aiReplyFailed'));
-
-  const setMessagesRef = useRef(setMessages);
-  const setHasMoreHistoryRef = useRef(setHasMoreHistory);
-  const setIsLoadingHistoryRef = useRef(setIsLoadingHistory);
-  const setPendingAssistantPreviewRef = useRef(setPendingAssistantPreview);
-  const setSessionStatusRef = useRef(setSessionStatus);
-
-  setMessagesRef.current = setMessages;
-  setHasMoreHistoryRef.current = setHasMoreHistory;
-  setIsLoadingHistoryRef.current = setIsLoadingHistory;
-  setPendingAssistantPreviewRef.current = setPendingAssistantPreview;
-  setSessionStatusRef.current = setSessionStatus;
+  const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
-  aiReplyFailedTextRef.current = t('weAgent.aiReplyFailed');
+  aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
-    setPendingAssistantPreviewRef.current((prev) => (
+    setPendingAssistantPreview((prev) => (
       prev.visible && prev.welinkSessionId === sessionId
         ? prev
         : { visible: true, welinkSessionId: sessionId, startedAt: Date.now() }
@@ -85,7 +75,7 @@ export function useChatSession({
   }, []);
 
   const hidePendingAssistantPreview = useCallback(() => {
-    setPendingAssistantPreviewRef.current((prev) => (
+    setPendingAssistantPreview((prev) => (
       prev.visible
         ? { visible: false, welinkSessionId: null, startedAt: 0 }
         : prev
@@ -102,10 +92,10 @@ export function useChatSession({
     nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
-    setMessagesRef.current([]);
-    setHasMoreHistoryRef.current(false);
-    setIsLoadingHistoryRef.current(false);
-    setSessionStatusRef.current('idle');
+    setMessages([]);
+    setHasMoreHistory(false);
+    setIsLoadingHistory(false);
+    setSessionStatus('idle');
     hidePendingAssistantPreview();
   }, [hidePendingAssistantPreview]);
 
@@ -115,7 +105,7 @@ export function useChatSession({
       const finalId = streamingMsgIdRef.current;
       const finalText = assemblerRef.current.getText();
       const finalParts = assemblerRef.current.getParts();
-      setMessagesRef.current((prev) => prev.map((message) => (
+      setMessages((prev) => prev.map((message) => (
         message.id === finalId
           ? {
             ...message,
@@ -143,7 +133,7 @@ export function useChatSession({
       isStreaming: false,
     };
 
-    setMessagesRef.current((prev) => {
+    setMessages((prev) => {
       if (currentStreamingMessageId) {
         const streamingMessageIndex = prev.findIndex((messageItem) => messageItem.id === currentStreamingMessageId);
         if (streamingMessageIndex >= 0) {
@@ -182,7 +172,7 @@ export function useChatSession({
   }, [hidePendingAssistantPreview]);
 
   const upsertAssistantMessage = useCallback((messageId: string, updater: (current?: Message) => Message) => {
-    setMessagesRef.current((prev) => {
+    setMessages((prev) => {
       const existingIndex = prev.findIndex((message) => message.id === messageId);
       if (existingIndex >= 0) {
         const next = [...prev];
@@ -210,7 +200,7 @@ export function useChatSession({
     const requestSessionId = welinkSessionId;
     const requestEpoch = historyEpochRef.current;
     isLoadingHistoryRef.current = true;
-    setIsLoadingHistoryRef.current(true);
+    setIsLoadingHistory(true);
     try {
       const result = await getSessionMessageHistory({
         welinkSessionId: requestSessionId,
@@ -225,7 +215,7 @@ export function useChatSession({
       }
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
       if (olderMessages.length > 0) {
-        setMessagesRef.current((prev) => {
+        setMessages((prev) => {
           const next = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
           knownUserMessageIdsRef.current = collectUserMessageIds(next);
           return next;
@@ -234,15 +224,15 @@ export function useChatSession({
       nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
       const nextHasMoreHistory = hasMoreHistoryByCursor(result);
       hasMoreHistoryRef.current = nextHasMoreHistory;
-      setHasMoreHistoryRef.current(nextHasMoreHistory);
+      setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(t('weAgent.loadHistoryFailed'));
+      showToast(tRef.current('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
-      setIsLoadingHistoryRef.current(false);
+      setIsLoadingHistory(false);
     }
-  }, [mode, t, welinkSessionId]);
+  }, [mode, welinkSessionId]);
 
   const sendUserMessage = useCallback(async (
     content: string,
@@ -250,7 +240,7 @@ export function useChatSession({
     subagentSessionId?: string,
   ) => {
     if (!welinkSessionId) {
-      showToast(t('weAgent.sendMessageWithoutSessionFailed'));
+      showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
@@ -261,7 +251,7 @@ export function useChatSession({
       ...(subagentSessionId ? { subagentSessionId } : {}),
     });
     const userMessage = messageOperationToMessage(result);
-    setMessagesRef.current((prev) => {
+    setMessages((prev) => {
       if (prev.find((message) => message.id === userMessage.id)) {
         return prev;
       }
@@ -271,7 +261,7 @@ export function useChatSession({
     });
     setScrollToBottomSignal((prev) => prev + 1);
     return result;
-  }, [t, welinkSessionId]);
+  }, [welinkSessionId]);
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
@@ -279,17 +269,17 @@ export function useChatSession({
     subagentSessionId,
   }: QuestionAnswerSubmission) => {
     finalizeStreamingMessage();
-    setSessionStatusRef.current('busy');
+    setSessionStatus('busy');
 
     try {
       await sendUserMessage(answer, toolCallId, subagentSessionId);
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, toolCallId, subagentSessionId })} | error=${JSON.stringify(err)}`);
-      setSessionStatusRef.current('idle');
-      showToast(t('weAgent.submitAnswerFailed'));
+      setSessionStatus('idle');
+      showToast(tRef.current('weAgent.submitAnswerFailed'));
       throw err;
     }
-  }, [finalizeStreamingMessage, mode, sendUserMessage, t, welinkSessionId]);
+  }, [finalizeStreamingMessage, mode, sendUserMessage, welinkSessionId]);
 
   useEffect(() => {
     activeWelinkSessionIdRef.current = welinkSessionId || null;
@@ -327,12 +317,12 @@ export function useChatSession({
           ...sessionMessageToMessage(message),
           isHistory: true,
         }));
-        setMessagesRef.current(mapped);
+        setMessages(mapped);
         knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
         nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
         const nextHasMoreHistory = hasMoreHistoryByCursor(result);
         hasMoreHistoryRef.current = nextHasMoreHistory;
-        setHasMoreHistoryRef.current(nextHasMoreHistory);
+        setHasMoreHistory(nextHasMoreHistory);
       } catch (err) {
         if (
           historyEpochRef.current !== requestEpoch
@@ -341,12 +331,12 @@ export function useChatSession({
           return;
         }
         WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-        showToast(t('weAgent.loadHistoryFailed'));
+        showToast(tRef.current('weAgent.loadHistoryFailed'));
       }
     };
 
     void loadMessages();
-  }, [mode, t, welinkSessionId]);
+  }, [mode, resetTransientState, welinkSessionId]);
 
   useEffect(() => {
     if (!welinkSessionId) return;
@@ -371,7 +361,7 @@ export function useChatSession({
         );
 
         if (hasMatchingQuestion) {
-          setMessagesRef.current((prev) => updateLatestQuestionPart(
+          setMessages((prev) => updateLatestQuestionPart(
             prev,
             (part) => (
               (!msg.partId || part.partId === msg.partId)
@@ -403,7 +393,7 @@ export function useChatSession({
             break;
           }
 
-          setSessionStatusRef.current('busy');
+          setSessionStatus('busy');
           ensureStreamingMessageContext(messageId);
 
           const assembler = assemblerRef.current;
@@ -434,9 +424,9 @@ export function useChatSession({
           }
 
           finalizeStreamingMessage();
-          setSessionStatusRef.current('busy');
+          setSessionStatus('busy');
           const content = msg.content ?? '';
-          setMessagesRef.current((prev) => {
+          setMessages((prev) => {
             const hasUserMessage = knownUserMessageIdsRef.current.has(messageId);
             if (hasUserMessage) {
               return prev;
@@ -470,7 +460,7 @@ export function useChatSession({
           const currentParts = hasStreamingPermission ? assemblerRef.current.getParts() : null;
           const currentStreamingMessageId = streamingMsgIdRef.current;
 
-          setMessagesRef.current((prev) => prev.map((messageItem) => {
+          setMessages((prev) => prev.map((messageItem) => {
             if (currentStreamingMessageId && currentParts && messageItem.id === currentStreamingMessageId) {
               return {
                 ...messageItem,
@@ -500,12 +490,12 @@ export function useChatSession({
           break;
         }
         case 'step.start':
-          setSessionStatusRef.current('busy');
+          setSessionStatus('busy');
           break;
         case 'step.done':
           if (streamingMsgIdRef.current && msg.tokens) {
             const finalId = streamingMsgIdRef.current;
-            setMessagesRef.current((prev) =>
+            setMessages((prev) =>
               prev.map((m) =>
                 m.id === finalId
                   ? {
@@ -534,32 +524,32 @@ export function useChatSession({
             break;
           }
           agentOfflineHandledRef.current = true;
-          setSessionStatusRef.current('idle');
+          setSessionStatus('idle');
           appendAssistantErrorBlock('agent已离线', 'agent已离线');
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
-            setSessionStatusRef.current('idle');
+            setSessionStatus('idle');
             finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
-            setSessionStatusRef.current('busy');
+            setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
-            setSessionStatusRef.current('retry');
+            setSessionStatus('retry');
           }
           break;
         case 'session.error':
-          setSessionStatusRef.current('error');
+          setSessionStatus('error');
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'error':
-          setSessionStatusRef.current('error');
+          setSessionStatus('error');
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'snapshot':
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
           hidePendingAssistantPreview();
-          setMessagesRef.current((msg.messages ?? []).map((sm) => snapshotMessageToMessage(sm)).reverse());
+          setMessages((msg.messages ?? []).map((sm) => snapshotMessageToMessage(sm)).reverse());
           break;
         case 'streaming': {
           const messageId = msg.messageId;
@@ -567,7 +557,7 @@ export function useChatSession({
             break;
           }
 
-          setSessionStatusRef.current(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
+          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           ensureStreamingMessageContext(messageId);
 
           const nextRole = normalizeRole(msg.role);
@@ -632,28 +622,28 @@ export function useChatSession({
   const onSend = useCallback(async (content: string) => {
     if (!welinkSessionId || !content) return;
 
-    setSessionStatusRef.current('busy');
+    setSessionStatus('busy');
     try {
       await sendUserMessage(content);
     } catch (err) {
-      setSessionStatusRef.current('idle');
-      showToast(t('weAgent.sendMessageFailed'));
+      setSessionStatus('idle');
+      showToast(tRef.current('weAgent.sendMessageFailed'));
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
-  }, [mode, sendUserMessage, t, welinkSessionId]);
+  }, [mode, sendUserMessage, welinkSessionId]);
 
   const onStop = useCallback(async () => {
     if (!welinkSessionId) return;
 
     try {
       await stopSkill({ welinkSessionId });
-      setSessionStatusRef.current('idle');
+      setSessionStatus('idle');
       finalizeStreamingMessage();
     } catch (err) {
       WeLog(`useChatSession stopSkill failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(t('weAgent.stopGenerateFailed'));
+      showToast(tRef.current('weAgent.stopGenerateFailed'));
     }
-  }, [finalizeStreamingMessage, mode, t, welinkSessionId]);
+  }, [finalizeStreamingMessage, mode, welinkSessionId]);
 
   const onSendToIM = useCallback(async () => {
     if (!welinkSessionId) return;
