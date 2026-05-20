@@ -59,9 +59,9 @@ createSession(params: CreateNewSessionParams): Promise<Session>
 |--------|------|------|------|
 | ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| bussinessDomain | String | 否 | 会话关联场域。`createSession` 调用时传入值 `skill` |
-| bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| bussinessType | String | 否 | 会话类型。`createSession` 调用时传入值 `skill` |
+| businessSessionDomain | String | 否 | 会话关联场域。`createSession` 调用时传入值 `skill` |
+| businessSessionId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
+| businessSessionType | String | 否 | 会话类型。`createSession` 调用时传入值 `skill` |
 | assistantAccount | String | 否 | 助理ID |
 
 ### 入参示例
@@ -70,10 +70,10 @@ createSession(params: CreateNewSessionParams): Promise<Session>
 {
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "bussinessDomain": "skill",
-  "bussinessType": "skill",
+  "businessSessionDomain": "skill",
+  "businessSessionType": "skill",
   "assistantAccount": "x00_1",
-  "bussinessId": "x00123456"
+  "businessSessionId": "x00123456"
 }
 ```
 
@@ -85,9 +85,9 @@ createSession(params: CreateNewSessionParams): Promise<Session>
 | `userId` | String | 用户 ID（从 Cookie 解析） |
 | `ak` | String \| null | Access Key，未关联 Agent 时为 `null` |
 | `title` | String \| null | 会话标题，未设置时为 `null` |
-| `bussinessDomain` | String \| null | 会话关联场域 |
-| `bussinessType` | String \| null | 会话类型 |
-| `bussinessId` | String \| null | 单聊场景为对话所属人Id，群里则为群Id |
+| `businessSessionDomain` | String \| null | 会话关联场域 |
+| `businessSessionType` | String \| null | 会话类型 |
+| `businessSessionId` | String \| null | 单聊场景为对话所属人Id，群里则为群Id |
 | `assistantAccount` | String \| null | 助理Id |
 | `status` | String | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | `toolSessionId` | String \| null | OpenCode Session ID，创建时可为 `null`，后续异步填充 |
@@ -102,9 +102,9 @@ createSession(params: CreateNewSessionParams): Promise<Session>
   "userId": "10001",
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "bussinessDomain": "skill",
-  "bussinessType": "skill",
-  "bussinessId": "x00123456",
+  "businessSessionDomain": "skill",
+  "businessSessionType": "skill",
+  "businessSessionId": "x00123456",
   "assistantAccount": "group_abc123",
   "status": "ACTIVE",
   "toolSessionId": null,
@@ -124,7 +124,7 @@ createSession(params: CreateNewSessionParams): Promise<Session>
      ```json
      {
         "ak": "ak_xxxxxxxx",
-        "bussinessId": "group_abc123",
+        "businessSessionId": "group_abc123",
         "businessSessionDomain": "skill",
         "page": 0,
         "size": 50,
@@ -132,8 +132,8 @@ createSession(params: CreateNewSessionParams): Promise<Session>
      }
      ```
    - 查询会话列表透传 `createSession` 中含有的对应查询参数即可
-   - `businessSessionDomain` 直接取 `createSession` 入参中的 `bussinessDomain`
-   - 若 `bussinessDomain` 未传，则查询时不传 `businessSessionDomain`
+   - 查询会话列表时，SDK 按服务端接口口径直接透传 `businessSessionDomain`、`businessSessionType`、`businessSessionId`
+   - 若 `businessSessionDomain` 未传，则查询时不传 `businessSessionDomain`
    - `createSession` 查询时不传 `status`
 3. 若历史会话列表不为空，则先根据 `status !== CLOSED` 筛选出未关闭的会话，再根据 `updatedAt` 取最新的会话作为当前会话
 4. 若不存在可复用会话（历史列表为空，或筛选后无未关闭会话），则调用 `POST /api/skill/sessions` 新建会话：
@@ -142,10 +142,10 @@ createSession(params: CreateNewSessionParams): Promise<Session>
      {
        "ak": "ak_xxxxxxxx",
        "title": "帮我创建一个React项目",
-       "bussinessDomain": "skill",
-       "bussinessType": "skill",
+       "businessSessionDomain": "skill",
+       "businessSessionType": "skill",
        "assistantAccount": "x00_1",
-       "bussinessId": "x00123456"
+       "businessSessionId": "x00123456"
      }
      ```
 5. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
@@ -173,10 +173,10 @@ try {
   const session = await createSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    bussinessDomain: "skill",
-    bussinessType: "skill",
+    businessSessionDomain: "skill",
+    businessSessionType: "skill",
     assistantAccount: "x00_1",
-    bussinessId: "x00123456"
+    businessSessionId: "x00123456"
   });
 
   console.log("会话创建成功:", session.welinkSessionId);
@@ -1389,7 +1389,9 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 | welinkSessionId | string | 是 | 会话 ID |
 | content | string | 是 | 用户输入的消息内容 |
 | toolCallId | string | 否 | 回答 AI `question` 时携带对应的工具调用 ID |
+| questionId | string | 否 | 回答 AI `question` 时携带的问题 ID。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
 | subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 `question` 时，必须回传事件中的真实子会话 ID |
+| businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### 出参
 
@@ -1418,12 +1420,17 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
      {
        "content": "请帮我重构登录模块的校验逻辑",
        "toolCallId": "call_2",
-       "subagentSessionId": "child-session-001"
+       "questionId": "question_2",
+       "subagentSessionId": "child-session-001",
+       "businessExtParam": {
+         "scene": "miniapp"
+       }
      }
      ```
 3. AI 流式响应由 WebSocket 推送到 SDK，再通过监听器分发
 4. 对于首次发送消息的场景，此接口会触发首轮 AI 执行
-5. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`，否则服务端会把应答路由到主对话
+5. 若当前回复的是 `question`，且服务端事件中带有问题 ID，则 SDK 应按对外文档口径透传 `questionId`
+6. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`，否则服务端会把应答路由到主对话
 
 ### 错误处理
 
@@ -1441,7 +1448,8 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 1. 若 `sendMessage` 失败，不影响会话的其他操作
 2. 建议在 `createSession` 成功后再调用 `sendMessage`，确保能正常发送消息
 3. 发送消息后，应注册 `registerSessionListener` 来接收 AI 的响应
-4. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`
+4. 若当前回复的是 `question`，且服务端事件中带有问题 ID，则 SDK 应透传 `questionId`
+5. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`
 
 ### 调用示例
 
@@ -1453,10 +1461,10 @@ try {
   const session = await createSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    bussinessDomain: "skill",
-    bussinessType: "skill",
+    businessSessionDomain: "skill",
+    businessSessionType: "skill",
     assistantAccount: "x00_1",
-    bussinessId: "x00123456"
+    businessSessionId: "x00123456"
   });
 
   // 然后发送首条消息
@@ -1496,6 +1504,7 @@ try {
     welinkSessionId: "42",
     content: "继续执行",
     toolCallId: "call_q_1",
+    questionId: "question_q_1",
     subagentSessionId: "child-session-001"
   });
 
@@ -1529,6 +1538,7 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 | `permId` | String | 是 | 权限请求 ID |
 | `response` | String | 是 | `once` / `always` / `reject` |
 | `subagentSessionId` | String | 否 | subagent 场景必传。回复子 agent 发起的 `permission.ask` 时，必须回传事件中的真实子会话 ID |
+| `businessExtParam` | Object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### 出参
 
@@ -1547,10 +1557,14 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
      ```json
      {
        "response": "once",
-       "subagentSessionId": "child-session-001"
+       "subagentSessionId": "child-session-001",
+       "businessExtParam": {
+         "scene": "miniapp"
+       }
      }
      ```
 3. 若收到的 `permission.ask` 事件带有 `subagentSessionId`，则该字段必须原样回传，否则服务端会把授权路由到主对话
+4. 若业务侧传入 `businessExtParam`，SDK 应原样透传给服务端
 
 ### 错误处理
 
@@ -1680,12 +1694,12 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
-| title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| bussinessDomain | String | 否 | 会话关联场域，默认值"miniapp" |
-| bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| bussinessType | String | 否 | 会话类型,默认值"direct" |
-| assistantAccount | String | 否 | 助理ID |
+| ak | String | 否 | 应用 AK；无 AK 的纯本地会话也合法 |
+| title | String | 否 | 会话标题；缺省时由服务端后续推送 `session.title` 填充 |
+| assistantAccount | String | 否 | 助理账号；为空时是否允许创建由服务端开关控制 |
+| businessSessionDomain | String | 否 | 业务侧外部 ID 三元组中的 domain；miniapp 场景通常传 `null` |
+| businessSessionType | String | 否 | 业务侧外部 ID 三元组中的 type；miniapp 场景通常传 `null` |
+| businessSessionId | String | 是 | 业务侧外部 ID 三元组中的 id；单聊传用户 ID，群聊传群 ID |
 
 ### 入参示例
 
@@ -1693,10 +1707,10 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
 {
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "bussinessDomain": "miniapp",
-  "bussinessType": "direct",
   "assistantAccount": "x00_1",
-  "bussinessId": "x00123456"
+  "businessSessionDomain": null,
+  "businessSessionType": null,
+  "businessSessionId": "x00123456"
 }
 ```
 
@@ -1704,14 +1718,14 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| `welinkSessionId` | string | 会话 ID |
-| `userId` | String | 用户 ID（从 Cookie 解析） |
-| `ak` | String \| null | Access Key，未关联 Agent 时为 `null` |
-| `title` | String \| null | 会话标题，未设置时为 `null` |
-| `bussinessDomain` | String \| null | 会话关联场域 |
-| `bussinessType` | String \| null | 会话类型 |
-| `bussinessId` | String \| null | 单聊场景为对话所属人Id，群里则为群Id |
-| `assistantAccount` | String \| null | 助理Id |
+ | `welinkSessionId` | string | 会话 ID |
+ | `userId` | String | 用户 ID（从 Cookie 解析） |
+ | `ak` | String \| null | Access Key，未关联 Agent 时为 `null` |
+ | `title` | String \| null | 会话标题，未设置时为 `null` |
+ | `businessSessionDomain` | String \| null | 业务侧外部 ID 三元组中的 domain |
+ | `businessSessionType` | String \| null | 业务侧外部 ID 三元组中的 type |
+ | `businessSessionId` | String \| null | 业务侧外部 ID 三元组中的 id |
+ | `assistantAccount` | String \| null | 助理Id |
 | `status` | String | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | `toolSessionId` | String \| null | OpenCode Session ID，创建时可为 `null`，后续异步填充 |
 | `createdAt` | String | 创建时间，ISO-8601 |
@@ -1725,9 +1739,9 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
   "userId": "10001",
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
-  "bussinessDomain": "miniapp",
-  "bussinessType": "direct",
-  "bussinessId": "x00123456",
+  "businessSessionDomain": null,
+  "businessSessionType": null,
+  "businessSessionId": null,
   "assistantAccount": "group_abc123",
   "status": "ACTIVE",
   "toolSessionId": null,
@@ -1747,10 +1761,10 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
      {
        "ak": "ak_xxxxxxxx",
        "title": "帮我创建一个React项目",
-       "bussinessDomain": "miniapp",
-       "bussinessType": "direct",
        "assistantAccount": "x00_1",
-       "bussinessId": "x00123456"
+       "businessSessionDomain": null,
+       "businessSessionType": null,
+       "businessSessionId": "x00123456"
      }
      ```
 3. 建连后，当前 `welinkSessionId` 已注册的监听器可收到后续消息
@@ -1771,10 +1785,10 @@ try {
   const session = await createNewSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    bussinessDomain: "miniapp",
-    bussinessType: "direct",
     assistantAccount: "x00_1",
-    bussinessId: "x00123456"
+    businessSessionDomain: null,
+    businessSessionType: null,
+    businessSessionId: "x00123456"
   });
 
   console.log("会话创建成功:", session.welinkSessionId);
@@ -1799,7 +1813,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>>
+getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>>
 ```
 
 ### 入参
@@ -1810,7 +1824,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 | size | number | 否 |   每页大小，默认值为50 |
 | status | string | 否   | 按状态过滤（`ACTIVE`/`IDLE`/`CLOSED`） |
 | ak | string | 否 |   按agent ak过滤 |
-| bussinessId | string | 否 | 按会话所属Id过滤，单聊为用户Id，群聊为群Id  |
+| businessSessionId | string | 否 | 按会话所属Id过滤，单聊为用户Id，群聊为群Id  |
 | assistantAccount | string | 否 |   按助理Id过滤 |
 | businessSessionDomain | string | 否 | 会话来源域：`miniapp` / `im` |
 
@@ -1820,7 +1834,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 ```json
 {
   "ak": "ak_xxxxxxxx",
-  "bussinessId": "group_abc123",
+  "businessSessionId": "group_abc123",
   "businessSessionDomain": "miniapp",
   "page": 0,
   "size": 50,
@@ -1849,9 +1863,9 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
         "userId": "10001",
         "ak": "ak_xxxxxxxx",
         "title": "帮我创建一个React项目",
-        "bussinessDomain": "miniapp",
-        "bussinessType": "direct",
-        "bussinessId": "x00123456",
+        "businessSessionDomain": "miniapp",
+        "businessSessionType": "direct",
+        "businessSessionId": "x00123456",
         "assistantAccount": "group_abc123",
         "status": "ACTIVE",
         "toolSessionId": null,
@@ -1876,7 +1890,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
      ```json
      {
        "ak": "ak_xxxxxxxx",
-       "bussinessId": "group_abc123",
+       "businessSessionId": "group_abc123",
        "businessSessionDomain": "miniapp",
        "page": 0,
        "size": 50,
@@ -1899,7 +1913,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 try {
   const sessionsList = await getHistorySessionsList({
     ak: "ak_xxxxxxxx",
-    bussinessId: "group_abc123",
+    businessSessionId: "group_abc123",
     businessSessionDomain: "miniapp",
     page: 0,
     size: 50,
@@ -1922,12 +1936,12 @@ try {
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
-| title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| bussinessDomain | String | 否 | 会话关联场域，默认值"miniapp" |
-| bussinessId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| bussinessType | String | 否 | 会话类型,默认值"direct" |
-| assistantAccount | String | 否 | 助理ID |
+| ak | String | 否 | 应用 AK；无 AK 的纯本地会话也合法 |
+| title | String | 否 | 会话标题；缺省时由服务端后续推送 `session.title` 填充 |
+| assistantAccount | String | 否 | 助理账号；为空时是否允许创建由服务端开关控制 |
+| businessSessionDomain | String | 否 | 业务侧外部 ID 三元组中的 domain；miniapp 场景通常传 `null` |
+| businessSessionType | String | 否 | 业务侧外部 ID 三元组中的 type；miniapp 场景通常传 `null` |
+| businessSessionId | String | 是 | 业务侧外部 ID 三元组中的 id；单聊传用户 ID，群聊传群 ID |
 
 ### StopSkillParams
 
@@ -1995,6 +2009,9 @@ try {
 | welinkSessionId | string | 是 | 会话 ID |
 | content | string | 是 | 用户输入的消息内容 |
 | toolCallId | string | 否 | 回答 AI `question` 时携带的工具调用 ID |
+| questionId | string | 否 | 回答 AI `question` 时携带的问题 ID。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
+| subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 `question` 时，必须回传事件中的真实子会话 ID |
+| businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### ReplyPermissionParams
 
@@ -2003,6 +2020,8 @@ try {
 | welinkSessionId | string | 是 | 会话 ID |
 | permId | string | 是 | 权限请求 ID |
 | response | string | 是 | `once` / `always` / `reject` |
+| subagentSessionId | string | 否 | subagent 场景必传。回复子 agent 发起的 `permission.ask` 时，必须回传事件中的真实子会话 ID |
+| businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### ControlSkillWeCodeParams
 
@@ -2186,7 +2205,7 @@ try {
 | partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现；`permission.ask` / `permission.reply` 可能缺失） |
 
 > 说明：
-> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。
+> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam` / `questionId`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId`。
 > - `permission.reply` 为极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
 > - `deliveryMode` 与 `replayDone` 为 SDK 本地扩展字段，不要求服务端透传；SDK 应在回调给 `SessionListener.onMessage` 前补齐。
 > - SDK 不再额外插入一条虚拟的补发完成消息；补发完成标记直接挂在当前轮次“最后一条补发事件”上返回，即该条事件同时带有 `deliveryMode = replay` 与 `replayDone = true`。
@@ -2428,9 +2447,9 @@ interface Session {
   userId?: string;               // 会话所有者
   ak?: string;                   // Agent Key
   title: string;                 // 会话标题
-  bussinessDomain: string;       // 会话关联场域
-  bussinessType: string;         // 会话类型
-  bussinessId: string;           // 对话所属id，单聊为用户Id，群聊为群Id
+  businessSessionDomain: string; // 会话关联场域
+  businessSessionType: string;   // 会话类型
+  businessSessionId: string;     // 对话所属id，单聊为用户Id，群聊为群Id
   assistantAccount: string;      // 分身账号id
   status: 'ACTIVE' | 'IDLE' | 'CLOSED';
   toolSessionId?: string;        // OpenCode 侧会话 ID（可能未就绪）

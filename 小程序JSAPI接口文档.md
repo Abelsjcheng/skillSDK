@@ -394,6 +394,7 @@ window.HWH5EXT.getSessionMessageHistory({
 - 重复注册不会报错，SDK 会 no-op，并返回成功语义。
 - 可在任意时机注册，SDK 保证时序安全，不因注册时机导致漏消息。
 - WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外没有外层 envelope。
+- SDK 会按 `welinkSessionId` 本地缓存“当前未完成轮次”的全部原始 `onmessage` 事件；若页面晚于会话开始时机打开，注册监听后会先补发缓存，再继续接收实时事件。
 
 ### 调用方式
 
@@ -442,6 +443,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | seq | number \| null | 递增序列号；大部分事件都有，个别极简事件也可能省略 |
 | welinkSessionId | string | 所属会话 ID；`agent.online` / `agent.offline` 不携带 |
 | emittedAt | string \| null | 事件产生时间，ISO-8601；`permission.reply` / `agent.online` / `agent.offline` / `error` 通常不携带 |
+| deliveryMode | string \| null | SDK 本地补充的投递模式：`replay` 表示缓存补发事件，`live` 表示实时事件；未走补发链路时可省略 |
+| replayDone | boolean \| null | SDK 本地补充的补发完成标记；仅出现在“最后一条补发事件”上，值为 `true` |
 
 #### 消息级字段（按事件返回）
 
@@ -510,6 +513,38 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 - 当 `streaming.sessionStatus = idle` 时，客户端应将当前所有 streaming part 视为已完成，避免残留流式展示状态。
 - `search_result` 的字段名严格是 `searchResults`，`ask_more` 的字段名严格是 `askMoreQuestions`。
 
+### 行为说明
+
+1. SDK 内部维护每个会话唯一监听器（`onMessage` / `onError` / `onClose`）。
+2. 同一 `welinkSessionId` 重复调用 `registerSessionListener` 时，不替换原监听器，直接返回成功。
+3. SDK 在本地按 `welinkSessionId` 缓存“当前未完成轮次”的全部原始 `StreamMessage` 事件：
+   - 缓存内容为当前轮次收到的全部原始 `onmessage` 事件
+   - 不区分事件类型，不做消息聚合，不改写字段结构
+   - 写入缓存时必须保持原始到达顺序
+4. 以下事件视为当前轮次结束，且终止事件本身也需要写入当前轮次缓存：
+   - `session.status` 且 `sessionStatus = idle`
+   - `session.error`
+   - `error`
+   - `agent.offline`
+5. 调用 `registerSessionListener` 时：
+   - 若该 `welinkSessionId` 存在当前未完成轮次缓存，SDK 必须先按原始到达顺序，通过 `onMessage` 逐条补发缓存中的全部事件
+   - 补发阶段的每条事件都必须补充 `deliveryMode = replay`
+   - 最后一条补发事件必须额外补充 `replayDone = true`，用于通知前端“补发阶段已完成”
+   - SDK 不再额外插入一条虚拟的补发完成消息
+   - 若该轮次缓存已结束，则不应再通过 `registerSessionListener` 回放该轮次缓存；页面应以 `getSessionMessageHistory` 返回的服务端历史为准恢复最终消息内容
+   - 当前轮次缓存补发完成后，再开始回调后续实时事件；实时事件必须补充 `deliveryMode = live`
+6. 若缓存补发期间又收到新的实时事件，SDK 需先将这些事件暂存到内部待发队列，待缓存补发完成后，再按顺序继续回调，保证前端接收到的始终是一条严格有序的事件流。
+7. `unregisterSessionListener` 仅移除当前监听器，不主动清空该会话的当前未完成轮次缓存。
+8. 若同一 `welinkSessionId` 在上一轮缓存已结束后再次收到新事件，SDK 应先清理上一轮已结束缓存，再开启下一轮新的未完成轮次缓存。
+9. 调用 `closeSkill`、`shutdown`、`destroyInstance` 或 SDK 实例销毁时，应立即清理对应缓存，避免无效残留。
+
+### 前端使用建议
+
+- 建议前端在 `deliveryMode = replay` 阶段只做内存聚合，不做逐条流式渲染。
+- 待收到“最后一条补发事件上的 `replayDone = true`”后，再将补发阶段聚合出的当前未完成消息一次性展示。
+- 对 `deliveryMode = live` 的事件再继续执行逐条流式渲染。
+- 页面关闭时应调用 `unregisterSessionListener` 释放监听，但不需要担心因此丢失当前未完成轮次缓存。
+
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
@@ -520,6 +555,10 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 
 ```javascript
 const onMessage = (message) => {
+  if (message.deliveryMode === 'replay') {
+    console.log('收到补发事件:', message.type, message.replayDone === true ? '补发结束' : '补发中');
+  }
+
   switch (message.type) {
     case 'text.delta':
       console.log('AI 响应片段:', message.content);
@@ -1572,12 +1611,12 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createNewS
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| ak | string | 是 | Agent Plugin 对应的 Access Key |
+| ak | string | 否 | Agent Plugin 对应的 Access Key |
 | title | string | 否 | 会话标题，不传则由 AI 自动生成 |
-| bussinessDomain | string | 是 | 会话归属领域，默认场景通常为 `miniapp` |
-| bussinessId | string | 是 | 会话归属 ID（单聊为用户 ID，群聊为群 ID） |
-| bussinessType | string | 是 | 会话类型，默认场景通常为 `direct` |
-| assistantAccount | string | 是 | 助理账号 ID |
+| businessSessionDomain | string | 否 | 业务侧外部 ID 三元组中的 domain |
+| businessSessionId | string | 是 | 业务侧外部 ID 三元组中的 id；单聊可传用户 ID，群聊可传群 ID |
+| businessSessionType | string | 否 | 业务侧外部 ID 三元组中的 type |
+| assistantAccount | string | 否 | 助理账号 ID；为空时是否允许创建由服务端开关控制 |
 
 ### 返回值
 
@@ -1589,9 +1628,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createNewS
 | userId | string | 用户 ID |
 | ak | string \| null | Access Key，未关联时为 `null` |
 | title | string \| null | 会话标题 |
-| bussinessDomain | string \| null | 会话归属领域 |
-| bussinessType | string \| null | 会话类型 |
-| bussinessId | string \| null | 会话归属 ID |
+| businessSessionDomain | string \| null | 业务侧外部 ID 三元组中的 domain |
+| businessSessionType | string \| null | 业务侧外部 ID 三元组中的 type |
+| businessSessionId | string \| null | 业务侧外部 ID 三元组中的 id |
 | assistantAccount | string \| null | 助理账号 ID |
 | status | string | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | toolSessionId | string \| null | OpenCode Session ID |
@@ -1612,10 +1651,10 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createNewS
 window.HWH5EXT.createNewSession({
   ak: 'ak_xxxxxxxx',
   title: '帮我创建一个 React 项目',
-  bussinessDomain: 'miniapp',
-  bussinessType: 'direct',
+  businessSessionDomain: null,
+  businessSessionType: null,
   assistantAccount: 'x00_1',
-  bussinessId: 'x00123456'
+  businessSessionId: 'x00123456'
 }).then((session) => {
   console.log('会话创建成功:', session.welinkSessionId);
 }).catch((error) => {
@@ -1651,19 +1690,19 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getHistory
 | size | number | 否 | 每页大小，默认 `50` |
 | status | string | 否 | 按状态过滤：`ACTIVE` / `IDLE` / `CLOSED` |
 | ak | string | 否 | 按 Agent AK 过滤 |
-| bussinessId | string | 否 | 按会话归属 ID 过滤 |
+| businessSessionId | string | 否 | 按会话归属 ID 过滤 |
 | assistantAccount | string | 否 | 按助理账号 ID 过滤 |
 | businessSessionDomain | string | 否 | 会话来源域过滤：`miniapp` / `im` |
 
 ### 返回值
 
-返回 Promise，resolve 数据：`PageResult<SkillSession>`
+返回 Promise，resolve 数据：`PageResult<Session>`
 
 分页结果字段：
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| content | SkillSession[] | 当前页会话列表 |
+| content | Session[] | 当前页会话列表 |
 | page | number | 当前页码（从 0 开始） |
 | size | number | 每页大小 |
 | total | number | 总记录数 |
@@ -1677,9 +1716,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getHistory
 | userId | string | 用户 ID |
 | ak | string \| null | Access Key，未关联时为 `null` |
 | title | string \| null | 会话标题 |
-| bussinessDomain | string \| null | 会话归属领域 |
-| bussinessType | string \| null | 会话类型 |
-| bussinessId | string \| null | 会话归属 ID |
+| businessSessionDomain | string \| null | 业务侧外部 ID 三元组中的 domain |
+| businessSessionType | string \| null | 业务侧外部 ID 三元组中的 type |
+| businessSessionId | string \| null | 业务侧外部 ID 三元组中的 id |
 | assistantAccount | string \| null | 助理账号 ID |
 | status | string | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | toolSessionId | string \| null | OpenCode Session ID |
@@ -1698,7 +1737,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getHistory
 ```javascript
 window.HWH5EXT.getHistorySessionsList({
   ak: 'ak_xxxxxxxx',
-  bussinessId: 'group_abc123',
+  businessSessionId: 'group_abc123',
   businessSessionDomain: 'miniapp',
   page: 0,
   size: 50,
