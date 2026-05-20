@@ -61,11 +61,23 @@ export function useChatSession({
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const aiReplyFailedTextRef = useRef(t('weAgent.aiReplyFailed'));
 
+  const setMessagesRef = useRef(setMessages);
+  const setHasMoreHistoryRef = useRef(setHasMoreHistory);
+  const setIsLoadingHistoryRef = useRef(setIsLoadingHistory);
+  const setPendingAssistantPreviewRef = useRef(setPendingAssistantPreview);
+  const setSessionStatusRef = useRef(setSessionStatus);
+
+  setMessagesRef.current = setMessages;
+  setHasMoreHistoryRef.current = setHasMoreHistory;
+  setIsLoadingHistoryRef.current = setIsLoadingHistory;
+  setPendingAssistantPreviewRef.current = setPendingAssistantPreview;
+  setSessionStatusRef.current = setSessionStatus;
+
   onSessionTitleChangeRef.current = onSessionTitleChange;
   aiReplyFailedTextRef.current = t('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
-    setPendingAssistantPreview((prev) => (
+    setPendingAssistantPreviewRef.current((prev) => (
       prev.visible && prev.welinkSessionId === sessionId
         ? prev
         : { visible: true, welinkSessionId: sessionId, startedAt: Date.now() }
@@ -73,7 +85,7 @@ export function useChatSession({
   }, []);
 
   const hidePendingAssistantPreview = useCallback(() => {
-    setPendingAssistantPreview((prev) => (
+    setPendingAssistantPreviewRef.current((prev) => (
       prev.visible
         ? { visible: false, welinkSessionId: null, startedAt: 0 }
         : prev
@@ -90,10 +102,10 @@ export function useChatSession({
     nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
-    setMessages([]);
-    setHasMoreHistory(false);
-    setIsLoadingHistory(false);
-    setSessionStatus('idle');
+    setMessagesRef.current([]);
+    setHasMoreHistoryRef.current(false);
+    setIsLoadingHistoryRef.current(false);
+    setSessionStatusRef.current('idle');
     hidePendingAssistantPreview();
   }, [hidePendingAssistantPreview]);
 
@@ -103,7 +115,7 @@ export function useChatSession({
       const finalId = streamingMsgIdRef.current;
       const finalText = assemblerRef.current.getText();
       const finalParts = assemblerRef.current.getParts();
-      setMessages((prev) => prev.map((message) => (
+      setMessagesRef.current((prev) => prev.map((message) => (
         message.id === finalId
           ? {
             ...message,
@@ -131,7 +143,7 @@ export function useChatSession({
       isStreaming: false,
     };
 
-    setMessages((prev) => {
+    setMessagesRef.current((prev) => {
       if (currentStreamingMessageId) {
         const streamingMessageIndex = prev.findIndex((messageItem) => messageItem.id === currentStreamingMessageId);
         if (streamingMessageIndex >= 0) {
@@ -170,7 +182,7 @@ export function useChatSession({
   }, [hidePendingAssistantPreview]);
 
   const upsertAssistantMessage = useCallback((messageId: string, updater: (current?: Message) => Message) => {
-    setMessages((prev) => {
+    setMessagesRef.current((prev) => {
       const existingIndex = prev.findIndex((message) => message.id === messageId);
       if (existingIndex >= 0) {
         const next = [...prev];
@@ -198,7 +210,7 @@ export function useChatSession({
     const requestSessionId = welinkSessionId;
     const requestEpoch = historyEpochRef.current;
     isLoadingHistoryRef.current = true;
-    setIsLoadingHistory(true);
+    setIsLoadingHistoryRef.current(true);
     try {
       const result = await getSessionMessageHistory({
         welinkSessionId: requestSessionId,
@@ -213,7 +225,7 @@ export function useChatSession({
       }
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
       if (olderMessages.length > 0) {
-        setMessages((prev) => {
+        setMessagesRef.current((prev) => {
           const next = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
           knownUserMessageIdsRef.current = collectUserMessageIds(next);
           return next;
@@ -222,13 +234,13 @@ export function useChatSession({
       nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
       const nextHasMoreHistory = hasMoreHistoryByCursor(result);
       hasMoreHistoryRef.current = nextHasMoreHistory;
-      setHasMoreHistory(nextHasMoreHistory);
+      setHasMoreHistoryRef.current(nextHasMoreHistory);
     } catch (err) {
       WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
       showToast(t('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
-      setIsLoadingHistory(false);
+      setIsLoadingHistoryRef.current(false);
     }
   }, [mode, t, welinkSessionId]);
 
@@ -249,7 +261,7 @@ export function useChatSession({
       ...(subagentSessionId ? { subagentSessionId } : {}),
     });
     const userMessage = messageOperationToMessage(result);
-    setMessages((prev) => {
+    setMessagesRef.current((prev) => {
       if (prev.find((message) => message.id === userMessage.id)) {
         return prev;
       }
@@ -267,13 +279,13 @@ export function useChatSession({
     subagentSessionId,
   }: QuestionAnswerSubmission) => {
     finalizeStreamingMessage();
-    setSessionStatus('busy');
+    setSessionStatusRef.current('busy');
 
     try {
       await sendUserMessage(answer, toolCallId, subagentSessionId);
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, toolCallId, subagentSessionId })} | error=${JSON.stringify(err)}`);
-      setSessionStatus('idle');
+      setSessionStatusRef.current('idle');
       showToast(t('weAgent.submitAnswerFailed'));
       throw err;
     }
@@ -315,12 +327,12 @@ export function useChatSession({
           ...sessionMessageToMessage(message),
           isHistory: true,
         }));
-        setMessages(mapped);
+        setMessagesRef.current(mapped);
         knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
         nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
         const nextHasMoreHistory = hasMoreHistoryByCursor(result);
         hasMoreHistoryRef.current = nextHasMoreHistory;
-        setHasMoreHistory(nextHasMoreHistory);
+        setHasMoreHistoryRef.current(nextHasMoreHistory);
       } catch (err) {
         if (
           historyEpochRef.current !== requestEpoch
@@ -334,7 +346,7 @@ export function useChatSession({
     };
 
     void loadMessages();
-  }, [mode, resetTransientState, t, welinkSessionId]);
+  }, [mode, t, welinkSessionId]);
 
   useEffect(() => {
     if (!welinkSessionId) return;
@@ -359,7 +371,7 @@ export function useChatSession({
         );
 
         if (hasMatchingQuestion) {
-          setMessages((prev) => updateLatestQuestionPart(
+          setMessagesRef.current((prev) => updateLatestQuestionPart(
             prev,
             (part) => (
               (!msg.partId || part.partId === msg.partId)
@@ -391,7 +403,7 @@ export function useChatSession({
             break;
           }
 
-          setSessionStatus('busy');
+          setSessionStatusRef.current('busy');
           ensureStreamingMessageContext(messageId);
 
           const assembler = assemblerRef.current;
@@ -422,9 +434,9 @@ export function useChatSession({
           }
 
           finalizeStreamingMessage();
-          setSessionStatus('busy');
+          setSessionStatusRef.current('busy');
           const content = msg.content ?? '';
-          setMessages((prev) => {
+          setMessagesRef.current((prev) => {
             const hasUserMessage = knownUserMessageIdsRef.current.has(messageId);
             if (hasUserMessage) {
               return prev;
@@ -458,7 +470,7 @@ export function useChatSession({
           const currentParts = hasStreamingPermission ? assemblerRef.current.getParts() : null;
           const currentStreamingMessageId = streamingMsgIdRef.current;
 
-          setMessages((prev) => prev.map((messageItem) => {
+          setMessagesRef.current((prev) => prev.map((messageItem) => {
             if (currentStreamingMessageId && currentParts && messageItem.id === currentStreamingMessageId) {
               return {
                 ...messageItem,
@@ -488,12 +500,12 @@ export function useChatSession({
           break;
         }
         case 'step.start':
-          setSessionStatus('busy');
+          setSessionStatusRef.current('busy');
           break;
         case 'step.done':
           if (streamingMsgIdRef.current && msg.tokens) {
             const finalId = streamingMsgIdRef.current;
-            setMessages((prev) =>
+            setMessagesRef.current((prev) =>
               prev.map((m) =>
                 m.id === finalId
                   ? {
@@ -522,32 +534,32 @@ export function useChatSession({
             break;
           }
           agentOfflineHandledRef.current = true;
-          setSessionStatus('idle');
+          setSessionStatusRef.current('idle');
           appendAssistantErrorBlock('agent已离线', 'agent已离线');
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
-            setSessionStatus('idle');
+            setSessionStatusRef.current('idle');
             finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
-            setSessionStatus('busy');
+            setSessionStatusRef.current('busy');
           } else if (msg.sessionStatus === 'retry') {
-            setSessionStatus('retry');
+            setSessionStatusRef.current('retry');
           }
           break;
         case 'session.error':
-          setSessionStatus('error');
+          setSessionStatusRef.current('error');
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'error':
-          setSessionStatus('error');
+          setSessionStatusRef.current('error');
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'snapshot':
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
           hidePendingAssistantPreview();
-          setMessages((msg.messages ?? []).map((sm) => snapshotMessageToMessage(sm)).reverse());
+          setMessagesRef.current((msg.messages ?? []).map((sm) => snapshotMessageToMessage(sm)).reverse());
           break;
         case 'streaming': {
           const messageId = msg.messageId;
@@ -555,7 +567,7 @@ export function useChatSession({
             break;
           }
 
-          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
+          setSessionStatusRef.current(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           ensureStreamingMessageContext(messageId);
 
           const nextRole = normalizeRole(msg.role);
@@ -620,11 +632,11 @@ export function useChatSession({
   const onSend = useCallback(async (content: string) => {
     if (!welinkSessionId || !content) return;
 
-    setSessionStatus('busy');
+    setSessionStatusRef.current('busy');
     try {
       await sendUserMessage(content);
     } catch (err) {
-      setSessionStatus('idle');
+      setSessionStatusRef.current('idle');
       showToast(t('weAgent.sendMessageFailed'));
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
@@ -635,7 +647,7 @@ export function useChatSession({
 
     try {
       await stopSkill({ welinkSessionId });
-      setSessionStatus('idle');
+      setSessionStatusRef.current('idle');
       finalizeStreamingMessage();
     } catch (err) {
       WeLog(`useChatSession stopSkill failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
