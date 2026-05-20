@@ -6,56 +6,56 @@ import androidx.annotation.Nullable;
 
 @Keep
 public final class CreateNewSessionBody {
-    @NonNull
+    @Nullable
     private final String ak;
+    @Nullable
+    private final String businessSessionDomain;
+    @Nullable
+    private final String businessSessionType;
     @NonNull
-    private final String bussinessDomain;
-    @NonNull
-    private final String bussinessType;
-    @NonNull
-    private final String bussinessId;
-    @NonNull
+    private final String businessSessionId;
+    @Nullable
     private final String assistantAccount;
     @Nullable
     private final String title;
 
     public CreateNewSessionBody(
-            @NonNull String ak,
-            @NonNull String bussinessDomain,
-            @NonNull String bussinessType,
-            @NonNull String bussinessId,
-            @NonNull String assistantAccount,
+            @Nullable String ak,
+            @Nullable String businessSessionDomain,
+            @Nullable String businessSessionType,
+            @NonNull String businessSessionId,
+            @Nullable String assistantAccount,
             @Nullable String title
     ) {
         this.ak = ak;
-        this.bussinessDomain = bussinessDomain;
-        this.bussinessType = bussinessType;
-        this.bussinessId = bussinessId;
+        this.businessSessionDomain = businessSessionDomain;
+        this.businessSessionType = businessSessionType;
+        this.businessSessionId = businessSessionId;
         this.assistantAccount = assistantAccount;
         this.title = title;
     }
 
-    @NonNull
+    @Nullable
     public String getAk() {
         return ak;
     }
 
-    @NonNull
-    public String getBussinessDomain() {
-        return bussinessDomain;
+    @Nullable
+    public String getBusinessSessionDomain() {
+        return businessSessionDomain;
+    }
+
+    @Nullable
+    public String getBusinessSessionType() {
+        return businessSessionType;
     }
 
     @NonNull
-    public String getBussinessType() {
-        return bussinessType;
+    public String getBusinessSessionId() {
+        return businessSessionId;
     }
 
-    @NonNull
-    public String getBussinessId() {
-        return bussinessId;
-    }
-
-    @NonNull
+    @Nullable
     public String getAssistantAccount() {
         return assistantAccount;
     }

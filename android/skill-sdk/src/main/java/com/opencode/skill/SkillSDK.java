@@ -59,7 +59,7 @@ import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SessionMessage;
 import com.opencode.skill.model.SessionStatusResult;
 import com.opencode.skill.model.SkillSdkException;
-import com.opencode.skill.model.SkillSession;
+import com.opencode.skill.model.Session;
 import com.opencode.skill.model.SkillWecodeStatusResult;
 import com.opencode.skill.model.StopSkillParams;
 import com.opencode.skill.model.StopSkillResult;
@@ -175,33 +175,67 @@ public final class SkillSDK {
     }
 
     // 1. createSession
-    public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+    public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<Session> callback) {
         if (!isInitialized()) {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getImGroupId())) {
-            callback.onError(error(1000, "imGroupId is required"));
+        final CreateSessionParams normalizedParams;
+        try {
+            String businessSessionId = TypeConvertUtils.requireString(params.getBusinessSessionId(), "businessSessionId");
+            String ak = TypeConvertUtils.optionalString(params.getAk());
+            String title = TypeConvertUtils.optionalString(params.getTitle());
+            String businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
+            String businessSessionType = TypeConvertUtils.optionalString(params.getBusinessSessionType());
+            String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
+            normalizedParams = new CreateSessionParams(
+                    ak,
+                    title,
+                    businessSessionDomain,
+                    businessSessionId,
+                    businessSessionType,
+                    assistantAccount
+            );
+        } catch (SkillSdkException e) {
+            callback.onError(e);
             return;
         }
 
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean result) {
-                String optionalAk = normalizeOptionalString(params.getAk());
-                apiClient.listSessions(params.getImGroupId(), optionalAk, "ACTIVE", 0, 20,
-                        new SkillCallback<PageResult<SkillSession>>() {
+                String optionalAk = normalizedParams.getAk();
+                String optionalAssistantAccount = normalizedParams.getAssistantAccount();
+                String businessSessionDomain = normalizedParams.getBusinessSessionDomain();
+                HistorySessionsParams historyParams = new HistorySessionsParams(
+                        0,
+                        50,
+                        null,
+                        optionalAk,
+                        normalizedParams.getBusinessSessionId(),
+                        optionalAssistantAccount,
+                        businessSessionDomain
+                );
+                apiClient.getHistorySessionsList(historyParams, new SkillCallback<PageResult<Session>>() {
                             @Override
-                            public void onSuccess(@Nullable PageResult<SkillSession> pageResult) {
-                                SkillSession reused = selectLatestActiveSession(pageResult == null ? null : pageResult.getContent(), params);
+                            public void onSuccess(@Nullable PageResult<Session> pageResult) {
+                                Session reused = selectLatestReusableSession(pageResult == null ? null : pageResult.getContent());
                                 if (reused != null) {
                                     callback.onSuccess(reused);
                                     return;
                                 }
 
-                                apiClient.createSession(params, new SkillCallback<SkillSession>() {
+                                CreateSessionParams createParams = new CreateSessionParams(
+                                        optionalAk,
+                                        normalizedParams.getTitle(),
+                                        normalizedParams.getBusinessSessionDomain(),
+                                        normalizedParams.getBusinessSessionId(),
+                                        normalizedParams.getBusinessSessionType(),
+                                        optionalAssistantAccount
+                                );
+                                apiClient.createSession(createParams, new SkillCallback<Session>() {
                                     @Override
-                                    public void onSuccess(@Nullable SkillSession session) {
+                                    public void onSuccess(@Nullable Session session) {
                                         if (session == null) {
                                             callback.onError(error(7000, "Create session returned empty data"));
                                             return;
@@ -251,6 +285,7 @@ public final class SkillSDK {
         Exception cleanupException = null;
         try {
             webSocketManager.clearAllListeners();
+            webSocketManager.clearAllRoundBuffers();
             listenerBindings.clear();
             sessionStatusCallbacks.clear();
             lastSessionStatusBySession.clear();
@@ -356,7 +391,15 @@ public final class SkillSDK {
                             callback.onError(error(4002, "No user message to regenerate"));
                             return;
                         }
-                        sendMessageInternal(params.getWelinkSessionId(), latest, null, null, callback);
+                        sendMessageInternal(
+                                params.getWelinkSessionId(),
+                                latest,
+                                null,
+                                null,
+                                null,
+                                null,
+                                callback
+                        );
                     }
 
                     @Override
@@ -620,7 +663,9 @@ public final class SkillSDK {
                         params.getWelinkSessionId(),
                         params.getContent(),
                         params.getToolCallId(),
+                        params.getQuestionId(),
                         params.getSubagentSessionId(),
+                        params.getBusinessExtParam(),
                         callback
                 );
             }
@@ -656,6 +701,7 @@ public final class SkillSDK {
                         params.getPermId(),
                         params.getResponse(),
                         params.getSubagentSessionId(),
+                        params.getBusinessExtParam(),
                         new SkillCallback<ReplyPermissionResult>() {
                             @Override
                             public void onSuccess(@Nullable ReplyPermissionResult result) {
@@ -696,7 +742,7 @@ public final class SkillSDK {
     }
 
     // 14. createNewSession
-    public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+    public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<Session> callback) {
         if (!isInitialized()) {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
@@ -704,18 +750,19 @@ public final class SkillSDK {
 
         final CreateNewSessionParams normalizedParams;
         try {
-            String ak = TypeConvertUtils.requireString(params.getAk(), "ak");
-            String bussinessDomain = TypeConvertUtils.requireString(params.getBussinessDomain(), "bussinessDomain");
-            String bussinessType = TypeConvertUtils.requireString(params.getBussinessType(), "bussinessType");
-            String bussinessId = TypeConvertUtils.requireString(params.getBussinessId(), "bussinessId");
-            String assistantAccount = TypeConvertUtils.requireString(params.getAssistantAccount(), "assistantAccount");
+            // createNewSession 按最新文档要求 businessSessionId 必传。
+            String businessSessionId = TypeConvertUtils.requireString(params.getBusinessSessionId(), "businessSessionId");
+            String ak = TypeConvertUtils.optionalString(params.getAk());
+            String businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
+            String businessSessionType = TypeConvertUtils.optionalString(params.getBusinessSessionType());
+            String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
             String title = TypeConvertUtils.optionalString(params.getTitle());
             normalizedParams = new CreateNewSessionParams(
                     ak,
                     title,
-                    bussinessDomain,
-                    bussinessType,
-                    bussinessId,
+                    businessSessionDomain,
+                    businessSessionType,
+                    businessSessionId,
                     assistantAccount
             );
         } catch (SkillSdkException e) {
@@ -726,9 +773,9 @@ public final class SkillSDK {
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean connected) {
-                apiClient.createNewSession(normalizedParams, new SkillCallback<SkillSession>() {
+                apiClient.createNewSession(normalizedParams, new SkillCallback<Session>() {
                     @Override
-                    public void onSuccess(@Nullable SkillSession session) {
+                    public void onSuccess(@Nullable Session session) {
                         if (session == null) {
                             callback.onError(error(7000, "Create session returned empty data"));
                             return;
@@ -752,7 +799,7 @@ public final class SkillSDK {
 
     // 15. getHistorySessionsList
     public void getHistorySessionsList(@NonNull HistorySessionsParams params,
-            @NonNull SkillCallback<PageResult<SkillSession>> callback) {
+            @NonNull SkillCallback<PageResult<Session>> callback) {
         if (!isInitialized()) {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
@@ -769,18 +816,22 @@ public final class SkillSDK {
             int page = TypeConvertUtils.toNonNegativeInt(params.getPage(), 0, "page");
             int size = TypeConvertUtils.toPositiveInt(params.getSize(), 50, "size");
             String ak = TypeConvertUtils.optionalString(params.getAk());
-            String bussinessId = TypeConvertUtils.optionalString(params.getBussinessId());
+            String businessSessionId = TypeConvertUtils.optionalString(params.getBusinessSessionId());
             String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
             businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
             if (businessSessionDomain != null) {
                 businessSessionDomain = businessSessionDomain.toLowerCase(Locale.ROOT);
+                if (!"miniapp".equals(businessSessionDomain) && !"im".equals(businessSessionDomain)) {
+                    callback.onError(error(1000, "businessSessionDomain must be miniapp/im"));
+                    return;
+                }
             }
             requestParams = new HistorySessionsParams(
                     page,
                     size,
                     status,
                     ak,
-                    bussinessId,
+                    businessSessionId,
                     assistantAccount,
                     businessSessionDomain
             );
@@ -793,20 +844,13 @@ public final class SkillSDK {
             callback.onError(error(1000, "status must be ACTIVE/IDLE/CLOSED"));
             return;
         }
-        if (businessSessionDomain != null
-                && !"miniapp".equals(businessSessionDomain)
-                && !"im".equals(businessSessionDomain)) {
-            callback.onError(error(1000, "businessSessionDomain must be miniapp/im"));
-            return;
-        }
-
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean connected) {
-                apiClient.getHistorySessionsList(requestParams, new SkillCallback<PageResult<SkillSession>>() {
+                apiClient.getHistorySessionsList(requestParams, new SkillCallback<PageResult<Session>>() {
                     @Override
-                    public void onSuccess(@Nullable PageResult<SkillSession> result) {
-                        PageResult<SkillSession> pageResult = result == null ? new PageResult<>() : result;
+                    public void onSuccess(@Nullable PageResult<Session> result) {
+                        PageResult<Session> pageResult = result == null ? new PageResult<>() : result;
                         callback.onSuccess(pageResult);
                     }
 
@@ -1785,10 +1829,19 @@ public final class SkillSDK {
             @NonNull String welinkSessionId,
             @NonNull String content,
             @Nullable String toolCallId,
+            @Nullable String questionId,
             @Nullable String subagentSessionId,
+            @Nullable com.google.gson.JsonObject businessExtParam,
             @NonNull SkillCallback<SendMessageResult> callback) {
         awaitingExecutingBySession.put(welinkSessionId, Boolean.TRUE);
-        apiClient.sendMessage(welinkSessionId, content, toolCallId, subagentSessionId, new SkillCallback<SendMessageResult>() {
+        apiClient.sendMessage(
+                welinkSessionId,
+                content,
+                toolCallId,
+                questionId,
+                subagentSessionId,
+                businessExtParam,
+                new SkillCallback<SendMessageResult>() {
             @Override
             public void onSuccess(@Nullable SendMessageResult result) {
                 if (result == null) {
@@ -1976,15 +2029,12 @@ public final class SkillSDK {
     }
 
     @Nullable
-    private SkillSession selectLatestActiveSession(@Nullable List<SkillSession> sessions, @NonNull CreateSessionParams params) {
+    private Session selectLatestReusableSession(@Nullable List<Session> sessions) {
         if (sessions == null || sessions.isEmpty()) {
             return null;
         }
-        String expectedAk = normalizeOptionalString(params.getAk());
         return sessions.stream()
-                .filter(session -> "ACTIVE".equalsIgnoreCase(session.getStatus()))
-                .filter(session -> expectedAk == null || expectedAk.equals(session.getAk()))
-                .filter(session -> params.getImGroupId().equals(session.getImGroupId()))
+                .filter(session -> !"CLOSED".equalsIgnoreCase(session.getStatus()))
                 .max(Comparator.comparing(this::safeUpdatedAt))
                 .orElse(null);
     }
@@ -1999,7 +2049,7 @@ public final class SkillSDK {
     }
 
     @NonNull
-    private Instant safeUpdatedAt(@NonNull SkillSession session) {
+    private Instant safeUpdatedAt(@NonNull Session session) {
         try {
             return Instant.parse(session.getUpdatedAt());
         } catch (Exception ignored) {

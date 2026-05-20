@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.annotations.SerializedName;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +58,9 @@ public class StreamMessage {
     @Nullable
     private String question;
     @Nullable
+    @SerializedName(value = "questionId", alternate = {"requestId"})
+    private String questionId;
+    @Nullable
     private List<String> options = new ArrayList<>();
     @Nullable
     private String fileName;
@@ -88,6 +92,10 @@ public class StreamMessage {
     private JsonArray messages;
     @Nullable
     private JsonArray parts;
+    @Nullable
+    private String deliveryMode;
+    @Nullable
+    private Boolean replayDone;
 
     @Nullable
     public String getType() {
@@ -279,6 +287,15 @@ public class StreamMessage {
     }
 
     @Nullable
+    public String getQuestionId() {
+        return questionId;
+    }
+
+    public void setQuestionId(@Nullable String questionId) {
+        this.questionId = questionId;
+    }
+
+    @Nullable
     public List<String> getOptions() {
         return options;
     }
@@ -420,5 +437,23 @@ public class StreamMessage {
 
     public void setParts(@Nullable JsonArray parts) {
         this.parts = parts;
+    }
+
+    @Nullable
+    public String getDeliveryMode() {
+        return deliveryMode;
+    }
+
+    public void setDeliveryMode(@Nullable String deliveryMode) {
+        this.deliveryMode = deliveryMode;
+    }
+
+    @Nullable
+    public Boolean getReplayDone() {
+        return replayDone;
+    }
+
+    public void setReplayDone(@Nullable Boolean replayDone) {
+        this.replayDone = replayDone;
     }
 }

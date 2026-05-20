@@ -22,9 +22,9 @@ import com.opencode.skill.model.QrcodeInfo;
 import com.opencode.skill.model.ReplyPermissionResult;
 import com.opencode.skill.model.SendMessageResult;
 import com.opencode.skill.model.SendMessageToIMResult;
+import com.opencode.skill.model.Session;
 import com.opencode.skill.model.SessionMessage;
 import com.opencode.skill.model.SkillSdkException;
-import com.opencode.skill.model.SkillSession;
 import com.opencode.skill.model.StopSkillResult;
 import com.opencode.skill.model.UpdateQrcodeInfoResult;
 import com.opencode.skill.model.UpdateWeAgentResult;
@@ -108,25 +108,28 @@ public class ApiClient {
         this.assistantApiService = assistantRetrofit.create(AssistantApiService.class);
     }
 
-    public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+    public void createSession(@NonNull CreateSessionParams params, @NonNull SkillCallback<Session> callback) {
         SkillApiService service = requireSkillApiService();
         enqueueEnvelope(service.createSession(new CreateSessionBody(
                 normalizeNonBlank(params.getAk()),
                 normalizeNonBlank(params.getTitle()),
-                normalizeNonBlank(params.getImGroupId())
-        )), SkillSession.class, callback);
+                normalizeNonBlank(params.getBusinessSessionDomain()),
+                params.getBusinessSessionId().trim(),
+                normalizeNonBlank(params.getBusinessSessionType()),
+                normalizeNonBlank(params.getAssistantAccount())
+        )), Session.class, callback);
     }
 
-    public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<SkillSession> callback) {
+    public void createNewSession(@NonNull CreateNewSessionParams params, @NonNull SkillCallback<Session> callback) {
         SkillApiService service = requireSkillApiService();
         enqueueEnvelope(service.createNewSession(new CreateNewSessionBody(
-                params.getAk().trim(),
-                params.getBussinessDomain().trim(),
-                params.getBussinessType().trim(),
-                params.getBussinessId().trim(),
-                params.getAssistantAccount().trim(),
+                normalizeNonBlank(params.getAk()),
+                normalizeNonBlank(params.getBusinessSessionDomain()),
+                normalizeNonBlank(params.getBusinessSessionType()),
+                params.getBusinessSessionId().trim(),
+                normalizeNonBlank(params.getAssistantAccount()),
                 normalizeNonBlank(params.getTitle())
-        )), SkillSession.class, callback);
+        )), Session.class, callback);
     }
 
     public void createDigitalTwin(
@@ -316,9 +319,9 @@ public class ApiClient {
     }
 
     public void listSessions(@Nullable String imGroupId, @Nullable String ak, @Nullable String status, int page, int size,
-            @NonNull SkillCallback<PageResult<SkillSession>> callback) {
+            @NonNull SkillCallback<PageResult<Session>> callback) {
         SkillApiService service = requireSkillApiService();
-        Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
+        Type type = TypeToken.getParameterized(PageResult.class, Session.class).getType();
         enqueueEnvelope(service.listSessions(
                 normalizeNonBlank(imGroupId),
                 normalizeNonBlank(ak),
@@ -329,36 +332,40 @@ public class ApiClient {
     }
 
     public void getHistorySessionsList(@NonNull HistorySessionsParams params,
-            @NonNull SkillCallback<PageResult<SkillSession>> callback) {
+            @NonNull SkillCallback<PageResult<Session>> callback) {
         SkillApiService service = requireSkillApiService();
-        Type type = TypeToken.getParameterized(PageResult.class, SkillSession.class).getType();
+        Type type = TypeToken.getParameterized(PageResult.class, Session.class).getType();
         enqueueEnvelope(service.getHistorySessionsList(
                 params.getPage(),
                 params.getSize(),
                 normalizeNonBlank(params.getStatus()),
                 normalizeNonBlank(params.getAk()),
-                normalizeNonBlank(params.getBussinessId()),
+                normalizeNonBlank(params.getBusinessSessionId()),
                 normalizeNonBlank(params.getAssistantAccount()),
                 normalizeNonBlank(params.getBusinessSessionDomain())
         ), type, callback);
     }
 
-    public void getSession(@NonNull String welinkSessionId, @NonNull SkillCallback<SkillSession> callback) {
-        enqueueEnvelope(requireSkillApiService().getSession(welinkSessionId), SkillSession.class, callback);
+    public void getSession(@NonNull String welinkSessionId, @NonNull SkillCallback<Session> callback) {
+        enqueueEnvelope(requireSkillApiService().getSession(welinkSessionId), Session.class, callback);
     }
 
     public void sendMessage(
             @NonNull String welinkSessionId,
             @NonNull String content,
             @Nullable String toolCallId,
+            @Nullable String questionId,
             @Nullable String subagentSessionId,
+            @Nullable JsonObject businessExtParam,
             @NonNull SkillCallback<SendMessageResult> callback) {
         enqueueEnvelope(requireSkillApiService().sendMessage(
                 welinkSessionId,
                 new SendMessageBody(
                         content,
                         normalizeNonBlank(toolCallId),
-                        normalizeNonBlank(subagentSessionId)
+                        normalizeNonBlank(questionId),
+                        normalizeNonBlank(subagentSessionId),
+                        businessExtParam
                 )
         ), SendMessageResult.class, callback);
     }
@@ -392,11 +399,12 @@ public class ApiClient {
             @NonNull String permId,
             @NonNull String response,
             @Nullable String subagentSessionId,
+            @Nullable JsonObject businessExtParam,
             @NonNull SkillCallback<ReplyPermissionResult> callback) {
         enqueueEnvelope(requireSkillApiService().replyPermission(
                 welinkSessionId,
                 permId,
-                new ReplyPermissionBody(response, normalizeNonBlank(subagentSessionId))
+                new ReplyPermissionBody(response, normalizeNonBlank(subagentSessionId), businessExtParam)
         ), ReplyPermissionResult.class, callback);
     }
 

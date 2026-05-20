@@ -32,7 +32,8 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /**
- * WebSocket connection + listener router.
+ * WebSocket 连接与会话监听分发管理器。
+ * 统一维护底层长连接，并按 welinkSessionId 将服务端 onmessage 事件分发给对应会话监听器。
  */
 public final class WebSocketManager {
     public interface InternalListener {
@@ -70,6 +71,10 @@ public final class WebSocketManager {
     private final CopyOnWriteArrayList<InternalListener> internalListeners = new CopyOnWriteArrayList<>();
     @NonNull
     private final CopyOnWriteArrayList<SkillCallback<Boolean>> pendingConnectCallbacks = new CopyOnWriteArrayList<>();
+    @NonNull
+    private final Map<String, SessionRoundBuffer> roundBuffers = new ConcurrentHashMap<>();
+    @NonNull
+    private final Map<String, ReplayState> replayStates = new ConcurrentHashMap<>();
     @NonNull
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -151,7 +156,22 @@ public final class WebSocketManager {
     }
 
     public void registerListener(@NonNull String welinkSessionId, @NonNull SessionListener listener) {
-        sessionListeners.computeIfAbsent(welinkSessionId, key -> new CopyOnWriteArrayList<>()).addIfAbsent(listener);
+        ReplayState replayState = replayStates.computeIfAbsent(welinkSessionId, key -> new ReplayState());
+        boolean shouldReplay = false;
+        synchronized (replayState) {
+            sessionListeners.computeIfAbsent(welinkSessionId, key -> new CopyOnWriteArrayList<>()).addIfAbsent(listener);
+            SessionRoundBuffer buffer = roundBuffers.get(welinkSessionId);
+            if (buffer != null && !buffer.completed && !replayState.replaying) {
+                // 先将当前会话标记为“正在补发缓存”状态，再让监听器真正参与实时消息分发。
+                // 这样可以兜住一个很小的并发窗口：如果此时服务端刚好又推来一条实时消息，
+                // 该消息不会插到历史补发消息前面，而是先进入 pendingLiveEvents，等补发完成后再顺序下发。
+                replayState.replaying = true;
+                shouldReplay = true;
+            }
+        }
+        if (shouldReplay) {
+            replayBufferedEventsIfNeeded(welinkSessionId, replayState);
+        }
     }
 
     public void unregisterListener(@NonNull String welinkSessionId, @NonNull SessionListener listener) {
@@ -173,6 +193,16 @@ public final class WebSocketManager {
         sessionListeners.clear();
     }
 
+    public void clearRoundBuffer(@NonNull String welinkSessionId) {
+        roundBuffers.remove(welinkSessionId);
+        replayStates.remove(welinkSessionId);
+    }
+
+    public void clearAllRoundBuffers() {
+        roundBuffers.clear();
+        replayStates.clear();
+    }
+
     public boolean hasAnySessionListeners() {
         return !sessionListeners.isEmpty();
     }
@@ -180,6 +210,7 @@ public final class WebSocketManager {
     public synchronized void shutdown() {
         disconnect();
         clearAllListeners();
+        clearAllRoundBuffers();
         internalListeners.clear();
         pendingConnectCallbacks.clear();
         scheduler.shutdownNow();
@@ -211,16 +242,147 @@ public final class WebSocketManager {
         if (sessionId == null || sessionId.trim().isEmpty()) {
             return;
         }
+        appendToRoundBuffer(sessionId, message);
+        if (shouldCompleteCurrentRound(message)) {
+            markRoundCompleted(sessionId);
+        }
         List<SessionListener> listeners = sessionListeners.getOrDefault(sessionId, new CopyOnWriteArrayList<>());
+        if (listeners.isEmpty()) {
+            return;
+        }
+        if (enqueueLiveEventDuringReplay(sessionId, message)) {
+            return;
+        }
+        dispatchToSessionListeners(listeners, message, DELIVERY_MODE_LIVE, false);
+    }
+
+    private void replayBufferedEventsIfNeeded(@NonNull String welinkSessionId, @NonNull ReplayState replayState) {
+        SessionRoundBuffer buffer = roundBuffers.get(welinkSessionId);
+        if (buffer == null || buffer.completed) {
+            synchronized (replayState) {
+                replayState.replaying = false;
+            }
+            return;
+        }
+
+        List<StreamMessage> snapshot;
+        synchronized (buffer) {
+            // 复制一份当前轮次事件快照进行补发，避免补发过程中实时消息继续写入 events 时，
+            // 直接遍历原始列表导致顺序错乱或并发修改问题。
+            snapshot = new ArrayList<>(buffer.events);
+        }
+
+        for (int index = 0; index < snapshot.size(); index++) {
+            StreamMessage message = snapshot.get(index);
+            List<SessionListener> listeners = sessionListeners.getOrDefault(welinkSessionId, new CopyOnWriteArrayList<>());
+            if (listeners.isEmpty()) {
+                synchronized (replayState) {
+                    replayState.replaying = false;
+                }
+                return;
+            }
+            boolean isLastReplayMessage = index == snapshot.size() - 1;
+            dispatchToSessionListeners(listeners, message, DELIVERY_MODE_REPLAY, isLastReplayMessage);
+        }
+        flushPendingReplayEvents(welinkSessionId, replayState);
+    }
+
+    private void flushPendingReplayEvents(@NonNull String welinkSessionId, @NonNull ReplayState replayState) {
+        while (true) {
+            List<StreamMessage> pendingMessages;
+            synchronized (replayState) {
+                if (replayState.pendingLiveEvents.isEmpty()) {
+                    // 只有在确认待补发的实时消息队列已经为空时，才允许退出补发状态。
+                    // 这样可以避免“刚判断为空，立刻又进来一条实时消息”却没人再触发发送的竞态问题。
+                    replayState.replaying = false;
+                    return;
+                }
+                pendingMessages = new ArrayList<>(replayState.pendingLiveEvents);
+                replayState.pendingLiveEvents.clear();
+            }
+            List<SessionListener> listeners = sessionListeners.getOrDefault(welinkSessionId, new CopyOnWriteArrayList<>());
+            if (listeners.isEmpty()) {
+                synchronized (replayState) {
+                    replayState.replaying = false;
+                }
+                return;
+            }
+            for (StreamMessage pendingMessage : pendingMessages) {
+                dispatchToSessionListeners(listeners, pendingMessage, DELIVERY_MODE_LIVE, false);
+            }
+        }
+    }
+
+    private boolean enqueueLiveEventDuringReplay(@NonNull String welinkSessionId, @NonNull StreamMessage message) {
+        ReplayState replayState = replayStates.get(welinkSessionId);
+        if (replayState == null) {
+            return false;
+        }
+        synchronized (replayState) {
+            if (!replayState.replaying) {
+                return false;
+            }
+            // 页面层希望拿到的是一个严格有序的事件流。
+            // 因此补发期间新到的实时消息不能直接透传，而是先排队，等待补发结束后立刻继续下发。
+            replayState.pendingLiveEvents.add(message);
+            return true;
+        }
+    }
+
+    private void dispatchToSessionListeners(
+            @NonNull List<SessionListener> listeners,
+            @NonNull StreamMessage message,
+            @NonNull String deliveryMode,
+            boolean replayDone
+    ) {
         for (SessionListener listener : listeners) {
             try {
-                listener.onMessage(message);
+                listener.onMessage(copyForDelivery(message, deliveryMode, replayDone));
             } catch (Exception callbackError) {
                 SessionError error = new SessionError("CALLBACK_ERROR", callbackError.getMessage() == null
                         ? "Session listener callback failed" : callbackError.getMessage());
                 listener.onError(error);
             }
         }
+    }
+
+    private void appendToRoundBuffer(@NonNull String welinkSessionId, @NonNull StreamMessage message) {
+        SessionRoundBuffer currentBuffer = roundBuffers.get(welinkSessionId);
+        if (currentBuffer == null || currentBuffer.completed) {
+            SessionRoundBuffer nextBuffer = new SessionRoundBuffer(welinkSessionId);
+            roundBuffers.put(welinkSessionId, nextBuffer);
+            currentBuffer = nextBuffer;
+        }
+        synchronized (currentBuffer) {
+            // 这里缓存的是服务端原始 onmessage 事件，且必须保持到达顺序不变。
+            // 后续若页面较晚注册监听器，就可以先补发这一轮“尚未结束”的完整事件序列，
+            // 让页面看到的内容与一开始就在线监听时完全一致。
+            currentBuffer.events.add(message);
+            currentBuffer.updatedAt = System.currentTimeMillis();
+        }
+    }
+
+    private void markRoundCompleted(@NonNull String welinkSessionId) {
+        SessionRoundBuffer buffer = roundBuffers.get(welinkSessionId);
+        if (buffer == null) {
+            return;
+        }
+        synchronized (buffer) {
+            // 一旦识别到当前轮次已经结束，只保留该状态用于下一轮开始时替换旧缓存，
+            // 后续 registerSessionListener 不再补发这一轮缓存，页面应改走历史消息接口。
+            buffer.completed = true;
+            buffer.updatedAt = System.currentTimeMillis();
+        }
+    }
+
+    private boolean shouldCompleteCurrentRound(@NonNull StreamMessage message) {
+        String type = message.getType();
+        if ("session.status".equals(type)) {
+            return "idle".equalsIgnoreCase(message.getSessionStatus());
+        }
+        return "session.error".equals(type)
+                || "error".equals(type)
+                || "agent.offline".equals(type);
     }
 
     @NonNull
@@ -310,12 +472,12 @@ public final class WebSocketManager {
         scheduler.schedule(() -> connect(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean result) {
-                // Reconnected.
+                // 重连成功后恢复连接状态，并继续复用现有监听与缓存能力。
             }
 
             @Override
             public void onError(@NonNull Throwable error) {
-                // Keep retrying.
+                // 连接失败后继续按既定策略重试，直到显式断开或达到上层停止条件。
             }
         }), reconnectIntervalMs, TimeUnit.MILLISECONDS);
     }
@@ -458,6 +620,57 @@ public final class WebSocketManager {
         }
         return null;
     }
+
+    /**
+     * 单个 welinkSessionId 当前轮次的原始事件缓存。
+     * 仅缓存“当前未结束轮次”的服务端报文，不在 SDK 内做聚合，页面层继续沿用现有渲染逻辑。
+     */
+    private static final class SessionRoundBuffer {
+        @NonNull
+        private final String welinkSessionId;
+        @NonNull
+        private final List<StreamMessage> events = new ArrayList<>();
+        private final long createdAt = System.currentTimeMillis();
+        private long updatedAt = createdAt;
+        private boolean completed;
+
+        private SessionRoundBuffer(@NonNull String welinkSessionId) {
+            this.welinkSessionId = welinkSessionId;
+        }
+    }
+
+    /**
+     * 监听器补发期间的过渡状态。
+     * replaying 表示正在补发缓存；pendingLiveEvents 保存补发窗口内新到的实时事件。
+     */
+    private static final class ReplayState {
+        private boolean replaying;
+        @NonNull
+        private final List<StreamMessage> pendingLiveEvents = new ArrayList<>();
+    }
+
+    @NonNull
+    private StreamMessage copyForDelivery(@NonNull StreamMessage source, @NonNull String deliveryMode, boolean replayDone) {
+        // 分发给监听器前基于原始 raw 重新反序列化一个新对象，避免直接修改缓存中的原始消息对象。
+        // 同时这样不需要手写逐字段复制，后续服务端新增字段时，只要 parseMessage 支持即可自动带出。
+        StreamMessage target = source.getRaw() == null
+                ? new StreamMessage()
+                : parseMessage(source.getRaw().toString());
+        if (source.getRaw() == null) {
+            target.setType(source.getType());
+            target.setSeq(source.getSeq());
+            target.setWelinkSessionId(source.getWelinkSessionId());
+            target.setEmittedAt(source.getEmittedAt());
+        }
+        target.setDeliveryMode(deliveryMode);
+        if (replayDone) {
+            target.setReplayDone(Boolean.TRUE);
+        }
+        return target;
+    }
+
+    private static final String DELIVERY_MODE_REPLAY = "replay";
+    private static final String DELIVERY_MODE_LIVE = "live";
 
     private final class InternalWebSocketListener extends WebSocketListener {
         @Override
