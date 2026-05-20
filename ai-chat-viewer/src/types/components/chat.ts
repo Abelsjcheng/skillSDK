@@ -79,6 +79,7 @@ export interface PendingAssistantBubbleProps {
   startedAt: number;
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
+  messageVariant?: 'weAgent' | 'plain';
 }
 
 export interface AvatarImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {

@@ -19,23 +19,27 @@ export const PendingAssistantBubble: React.FC<PendingAssistantBubbleProps> = ({
   startedAt,
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
+  messageVariant = 'weAgent',
 }) => {
   const { t } = useTranslation();
   const assistantName = weAgentAssistantName.trim();
   const messageMetaText = `${assistantName} ${formatMessageTime(startedAt || Date.now())}`.trim();
+  const isPlainVariant = messageVariant === 'plain';
 
   return (
     <div className="message-block message-we-agent message-assistant">
       <div className="we-agent-message we-agent-message--assistant">
-        <div className="we-agent-message__meta is-assistant">
-          <AvatarImage
-            className="we-agent-message__avatar"
-            src={weAgentAssistantAvatar}
-            fallbackSrc={defaultAvatar}
-            alt=""
-          />
-          <span className="we-agent-message__meta-text">{messageMetaText}</span>
-        </div>
+        {!isPlainVariant && (
+          <div className="we-agent-message__meta is-assistant">
+            <AvatarImage
+              className="we-agent-message__avatar"
+              src={weAgentAssistantAvatar}
+              fallbackSrc={defaultAvatar}
+              alt=""
+            />
+            <span className="we-agent-message__meta-text">{messageMetaText}</span>
+          </div>
+        )}
         <div className="we-agent-message__bubble is-assistant is-pending">
           <div className="message-content">
             <div className="we-agent-message__pending">
