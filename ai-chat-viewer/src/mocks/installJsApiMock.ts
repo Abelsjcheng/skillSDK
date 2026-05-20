@@ -976,7 +976,10 @@ function flushPendingReplayEvents(sessionId: string): void {
 
     const pendingMessages = replayState.pendingLiveEvents.splice(0, replayState.pendingLiveEvents.length);
     pendingMessages.forEach((message) => {
-      dispatchToSessionListener(listener, message);
+      dispatchToSessionListener(listener, {
+        ...message,
+        deliveryMode: 'live',
+      });
     });
   }
 }
@@ -1000,8 +1003,12 @@ function replayBufferedEventsIfNeeded(sessionId: string): void {
   }
 
   const snapshot = buffer.events.slice();
-  snapshot.forEach((message) => {
-    dispatchToSessionListener(listener, message);
+  snapshot.forEach((message, index) => {
+    dispatchToSessionListener(listener, {
+      ...message,
+      deliveryMode: 'replay',
+      replayDone: index === snapshot.length - 1 ? true : undefined,
+    });
   });
   flushPendingReplayEvents(sessionId);
 }
@@ -1042,7 +1049,10 @@ function emit(sessionId: string, payload: MockEmitPayload): void {
     return;
   }
 
-  dispatchToSessionListener(listener, message);
+  dispatchToSessionListener(listener, {
+    ...message,
+    deliveryMode: 'live',
+  });
 }
 
 function clearSessionTimers(record: SessionRecord): void {
@@ -2090,9 +2100,9 @@ function createSession(params: CreateNewSessionParams): SkillSession {
     userId: 'mock_user_id',
     ak: params.ak,
     title: params.title ?? `session-${idCounter}`,
-    bussinessDomain: params.bussinessDomain,
-    bussinessType: params.bussinessType,
-    bussinessId: params.bussinessId,
+    bussinessDomain: params.businessSessionDomain,
+    bussinessType: params.businessSessionType,
+    bussinessId: params.businessSessionId,
     assistantAccount: params.assistantAccount,
     status: 'ACTIVE',
     toolSessionId: null,
@@ -2108,9 +2118,9 @@ function createFixedSession(params: CreateNewSessionParams, welinkSessionId: str
     userId: 'mock_user_id',
     ak: params.ak,
     title: params.title ?? welinkSessionId,
-    bussinessDomain: params.bussinessDomain,
-    bussinessType: params.bussinessType,
-    bussinessId: params.bussinessId,
+    bussinessDomain: params.businessSessionDomain,
+    bussinessType: params.businessSessionType,
+    bussinessId: params.businessSessionId,
     assistantAccount: params.assistantAccount,
     status: 'ACTIVE',
     toolSessionId: null,
@@ -2184,10 +2194,10 @@ function seedMockData(): void {
   const seedSession = createFixedSession({
     ak: internalAssistant.appKey,
     title: 'mock-initial-session',
-    bussinessDomain: 'miniapp',
-    bussinessType: 'direct',
+    businessSessionDomain: 'miniapp',
+    businessSessionType: 'direct',
     assistantAccount: internalAssistant.partnerAccount,
-    bussinessId: MOCK_UID,
+    businessSessionId: MOCK_UID,
   }, DEFAULT_SKILL_CUI_WELINK_SESSION_ID);
 
   const seedRecord: SessionRecord = {
@@ -2225,10 +2235,10 @@ function seedMockData(): void {
   const replaySession = createFixedSession({
     ak: internalAssistant.appKey,
     title: 'mock-replay-session',
-    bussinessDomain: 'miniapp',
-    bussinessType: 'direct',
+    businessSessionDomain: 'miniapp',
+    businessSessionType: 'direct',
     assistantAccount: internalAssistant.partnerAccount,
-    bussinessId: MOCK_UID,
+    businessSessionId: MOCK_UID,
   }, DEFAULT_SKILL_CUI_REPLAY_WELINK_SESSION_ID);
 
   const replayRecord: SessionRecord = {
@@ -2760,6 +2770,8 @@ function buildMockApi(): HWH5EXT {
       expireTime: String(Date.now() + 10 * 60 * 1000),
       status: 0,
       expired: false,
+      mac: '',
+      channel: '',
     }),
 
     updateQrcodeInfo: async (): Promise<UpdateQrcodeInfoResult> => ({
@@ -2783,7 +2795,7 @@ function buildMockApi(): HWH5EXT {
         .filter((session) => !params.assistantAccount || session.assistantAccount === params.assistantAccount)
         .filter((session) => !params.status || session.status === params.status)
         .filter((session) => !params.ak || session.ak === params.ak)
-        .filter((session) => !params.bussinessId || session.bussinessId === params.bussinessId)
+        .filter((session) => !params.businessSessionId || session.bussinessId === params.businessSessionId)
         .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 
       const total = filtered.length;
