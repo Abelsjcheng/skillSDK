@@ -2,6 +2,7 @@
   padding: 12px;
   background: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-height: inherit;
 }
 
 .skill-cui .content-wrapper {
@@ -181,4 +182,93 @@
   flex: 1;
   min-height: 0;
   background: #ffffff;
+}
+
+.skill-cui {
+  .message-we-agent {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .we-agent-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+
+    &.we-agent-message--assistant {
+      align-items: flex-start;
+      width: 100%;
+    }
+  }
+
+  .we-agent-message__meta {
+    display: inline-flex;
+    align-items: center;
+
+    > * + * {
+      margin-left: 4px;
+    }
+  }
+
+  .we-agent-message__meta-text {
+    color: rgba(102, 102, 102, 1);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 20px;
+  }
+
+  .we-agent-message__avatar {
+    display: none;
+  }
+
+  .we-agent-message__bubble {
+    margin-top: 4px;
+    word-break: break-word;
+    overflow-wrap: break-word;
+
+    &.is-assistant {
+      margin-top: 8px;
+      width: 100%;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-sizing: border-box;
+
+      &.is-pending {
+        min-height: 22px;
+      }
+    }
+  }
+
+  .we-agent-message__bubble .message-content {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+    color: inherit;
+  }
+
+  .we-agent-message__pending {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+
+    > * + * {
+      margin-left: 8px;
+    }
+  }
+
+  .we-agent-message__pending-icon {
+    width: 16px;
+    height: 16px;
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .we-agent-message__pending-text {
+    color: rgba(51, 51, 51, 1);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 22px;
+  }
 }

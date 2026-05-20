@@ -36,6 +36,8 @@ export function useChatSession({
   onSessionTitleChange,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingAssistantPreview, setPendingAssistantPreview] = useState<PendingAssistantPreview>({
     visible: false,
@@ -59,10 +61,10 @@ export function useChatSession({
   const historyEpochRef = useRef(0);
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
-  const aiReplyFailedTextRef = useRef(t('weAgent.aiReplyFailed'));
+  const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
-  aiReplyFailedTextRef.current = t('weAgent.aiReplyFailed');
+  aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
     setPendingAssistantPreview((prev) => (
@@ -225,12 +227,12 @@ export function useChatSession({
       setHasMoreHistory(nextHasMoreHistory);
     } catch (err) {
       WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(t('weAgent.loadHistoryFailed'));
+      showToast(tRef.current('weAgent.loadHistoryFailed'));
     } finally {
       isLoadingHistoryRef.current = false;
       setIsLoadingHistory(false);
     }
-  }, [mode, t, welinkSessionId]);
+  }, [mode, welinkSessionId]);
 
   const sendUserMessage = useCallback(async (
     content: string,
@@ -238,7 +240,7 @@ export function useChatSession({
     subagentSessionId?: string,
   ) => {
     if (!welinkSessionId) {
-      showToast(t('weAgent.sendMessageWithoutSessionFailed'));
+      showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
@@ -259,7 +261,7 @@ export function useChatSession({
     });
     setScrollToBottomSignal((prev) => prev + 1);
     return result;
-  }, [t, welinkSessionId]);
+  }, [welinkSessionId]);
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
@@ -274,10 +276,10 @@ export function useChatSession({
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, toolCallId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
-      showToast(t('weAgent.submitAnswerFailed'));
+      showToast(tRef.current('weAgent.submitAnswerFailed'));
       throw err;
     }
-  }, [finalizeStreamingMessage, mode, sendUserMessage, t, welinkSessionId]);
+  }, [finalizeStreamingMessage, mode, sendUserMessage, welinkSessionId]);
 
   useEffect(() => {
     activeWelinkSessionIdRef.current = welinkSessionId || null;
@@ -329,12 +331,12 @@ export function useChatSession({
           return;
         }
         WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-        showToast(t('weAgent.loadHistoryFailed'));
+        showToast(tRef.current('weAgent.loadHistoryFailed'));
       }
     };
 
     void loadMessages();
-  }, [mode, resetTransientState, t, welinkSessionId]);
+  }, [mode, resetTransientState, welinkSessionId]);
 
   useEffect(() => {
     if (!welinkSessionId) return;
@@ -625,10 +627,10 @@ export function useChatSession({
       await sendUserMessage(content);
     } catch (err) {
       setSessionStatus('idle');
-      showToast(t('weAgent.sendMessageFailed'));
+      showToast(tRef.current('weAgent.sendMessageFailed'));
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
-  }, [mode, sendUserMessage, t, welinkSessionId]);
+  }, [mode, sendUserMessage, welinkSessionId]);
 
   const onStop = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -639,9 +641,9 @@ export function useChatSession({
       finalizeStreamingMessage();
     } catch (err) {
       WeLog(`useChatSession stopSkill failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(t('weAgent.stopGenerateFailed'));
+      showToast(tRef.current('weAgent.stopGenerateFailed'));
     }
-  }, [finalizeStreamingMessage, mode, t, welinkSessionId]);
+  }, [finalizeStreamingMessage, mode, welinkSessionId]);
 
   const onSendToIM = useCallback(async () => {
     if (!welinkSessionId) return;

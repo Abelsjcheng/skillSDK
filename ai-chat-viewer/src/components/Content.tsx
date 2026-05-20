@@ -192,6 +192,7 @@ export const Content: React.FC<ContentProps> = ({
               startedAt={pendingAssistantPreview.startedAt}
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
+              messageVariant={messageVariant}
             />
           </div>
         ) : null}

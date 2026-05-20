@@ -137,7 +137,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
     controlSkillWeCode: (params) => {
-      window.dispatchEvent(new CustomEvent('agentSkills_controlSkillWecode', {
+      window.dispatchEvent(new CustomEvent('agentSkills_controlSkillWeCode', {
         detail: { action: params.action },
       }));
       return call<ControlSkillWeCodeResponse>('controlSkillWeCode', params);
