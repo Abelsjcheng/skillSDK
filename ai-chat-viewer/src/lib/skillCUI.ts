@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import SkillCUI from '../pages/skillCUI';
 import type { SkillCUIProps } from '../types/pages';
-
+import { ensureLanguageInitialized } from '../i18n/config';
 export type { SkillCUIProps };
 
 const rootMap = new WeakMap<Element, Root>();
@@ -13,7 +13,7 @@ export function mountSkillCUI(container: Element, props?: SkillCUIProps): Root {
     root = createRoot(container);
     rootMap.set(container, root);
   }
-
+  ensureLanguageInitialized();
   root.render(React.createElement(SkillCUI, props));
   return root;
 }
