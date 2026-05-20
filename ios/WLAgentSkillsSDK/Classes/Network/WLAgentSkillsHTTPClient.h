@@ -18,16 +18,19 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 
 - (void)createSessionWithAK:(nullable NSString *)ak
                                             title:(nullable NSString *)title
-                                    imGroupId:(NSString *)imGroupId
+                        businessSessionDomain:(nullable NSString *)businessSessionDomain
+                          businessSessionType:(nullable NSString *)businessSessionType
+                            businessSessionId:(NSString *)businessSessionId
+                            assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)createNewSessionWithAK:(NSString *)ak
+- (void)createNewSessionWithAK:(nullable NSString *)ak
                                         title:(nullable NSString *)title
-                            bussinessDomain:(NSString *)bussinessDomain
-                                bussinessType:(NSString *)bussinessType
-                                    bussinessId:(NSString *)bussinessId
-                            assistantAccount:(NSString *)assistantAccount
+                        businessSessionDomain:(nullable NSString *)businessSessionDomain
+                          businessSessionType:(nullable NSString *)businessSessionType
+                            businessSessionId:(NSString *)businessSessionId
+                            assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
@@ -91,7 +94,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                                 size:(nullable NSNumber *)size
                                             status:(nullable NSString *)status
                                                 ak:(nullable NSString *)ak
-                                    bussinessId:(nullable NSString *)bussinessId
+                            businessSessionId:(nullable NSString *)businessSessionId
                             assistantAccount:(nullable NSString *)assistantAccount
                     businessSessionDomain:(nullable NSString *)businessSessionDomain
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -116,7 +119,9 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId
+                                            questionId:(nullable NSString *)questionId
                                     subagentSessionId:(nullable NSString *)subagentSessionId
+                                      businessExtParam:(nullable NSDictionary *)businessExtParam
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
@@ -128,6 +133,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                                             permId:(NSString *)permId
                                                         response:(NSString *)response
                                             subagentSessionId:(nullable NSString *)subagentSessionId
+                                              businessExtParam:(nullable NSDictionary *)businessExtParam
                                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                                             failure:(WLAgentSkillsHTTPFailureBlock)failure;
 

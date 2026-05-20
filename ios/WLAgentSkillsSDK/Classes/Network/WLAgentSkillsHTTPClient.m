@@ -44,35 +44,53 @@
 
 - (void)createSessionWithAK:(nullable NSString *)ak
                                             title:(nullable NSString *)title
-                                    imGroupId:(NSString *)imGroupId
+                        businessSessionDomain:(nullable NSString *)businessSessionDomain
+                          businessSessionType:(nullable NSString *)businessSessionType
+                            businessSessionId:(NSString *)businessSessionId
+                            assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [@{ @"imGroupId" : imGroupId } mutableCopy];
+    NSMutableDictionary *parameters = [@{ @"businessSessionId" : businessSessionId } mutableCopy];
     if (ak != nil && ak.length > 0) {
         parameters[@"ak"] = ak;
     }
     if (title != nil && title.length > 0) {
         parameters[@"title"] = title;
     }
+    if (businessSessionDomain != nil && businessSessionDomain.length > 0) {
+        parameters[@"businessSessionDomain"] = businessSessionDomain;
+    }
+    if (businessSessionType != nil && businessSessionType.length > 0) {
+        parameters[@"businessSessionType"] = businessSessionType;
+    }
+    if (assistantAccount != nil && assistantAccount.length > 0) {
+        parameters[@"assistantAccount"] = assistantAccount;
+    }
 
     [self POST:@"/api/skill/sessions" parameters:parameters success:success failure:failure];
 }
 
-- (void)createNewSessionWithAK:(NSString *)ak
+- (void)createNewSessionWithAK:(nullable NSString *)ak
                                         title:(nullable NSString *)title
-                            bussinessDomain:(NSString *)bussinessDomain
-                                bussinessType:(NSString *)bussinessType
-                                    bussinessId:(NSString *)bussinessId
-                            assistantAccount:(NSString *)assistantAccount
+                        businessSessionDomain:(nullable NSString *)businessSessionDomain
+                          businessSessionType:(nullable NSString *)businessSessionType
+                            businessSessionId:(NSString *)businessSessionId
+                            assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [@{
-        @"ak" : ak,
-        @"bussinessDomain" : bussinessDomain,
-        @"bussinessType" : bussinessType,
-        @"bussinessId" : bussinessId,
-        @"assistantAccount" : assistantAccount
-    } mutableCopy];
+    NSMutableDictionary *parameters = [@{ @"businessSessionId" : businessSessionId } mutableCopy];
+    if (ak != nil && ak.length > 0) {
+        parameters[@"ak"] = ak;
+    }
+    if (businessSessionDomain != nil && businessSessionDomain.length > 0) {
+        parameters[@"businessSessionDomain"] = businessSessionDomain;
+    }
+    if (businessSessionType != nil && businessSessionType.length > 0) {
+        parameters[@"businessSessionType"] = businessSessionType;
+    }
+    if (assistantAccount != nil && assistantAccount.length > 0) {
+        parameters[@"assistantAccount"] = assistantAccount;
+    }
     if (title != nil && title.length > 0) {
         parameters[@"title"] = title;
     }
@@ -262,7 +280,7 @@
                                                 size:(nullable NSNumber *)size
                                             status:(nullable NSString *)status
                                                 ak:(nullable NSString *)ak
-                                    bussinessId:(nullable NSString *)bussinessId
+                            businessSessionId:(nullable NSString *)businessSessionId
                             assistantAccount:(nullable NSString *)assistantAccount
                     businessSessionDomain:(nullable NSString *)businessSessionDomain
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -280,8 +298,8 @@
     if (ak != nil && ak.length > 0) {
         parameters[@"ak"] = ak;
     }
-    if (bussinessId != nil && bussinessId.length > 0) {
-        parameters[@"bussinessId"] = bussinessId;
+    if (businessSessionId != nil && businessSessionId.length > 0) {
+        parameters[@"businessSessionId"] = businessSessionId;
     }
     if (assistantAccount != nil && assistantAccount.length > 0) {
         parameters[@"assistantAccount"] = assistantAccount;
@@ -330,7 +348,9 @@
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId
+                                            questionId:(nullable NSString *)questionId
                                     subagentSessionId:(nullable NSString *)subagentSessionId
+                                      businessExtParam:(nullable NSDictionary *)businessExtParam
                                                     success:(WLAgentSkillsHTTPSuccessBlock)success
                                                     failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/messages", welinkSessionId];
@@ -338,8 +358,14 @@
     if (toolCallId != nil && toolCallId.length > 0) {
         parameters[@"toolCallId"] = toolCallId;
     }
+    if (questionId != nil && questionId.length > 0) {
+        parameters[@"questionId"] = questionId;
+    }
     if (subagentSessionId != nil && subagentSessionId.length > 0) {
         parameters[@"subagentSessionId"] = subagentSessionId;
+    }
+    if (businessExtParam != nil && businessExtParam.count > 0) {
+        parameters[@"businessExtParam"] = businessExtParam;
     }
     [self POST:path parameters:parameters success:success failure:failure];
 }
@@ -355,12 +381,16 @@
                                                             permId:(NSString *)permId
                                                         response:(NSString *)response
                                             subagentSessionId:(nullable NSString *)subagentSessionId
+                                              businessExtParam:(nullable NSDictionary *)businessExtParam
                                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
     NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/permissions/%@", welinkSessionId, permId];
     NSMutableDictionary *parameters = [@{ @"response" : response } mutableCopy];
     if (subagentSessionId != nil && subagentSessionId.length > 0) {
         parameters[@"subagentSessionId"] = subagentSessionId;
+    }
+    if (businessExtParam != nil && businessExtParam.count > 0) {
+        parameters[@"businessExtParam"] = businessExtParam;
     }
     [self POST:path parameters:parameters success:success failure:failure];
 }

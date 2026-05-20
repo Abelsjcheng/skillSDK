@@ -21,7 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 1. createSession
 - (void)createSession:(WLAgentSkillsCreateSessionParams *)params
-                            success:(void (^)(WLAgentSkillsSkillSession *session))success
+                            success:(void (^)(WLAgentSkillsSession *session))success
                             failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 2. closeSkill (local WebSocket only)
@@ -82,12 +82,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 14. createNewSession
 - (void)createNewSession:(WLAgentSkillsCreateNewSessionParams *)params
-                success:(void (^)(WLAgentSkillsSkillSession *session))success
+                success:(void (^)(WLAgentSkillsSession *session))success
                 failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 15. getHistorySessionsList
 - (void)getHistorySessionsList:(WLAgentSkillsHistorySessionsParams *)params
-                        success:(void (^)(WLAgentSkillsSkillSessionPageResult *result))success
+                        success:(void (^)(WLAgentSkillsSessionPageResult *result))success
                         failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 16. createDigitalTwin

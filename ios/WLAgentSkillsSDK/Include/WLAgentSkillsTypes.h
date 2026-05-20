@@ -46,16 +46,19 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @interface WLAgentSkillsCreateSessionParams : NSObject
 @property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
-@property (nonatomic, copy) NSString *imGroupId;
+@property (nonatomic, copy, nullable) NSString *businessSessionDomain;
+@property (nonatomic, copy) NSString *businessSessionId;
+@property (nonatomic, copy, nullable) NSString *businessSessionType;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
 @end
 
 @interface WLAgentSkillsCreateNewSessionParams : NSObject
-@property (nonatomic, copy) NSString *ak;
+@property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
-@property (nonatomic, copy) NSString *bussinessDomain;
-@property (nonatomic, copy) NSString *bussinessType;
-@property (nonatomic, copy) NSString *bussinessId;
-@property (nonatomic, copy) NSString *assistantAccount;
+@property (nonatomic, copy, nullable) NSString *businessSessionDomain;
+@property (nonatomic, copy, nullable) NSString *businessSessionType;
+@property (nonatomic, copy) NSString *businessSessionId;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
 @end
 
 @interface WLAgentSkillsHistorySessionsParams : NSObject
@@ -63,7 +66,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, strong, nullable) NSNumber *size;
 @property (nonatomic, copy, nullable) NSString *status;
 @property (nonatomic, copy, nullable) NSString *ak;
-@property (nonatomic, copy, nullable) NSString *bussinessId;
+@property (nonatomic, copy, nullable) NSString *businessSessionId;
 @property (nonatomic, copy, nullable) NSString *assistantAccount;
 @property (nonatomic, copy, nullable) NSString *businessSessionDomain;
 @end
@@ -119,7 +122,9 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *content;
 @property (nonatomic, copy, nullable) NSString *toolCallId;
+@property (nonatomic, copy, nullable) NSString *questionId;
 @property (nonatomic, copy, nullable) NSString *subagentSessionId;
+@property (nonatomic, strong, nullable) NSDictionary *businessExtParam;
 @end
 
 @interface WLAgentSkillsReplyPermissionParams : NSObject
@@ -127,6 +132,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *permId;
 @property (nonatomic, copy) NSString *response;
 @property (nonatomic, copy, nullable) NSString *subagentSessionId;
+@property (nonatomic, strong, nullable) NSDictionary *businessExtParam;
 @end
 
 @interface WLAgentSkillsControlSkillWeCodeParams : NSObject
@@ -211,15 +217,15 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 
 #pragma mark - Data Models
 
-@interface WLAgentSkillsSkillSession : NSObject
+@interface WLAgentSkillsSession : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *userId;
 @property (nonatomic, copy, nullable) NSString *ak;
 @property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy, nullable) NSString *imGroupId;
-@property (nonatomic, copy, nullable) NSString *bussinessDomain;
-@property (nonatomic, copy, nullable) NSString *bussinessType;
-@property (nonatomic, copy, nullable) NSString *bussinessId;
+@property (nonatomic, copy, nullable) NSString *businessSessionDomain;
+@property (nonatomic, copy, nullable) NSString *businessSessionType;
+@property (nonatomic, copy, nullable) NSString *businessSessionId;
 @property (nonatomic, copy, nullable) NSString *assistantAccount;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, copy, nullable) NSString *toolSessionId;
@@ -244,6 +250,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy, nullable) NSString *header;
 @property (nonatomic, copy, nullable) NSString *question;
+@property (nonatomic, copy, nullable) NSString *questionId;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
 @property (nonatomic, copy, nullable) NSString *permissionId;
 @property (nonatomic, copy, nullable) NSString *permType;
@@ -299,8 +306,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 - (NSDictionary *)toDictionary;
 @end
 
-@interface WLAgentSkillsSkillSessionPageResult : NSObject
-@property (nonatomic, strong) NSArray<WLAgentSkillsSkillSession *> *content;
+@interface WLAgentSkillsSessionPageResult : NSObject
+@property (nonatomic, strong) NSArray<WLAgentSkillsSession *> *content;
 @property (nonatomic, strong) NSNumber *page;
 @property (nonatomic, strong) NSNumber *size;
 @property (nonatomic, strong) NSNumber *total;
@@ -445,6 +452,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *subagentName;
 @property (nonatomic, strong, nullable) NSArray *messages;
 @property (nonatomic, strong, nullable) NSArray *parts;
+@property (nonatomic, copy, nullable) NSString *deliveryMode;
+@property (nonatomic, assign) BOOL replayDone;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;

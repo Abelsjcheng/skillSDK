@@ -216,7 +216,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 #pragma mark - Data Models
 
-@implementation WLAgentSkillsSkillSession
+@implementation WLAgentSkillsSession
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
@@ -226,9 +226,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _ak = WLAgentSkillsStringValue(dictionary[@"ak"], nil);
         _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
         _imGroupId = WLAgentSkillsStringValue(dictionary[@"imGroupId"], nil);
-        _bussinessDomain = WLAgentSkillsStringValue(dictionary[@"bussinessDomain"], nil);
-        _bussinessType = WLAgentSkillsStringValue(dictionary[@"bussinessType"], nil);
-        _bussinessId = WLAgentSkillsStringValue(dictionary[@"bussinessId"], nil);
+        _businessSessionDomain = WLAgentSkillsStringValue(dictionary[@"businessSessionDomain"], nil);
+        _businessSessionType = WLAgentSkillsStringValue(dictionary[@"businessSessionType"], nil);
+        _businessSessionId = WLAgentSkillsStringValue(dictionary[@"businessSessionId"], nil);
         _assistantAccount = WLAgentSkillsStringValue(dictionary[@"assistantAccount"], nil);
         _status = WLAgentSkillsStringValue(dictionary[@"status"], @"");
         _toolSessionId = WLAgentSkillsStringValue(dictionary[@"toolSessionId"], nil);
@@ -245,9 +245,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"ak" : WLAgentSkillsNullObject(self.ak),
         @"title" : WLAgentSkillsNullObject(self.title),
         @"imGroupId" : WLAgentSkillsNullObject(self.imGroupId),
-        @"bussinessDomain" : WLAgentSkillsNullObject(self.bussinessDomain),
-        @"bussinessType" : WLAgentSkillsNullObject(self.bussinessType),
-        @"bussinessId" : WLAgentSkillsNullObject(self.bussinessId),
+        @"businessSessionDomain" : WLAgentSkillsNullObject(self.businessSessionDomain),
+        @"businessSessionType" : WLAgentSkillsNullObject(self.businessSessionType),
+        @"businessSessionId" : WLAgentSkillsNullObject(self.businessSessionId),
         @"assistantAccount" : WLAgentSkillsNullObject(self.assistantAccount),
         @"status" : self.status ?: @"",
         @"toolSessionId" : WLAgentSkillsNullObject(self.toolSessionId),
@@ -469,6 +469,10 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
     _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
+    _questionId = WLAgentSkillsStringValue(
+        dictionary[@"questionId"],
+        WLAgentSkillsStringValue(dictionary[@"requestId"], nil)
+    );
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
     _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
     _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
@@ -523,6 +527,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     }
     if (self.question != nil && self.question.length > 0) {
     dictionary[@"question"] = self.question;
+    }
+    if (self.questionId != nil && self.questionId.length > 0) {
+    dictionary[@"questionId"] = self.questionId;
     }
     if (self.options != nil && self.options.count > 0) {
     dictionary[@"options"] = self.options;
@@ -700,17 +707,17 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
-@implementation WLAgentSkillsSkillSessionPageResult
+@implementation WLAgentSkillsSessionPageResult
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [super init];
     if (self) {
-        NSMutableArray<WLAgentSkillsSkillSession *> *sessions = [NSMutableArray array];
+        NSMutableArray<WLAgentSkillsSession *> *sessions = [NSMutableArray array];
         for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"content"])) {
             if (![item isKindOfClass:[NSDictionary class]]) {
                 continue;
             }
-            [sessions addObject:[[WLAgentSkillsSkillSession alloc] initWithDictionary:item]];
+            [sessions addObject:[[WLAgentSkillsSession alloc] initWithDictionary:item]];
         }
         _content = [sessions copy];
         _page = WLAgentSkillsNumberValue(dictionary[@"page"], WLAgentSkillsNumberValue(dictionary[@"number"], @0));
@@ -815,6 +822,10 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
     _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
+    _questionId = WLAgentSkillsStringValue(
+        dictionary[@"questionId"],
+        WLAgentSkillsStringValue(dictionary[@"requestId"], nil)
+    );
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
     _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
     _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
@@ -831,6 +842,10 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _subagentName = WLAgentSkillsStringValue(dictionary[@"subagentName"], nil);
     _messages = [dictionary[@"messages"] isKindOfClass:[NSArray class]] ? dictionary[@"messages"] : nil;
     _parts = [dictionary[@"parts"] isKindOfClass:[NSArray class]] ? dictionary[@"parts"] : nil;
+    _deliveryMode = WLAgentSkillsStringValue(dictionary[@"deliveryMode"], nil);
+    _replayDone = [dictionary[@"replayDone"] respondsToSelector:@selector(boolValue)]
+        ? [dictionary[@"replayDone"] boolValue]
+        : NO;
     }
     return self;
 }
@@ -858,6 +873,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"title" : WLAgentSkillsNullObject(self.title),
         @"header" : WLAgentSkillsNullObject(self.header),
         @"question" : WLAgentSkillsNullObject(self.question),
+        @"questionId" : WLAgentSkillsNullObject(self.questionId),
         @"options" : WLAgentSkillsNullObject(self.options),
         @"fileName" : WLAgentSkillsNullObject(self.fileName),
         @"fileUrl" : WLAgentSkillsNullObject(self.fileUrl),
@@ -873,7 +889,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"subagentSessionId" : WLAgentSkillsNullObject(self.subagentSessionId),
         @"subagentName" : WLAgentSkillsNullObject(self.subagentName),
         @"messages" : WLAgentSkillsNullObject(self.messages),
-        @"parts" : WLAgentSkillsNullObject(self.parts)
+        @"parts" : WLAgentSkillsNullObject(self.parts),
+        @"deliveryMode" : WLAgentSkillsNullObject(self.deliveryMode),
+        @"replayDone" : @(self.replayDone)
     };
 }
 
