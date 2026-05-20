@@ -55,7 +55,7 @@ import {
   SessionStatus,
   SkillSDKConfig,
   SkillSdkException,
-  SkillSession,
+  Session,
   SkillWecodeStatus,
   SkillWeCodeAction,
   StopSkillParams,
@@ -145,6 +145,7 @@ export class SkillSDK {
     try {
       await SkillSDK.instance.wsManager.disconnect();
       SkillSDK.instance.wsManager.clearAllListeners();
+      SkillSDK.instance.wsManager.clearAllRoundBuffers();
       SkillSDK.instance.sessionStateManager.clearAll();
       SkillSDK.instance.weCodeStateManager.clearAll();
       SkillSDK.instance.assistantDetailUpdatedCallbacks.clear();
@@ -172,12 +173,26 @@ export class SkillSDK {
   }
 
   // 1. createSession
-  async createSession(params: CreateSessionParams): Promise<SkillSession> {
+  async createSession(params: CreateSessionParams): Promise<Session> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireString(params.imGroupId, 'imGroupId');
       const ak = this.normalizeOptionalString(params.ak);
-      const imGroupId = params.imGroupId.trim();
+      const businessSessionId = TypeConverter.toRequiredString(
+        params.businessSessionId,
+        'businessSessionId'
+      );
+      const assistantAccount = TypeConverter.toOptionalString(
+        params.assistantAccount,
+        'assistantAccount'
+      );
+      const businessSessionDomain = TypeConverter.toOptionalString(
+        params.businessSessionDomain,
+        'businessSessionDomain'
+      );
+      const businessSessionType = TypeConverter.toOptionalString(
+        params.businessSessionType,
+        'businessSessionType'
+      );
       if (params.ak !== undefined && ak === undefined) {
         throw new SkillSdkException(1000, 'ak must be a non-empty string');
       }
@@ -188,29 +203,48 @@ export class SkillSDK {
       await this.wsManager.connect();
 
       const query: Record<string, string | number> = {
-        imGroupId,
-        status: 'ACTIVE',
         page: 0,
-        size: 20
+        size: 50,
+        businessSessionId
       };
+      if (businessSessionDomain !== undefined) {
+        query.businessSessionDomain = businessSessionDomain;
+      }
+      if (businessSessionType !== undefined) {
+        query.businessSessionType = businessSessionType;
+      }
       if (ak !== undefined) {
         query.ak = ak;
       }
-      const sessionList = await this.httpClient.get<PageResult<SkillSession>>('/api/skill/sessions', query);
-      const active = sessionList.content ?? [];
-      if (active.length > 0) {
-        return this.pickLatestSession(active);
+      if (assistantAccount !== undefined) {
+        query.assistantAccount = assistantAccount;
+      }
+      const sessionList = await this.fetchServerSessions(query, 0, 50);
+      const reusable = this.pickLatestSession(sessionList.content ?? []);
+      if (reusable !== null) {
+        return reusable;
       }
 
-      const payload: Record<string, Object> = {};
+      const payload: Record<string, Object> = {
+        businessSessionId
+      };
+      if (businessSessionDomain !== undefined) {
+        payload.businessSessionDomain = businessSessionDomain;
+      }
+      if (businessSessionType !== undefined) {
+        payload.businessSessionType = businessSessionType;
+      }
       if (ak !== undefined) {
         payload.ak = ak;
       }
       if (params.title !== undefined) {
         payload.title = params.title;
       }
-      payload.imGroupId = imGroupId;
-      return await this.httpClient.post<SkillSession>('/api/skill/sessions', payload);
+      if (assistantAccount !== undefined) {
+        payload.assistantAccount = assistantAccount;
+      }
+
+      return await this.httpClient.post<Session>('/api/skill/sessions', payload);
     } catch (error) {
       throw this.normalizeError('createSession', error);
     }
@@ -224,6 +258,7 @@ export class SkillSDK {
       }
       await this.wsManager.disconnect();
       this.wsManager.clearAllListeners();
+      this.wsManager.clearAllRoundBuffers();
       this.sessionStateManager.clearAll();
       this.weCodeStateManager.clearAll();
       this.assistantDetailUpdatedCallbacks.clear();
@@ -418,6 +453,9 @@ export class SkillSDK {
       if (params.toolCallId !== undefined) {
         Validator.requireString(params.toolCallId, 'toolCallId');
       }
+      if (params.questionId !== undefined) {
+        Validator.requireString(params.questionId, 'questionId');
+      }
       if (params.subagentSessionId !== undefined) {
         Validator.requireString(params.subagentSessionId, 'subagentSessionId');
       }
@@ -433,8 +471,14 @@ export class SkillSDK {
       if (params.toolCallId !== undefined) {
         payload.toolCallId = params.toolCallId;
       }
+      if (params.questionId !== undefined) {
+        payload.questionId = params.questionId;
+      }
       if (params.subagentSessionId !== undefined) {
         payload.subagentSessionId = params.subagentSessionId;
+      }
+      if (params.businessExtParam !== undefined) {
+        payload.businessExtParam = params.businessExtParam;
       }
 
       const result = await this.httpClient.post<SendMessageResult>(
@@ -469,6 +513,9 @@ export class SkillSDK {
       if (params.subagentSessionId !== undefined) {
         payload.subagentSessionId = params.subagentSessionId;
       }
+      if (params.businessExtParam !== undefined) {
+        payload.businessExtParam = params.businessExtParam;
+      }
 
       return await this.httpClient.post<ReplyPermissionResult>(
         `/api/skill/sessions/${params.welinkSessionId}/permissions/${params.permId}`,
@@ -502,37 +549,55 @@ export class SkillSDK {
   }
 
   // 14. createNewSession
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
     try {
       Validator.requireObject(params, 'params');
-      const ak = TypeConverter.toRequiredString(params.ak, 'ak');
-      const bussinessDomain = TypeConverter.toRequiredString(params.bussinessDomain, 'bussinessDomain');
-      const bussinessType = TypeConverter.toRequiredString(params.bussinessType, 'bussinessType');
-      const bussinessId = TypeConverter.toRequiredString(params.bussinessId, 'bussinessId');
-      const assistantAccount = TypeConverter.toRequiredString(params.assistantAccount, 'assistantAccount');
+      // createNewSession 按最新文档要求 businessSessionId 必传。
+      const businessSessionId = TypeConverter.toRequiredString(
+        params.businessSessionId,
+        'businessSessionId'
+      );
+      const ak = TypeConverter.toOptionalString(params.ak, 'ak');
+      const businessSessionDomain = TypeConverter.toOptionalString(
+        params.businessSessionDomain,
+        'businessSessionDomain'
+      );
+      const businessSessionType = TypeConverter.toOptionalString(
+        params.businessSessionType,
+        'businessSessionType'
+      );
+      const assistantAccount = TypeConverter.toOptionalString(params.assistantAccount, 'assistantAccount');
       const title = TypeConverter.toOptionalString(params.title, 'title');
 
       await this.ensureWebSocketConnected();
 
       const payload: Record<string, Object> = {
-        ak,
-        bussinessDomain,
-        bussinessType,
-        bussinessId,
-        assistantAccount
+        businessSessionId
       };
+      if (ak !== undefined) {
+        payload.ak = ak;
+      }
+      if (businessSessionDomain !== undefined) {
+        payload.businessSessionDomain = businessSessionDomain;
+      }
+      if (businessSessionType !== undefined) {
+        payload.businessSessionType = businessSessionType;
+      }
+      if (assistantAccount !== undefined) {
+        payload.assistantAccount = assistantAccount;
+      }
       if (title !== undefined) {
         payload.title = title;
       }
 
-      return await this.httpClient.post<SkillSession>('/api/skill/sessions', payload);
+      return await this.httpClient.post<Session>('/api/skill/sessions', payload);
     } catch (error) {
       throw this.normalizeError('createNewSession', error);
     }
   }
 
   // 15. getHistorySessionsList
-  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>> {
+  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>> {
     try {
       Validator.requireObject(params, 'params');
       const page = TypeConverter.toNonNegativeInt(params.page, 0, 'page');
@@ -548,7 +613,10 @@ export class SkillSDK {
       }
 
       const ak = TypeConverter.toOptionalString(params.ak, 'ak');
-      const bussinessId = TypeConverter.toOptionalString(params.bussinessId, 'bussinessId');
+      const businessSessionId = TypeConverter.toOptionalString(
+        params.businessSessionId,
+        'businessSessionId'
+      );
       const assistantAccount = TypeConverter.toOptionalString(params.assistantAccount, 'assistantAccount');
       let businessSessionDomain = TypeConverter.toOptionalString(
         params.businessSessionDomain,
@@ -571,8 +639,8 @@ export class SkillSDK {
       if (ak !== undefined) {
         query.ak = ak;
       }
-      if (bussinessId !== undefined) {
-        query.bussinessId = bussinessId;
+      if (businessSessionId !== undefined) {
+        query.businessSessionId = businessSessionId;
       }
       if (assistantAccount !== undefined) {
         query.assistantAccount = assistantAccount;
@@ -1275,23 +1343,9 @@ export class SkillSDK {
     query: Record<string, string | number>,
     page: number,
     size: number
-  ): Promise<PageResult<SkillSession>> {
-    const result = await this.httpClient.get<Record<string, Object>>('/api/skill/sessions', query);
-    const content = Array.isArray(result.content) ? (result.content as SkillSession[]) : [];
-    const resolvedPage = Number(result.page ?? result.number ?? page);
-    const resolvedSize = Number(result.size ?? size);
-    const resolvedTotal = Number(result.total ?? result.totalElements ?? content.length);
-    const resolvedTotalPages = Number(result.totalPages);
-
-    return {
-      content,
-      page: Number.isFinite(resolvedPage) ? resolvedPage : page,
-      size: Number.isFinite(resolvedSize) && resolvedSize > 0 ? resolvedSize : size,
-      total: Number.isFinite(resolvedTotal) && resolvedTotal >= 0 ? resolvedTotal : content.length,
-      totalPages: Number.isFinite(resolvedTotalPages) && resolvedTotalPages >= 0
-        ? resolvedTotalPages
-        : 0
-    };
+  ): Promise<PageResult<Session>> {
+    const result = await this.httpClient.get<PageResult<Session>>('/api/skill/sessions', query);
+    return result;
   }
 
   private normalizeCreateDigitalTwinResult(result: Record<string, Object>): CreateDigitalTwinResult {
@@ -1591,8 +1645,12 @@ export class SkillSDK {
     return { success: false };
   }
 
-  private pickLatestSession(sessions: SkillSession[]): SkillSession {
-    const sorted = [...sessions].sort((a: SkillSession, b: SkillSession) => {
+  private pickLatestSession(sessions: Session[]): Session | null {
+    const candidates = sessions.filter((session: Session) => session.status !== 'CLOSED');
+    if (candidates.length === 0) {
+      return null;
+    }
+    const sorted = candidates.slice().sort((a: Session, b: Session) => {
       const left = Number.isNaN(Date.parse(a.updatedAt)) ? 0 : Date.parse(a.updatedAt);
       const right = Number.isNaN(Date.parse(b.updatedAt)) ? 0 : Date.parse(b.updatedAt);
       return right - left;
