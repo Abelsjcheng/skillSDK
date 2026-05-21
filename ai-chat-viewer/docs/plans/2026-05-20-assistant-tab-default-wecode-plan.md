@@ -1,44 +1,45 @@
-# 助理 Tab 默认展示助手 We 码方案
+# 助理 Tab 默认展示主 Agent 方案
 
 - 方案日期：2026-05-20
 - 目标工程：`ai-chat-viewer`
-- 参考文档：`SkillClientSdkInterfaceV2.md`
-- 方案类型：SDK V2 URI 返回策略调整方案
+- 相关文档：`SkillClientSdkInterfaceV2.md`
+- 方案类型：助理 Tab 默认入口与主 Agent 展示策略调整方案
 
 ## 1. 背景
 
 ### 1.1 场景说明
 
-当前助理 tab 的页面打开入口依赖 SDK V2 的 `getWeAgentUri` 返回值。
+当前助理 Tab 的打开入口依赖 SDK V2 `getWeAgentUri` 返回的 URI，前端再根据 URI 打开对应页面。
 
-现状下：
+现状存在以下问题：
 
-1. 当 SDK 能读取到持久化的当前助理详情时，会基于助理详情组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`。
-2. 当 SDK 读取不到持久化助理详情时，`weAgentUri` 的 fallback 会返回：
-   - `h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`
-3. 同时 `assistantDetailUri`、`switchAssistantUri` 在该场景下返回空字符串。
-
-这会导致助理 tab 首次打开时，默认进入激活页，而不是直接进入固定的助手地址；同时右上角 `+` 菜单依赖的“助理详情”“切换助理”地址也无法返回。
+1. 首次打开助理 Tab 时，默认入口与“主 agent”概念未完全对齐。
+2. 当本地没有当前助理缓存时，容易进入激活页，无法直接围绕“主 agent”提供统一体验。
+3. 助理详情页、切换助理页、激活页、IM + 号入口之间，对“主 agent”“历史助手分身”“创建入口”的规则不一致。
+4. 新版场景要求弱化“创建助理”入口，但当前多处页面和宿主行为仍可能暴露该入口。
 
 ### 1.2 需求目标
 
-本次方案目标调整为：
+本次方案目标如下：
 
-1. 调整 `SkillClientSdkInterfaceV2.md` 中 `getWeAgentUri` 的实现规则。
-2. 若 SDK 读取不到持久化助理详情：
-   - `weAgentUri` 返回固定的助手地址
-   - `assistantDetailUri` 返回对应助理详情地址
-   - `switchAssistantUri` 返回对应切换助理地址
-3. 通过 SDK 返回值策略调整，实现助理 tab 默认不再进入激活页。
+1. 首次打开助理 Tab 时，默认展示助手主 agent。
+2. 若用户没有主 agent，则展示激活页面，但激活页只允许跳转“选择助手”页面，不再跳转“创建助手”页面。
+3. 助理 Tab 右上角显示 `+` 菜单，菜单项为“助理详情”“切换助理”。
+4. 首次打开助理 Tab 时显示引导图。
+5. 助理详情页返回并展示主 agent 信息，且主 agent 不显示创建人等信息，不允许编辑和删除。
+6. 切换助理页固定将主 agent 展示在第一位，同时保留历史助手分身切换能力，并调整主 agent 的 tag 文案。
+7. 新版 IM `+` 号场景和激活页不再暴露“创建助理”入口；历史版本仍可能存在入口，但由服务端控制失败返回。
+8. 扫码注册入口保持不变。
+9. 设置页开关和 IM 激活 Tab 行为保持支持：打开主 agent 时跳主 agent，打开助手分身时跳对应分身。
 
 ### 1.3 非目标
 
 本次方案不包含以下内容：
 
-1. 不调整 `SkillClientSdkInterfaceV1.md`。
-2. 不新增前端独立首页页面。
-3. 不修改 `weAgentCUI` 消息渲染逻辑。
-4. 不修改助理详情页和切换助理页自身的页面结构。
+1. 不调整 `weAgentCUI` 内部消息渲染逻辑。
+2. 不调整扫码注册的业务链路和页面结构。
+3. 不新增“重新创建主 agent”的新业务流程。
+4. 不改动历史助手分身的会话消息协议。
 
 ## 2. 方案图
 
@@ -46,52 +47,58 @@
 
 ```mermaid
 flowchart TD
-    A["宿主打开助理 Tab"] --> B["调用 SDK getWeAgentUri"]
-    B --> C{"是否读到持久化助理详情"}
-    C -- 是 --> D["按当前助理详情组装 weAgentUri / assistantDetailUri / switchAssistantUri"]
-    C -- 否 --> E["返回固定助手地址 weAgentUri"]
-    E --> F["返回固定助理详情地址 assistantDetailUri"]
-    E --> G["返回固定切换助理地址 switchAssistantUri"]
-    D --> H["宿主根据返回 URI 打开页面"]
-    F --> H
-    G --> H
+    A["用户打开助理 Tab"] --> B["宿主调用 SDK getWeAgentUri"]
+    B --> C{"是否存在主 agent / 当前助理详情"}
+    C -- 有主 agent --> D["返回主 agent 对应 weAgentUri"]
+    C -- 无主 agent --> E["返回 activateAssistant 地址"]
+    D --> F["打开主 agent 页面"]
+    E --> G["打开激活页"]
+    F --> H["右上角 + 提供 助理详情 / 切换助理"]
+    G --> I["仅允许去选择助手页"]
+    F --> J["首次打开展示引导图"]
+    H --> K["助理详情页展示主 agent 只读信息"]
+    H --> L["切换助理页首位固定主 agent"]
 ```
 
 ### 2.2 方案核心
 
-本次不通过前端新增页面改变默认入口，而是通过 `getWeAgentUri` 的 fallback 返回值来控制助理 tab 的默认落点。
+本次方案核心不是单纯修改一个 fallback URI，而是统一“主 agent”在助理体系中的默认入口与页面规则。
 
-调整后：
+统一原则如下：
 
-1. SDK 有持久化助理详情时，行为保持不变。
-2. SDK 无持久化助理详情时，不再返回 `activateAssistant` 地址。
-3. SDK 无持久化助理详情时，仍然必须返回完整可用的：
-   - `weAgentUri`
-   - `assistantDetailUri`
-   - `switchAssistantUri`
+1. 助理 Tab 默认围绕主 agent 打开。
+2. 没有主 agent 时才进入激活页。
+3. 激活页不再承载创建助理入口，只保留选择助手能力。
+4. 主 agent 在详情页和切换页均视为特殊只读对象。
+5. 历史助手分身仍保留切换与打开能力。
 
 ## 3. 时序图
 
-### 3.1 打开助理 tab
+### 3.1 首次打开助理 Tab
 
 ```mermaid
 sequenceDiagram
-    participant Host as 宿主
+    participant User as 用户
+    participant Host as 宿主/前端
     participant SDK as Skill SDK V2
     participant Storage as 本地持久化
+    participant Server as 服务端
 
+    User->>Host: 打开助理 Tab
     Host->>SDK: 调用 getWeAgentUri()
-    SDK->>Storage: 读取 current_we_agent_detail
-    alt 读取到持久化助理详情
-        Storage-->>SDK: 返回助理详情
-        SDK->>SDK: 按助理详情组装三个 URI
-        SDK-->>Host: 返回 weAgentUri / assistantDetailUri / switchAssistantUri
-    else 读取不到持久化助理详情
+    SDK->>Storage: 读取当前助理详情/主 agent 信息
+    alt 本地已有主 agent 或当前助理详情
+        Storage-->>SDK: 返回主 agent 信息
+        SDK-->>Host: 返回主 agent weAgentUri + 详情页 URI + 切换页 URI
+        Host->>Host: 打开主 agent 页面
+        Host->>Host: 首次进入展示引导图
+    else 本地无主 agent
         Storage-->>SDK: 返回空
-        SDK->>SDK: 返回固定助手地址和固定详情/切换地址
-        SDK-->>Host: 返回 weAgentUri / assistantDetailUri / switchAssistantUri
+        SDK-->>Host: 返回 activateAssistant 地址 + 详情页 URI + 切换页 URI
+        Host->>Host: 打开激活页
+        Host->>Host: 激活页仅允许跳转选择助手页
+        Host->>Host: 首次进入展示引导图
     end
-    Host->>Host: 根据 URI 打开助理 tab
 ```
 
 ### 3.2 点击右上角 `+`
@@ -100,178 +107,253 @@ sequenceDiagram
 sequenceDiagram
     participant User as 用户
     participant Host as 宿主/前端
-    participant SDK as Skill SDK V2
 
     User->>Host: 点击右上角 +
     Host->>Host: 展示菜单
     alt 点击助理详情
-        Host->>SDK: 使用 assistantDetailUri
-        SDK-->>Host: 返回助理详情地址
-        Host->>Host: 打开 assistantDetail
+        Host->>Host: 打开助理详情页
+        Host->>Host: 展示主 agent 信息，隐藏编辑/删除
     else 点击切换助理
-        Host->>SDK: 使用 switchAssistantUri
-        SDK-->>Host: 返回切换助理地址
-        Host->>Host: 打开 switchAssistant
+        Host->>Host: 打开切换助理页
+        Host->>Host: 列表首位固定主 agent，后续展示历史助手分身
+    end
+```
+
+### 3.3 IM 或设置页打开助理
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant IM as IM/设置页
+    participant Host as 宿主/前端
+
+    User->>IM: 从 IM 或设置页打开助理
+    alt 打开的是主 agent
+        IM->>Host: 传入主 agent 标识
+        Host->>Host: 跳转主 agent 页面
+    else 打开的是助手分身
+        IM->>Host: 传入分身标识
+        Host->>Host: 跳转对应分身页面
     end
 ```
 
 ## 4. 技术细节
 
-### 4.1 调整点
+### 4.1 助理 Tab 默认入口策略
 
-本次仅调整 `SkillClientSdkInterfaceV2.md` 中 `getWeAgentUri` 的 fallback 规则。
+`SkillClientSdkInterfaceV2.md` 中 `getWeAgentUri` 的实现口径需要调整为：
 
-重点修改如下：
+1. 若能识别到主 agent 或当前助理详情，默认返回主 agent 对应的 `weAgentUri`。
+2. 若无法识别到主 agent，返回激活页地址。
+3. 不再采用“无缓存即默认固定主 agent 页面”的旧目标。
+4. `assistantDetailUri` 和 `switchAssistantUri` 仍需可返回可打开的页面地址，供右上角 `+` 菜单使用。
 
-1. 若读取不到持久化助理详情：
-   - `weAgentUri` 不再返回 `#activateAssistant`
-   - `assistantDetailUri` 不再返回空字符串
-   - `switchAssistantUri` 不再返回空字符串
+### 4.2 首次打开助理 Tab
 
-### 4.2 读取到持久化助理详情时
+首次打开场景按以下规则处理：
 
-该场景保持现有规则不变：
-
-1. 读取 `weCodeUrl`、`partnerAccount`、`id`
-2. 按 `weCodeUrl.host` 是否等于 `WE_AGENT_CUI_APPID: S008623` 组装 `weAgentUri`
-3. `assistantDetailUri` 组装为：
-   - `h5://S008623/index.html?partnerAccount={partnerAccount}#assistantDetail`
-4. `switchAssistantUri` 组装为：
-   - `h5://S008623/index.html?partnerAccount={partnerAccount}#switchAssistant`
-
-### 4.3 读取不到持久化助理详情时
-
-该场景调整为固定返回对应地址。
-
-建议规则如下：
-
-1. `weAgentUri`
-   - 返回固定的助手地址
-   - 不再使用 `h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`
-2. `assistantDetailUri`
-   - 返回固定的助理详情地址
-3. `switchAssistantUri`
-   - 返回固定的切换助理地址
-
-### 4.4 固定地址返回规则
-
-由于本次需求明确是“若读取不到持久化助理详情，则返回固定的助手地址、助理详情地址、切换助理地址”，因此文档中建议将 fallback 规则统一定义为固定页面地址。
-
-推荐写法：
-
-1. `weAgentUri`
-   - 固定返回：`h5://S008623/index.html?wecodePlace=weAgent#weAgentCUI`
-2. `assistantDetailUri`
-   - 固定返回：`h5://S008623/index.html#assistantDetail`
-3. `switchAssistantUri`
-   - 固定返回：`h5://S008623/index.html#switchAssistant`
+1. 默认显示主 agent。
+2. 若用户没有主 agent，显示激活页。
+3. 激活页不允许跳转“创建助手”，只允许跳转“选择助手”。
+4. 首次进入助理 Tab 即展示引导图。
 
 说明：
 
-1. 这里不再依赖持久化助理详情中的 `partnerAccount`。
-2. 这里的“固定地址”含义是：即使没有当前助理缓存，也返回一个稳定可打开的页面地址。
-3. 若后续宿主要求这些固定地址必须带默认 query，再由 SDK 文档补充固定 query 规则。
+1. “首次打开”以宿主或前端定义的首次进入态为准。
+2. 引导图显示逻辑与是否有主 agent 解耦，两种场景都显示。
 
-### 4.5 文档层需要同步调整的内容
+### 4.3 右上角 `+` 菜单
 
-`SkillClientSdkInterfaceV2.md` 中至少需要同步修改以下部分：
+右上角 `+` 菜单统一保留两个入口：
 
-1. `getWeAgentUri` 的出参说明表
-2. `getWeAgentUri` 的出参示例
-3. `getWeAgentUri` 的实现方法
-4. 与 `openWeAgent`、`deleteWeAgent` 中复用 `getWeAgentUri` 规则的描述
+1. 助理详情
+2. 切换助理
 
-### 4.6 相关接口联动
+不包含以下入口：
 
-由于文档中已有以下接口或场景复用 URI 组装规则，因此需要同步检查：
+1. 创建助理
+2. 其他新增快捷入口
 
-1. `openWeAgent`
-2. `deleteWeAgent`
-3. 宿主使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 打开页面的逻辑说明
+### 4.4 助理详情页
 
-同步原则：
+助理详情页需要满足以下规则：
 
-1. 所有 fallback 规则口径必须一致
-2. 不允许一个地方写返回空字符串，另一个地方写固定地址
+1. 助理详情接口返回主 agent 相关信息。
+2. 主 agent 卡片或详情区域不显示创建人等信息。
+3. 主 agent 不允许编辑。
+4. 主 agent 不允许删除。
+
+实现口径建议：
+
+1. 由接口返回或前端识别当前对象是否为主 agent。
+2. 一旦识别为主 agent，前端直接隐藏编辑、删除、创建人展示区。
+3. 若详情页同时兼容历史助手分身，则分身仍沿用原有展示逻辑。
+
+### 4.5 切换助理页
+
+切换助理页规则如下：
+
+1. 助理列表固定第一个为主 agent。
+2. 保留历史助手分身列表和切换能力。
+3. 主 agent 的 tag 标签文案按新需求修改。
+
+实现建议：
+
+1. 若服务端直接返回主 agent，前端按字段排序置顶。
+2. 若服务端未保证顺序，前端本地重排，确保主 agent 首位固定。
+3. 历史分身不因为主 agent 置顶而丢失。
+
+### 4.6 创建助理入口收敛
+
+本次需要统一收敛创建助理入口：
+
+1. 新版 IM `+` 号入口屏蔽创建助理。
+2. 激活页不再跳转创建助理。
+3. 历史版本若仍存在创建入口，不强制前端删除，但由服务端控制创建失败。
+
+这里的策略分两层：
+
+1. 新版前端与宿主不再展示创建入口。
+2. 旧版客户端即使进入创建流程，服务端也通过接口报错控制创建失败。
+
+### 4.7 扫码注册入口
+
+扫码注册入口保持现状不变：
+
+1. 页面入口不变。
+2. 跳转链路不变。
+3. 服务端协议不变。
+
+### 4.8 设置页开关与 IM 激活 Tab
+
+设置页与 IM 侧打开助理时需要统一行为：
+
+1. 打开主 agent 时，跳转主 agent 页面。
+2. 打开助手分身时，跳转对应分身页面。
+
+这意味着 SDK 或宿主在路由组装时，需要能够区分：
+
+1. 主 agent 标识
+2. 分身标识
+
+### 4.9 文档需要同步修改的内容
+
+本次文档层建议同步调整：
+
+1. `SkillClientSdkInterfaceV2.md` 中 `getWeAgentUri` 的目标说明。
+2. `getWeAgentUri` 的 URI 返回规则示例。
+3. 助理详情页与切换助理页相关 URI 的说明。
+4. 激活页跳转限制说明。
+5. 与主 agent / 助手分身识别相关的字段说明。
 
 ## 5. 性能
 
-本次仅为 URI fallback 规则调整，对性能基本无新增负担。
+本次主要是页面入口与展示规则调整，对性能影响较小。
 
 需要注意：
 
-1. 不新增接口请求
-2. 不新增额外缓存读取次数
-3. 仍维持一次本地持久化读取即可完成 URI 组装
+1. 不新增长链路接口。
+2. 切换助理页若需要前端重排主 agent，只涉及本地列表排序，开销可忽略。
+3. 首次打开引导图应复用现有资源，避免重复下载。
 
 ## 6. 功耗
 
-本次修改不涉及轮询、长连接、后台任务或额外网络请求，功耗影响可忽略。
+本次修改不涉及轮询、后台任务或新增长连接，功耗影响可忽略。
+
+需要注意：
+
+1. 引导图展示不要引入额外高频动画或重复预加载。
+2. 不因主 agent 判断增加额外重试请求。
 
 ## 7. 埋码
 
-本次为 SDK URI 返回策略调整，不强制新增 SDK 埋码。
+建议补充以下埋码，便于验证新规则落地情况：
 
-若前端或宿主需要验证 fallback 生效情况，可选增加以下埋码：
-
-1. `get_weagent_uri_fallback_hit`
-   - 说明：命中“无持久化助理详情”的 fallback 分支
-2. `open_weagent_from_fallback_uri`
-   - 说明：宿主使用 fallback 返回的 `weAgentUri` 成功打开助理页面
-
-当前文档阶段可先不强制要求埋码实现。
+1. `assistant_tab_open_main_agent`
+   - 说明：助理 Tab 默认打开主 agent
+2. `assistant_tab_open_activate_page`
+   - 说明：因无主 agent 进入激活页
+3. `assistant_tab_plus_click_detail`
+   - 说明：点击右上角 `+` 后进入助理详情页
+4. `assistant_tab_plus_click_switch`
+   - 说明：点击右上角 `+` 后进入切换助理页
+5. `assistant_activate_block_create_entry`
+   - 说明：激活页已屏蔽创建入口
+6. `assistant_switch_list_main_agent_top`
+   - 说明：切换助理页主 agent 成功置顶展示
 
 ## 8. 影响范围
 
 ### 8.1 直接影响
 
-1. `SkillClientSdkInterfaceV2.md` 中 `getWeAgentUri` 的 fallback 规则
-2. 助理 tab 无持久化详情时的默认打开页面
-3. 助理 tab 右上角 `+` 菜单可用性
+1. 助理 Tab 默认打开页逻辑。
+2. `getWeAgentUri` 的返回策略说明。
+3. 助理详情页的展示与操作权限。
+4. 切换助理页的列表顺序和 tag 文案。
+5. 激活页与新版 IM `+` 号的创建入口收敛。
 
 ### 8.2 间接影响
 
-1. 宿主依赖 `assistantDetailUri`、`switchAssistantUri` 为空来做禁用态的逻辑，需要同步调整
-2. `openWeAgent`、`deleteWeAgent` 若文档中写明复用同一套 URI 规则，也需同步改口径
+1. 宿主使用 `assistantDetailUri`、`switchAssistantUri` 的菜单逻辑。
+2. 服务端创建助理失败返回在旧版本客户端中的表现。
+3. IM 和设置页打开主 agent / 分身的路由判断。
 
 ### 8.3 不影响
 
-1. `SkillClientSdkInterfaceV1.md`
-2. `weAgentCUI` 聊天逻辑
-3. 助理详情页内部展示逻辑
-4. 切换助理页内部展示逻辑
+1. 扫码注册入口链路。
+2. `weAgentCUI` 聊天消息渲染。
+3. 历史助手分身的消息协议。
 
 ## 9. 测试范围
 
-### 9.1 功能测试
+### 9.1 首次打开助理 Tab
 
-1. 本地存在 `current_we_agent_detail` 时，`getWeAgentUri` 返回规则保持不变。
-2. 本地不存在 `current_we_agent_detail` 时，`weAgentUri` 不再返回 `#activateAssistant`。
-3. 本地不存在 `current_we_agent_detail` 时，`assistantDetailUri` 返回固定地址，不再为空字符串。
-4. 本地不存在 `current_we_agent_detail` 时，`switchAssistantUri` 返回固定地址，不再为空字符串。
+1. 用户存在主 agent 时，首次打开默认进入主 agent 页面。
+2. 用户不存在主 agent 时，首次打开进入激活页。
+3. 两种场景下首次进入都展示引导图。
 
-### 9.2 兼容测试
+### 9.2 助理详情页
 
-1. 宿主使用 fallback 的 `weAgentUri` 能正常打开页面。
-2. 宿主点击右上角 `+` 后，使用 fallback 的 `assistantDetailUri`、`switchAssistantUri` 能正常打开对应页面。
-3. 读取到持久化助理详情的正常路径不回退。
+1. 助理详情接口返回主 agent 信息正确。
+2. 主 agent 不显示创建人等信息。
+3. 主 agent 不展示编辑、删除入口。
+4. 历史助手分身若进入详情页，仍保留既有逻辑。
 
-### 9.3 文档一致性检查
+### 9.3 切换助理页
 
-1. `getWeAgentUri` 出参表、示例、实现方法三处描述一致。
-2. `openWeAgent`、`deleteWeAgent` 中引用的 URI fallback 规则与 `getWeAgentUri` 保持一致。
-3. 不再出现“读取不到持久化助理详情时，详情地址和切换地址返回空字符串”的旧描述。
+1. 列表第一项固定为主 agent。
+2. 历史助手分身仍可展示和切换。
+3. 主 agent tag 文案符合新要求。
+
+### 9.4 创建助理入口
+
+1. 新版 IM `+` 号不显示创建助理入口。
+2. 激活页不跳转创建助理。
+3. 历史版本仍存在入口时，服务端返回创建失败，客户端表现符合预期。
+
+### 9.5 扫码注册与设置页
+
+1. 扫码注册入口行为保持不变。
+2. 设置页打开主 agent 时跳主 agent。
+3. 设置页打开助手分身时跳对应分身。
+4. IM 激活 Tab 打开主 agent / 分身行为正确。
+
+### 9.6 文档一致性检查
+
+1. `SkillClientSdkInterfaceV2.md` 与本方案中“默认入口”规则一致。
+2. 主 agent、助手分身、激活页的口径一致。
+3. 不再出现“激活页可跳创建助理”的旧描述。
 
 ## 10. 最终建议
 
-本次最佳方案不是新增前端页面来兜默认入口，而是直接调整 `SkillClientSdkInterfaceV2.md` 的 `getWeAgentUri` fallback 规则：
+本次建议将助理体系的默认入口统一收敛到“主 agent 优先”模型：
 
-1. 读取到持久化助理详情时，保持原有 URI 组装逻辑不变。
-2. 读取不到持久化助理详情时：
-   - `weAgentUri` 返回固定助手地址
-   - `assistantDetailUri` 返回固定助理详情地址
-   - `switchAssistantUri` 返回固定切换助理地址
-3. 同步修改文档中的出参说明、示例和实现方法。
-4. 同步检查 `openWeAgent`、`deleteWeAgent` 等复用 URI 规则的描述，保持文档口径一致。
+1. 首次打开助理 Tab，默认展示主 agent；无主 agent 时再显示激活页。
+2. 激活页不再承担创建助理入口，只保留选择助手能力。
+3. 右上角 `+` 固定为“助理详情”“切换助理”两个入口。
+4. 助理详情页将主 agent 视为只读对象，不显示创建人，不允许编辑删除。
+5. 切换助理页固定主 agent 置顶，同时保留历史助手分身切换。
+6. 新版入口收敛创建助理，历史版本由服务端兜底失败。
+7. 扫码注册入口保持不变，设置页和 IM 打开行为继续支持主 agent / 分身分流。
 
-这样改动边界最小，也最符合“通过 SDK 返回地址策略控制助理 tab 默认入口”的目标。
+这样可以在不改动聊天核心链路的前提下，统一助理 Tab、详情页、切换页、激活页和 IM 入口的产品口径。
