@@ -142,10 +142,10 @@ function App({ assistantAccount = '' }: AppProps) {
     const userInfo = await getUserInfo();
     return createNewSession({
       ak: appKey,
-      bussinessDomain: 'miniapp',
-      bussinessType: 'direct',
+      businessSessionDomain: 'miniapp',
+      businessSessionType: 'direct',
       assistantAccount: currentAssistantAccount,
-      bussinessId: userInfo.uid,
+      businessSessionId: userInfo.uid,
     });
   }, []);
 

@@ -419,9 +419,12 @@
 
   // ThinkingBlock
   .thinking-block {
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     border-radius: 8px;
-    border: 1px solid #d9d9d9;
-    background-color: #fafafa;
+    border: 1px solid rgba(238, 238, 238, 1);
+    background-color: #ffffff;
     margin: 4px 0;
 
     &.streaming {
@@ -434,6 +437,7 @@
     align-items: center;
     padding: 10px 12px;
     cursor: pointer;
+    background: rgba(245, 245, 245, 1);
 
     > * + * {
       margin-left: 8px;
@@ -472,7 +476,7 @@
 
   .thinking-block__content {
     padding: 12px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid #ececec;
     background-color: #fff;
     font-size: 13px;
     color: #666;
