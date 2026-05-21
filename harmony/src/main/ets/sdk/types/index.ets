@@ -28,7 +28,7 @@ export enum SkillWeCodeAction {
 export type PermissionResponse = 'once' | 'always' | 'reject';
 export type SessionRecordStatus = 'ACTIVE' | 'IDLE' | 'CLOSED';
 export type SessionRuntimeStatus = 'busy' | 'idle' | 'retry';
-export type BusinessSessionDomain = 'miniapp' | 'im' | 'skill';
+export type BusinessSessionDomain = string;
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
 

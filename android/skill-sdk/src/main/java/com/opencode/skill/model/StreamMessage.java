@@ -58,7 +58,7 @@ public class StreamMessage {
     @Nullable
     private String question;
     @Nullable
-    @SerializedName(value = "questionId", alternate = {"requestId"})
+    @SerializedName("questionId")
     private String questionId;
     @Nullable
     private List<String> options = new ArrayList<>();

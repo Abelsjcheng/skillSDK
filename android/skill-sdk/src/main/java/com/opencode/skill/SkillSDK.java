@@ -623,9 +623,9 @@ public final class SkillSDK {
         };
 
         ListenerBinding binding = new ListenerBinding(listener);
-        ListenerBinding previous = listenerBindings.putIfAbsent(params.getWelinkSessionId(), binding);
+        ListenerBinding previous = listenerBindings.put(params.getWelinkSessionId(), binding);
         if (previous != null) {
-            return new RegisterSessionListenerResult("success");
+            webSocketManager.unregisterListener(params.getWelinkSessionId(), previous.sessionListener);
         }
         webSocketManager.registerListener(params.getWelinkSessionId(), listener);
         return new RegisterSessionListenerResult("success");
@@ -819,13 +819,6 @@ public final class SkillSDK {
             String businessSessionId = TypeConvertUtils.optionalString(params.getBusinessSessionId());
             String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
             businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
-            if (businessSessionDomain != null) {
-                businessSessionDomain = businessSessionDomain.toLowerCase(Locale.ROOT);
-                if (!"miniapp".equals(businessSessionDomain) && !"im".equals(businessSessionDomain)) {
-                    callback.onError(error(1000, "businessSessionDomain must be miniapp/im"));
-                    return;
-                }
-            }
             requestParams = new HistorySessionsParams(
                     page,
                     size,

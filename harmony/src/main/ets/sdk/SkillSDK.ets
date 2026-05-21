@@ -618,14 +618,10 @@ export class SkillSDK {
         'businessSessionId'
       );
       const assistantAccount = TypeConverter.toOptionalString(params.assistantAccount, 'assistantAccount');
-      let businessSessionDomain = TypeConverter.toOptionalString(
+      const businessSessionDomain = TypeConverter.toOptionalString(
         params.businessSessionDomain,
         'businessSessionDomain'
       );
-      if (businessSessionDomain !== undefined) {
-        businessSessionDomain = businessSessionDomain.toLowerCase();
-        Validator.requireEnum(businessSessionDomain, ['miniapp', 'im'], 'businessSessionDomain');
-      }
 
       await this.ensureWebSocketConnected();
 

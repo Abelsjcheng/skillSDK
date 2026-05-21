@@ -680,14 +680,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     NSString *businessSessionId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionId];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
     NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
-    if (businessSessionDomain != nil) {
-        businessSessionDomain = [businessSessionDomain lowercaseString];
-        NSSet *validBusinessSessionDomains = [NSSet setWithArray:@[@"miniapp", @"im"]];
-        if (![validBusinessSessionDomains containsObject:businessSessionDomain]) {
-            [self dispatchFailure:failure code:1000 message:@"businessSessionDomain must be miniapp/im."];
-            return;
-        }
-    }
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 

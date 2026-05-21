@@ -13,7 +13,7 @@ import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownCompo
 
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const prevStreamingRef = useRef(part.isStreaming);
   const markdownComponents = useRef<Components>(createMarkdownComponents());
 
