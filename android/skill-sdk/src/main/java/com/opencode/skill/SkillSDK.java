@@ -819,13 +819,6 @@ public final class SkillSDK {
             String businessSessionId = TypeConvertUtils.optionalString(params.getBusinessSessionId());
             String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
             businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
-            if (businessSessionDomain != null) {
-                businessSessionDomain = businessSessionDomain.toLowerCase(Locale.ROOT);
-                if (!"miniapp".equals(businessSessionDomain) && !"im".equals(businessSessionDomain)) {
-                    callback.onError(error(1000, "businessSessionDomain must be miniapp/im"));
-                    return;
-                }
-            }
             requestParams = new HistorySessionsParams(
                     page,
                     size,
