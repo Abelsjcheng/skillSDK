@@ -127,9 +127,6 @@ export class WebSocketManager {
 
   registerSessionListener(sessionId: string, listener: SessionListener): void {
     const key = sessionId;
-    if (this.listenersBySession.has(key)) {
-      return;
-    }
     const state = this.getOrCreateReplayState(key);
     const buffer = this.roundBuffersBySession.get(key);
     let shouldReplay = false;
@@ -184,10 +181,6 @@ export class WebSocketManager {
       let parsed: StreamMessage;
       try {
         parsed = JSON.parse(payload) as StreamMessage;
-        const rawRecord = parsed as Record<string, Object>;
-        if (parsed.questionId === undefined && typeof rawRecord.requestId === 'string') {
-          parsed.questionId = rawRecord.requestId as string;
-        }
       } catch (parseError) {
         this.logger.warn('ignore invalid ws message', payload, parseError);
         return;
