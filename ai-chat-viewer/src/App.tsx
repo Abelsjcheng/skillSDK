@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isIosMobileDevice, isPcMiniApp } from './constants';
 import { Content } from './components/Content';
@@ -299,7 +299,7 @@ function App({ assistantAccount = '' }: AppProps) {
               <button
                 type="button"
                 className="we-agent-cui-actions__button"
-                data-tooltip={isPc ? '新建会话' : undefined}
+                data-tooltip={isPc ? t('weAgent.newSessionToolTip') : undefined}
                 onClick={(event) => {
                   runButtonClickWithDebounce(event, () => {
                     void handleCreateSession();
