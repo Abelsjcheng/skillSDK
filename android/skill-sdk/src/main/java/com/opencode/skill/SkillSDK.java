@@ -623,9 +623,9 @@ public final class SkillSDK {
         };
 
         ListenerBinding binding = new ListenerBinding(listener);
-        ListenerBinding previous = listenerBindings.putIfAbsent(params.getWelinkSessionId(), binding);
+        ListenerBinding previous = listenerBindings.put(params.getWelinkSessionId(), binding);
         if (previous != null) {
-            return new RegisterSessionListenerResult("success");
+            webSocketManager.unregisterListener(params.getWelinkSessionId(), previous.sessionListener);
         }
         webSocketManager.registerListener(params.getWelinkSessionId(), listener);
         return new RegisterSessionListenerResult("success");

@@ -159,7 +159,10 @@ public final class WebSocketManager {
         ReplayState replayState = replayStates.computeIfAbsent(welinkSessionId, key -> new ReplayState());
         boolean shouldReplay = false;
         synchronized (replayState) {
-            sessionListeners.computeIfAbsent(welinkSessionId, key -> new CopyOnWriteArrayList<>()).addIfAbsent(listener);
+            CopyOnWriteArrayList<SessionListener> listeners =
+                    sessionListeners.computeIfAbsent(welinkSessionId, key -> new CopyOnWriteArrayList<>());
+            listeners.clear();
+            listeners.add(listener);
             SessionRoundBuffer buffer = roundBuffers.get(welinkSessionId);
             if (buffer != null && !buffer.completed && !replayState.replaying) {
                 // 先将当前会话标记为“正在补发缓存”状态，再让监听器真正参与实时消息分发。
