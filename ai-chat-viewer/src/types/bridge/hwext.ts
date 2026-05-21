@@ -79,9 +79,9 @@ export interface ControlSkillWeCodeParams {
 export interface CreateNewSessionParams {
   ak: string;
   title?: string;
-  bussinessDomain: string;
-  bussinessId: string;
-  bussinessType: string;
+  businessSessionDomain: string;
+  businessSessionId: string;
+  businessSessionType: string;
   assistantAccount: string;
 }
 
@@ -95,7 +95,7 @@ export interface GetHistorySessionsListParams {
   size?: number;
   status?: string;
   ak?: string;
-  bussinessId?: string;
+  businessSessionId?: string;
   assistantAccount?: string;
   businessSessionDomain?: 'miniapp' | 'im' | string;
 }
@@ -175,6 +175,8 @@ export interface QueryQrcodeInfoResult {
   expireTime: string;
   status: number;
   expired: boolean;
+  mac: string;
+  channel: string;
 }
 
 export interface UpdateQrcodeInfoParams {

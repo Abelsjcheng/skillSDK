@@ -184,6 +184,10 @@ export class WebSocketManager {
       let parsed: StreamMessage;
       try {
         parsed = JSON.parse(payload) as StreamMessage;
+        const rawRecord = parsed as Record<string, Object>;
+        if (parsed.questionId === undefined && typeof rawRecord.requestId === 'string') {
+          parsed.questionId = rawRecord.requestId as string;
+        }
       } catch (parseError) {
         this.logger.warn('ignore invalid ws message', payload, parseError);
         return;
@@ -211,7 +215,7 @@ export class WebSocketManager {
         return;
       }
       try {
-        listener.onMessage(parsed);
+        listener.onMessage(this.copyForDelivery(parsed, 'live', false));
       } catch (listenerError) {
         this.logger.warn('listener onMessage failed', listenerError);
       }
@@ -275,9 +279,11 @@ export class WebSocketManager {
       return;
     }
 
-    snapshot.forEach((message: StreamMessage) => {
-      listener.onMessage(message);
-    });
+    for (let index = 0; index < snapshot.length; index++) {
+      const message = snapshot[index];
+      const isLastReplayMessage = index === snapshot.length - 1;
+      listener.onMessage(this.copyForDelivery(message, 'replay', isLastReplayMessage));
+    }
     this.flushPendingLiveEvents(sessionId);
   }
 
@@ -295,7 +301,7 @@ export class WebSocketManager {
       }
       const pendingMessages = state.pendingLiveEvents.splice(0, state.pendingLiveEvents.length);
       pendingMessages.forEach((message: StreamMessage) => {
-        listener.onMessage(message);
+        listener.onMessage(this.copyForDelivery(message, 'live', false));
       });
     }
     // 只有确认补发期间积压的实时消息已经全部清空，才结束 replaying 状态。
@@ -363,6 +369,19 @@ export class WebSocketManager {
       this.replayStatesBySession.set(sessionId, state);
     }
     return state;
+  }
+
+  private copyForDelivery(
+    message: StreamMessage,
+    deliveryMode: 'replay' | 'live',
+    replayDone: boolean
+  ): StreamMessage {
+    // 这里不使用对象展开语法，避免低版本 Harmony 运行环境兼容性问题。
+    // 通过 JSON 深拷贝保留现有顶层字段，再补充 SDK 本地分发字段。
+    const cloned = JSON.parse(JSON.stringify(message)) as StreamMessage;
+    cloned.deliveryMode = deliveryMode;
+    cloned.replayDone = replayDone ? true : undefined;
+    return cloned;
   }
 
   private resolveWsUrl(config: SkillSDKConfig, fallback?: string): string {

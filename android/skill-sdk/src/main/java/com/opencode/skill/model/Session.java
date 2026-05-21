@@ -1,13 +1,15 @@
-﻿package com.opencode.skill.model;
+package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.Objects;
 
 @Keep
-public class SkillSession {
+public class Session {
     @NonNull
     private String welinkSessionId = "";
     @NonNull
@@ -19,11 +21,14 @@ public class SkillSession {
     @Nullable
     private String imGroupId;
     @Nullable
-    private String bussinessDomain;
+    @SerializedName("businessSessionDomain")
+    private String businessSessionDomain;
     @Nullable
-    private String bussinessType;
+    @SerializedName("businessSessionType")
+    private String businessSessionType;
     @Nullable
-    private String bussinessId;
+    @SerializedName("businessSessionId")
+    private String businessSessionId;
     @Nullable
     private String assistantAccount;
     @NonNull
@@ -81,30 +86,30 @@ public class SkillSession {
     }
 
     @Nullable
-    public String getBussinessDomain() {
-        return bussinessDomain;
+    public String getBusinessSessionDomain() {
+        return businessSessionDomain;
     }
 
-    public void setBussinessDomain(@Nullable String bussinessDomain) {
-        this.bussinessDomain = bussinessDomain;
-    }
-
-    @Nullable
-    public String getBussinessType() {
-        return bussinessType;
-    }
-
-    public void setBussinessType(@Nullable String bussinessType) {
-        this.bussinessType = bussinessType;
+    public void setBusinessSessionDomain(@Nullable String businessSessionDomain) {
+        this.businessSessionDomain = businessSessionDomain;
     }
 
     @Nullable
-    public String getBussinessId() {
-        return bussinessId;
+    public String getBusinessSessionType() {
+        return businessSessionType;
     }
 
-    public void setBussinessId(@Nullable String bussinessId) {
-        this.bussinessId = bussinessId;
+    public void setBusinessSessionType(@Nullable String businessSessionType) {
+        this.businessSessionType = businessSessionType;
+    }
+
+    @Nullable
+    public String getBusinessSessionId() {
+        return businessSessionId;
+    }
+
+    public void setBusinessSessionId(@Nullable String businessSessionId) {
+        this.businessSessionId = businessSessionId;
     }
 
     @Nullable

@@ -12,7 +12,7 @@ public class HistorySessionsParams {
     @Nullable
     private final String ak;
     @Nullable
-    private final String bussinessId;
+    private final String businessSessionId;
     @Nullable
     private final String assistantAccount;
     @Nullable
@@ -27,7 +27,7 @@ public class HistorySessionsParams {
             int size,
             @Nullable String status,
             @Nullable String ak,
-            @Nullable String bussinessId,
+            @Nullable String businessSessionId,
             @Nullable String assistantAccount,
             @Nullable String businessSessionDomain
     ) {
@@ -35,7 +35,7 @@ public class HistorySessionsParams {
         this.size = size;
         this.status = status;
         this.ak = ak;
-        this.bussinessId = bussinessId;
+        this.businessSessionId = businessSessionId;
         this.assistantAccount = assistantAccount;
         this.businessSessionDomain = businessSessionDomain;
     }
@@ -59,8 +59,8 @@ public class HistorySessionsParams {
     }
 
     @Nullable
-    public String getBussinessId() {
-        return bussinessId;
+    public String getBusinessSessionId() {
+        return businessSessionId;
     }
 
     @Nullable

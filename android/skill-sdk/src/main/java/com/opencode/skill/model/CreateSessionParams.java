@@ -11,27 +11,27 @@ public class CreateSessionParams {
     @Nullable
     private final String title;
     @Nullable
-    private final String bussinessDomain;
+    private final String businessSessionDomain;
     @NonNull
-    private final String bussinessId;
+    private final String businessSessionId;
     @Nullable
-    private final String bussinessType;
+    private final String businessSessionType;
     @Nullable
     private final String assistantAccount;
 
     public CreateSessionParams(
             @Nullable String ak,
             @Nullable String title,
-            @Nullable String bussinessDomain,
-            @NonNull String bussinessId,
-            @Nullable String bussinessType,
+            @Nullable String businessSessionDomain,
+            @NonNull String businessSessionId,
+            @Nullable String businessSessionType,
             @Nullable String assistantAccount
     ) {
         this.ak = ak;
         this.title = title;
-        this.bussinessDomain = bussinessDomain;
-        this.bussinessId = bussinessId;
-        this.bussinessType = bussinessType;
+        this.businessSessionDomain = businessSessionDomain;
+        this.businessSessionId = businessSessionId;
+        this.businessSessionType = businessSessionType;
         this.assistantAccount = assistantAccount;
     }
 
@@ -46,18 +46,18 @@ public class CreateSessionParams {
     }
 
     @Nullable
-    public String getBussinessDomain() {
-        return bussinessDomain;
+    public String getBusinessSessionDomain() {
+        return businessSessionDomain;
     }
 
     @NonNull
-    public String getBussinessId() {
-        return bussinessId;
+    public String getBusinessSessionId() {
+        return businessSessionId;
     }
 
     @Nullable
-    public String getBussinessType() {
-        return bussinessType;
+    public String getBusinessSessionType() {
+        return businessSessionType;
     }
 
     @Nullable

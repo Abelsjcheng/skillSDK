@@ -65,6 +65,17 @@ type LocalEmitPayload = Omit<Parameters<RegisterSessionListenerParams['onMessage
   emittedAt?: string | null;
 };
 
+interface SessionRoundBuffer {
+  welinkSessionId: string;
+  events: Parameters<RegisterSessionListenerParams['onMessage']>[0][];
+  completed: boolean;
+}
+
+interface ReplayState {
+  replaying: boolean;
+  pendingLiveEvents: Parameters<RegisterSessionListenerParams['onMessage']>[0][];
+}
+
 const MOCK_CODEBLOCK_REPLY = [
   '下面给你一段用于验证代码块样式的 mock 返回：',
   '',
@@ -291,14 +302,28 @@ class SkillStreamSocket {
   private reconnectTimer: number | null = null;
   private connecting = false;
   private localSeq = 0;
+  private roundBufferStore = new Map<string, SessionRoundBuffer>();
+  private replayStateStore = new Map<string, ReplayState>();
 
   constructor(private readonly config: OpenCodeBridgeConfig) {}
 
   register(params: RegisterSessionListenerParams): void {
     const sessionId = String(params.welinkSessionId);
-    const sessionListeners = this.listeners.get(sessionId) ?? new Set<RegisterSessionListenerParams>();
-    sessionListeners.add(params);
-    this.listeners.set(sessionId, sessionListeners);
+    if (this.listeners.has(sessionId)) {
+      return;
+    }
+
+    this.listeners.set(sessionId, new Set<RegisterSessionListenerParams>([params]));
+    const replayState = this.getOrCreateReplayState(sessionId);
+    const buffer = this.roundBufferStore.get(sessionId);
+
+    if (buffer && !buffer.completed && !replayState.replaying) {
+      replayState.replaying = true;
+      window.setTimeout(() => {
+        this.replayBufferedEventsIfNeeded(sessionId);
+      }, 0);
+    }
+
     this.ensureConnected();
   }
 
@@ -311,19 +336,137 @@ class SkillStreamSocket {
   }
 
   emitLocal(sessionId: string, payload: LocalEmitPayload): void {
+    this.localSeq += 1;
+    const message = {
+      ...payload,
+      welinkSessionId: sessionId,
+      seq: this.localSeq,
+      emittedAt: payload.emittedAt ?? nowIso(),
+    };
+
+    this.publishEvent(sessionId, message);
+  }
+
+  private getOrCreateReplayState(sessionId: string): ReplayState {
+    const existing = this.replayStateStore.get(sessionId);
+    if (existing) {
+      return existing;
+    }
+
+    const nextState: ReplayState = {
+      replaying: false,
+      pendingLiveEvents: [],
+    };
+    this.replayStateStore.set(sessionId, nextState);
+    return nextState;
+  }
+
+  private getOrCreateRoundBuffer(sessionId: string): SessionRoundBuffer {
+    const existing = this.roundBufferStore.get(sessionId);
+    if (existing && !existing.completed) {
+      return existing;
+    }
+
+    const nextBuffer: SessionRoundBuffer = {
+      welinkSessionId: sessionId,
+      events: [],
+      completed: false,
+    };
+    this.roundBufferStore.set(sessionId, nextBuffer);
+    return nextBuffer;
+  }
+
+  private shouldCompleteCurrentRound(message: Parameters<RegisterSessionListenerParams['onMessage']>[0]): boolean {
+    if (message.type === 'session.status') {
+      return message.sessionStatus === 'idle';
+    }
+
+    return message.type === 'session.error'
+      || message.type === 'error'
+      || message.type === 'agent.offline';
+  }
+
+  private appendToRoundBuffer(sessionId: string, message: Parameters<RegisterSessionListenerParams['onMessage']>[0]): void {
+    const buffer = this.getOrCreateRoundBuffer(sessionId);
+    buffer.events.push(message);
+    if (this.shouldCompleteCurrentRound(message)) {
+      buffer.completed = true;
+    }
+  }
+
+  private dispatchToSessionListeners(
+    sessionId: string,
+    message: Parameters<RegisterSessionListenerParams['onMessage']>[0],
+  ): void {
     const sessionListeners = this.listeners.get(sessionId);
     if (!sessionListeners || sessionListeners.size === 0) {
       return;
     }
 
-    this.localSeq += 1;
     sessionListeners.forEach((listener) => {
-      listener.onMessage({
-        ...payload,
-        welinkSessionId: sessionId,
-        seq: this.localSeq,
-        emittedAt: payload.emittedAt ?? nowIso(),
+      listener.onMessage(message);
+    });
+  }
+
+  private flushPendingReplayEvents(sessionId: string): void {
+    const replayState = this.replayStateStore.get(sessionId);
+    if (!replayState) {
+      return;
+    }
+
+    if (replayState.pendingLiveEvents.length === 0) {
+      replayState.replaying = false;
+      return;
+    }
+
+    const pendingMessages = replayState.pendingLiveEvents.splice(0, replayState.pendingLiveEvents.length);
+    pendingMessages.forEach((message) => {
+      this.dispatchToSessionListeners(sessionId, {
+        ...message,
+        deliveryMode: 'live',
       });
+    });
+    replayState.replaying = false;
+  }
+
+  private replayBufferedEventsIfNeeded(sessionId: string): void {
+    const buffer = this.roundBufferStore.get(sessionId);
+    const replayState = this.replayStateStore.get(sessionId);
+    if (!replayState) {
+      return;
+    }
+
+    if (!buffer || buffer.completed) {
+      replayState.replaying = false;
+      return;
+    }
+
+    const snapshot = buffer.events.slice();
+    snapshot.forEach((message, index) => {
+      this.dispatchToSessionListeners(sessionId, {
+        ...message,
+        deliveryMode: 'replay',
+        replayDone: index === snapshot.length - 1 ? true : undefined,
+      });
+    });
+    this.flushPendingReplayEvents(sessionId);
+  }
+
+  private publishEvent(
+    sessionId: string,
+    message: Parameters<RegisterSessionListenerParams['onMessage']>[0],
+  ): void {
+    this.appendToRoundBuffer(sessionId, message);
+
+    const replayState = this.replayStateStore.get(sessionId);
+    if (replayState?.replaying) {
+      replayState.pendingLiveEvents.push(message);
+      return;
+    }
+
+    this.dispatchToSessionListeners(sessionId, {
+      ...message,
+      deliveryMode: 'live',
     });
   }
 
@@ -365,10 +508,7 @@ class SkillStreamSocket {
         : '';
 
       if (sessionId) {
-        const sessionListeners = this.listeners.get(sessionId);
-        sessionListeners?.forEach((listener) => {
-          listener.onMessage(message as any);
-        });
+        this.publishEvent(sessionId, message as any);
         return;
       }
 
@@ -652,9 +792,9 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
           body: JSON.stringify({
             ak: params.ak,
             title: params.title,
-            businessSessionDomain: params.bussinessDomain,
-            businessSessionType: params.bussinessType,
-            businessSessionId: params.bussinessId,
+            businessSessionDomain: params.businessSessionDomain,
+            businessSessionType: params.businessSessionType,
+            businessSessionId: params.businessSessionId,
             assistantAccount: params.assistantAccount,
           }),
         },
@@ -735,6 +875,8 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         expireTime: String(Date.now() + 10 * 60 * 1000),
         status: 0,
         expired: false,
+        mac: '',
+        channel: '',
       };
     },
 
@@ -766,8 +908,8 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
       if (params.ak) {
         searchParams.set('ak', params.ak);
       }
-      if (params.bussinessId) {
-        searchParams.set('businessSessionId', params.bussinessId);
+      if (params.businessSessionId) {
+        searchParams.set('businessSessionId', params.businessSessionId);
       }
       if (params.businessSessionDomain) {
         searchParams.set('businessSessionDomain', params.businessSessionDomain);

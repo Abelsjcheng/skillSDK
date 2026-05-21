@@ -266,6 +266,7 @@
     }
 
     WLAgentSkillsStreamMessage *streamMessage = [[WLAgentSkillsStreamMessage alloc] initWithDictionary:json];
+    streamMessage.raw = json;
 
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidReceiveMessage:)]) {
     [self.delegate webSocketManagerDidReceiveMessage:streamMessage];
@@ -291,7 +292,7 @@
     }
 
     if (listener.onMessage != nil) {
-    listener.onMessage(streamMessage);
+    listener.onMessage([self copyForDelivery:streamMessage deliveryMode:@"live" replayDone:NO]);
     }
 }
 
@@ -324,9 +325,12 @@
     snapshot = [buffer.events copy];
     }
 
-    for (WLAgentSkillsStreamMessage *message in snapshot) {
+    NSUInteger snapshotCount = snapshot.count;
+    for (NSUInteger index = 0; index < snapshotCount; index++) {
+        WLAgentSkillsStreamMessage *message = snapshot[index];
         if (listener.onMessage != nil) {
-        listener.onMessage(message);
+        BOOL isLastReplayMessage = index == snapshotCount - 1;
+        listener.onMessage([self copyForDelivery:message deliveryMode:@"replay" replayDone:isLastReplayMessage]);
         }
     }
     [self flushPendingLiveEventsForSessionId:welinkSessionId];
@@ -352,7 +356,7 @@
 
     for (WLAgentSkillsStreamMessage *message in pendingMessages) {
         if (listener.onMessage != nil) {
-        listener.onMessage(message);
+        listener.onMessage([self copyForDelivery:message deliveryMode:@"live" replayDone:NO]);
         }
     }
     }
@@ -425,6 +429,18 @@
     self.replayStates[welinkSessionId] = state;
     }
     return state;
+}
+
+- (WLAgentSkillsStreamMessage *)copyForDelivery:(WLAgentSkillsStreamMessage *)source
+                                   deliveryMode:(NSString *)deliveryMode
+                                     replayDone:(BOOL)replayDone {
+    NSDictionary *rawDictionary = [source.raw isKindOfClass:[NSDictionary class]] ? source.raw : nil;
+    WLAgentSkillsStreamMessage *target = rawDictionary != nil
+        ? [[WLAgentSkillsStreamMessage alloc] initWithDictionary:rawDictionary]
+        : [[WLAgentSkillsStreamMessage alloc] initWithDictionary:[source toDictionary]];
+    target.deliveryMode = deliveryMode;
+    target.replayDone = replayDone;
+    return target;
 }
 
 #pragma mark - Notify Helpers

@@ -253,7 +253,7 @@ public final class WebSocketManager {
         if (enqueueLiveEventDuringReplay(sessionId, message)) {
             return;
         }
-        dispatchToSessionListeners(listeners, message);
+        dispatchToSessionListeners(listeners, message, DELIVERY_MODE_LIVE, false);
     }
 
     private void replayBufferedEventsIfNeeded(@NonNull String welinkSessionId, @NonNull ReplayState replayState) {
@@ -272,7 +272,8 @@ public final class WebSocketManager {
             snapshot = new ArrayList<>(buffer.events);
         }
 
-        for (StreamMessage message : snapshot) {
+        for (int index = 0; index < snapshot.size(); index++) {
+            StreamMessage message = snapshot.get(index);
             List<SessionListener> listeners = sessionListeners.getOrDefault(welinkSessionId, new CopyOnWriteArrayList<>());
             if (listeners.isEmpty()) {
                 synchronized (replayState) {
@@ -280,7 +281,8 @@ public final class WebSocketManager {
                 }
                 return;
             }
-            dispatchToSessionListeners(listeners, message);
+            boolean isLastReplayMessage = index == snapshot.size() - 1;
+            dispatchToSessionListeners(listeners, message, DELIVERY_MODE_REPLAY, isLastReplayMessage);
         }
         flushPendingReplayEvents(welinkSessionId, replayState);
     }
@@ -306,7 +308,7 @@ public final class WebSocketManager {
                 return;
             }
             for (StreamMessage pendingMessage : pendingMessages) {
-                dispatchToSessionListeners(listeners, pendingMessage);
+                dispatchToSessionListeners(listeners, pendingMessage, DELIVERY_MODE_LIVE, false);
             }
         }
     }
@@ -327,10 +329,15 @@ public final class WebSocketManager {
         }
     }
 
-    private void dispatchToSessionListeners(@NonNull List<SessionListener> listeners, @NonNull StreamMessage message) {
+    private void dispatchToSessionListeners(
+            @NonNull List<SessionListener> listeners,
+            @NonNull StreamMessage message,
+            @NonNull String deliveryMode,
+            boolean replayDone
+    ) {
         for (SessionListener listener : listeners) {
             try {
-                listener.onMessage(message);
+                listener.onMessage(copyForDelivery(message, deliveryMode, replayDone));
             } catch (Exception callbackError) {
                 SessionError error = new SessionError("CALLBACK_ERROR", callbackError.getMessage() == null
                         ? "Session listener callback failed" : callbackError.getMessage());
@@ -641,6 +648,29 @@ public final class WebSocketManager {
         @NonNull
         private final List<StreamMessage> pendingLiveEvents = new ArrayList<>();
     }
+
+    @NonNull
+    private StreamMessage copyForDelivery(@NonNull StreamMessage source, @NonNull String deliveryMode, boolean replayDone) {
+        // 分发给监听器前基于原始 raw 重新反序列化一个新对象，避免直接修改缓存中的原始消息对象。
+        // 同时这样不需要手写逐字段复制，后续服务端新增字段时，只要 parseMessage 支持即可自动带出。
+        StreamMessage target = source.getRaw() == null
+                ? new StreamMessage()
+                : parseMessage(source.getRaw().toString());
+        if (source.getRaw() == null) {
+            target.setType(source.getType());
+            target.setSeq(source.getSeq());
+            target.setWelinkSessionId(source.getWelinkSessionId());
+            target.setEmittedAt(source.getEmittedAt());
+        }
+        target.setDeliveryMode(deliveryMode);
+        if (replayDone) {
+            target.setReplayDone(Boolean.TRUE);
+        }
+        return target;
+    }
+
+    private static final String DELIVERY_MODE_REPLAY = "replay";
+    private static final String DELIVERY_MODE_LIVE = "live";
 
     private final class InternalWebSocketListener extends WebSocketListener {
         @Override

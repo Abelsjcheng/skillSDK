@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StreamAssembler } from '../protocol/StreamAssembler';
-import type { Message, MessagePart, PendingAssistantPreview, QuestionAnswerSubmission, SessionStatus, StreamMessage } from '../types';
+import type {
+  Message,
+  MessagePart,
+  PendingAssistantPreview,
+  QuestionAnswerSubmission,
+  SessionStatus,
+  StreamMessage,
+} from '../types';
 import {
   collectUserMessageIds,
   contentTypeForRole,
@@ -14,21 +21,37 @@ import {
   updateLatestQuestionPart,
 } from '../utils/message';
 import {
+  controlSkillWeCode,
   getSessionMessageHistory,
   registerSessionListener,
   sendMessage as sendMessageApi,
+  sendMessageToIM,
   stopSkill,
   unregisterSessionListener,
-  sendMessageToIM,
-  controlSkillWeCode,
 } from '../utils/hwext';
-import { hasMoreHistoryByCursor } from '../utils/session';
-import { WeLog } from '../utils/logger';
-import { showToast } from '../utils/toast';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { WeLog } from '../utils/logger';
+import { hasMoreHistoryByCursor } from '../utils/session';
+import { showToast } from '../utils/toast';
 import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
 
 const HISTORY_PAGE_SIZE = 20;
+
+function buildUserMessage(msg: StreamMessage): Message | null {
+  const messageId = msg.messageId;
+  if (!messageId) {
+    return null;
+  }
+
+  return {
+    id: messageId,
+    role: 'user',
+    content: msg.content ?? '',
+    contentType: 'plain',
+    timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
+    isStreaming: false,
+  };
+}
 
 export function useChatSession({
   mode,
@@ -38,6 +61,7 @@ export function useChatSession({
   const { t } = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingAssistantPreview, setPendingAssistantPreview] = useState<PendingAssistantPreview>({
     visible: false,
@@ -50,9 +74,12 @@ export function useChatSession({
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
 
   const assemblerRef = useRef(new StreamAssembler());
+  const replayAssemblerRef = useRef(new StreamAssembler());
   const streamingMsgIdRef = useRef<string | null>(null);
+  const replayStreamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
+  const replayMessagesRef = useRef(new Map<string, Message>());
   const knownUserMessageIdsRef = useRef(new Set<string>());
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
@@ -62,6 +89,7 @@ export function useChatSession({
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
+  const agentOfflineTextRef = useRef('agent已离线');
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
   aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
@@ -85,7 +113,10 @@ export function useChatSession({
   const resetTransientState = useCallback(() => {
     historyEpochRef.current += 1;
     assemblerRef.current.reset();
+    replayAssemblerRef.current.reset();
     streamingMsgIdRef.current = null;
+    replayStreamingMsgIdRef.current = null;
+    replayMessagesRef.current.clear();
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
@@ -193,6 +224,174 @@ export function useChatSession({
     }
   }, [finalizeStreamingMessage]);
 
+  const flushReplayMessages = useCallback(() => {
+    const replayMessages = Array.from(replayMessagesRef.current.values());
+    replayMessagesRef.current.clear();
+    replayAssemblerRef.current.reset();
+    replayStreamingMsgIdRef.current = null;
+
+    if (replayMessages.length === 0) {
+      return;
+    }
+
+    replayMessages.sort((left, right) => left.timestamp - right.timestamp);
+
+    setMessages((prev) => {
+      const next = [...prev];
+      replayMessages.forEach((message) => {
+        const existingIndex = next.findIndex((item) => item.id === message.id);
+        if (existingIndex >= 0) {
+          next[existingIndex] = {
+            ...next[existingIndex],
+            ...message,
+            isStreaming: false,
+          };
+        } else {
+          next.push({
+            ...message,
+            isStreaming: false,
+          });
+        }
+      });
+      knownUserMessageIdsRef.current = collectUserMessageIds(next);
+      return next;
+    });
+  }, []);
+
+  const handleReplayMessage = useCallback((msg: StreamMessage) => {
+    switch (msg.type) {
+      case 'text.delta':
+      case 'text.done':
+      case 'thinking.delta':
+      case 'thinking.done':
+      case 'tool.update':
+      case 'question':
+      case 'permission.ask':
+      case 'file': {
+        const messageId = msg.messageId;
+        if (!messageId) {
+          break;
+        }
+
+        if (replayStreamingMsgIdRef.current && replayStreamingMsgIdRef.current !== messageId) {
+          replayAssemblerRef.current.reset();
+        }
+        replayStreamingMsgIdRef.current = messageId;
+
+        replayAssemblerRef.current.handleMessage(msg);
+        const current = replayMessagesRef.current.get(messageId);
+        replayMessagesRef.current.set(messageId, {
+          id: messageId,
+          role: current?.role ?? 'assistant',
+          content: replayAssemblerRef.current.getText(),
+          contentType: current?.contentType ?? 'markdown',
+          timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
+          isStreaming: false,
+          parts: replayAssemblerRef.current.getParts().map((part) => ({ ...part, isStreaming: false })),
+          meta: current?.meta,
+          isHistory: current?.isHistory,
+        });
+        break;
+      }
+      case 'message.user': {
+        const nextMessage = buildUserMessage(msg);
+        if (!nextMessage) {
+          break;
+        }
+        if (
+          replayMessagesRef.current.has(nextMessage.id)
+          || knownUserMessageIdsRef.current.has(nextMessage.id)
+        ) {
+          break;
+        }
+        replayMessagesRef.current.set(nextMessage.id, nextMessage);
+        break;
+      }
+      case 'permission.reply': {
+        const permissionId = msg.permissionId;
+        if (!permissionId) {
+          break;
+        }
+
+        replayMessagesRef.current.forEach((message, messageId) => {
+          if (!message.parts?.some((part) => part.type === 'permission' && part.permissionId === permissionId)) {
+            return;
+          }
+
+          replayMessagesRef.current.set(messageId, {
+            ...message,
+            parts: message.parts.map((part) => (
+              part.type === 'permission' && part.permissionId === permissionId
+                ? {
+                  ...part,
+                  permResolved: true,
+                  response: msg.response ?? part.response,
+                  isStreaming: false,
+                }
+                : part
+            )),
+          });
+        });
+        break;
+      }
+      case 'step.done': {
+        const currentReplayMessageId = replayStreamingMsgIdRef.current;
+        if (!currentReplayMessageId || !msg.tokens) {
+          break;
+        }
+
+        const current = replayMessagesRef.current.get(currentReplayMessageId);
+        if (!current) {
+          break;
+        }
+
+        replayMessagesRef.current.set(currentReplayMessageId, {
+          ...current,
+          meta: {
+            ...current.meta,
+            tokens: msg.tokens ?? undefined,
+            cost: msg.cost ?? undefined,
+          },
+        });
+        break;
+      }
+      case 'snapshot': {
+        replayAssemblerRef.current.reset();
+        replayStreamingMsgIdRef.current = null;
+        replayMessagesRef.current.clear();
+        (msg.messages ?? []).slice().reverse().forEach((snapshot) => {
+          const mapped = snapshotMessageToMessage(snapshot);
+          replayMessagesRef.current.set(mapped.id, mapped);
+        });
+        break;
+      }
+      case 'streaming': {
+        const messageId = msg.messageId;
+        if (!messageId || !msg.parts || msg.parts.length === 0) {
+          break;
+        }
+
+        const nextRole = normalizeRole(msg.role);
+        replayMessagesRef.current.set(messageId, {
+          id: messageId,
+          role: nextRole,
+          content: '',
+          contentType: contentTypeForRole(nextRole),
+          timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
+          isStreaming: false,
+          parts: mapRawParts(msg.parts, false),
+        });
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (msg.replayDone) {
+      flushReplayMessages();
+    }
+  }, [flushReplayMessages]);
+
   const loadMoreHistory = useCallback(async () => {
     if (!welinkSessionId) return;
     if (isLoadingHistoryRef.current || !hasMoreHistoryRef.current) return;
@@ -201,18 +400,21 @@ export function useChatSession({
     const requestEpoch = historyEpochRef.current;
     isLoadingHistoryRef.current = true;
     setIsLoadingHistory(true);
+
     try {
       const result = await getSessionMessageHistory({
         welinkSessionId: requestSessionId,
         beforeSeq: nextBeforeSeqRef.current ?? undefined,
         size: HISTORY_PAGE_SIZE,
       });
+
       if (
         historyEpochRef.current !== requestEpoch
         || activeWelinkSessionIdRef.current !== requestSessionId
       ) {
         return;
       }
+
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
       if (olderMessages.length > 0) {
         setMessages((prev) => {
@@ -221,6 +423,7 @@ export function useChatSession({
           return next;
         });
       }
+
       nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
       const nextHasMoreHistory = hasMoreHistoryByCursor(result);
       hasMoreHistoryRef.current = nextHasMoreHistory;
@@ -250,9 +453,10 @@ export function useChatSession({
       ...(toolCallId ? { toolCallId } : {}),
       ...(subagentSessionId ? { subagentSessionId } : {}),
     });
+
     const userMessage = messageOperationToMessage(result);
     setMessages((prev) => {
-      if (prev.find((message) => message.id === userMessage.id)) {
+      if (prev.some((message) => message.id === userMessage.id)) {
         return prev;
       }
       const next = [...prev, userMessage];
@@ -307,12 +511,14 @@ export function useChatSession({
           welinkSessionId,
           size: HISTORY_PAGE_SIZE,
         });
+
         if (
           historyEpochRef.current !== requestEpoch
           || activeWelinkSessionIdRef.current !== welinkSessionId
         ) {
           return;
         }
+
         const mapped = result.content.map((message) => ({
           ...sessionMessageToMessage(message),
           isHistory: true,
@@ -345,6 +551,15 @@ export function useChatSession({
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
       if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
         return;
+      }
+
+      if (msg.deliveryMode === 'replay') {
+        handleReplayMessage(msg);
+        return;
+      }
+
+      if (replayMessagesRef.current.size > 0) {
+        flushReplayMessages();
       }
 
       if (
@@ -418,34 +633,23 @@ export function useChatSession({
           break;
         }
         case 'message.user': {
-          const messageId = msg.messageId;
-          if (!messageId) {
+          const nextMessage = buildUserMessage(msg);
+          if (!nextMessage) {
             break;
           }
 
           finalizeStreamingMessage();
           setSessionStatus('busy');
-          const content = msg.content ?? '';
           setMessages((prev) => {
-            const hasUserMessage = knownUserMessageIdsRef.current.has(messageId);
-            if (hasUserMessage) {
+            if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
               return prev;
             }
 
-            const nextMessage: Message = {
-              id: messageId,
-              role: 'user',
-              content,
-              contentType: 'plain',
-              timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
-              isStreaming: false,
-            };
-
             const next = [...prev, nextMessage];
-            knownUserMessageIdsRef.current.add(messageId);
+            knownUserMessageIdsRef.current.add(nextMessage.id);
             return next;
           });
-          showPendingAssistantPreview(activeWelinkSessionId);
+          showPendingAssistantPreview(activeWelinkSessionIdRef.current);
           break;
         }
         case 'permission.reply': {
@@ -454,9 +658,11 @@ export function useChatSession({
               (part) => part.type === 'permission' && part.permissionId === msg.permissionId,
             ),
           );
+
           if (hasStreamingPermission) {
             assemblerRef.current.handleMessage(msg);
           }
+
           const currentParts = hasStreamingPermission ? assemblerRef.current.getParts() : null;
           const currentStreamingMessageId = streamingMsgIdRef.current;
 
@@ -495,20 +701,18 @@ export function useChatSession({
         case 'step.done':
           if (streamingMsgIdRef.current && msg.tokens) {
             const finalId = streamingMsgIdRef.current;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === finalId
-                  ? {
-                    ...m,
-                    meta: {
-                      ...m.meta,
-                      tokens: msg.tokens ?? undefined,
-                      cost: msg.cost ?? undefined,
-                    },
-                  }
-                  : m,
-              ),
-            );
+            setMessages((prev) => prev.map((message) => (
+              message.id === finalId
+                ? {
+                  ...message,
+                  meta: {
+                    ...message.meta,
+                    tokens: msg.tokens ?? undefined,
+                    cost: msg.cost ?? undefined,
+                  },
+                }
+                : message
+            )));
           }
           break;
         case 'session.title':
@@ -525,7 +729,7 @@ export function useChatSession({
           }
           agentOfflineHandledRef.current = true;
           setSessionStatus('idle');
-          appendAssistantErrorBlock('agent已离线', 'agent已离线');
+          appendAssistantErrorBlock(agentOfflineTextRef.current, agentOfflineTextRef.current);
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
@@ -538,9 +742,6 @@ export function useChatSession({
           }
           break;
         case 'session.error':
-          setSessionStatus('error');
-          appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
-          break;
         case 'error':
           setSessionStatus('error');
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
@@ -549,7 +750,7 @@ export function useChatSession({
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
           hidePendingAssistantPreview();
-          setMessages((msg.messages ?? []).map((sm) => snapshotMessageToMessage(sm)).reverse());
+          setMessages((msg.messages ?? []).map((item) => snapshotMessageToMessage(item)).reverse());
           break;
         case 'streaming': {
           const messageId = msg.messageId;
@@ -613,6 +814,8 @@ export function useChatSession({
     appendAssistantErrorBlock,
     ensureStreamingMessageContext,
     finalizeStreamingMessage,
+    flushReplayMessages,
+    handleReplayMessage,
     hidePendingAssistantPreview,
     mode,
     upsertAssistantMessage,
@@ -679,10 +882,10 @@ export function useChatSession({
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
-      showToast('已复制到剪贴板');
+      showToast(tRef.current('common.copySuccess'));
     } catch (err) {
       WeLog(`useChatSession copy failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast('复制失败');
+      showToast(tRef.current('assistantDetail.copyFailed'));
     }
   }, [mode, welinkSessionId]);
 

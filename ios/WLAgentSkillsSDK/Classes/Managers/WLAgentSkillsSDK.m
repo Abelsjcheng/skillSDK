@@ -102,38 +102,37 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 #pragma mark - 1. createSession
 
 - (void)createSession:(WLAgentSkillsCreateSessionParams *)params
-                            success:(void (^)(WLAgentSkillsSkillSession *session))success
+                            success:(void (^)(WLAgentSkillsSession *session))success
                             failure:(void (^)(NSError *error))failure {
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;
     }
     NSString *errorMessage = nil;
-    NSString *bussinessId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.bussinessId
-                                                                        fieldName:@"bussinessId"
+    NSString *businessSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.businessSessionId
+                                                                        fieldName:@"businessSessionId"
                                                                      errorMessage:&errorMessage];
-    if (bussinessId == nil) {
+    if (businessSessionId == nil) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
     NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
     NSString *title = [WLAgentSkillsTypeConverter optionalStringFromValue:params.title];
-    NSString *bussinessDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessDomain];
-    NSString *bussinessType = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessType];
+    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
+    NSString *businessSessionType = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionType];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
     __weak typeof(self) weakSelf = self;
-    NSString *businessSessionDomain = bussinessDomain;
-
     [[WLAgentSkillsHTTPClient sharedClient] getHistorySessionsWithPage:@0
                                                                   size:@50
                                                                 status:nil
                                                                     ak:ak
-                                                          bussinessId:bussinessId
+                                                    businessSessionId:businessSessionId
                                                       assistantAccount:assistantAccount
                                               businessSessionDomain:businessSessionDomain
+                                                businessSessionType:businessSessionType
                                                                 success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         NSArray *content = [data[@"content"] isKindOfClass:[NSArray class]] ? data[@"content"] : @[];
@@ -141,20 +140,20 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 
         if (existing != nil) {
             if (success) {
-                success([[WLAgentSkillsSkillSession alloc] initWithDictionary:existing]);
+                success([[WLAgentSkillsSession alloc] initWithDictionary:existing]);
             }
             return;
         }
 
         [[WLAgentSkillsHTTPClient sharedClient] createSessionWithAK:ak
                                                                                                                         title:title
-                                                                                                                bussinessDomain:bussinessDomain
-                                                                                                                    bussinessType:bussinessType
-                                                                                                                    bussinessId:bussinessId
+                                                                                                        businessSessionDomain:businessSessionDomain
+                                                                                                          businessSessionType:businessSessionType
+                                                                                                            businessSessionId:businessSessionId
                                                                                                                 assistantAccount:assistantAccount
                                                                                                                     success:^(id  _Nullable createdResponse) {
             NSDictionary *created = [createdResponse isKindOfClass:[NSDictionary class]] ? createdResponse : @{};
-            WLAgentSkillsSkillSession *session = [[WLAgentSkillsSkillSession alloc] initWithDictionary:created];
+            WLAgentSkillsSession *session = [[WLAgentSkillsSession alloc] initWithDictionary:created];
             if (success) {
                 success(session);
             }
@@ -273,7 +272,9 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [weakSelf sendMessageWithSessionId:params.welinkSessionId
                                                                 content:content
                                                         toolCallId:nil
+                                                        questionId:nil
                                                 subagentSessionId:nil
+                                                  businessExtParam:nil
                                                                 success:success
                                                                 failure:failure];
     }
@@ -501,7 +502,9 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     [self sendMessageWithSessionId:params.welinkSessionId
                                                     content:params.content
                                             toolCallId:params.toolCallId
+                                            questionId:params.questionId
                                     subagentSessionId:params.subagentSessionId
+                                      businessExtParam:params.businessExtParam
                                                     success:success
                                                     failure:failure];
 }
@@ -535,6 +538,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                                                                                     permId:params.permId
                                                                                                                                 response:params.response
                                                                                                                     subagentSessionId:params.subagentSessionId
+                                                                                                                      businessExtParam:params.businessExtParam
                                                                                                                                 success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsReplyPermissionResult *result = [[WLAgentSkillsReplyPermissionResult alloc] initWithDictionary:data];
@@ -588,7 +592,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 #pragma mark - 14. createNewSession
 
 - (void)createNewSession:(WLAgentSkillsCreateNewSessionParams *)params
-                success:(void (^)(WLAgentSkillsSkillSession *session))success
+                success:(void (^)(WLAgentSkillsSession *session))success
                 failure:(void (^)(NSError *error))failure {
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
@@ -596,16 +600,16 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }
 
     NSString *errorMessage = nil;
-    NSString *bussinessId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.bussinessId
-                                                                        fieldName:@"bussinessId"
-                                                                     errorMessage:&errorMessage];
-    if (bussinessId == nil) {
+    NSString *businessSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.businessSessionId
+                                                                            fieldName:@"businessSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (businessSessionId == nil) {
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
     NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
-    NSString *bussinessDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessDomain];
-    NSString *bussinessType = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessType];
+    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
+    NSString *businessSessionType = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionType];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
     NSString *title = [WLAgentSkillsTypeConverter optionalStringFromValue:params.title];
 
@@ -614,13 +618,13 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] createNewSessionWithAK:ak
                                                              title:title
-                                                   bussinessDomain:bussinessDomain
-                                                     bussinessType:bussinessType
-                                                       bussinessId:bussinessId
+                                             businessSessionDomain:businessSessionDomain
+                                               businessSessionType:businessSessionType
+                                                 businessSessionId:businessSessionId
                                                    assistantAccount:assistantAccount
                                                             success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        WLAgentSkillsSkillSession *session = [[WLAgentSkillsSkillSession alloc] initWithDictionary:data];
+        WLAgentSkillsSession *session = [[WLAgentSkillsSession alloc] initWithDictionary:data];
         if (success) {
             success(session);
         }
@@ -633,7 +637,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 #pragma mark - 15. getHistorySessionsList
 
 - (void)getHistorySessionsList:(WLAgentSkillsHistorySessionsParams *)params
-                        success:(void (^)(WLAgentSkillsSkillSessionPageResult *result))success
+                        success:(void (^)(WLAgentSkillsSessionPageResult *result))success
                         failure:(void (^)(NSError *error))failure {
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
@@ -673,14 +677,14 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     NSNumber *page = @(pageValue);
     NSNumber *size = @(sizeValue);
     NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
-    NSString *bussinessId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.bussinessId];
+    NSString *businessSessionId = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionId];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
     NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
     if (businessSessionDomain != nil) {
         businessSessionDomain = [businessSessionDomain lowercaseString];
-        NSSet *validBusinessSessionDomains = [NSSet setWithArray:@[@"miniapp", @"im", @"skill"]];
+        NSSet *validBusinessSessionDomains = [NSSet setWithArray:@[@"miniapp", @"im"]];
         if (![validBusinessSessionDomains containsObject:businessSessionDomain]) {
-            [self dispatchFailure:failure code:1000 message:@"businessSessionDomain must be miniapp/im/skill."];
+            [self dispatchFailure:failure code:1000 message:@"businessSessionDomain must be miniapp/im."];
             return;
         }
     }
@@ -692,7 +696,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                                                                    size:size
                                                                  status:status
                                                                      ak:ak
-                                                             bussinessId:bussinessId
+                                                     businessSessionId:businessSessionId
                                                          assistantAccount:assistantAccount
                                                     businessSessionDomain:businessSessionDomain
                                                                 success:^(id  _Nullable responseObject) {
@@ -701,9 +705,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
             return;
         }
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        WLAgentSkillsSkillSessionPageResult *result = [strongSelf normalizedSkillSessionPageResultFromDictionary:data
-                                                                                                     requestPage:page
-                                                                                                     requestSize:size];
+        WLAgentSkillsSessionPageResult *result = [[WLAgentSkillsSessionPageResult alloc] initWithDictionary:data];
         if (success) {
             success(result);
         }
@@ -1427,7 +1429,9 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 - (void)sendMessageWithSessionId:(NSString *)welinkSessionId
                                                     content:(NSString *)content
                                             toolCallId:(nullable NSString *)toolCallId
+                                            questionId:(nullable NSString *)questionId
                                     subagentSessionId:(nullable NSString *)subagentSessionId
+                                      businessExtParam:(nullable NSDictionary *)businessExtParam
                                                     success:(void (^)(WLAgentSkillsSendMessageResult *result))success
                                                     failure:(void (^)(NSError *error))failure {
     [self setSendMessageTriggered:YES sessionId:welinkSessionId];
@@ -1437,7 +1441,9 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:welinkSessionId
                                                                                                                         content:content
                                                                                                                     toolCallId:toolCallId
+                                                                                                                    questionId:questionId
                                                                                                             subagentSessionId:subagentSessionId
+                                                                                                              businessExtParam:businessExtParam
                                                                                                                         success:^(id  _Nullable responseObject) {
         NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
         WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] initWithDictionary:data];
@@ -1647,34 +1653,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         }
     }
     return fallback;
-}
-
-- (WLAgentSkillsSkillSessionPageResult *)normalizedSkillSessionPageResultFromDictionary:(NSDictionary *)dictionary
-                                                                                 requestPage:(NSNumber *)requestPage
-                                                                                 requestSize:(NSNumber *)requestSize {
-    WLAgentSkillsSkillSessionPageResult *raw = [[WLAgentSkillsSkillSessionPageResult alloc] initWithDictionary:dictionary];
-    NSNumber *safePage = raw.page ?: (requestPage ?: @0);
-    NSInteger safeSizeValue = raw.size != nil && raw.size.integerValue > 0
-        ? raw.size.integerValue
-        : (requestSize != nil && requestSize.integerValue > 0 ? requestSize.integerValue : 50);
-    NSNumber *safeSize = @(safeSizeValue);
-    NSNumber *safeTotal = raw.total ?: @((NSInteger)raw.content.count);
-    NSNumber *safeTotalPages = raw.totalPages;
-    if (safeTotalPages == nil || safeTotalPages.integerValue < 0) {
-        NSInteger totalPages = 0;
-        if (safeTotal.longLongValue > 0 && safeSizeValue > 0) {
-            totalPages = (NSInteger)((safeTotal.longLongValue + safeSizeValue - 1) / safeSizeValue);
-        }
-        safeTotalPages = @(totalPages);
-    }
-
-    raw.page = safePage;
-    raw.size = safeSize;
-    raw.total = safeTotal;
-    raw.totalPages = safeTotalPages;
-    raw.number = safePage;
-    raw.totalElements = safeTotal;
-    return raw;
 }
 
 - (NSArray<WLAgentSkillsAgentType *> *)parseAgentTypeListFromResponse:(id)responseObject {

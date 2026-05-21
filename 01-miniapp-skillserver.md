@@ -97,9 +97,9 @@ POST /api/skill/sessions
 {
   "ak": "agent-access-key",     // 必需：Agent Key
   "title": "会话标题",            // 可选
-  "bussinessDomain": "miniapp",   // 必需：会话关联场域
-  "bussinessType": "direct",     // 必需：会话类型
-  "bussinessId": "userAccount",   // 必需：对话所属人id
+  "businessSessionDomain": "miniapp",   // 必需：会话关联场域
+  "businessSessionType": "direct",     // 必需：会话类型
+  "businessSessionId": "userAccount",   // 必需：对话所属人id
   "assistantAccount": "assistantAccount"   // 必需：分身账号id
 }
 ```
@@ -112,9 +112,9 @@ interface Session {
   userId?: string;               // 会话所有者
   ak?: string;                   // Agent Key
   title: string;                 // 会话标题
-  bussinessDomain: string;       // 会话关联场域
-  bussinessType: string;         // 会话类型
-  bussinessId: string;           // 对话所属人id
+  businessSessionDomain: string;       // 会话关联场域
+  businessSessionType: string;         // 会话类型
+  businessSessionId: string;           // 对话所属人id
   assistantAccount: string;      // 分身账号id
   status: 'active' | 'idle' | 'closed';
   toolSessionId?: string;        // OpenCode 侧会话 ID（可能未就绪）
@@ -158,7 +158,7 @@ interface Session {
 #### 查询会话列表
 
 ```
-GET /api/skill/sessions?status=active&bussinessId=xxx&ak=xxx&page=0&size=20&assistantAccount=xxx
+GET /api/skill/sessions?status=active&businessSessionId=xxx&ak=xxx&page=0&size=20&assistantAccount=xxx
 ```
 
 **查询参数：**
@@ -166,7 +166,7 @@ GET /api/skill/sessions?status=active&bussinessId=xxx&ak=xxx&page=0&size=20&assi
 | ------------------ | ------ | ---------------------------- |
 | `status`           | string | 按状态筛选                   |
 | `ak`               | string | 按 Agent Key 筛选            |
-| `bussinessId`      | string | 按 业务ID筛选（原imGroupId） |
+| `businessSessionId`      | string | 按 业务ID筛选（原imGroupId） |
 | `assistantAccount` | string | 按 分身账号筛选              |
 | `page`             | int    | 页码（从 0 开始）            |
 | `size`             | int    | 每页大小                     |

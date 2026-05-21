@@ -41,7 +41,7 @@ public interface SkillApiService {
             @Query("size") int size,
             @Query("status") @Nullable String status,
             @Query("ak") @Nullable String ak,
-            @Query("bussinessId") @Nullable String bussinessId,
+            @Query("businessSessionId") @Nullable String businessSessionId,
             @Query("assistantAccount") @Nullable String assistantAccount,
             @Query("businessSessionDomain") @Nullable String businessSessionDomain
     );

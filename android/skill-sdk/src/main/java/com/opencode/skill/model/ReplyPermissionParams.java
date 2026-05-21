@@ -4,6 +4,8 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.gson.JsonObject;
+
 @Keep
 public class ReplyPermissionParams {
     @NonNull
@@ -14,9 +16,11 @@ public class ReplyPermissionParams {
     private final String response;
     @Nullable
     private final String subagentSessionId;
+    @Nullable
+    private final JsonObject businessExtParam;
 
     public ReplyPermissionParams(@NonNull String welinkSessionId, @NonNull String permId, @NonNull String response) {
-        this(welinkSessionId, permId, response, null);
+        this(welinkSessionId, permId, response, null, null);
     }
 
     public ReplyPermissionParams(
@@ -25,10 +29,21 @@ public class ReplyPermissionParams {
             @NonNull String response,
             @Nullable String subagentSessionId
     ) {
+        this(welinkSessionId, permId, response, subagentSessionId, null);
+    }
+
+    public ReplyPermissionParams(
+            @NonNull String welinkSessionId,
+            @NonNull String permId,
+            @NonNull String response,
+            @Nullable String subagentSessionId,
+            @Nullable JsonObject businessExtParam
+    ) {
         this.welinkSessionId = welinkSessionId;
         this.permId = permId;
         this.response = response;
         this.subagentSessionId = subagentSessionId;
+        this.businessExtParam = businessExtParam;
     }
 
     @NonNull
@@ -49,5 +64,10 @@ public class ReplyPermissionParams {
     @Nullable
     public String getSubagentSessionId() {
         return subagentSessionId;
+    }
+
+    @Nullable
+    public JsonObject getBusinessExtParam() {
+        return businessExtParam;
     }
 }

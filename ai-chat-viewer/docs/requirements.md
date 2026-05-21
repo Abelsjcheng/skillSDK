@@ -1019,11 +1019,11 @@
    - 再调用 `getHistorySessionsList({ assistantAccount, status: 'ACTIVE' })` 查询当前助理活跃会话：
       - 若存在会话：按 `updatedAt` 取最新会话；
       - 若不存在会话：调用 `createNewSession` 创建会话，入参固定为：
-         - `bussinessDomain: 'miniapp'`
-         - `bussinessType: 'direct'`
+         - `businessSessionDomain: 'miniapp'`
+         - `businessSessionType: 'direct'`
          - `assistantAccount`
          - `ak: 助理详情.appKey`
-         - `bussinessId: window.HWH5.getUserInfo()` 返回的 `uid` 字符串
+         - `businessSessionId: window.HWH5.getUserInfo()` 返回的 `uid` 字符串
    - 将选中/新建会话的 `welinkSessionId` 作为后续 AI 对话与历史消息展示的会话 ID；
    - 点击“新建会话”图标按钮时，按同样参数调用 `createNewSession`，并用新会话 `welinkSessionId` 更新当前对话会话上下文。
 12. 助理头像地址兼容规则（助理详情/切换助理/启用助理）：

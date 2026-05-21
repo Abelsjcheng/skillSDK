@@ -99,15 +99,15 @@ export interface RestApiResponse<T> {
 // Shared entities
 // ---------------------------
 
-export interface SkillSession {
+export interface Session {
   welinkSessionId: string;
   userId: string;
   ak: string | null;
   title: string | null;
   imGroupId: string | null;
-  bussinessDomain?: string | null;
-  bussinessType?: string | null;
-  bussinessId?: string | null;
+  businessSessionDomain?: string | null;
+  businessSessionType?: string | null;
+  businessSessionId?: string | null;
   assistantAccount?: string | null;
   status: SessionRecordStatus;
   toolSessionId: string | null;
@@ -128,6 +128,7 @@ export interface SessionMessagePart {
   title?: string;
   header?: string;
   question?: string;
+  questionId?: string;
   options?: string[];
   permissionId?: string;
   permType?: string;
@@ -237,6 +238,7 @@ export interface StreamMessage {
   title?: string | null;
   header?: string;
   question?: string;
+  questionId?: string | null;
   options?: string[];
   fileName?: string;
   fileUrl?: string;
@@ -261,6 +263,8 @@ export interface StreamMessage {
   subagentName?: string;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
+  deliveryMode?: 'replay' | 'live';
+  replayDone?: boolean;
 }
 
 export interface SessionError {
@@ -282,18 +286,18 @@ export interface SessionListener {
 export interface CreateSessionParams {
   ak?: string;
   title?: string;
-  bussinessDomain?: string;
-  bussinessId: string;
-  bussinessType?: string;
+  businessSessionDomain?: string;
+  businessSessionId: string;
+  businessSessionType?: string;
   assistantAccount?: string;
 }
 
 export interface CreateNewSessionParams {
   ak?: string;
   title?: string;
-  bussinessDomain?: string;
-  bussinessType?: string;
-  bussinessId: string;
+  businessSessionDomain?: string;
+  businessSessionType?: string;
+  businessSessionId: string;
   assistantAccount?: string;
 }
 
@@ -302,7 +306,7 @@ export interface HistorySessionsParams {
   size?: number;
   status?: SessionRecordStatus;
   ak?: string;
-  bussinessId?: string;
+  businessSessionId?: string;
   assistantAccount?: string;
   businessSessionDomain?: BusinessSessionDomain;
 }
@@ -389,7 +393,9 @@ export interface SendMessageParams {
   welinkSessionId: string;
   content: string;
   toolCallId?: string;
+  questionId?: string;
   subagentSessionId?: string;
+  businessExtParam?: Record<string, Object>;
 }
 
 export interface SendMessageResult {
@@ -410,6 +416,7 @@ export interface ReplyPermissionParams {
   permId: string;
   response: PermissionResponse;
   subagentSessionId?: string;
+  businessExtParam?: Record<string, Object>;
 }
 
 export interface ReplyPermissionResult {
