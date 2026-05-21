@@ -499,53 +499,13 @@ export function useChatSession({
   }, [messages, welinkSessionId]);
 
   useEffect(() => {
+    if (!welinkSessionId) return;
+
     activeWelinkSessionIdRef.current = welinkSessionId || null;
     resetTransientState();
+    const requestSessionId = welinkSessionId;
     const requestEpoch = historyEpochRef.current;
-
-    if (!welinkSessionId) return;
-
-    const loadMessages = async () => {
-      try {
-        const result = await getSessionMessageHistory({
-          welinkSessionId,
-          size: HISTORY_PAGE_SIZE,
-        });
-
-        if (
-          historyEpochRef.current !== requestEpoch
-          || activeWelinkSessionIdRef.current !== welinkSessionId
-        ) {
-          return;
-        }
-
-        const mapped = result.content.map((message) => ({
-          ...sessionMessageToMessage(message),
-          isHistory: true,
-        }));
-        setMessages(mapped);
-        knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
-        nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
-        const nextHasMoreHistory = hasMoreHistoryByCursor(result);
-        hasMoreHistoryRef.current = nextHasMoreHistory;
-        setHasMoreHistory(nextHasMoreHistory);
-      } catch (err) {
-        if (
-          historyEpochRef.current !== requestEpoch
-          || activeWelinkSessionIdRef.current !== welinkSessionId
-        ) {
-          return;
-        }
-        WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-        showToast(tRef.current('weAgent.loadHistoryFailed'));
-      }
-    };
-
-    void loadMessages();
-  }, [mode, resetTransientState, welinkSessionId]);
-
-  useEffect(() => {
-    if (!welinkSessionId) return;
+    let cancelled = false;
 
     const onMessage = (msg: StreamMessage) => {
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
@@ -792,20 +752,74 @@ export function useChatSession({
       WeLog(`useChatSession session listener closed | extra=${JSON.stringify({ mode, welinkSessionId, reason })}`);
     };
 
-    if (!listenerRegisteredRef.current) {
+    const registerCurrentSessionListener = () => {
+      if (cancelled || listenerRegisteredRef.current) {
+        return;
+      }
       registerSessionListener({
-        welinkSessionId,
+        welinkSessionId: requestSessionId,
         onMessage,
         onError,
         onClose,
       });
       listenerRegisteredRef.current = true;
-    }
+    };
+
+    const loadMessages = async () => {
+      try {
+        const result = await getSessionMessageHistory({
+          welinkSessionId: requestSessionId,
+          size: HISTORY_PAGE_SIZE,
+        });
+
+        if (
+          cancelled
+          || historyEpochRef.current !== requestEpoch
+          || activeWelinkSessionIdRef.current !== requestSessionId
+        ) {
+          return;
+        }
+
+        const mapped = result.content.map((message) => ({
+          ...sessionMessageToMessage(message),
+          isHistory: true,
+        }));
+        setMessages(mapped);
+        knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
+        nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
+        const nextHasMoreHistory = hasMoreHistoryByCursor(result);
+        hasMoreHistoryRef.current = nextHasMoreHistory;
+        setHasMoreHistory(nextHasMoreHistory);
+      } catch (err) {
+        if (
+          cancelled
+          || historyEpochRef.current !== requestEpoch
+          || activeWelinkSessionIdRef.current !== requestSessionId
+        ) {
+          return;
+        }
+        WeLog(`useChatSession getSessionMessageHistory failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
+        showToast(tRef.current('weAgent.loadHistoryFailed'));
+      }
+    };
+
+    void (async () => {
+      await loadMessages();
+      if (
+        cancelled
+        || historyEpochRef.current !== requestEpoch
+        || activeWelinkSessionIdRef.current !== requestSessionId
+      ) {
+        return;
+      }
+      registerCurrentSessionListener();
+    })();
 
     return () => {
+      cancelled = true;
       if (listenerRegisteredRef.current) {
         unregisterSessionListener({
-          welinkSessionId,
+          welinkSessionId: requestSessionId,
         });
         listenerRegisteredRef.current = false;
       }
@@ -818,6 +832,7 @@ export function useChatSession({
     handleReplayMessage,
     hidePendingAssistantPreview,
     mode,
+    resetTransientState,
     upsertAssistantMessage,
     welinkSessionId,
   ]);
