@@ -469,10 +469,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
     _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
-    _questionId = WLAgentSkillsStringValue(
-        dictionary[@"questionId"],
-        WLAgentSkillsStringValue(dictionary[@"requestId"], nil)
-    );
+    _questionId = WLAgentSkillsStringValue(dictionary[@"questionId"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
     _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
     _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
@@ -822,10 +819,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _title = WLAgentSkillsStringValue(dictionary[@"title"], nil);
     _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
-    _questionId = WLAgentSkillsStringValue(
-        dictionary[@"questionId"],
-        WLAgentSkillsStringValue(dictionary[@"requestId"], nil)
-    );
+    _questionId = WLAgentSkillsStringValue(dictionary[@"questionId"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
     _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
     _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);

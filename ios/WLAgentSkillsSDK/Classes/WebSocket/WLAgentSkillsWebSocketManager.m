@@ -116,9 +116,6 @@
     __block BOOL shouldReplay = NO;
 
     @synchronized(self) {
-    if (self.listeners[key] != nil) {
-        return NO;
-    }
     WLAgentSkillsReplayState *state = [self replayStateForSessionIdLocked:key];
     WLAgentSkillsSessionRoundBuffer *buffer = self.roundBuffers[key];
     if (buffer != nil && !buffer.completed && !state.replaying) {
