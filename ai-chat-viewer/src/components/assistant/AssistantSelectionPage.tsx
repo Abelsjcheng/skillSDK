@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import '../../styles/SwitchAssistant.less';
 import {
   dispatchAssistantCloseEvent,
@@ -28,7 +27,6 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   onSelectAssistant,
   rightButtonDisabled = false,
 }) => {
-  const { t } = useTranslation();
   const assistantList = useMemo(() => assistants ?? EMPTY_ASSISTANT_LIST, [assistants]);
   const isSelectionControlled = selectedAssistantId !== undefined;
   const resolvedDefaultSelectedAssistantId = useMemo(
