@@ -1,56 +1,8 @@
-const path = require('path');
-const {
-  RESOLVE_EXTENSIONS,
-  WEBPACK_ES5_TARGET,
-  createEs5Output,
-  createModuleRules,
-} = require('./webpack.shared');
+const { createSharedLibWebpackConfig } = require('./webpack.shared.lib');
 
-module.exports = {
-  mode: 'production',
-  target: WEBPACK_ES5_TARGET,
+module.exports = createSharedLibWebpackConfig({
   entry: './src/lib/index.ts',
-  output: createEs5Output({
-    path: path.resolve(__dirname, 'dist/lib'),
-    filename: 'index.js',
-    library: {
-      name: 'AIChatViewer',
-      type: 'umd',
-    },
-    globalObject: 'this',
-    clean: false,
-    publicPath: './',
-  }),
-  resolve: {
-    extensions: RESOLVE_EXTENSIONS,
-  },
-  externals: {
-    react: {
-      commonjs: 'react',
-      commonjs2: 'react',
-      amd: 'react',
-      root: 'React',
-    },
-    'react-dom/client': {
-      commonjs: 'react-dom/client',
-      commonjs2: 'react-dom/client',
-      amd: 'react-dom/client',
-      root: 'ReactDOM',
-    },
-    'react/jsx-runtime': {
-      commonjs: 'react/jsx-runtime',
-      commonjs2: 'react/jsx-runtime',
-      amd: 'react/jsx-runtime',
-      root: 'ReactJSXRuntime',
-    },
-  },
-  module: {
-    rules: createModuleRules({ singletonStyleTag: true }),
-  },
-  optimization: {
-    minimize: false,
-    usedExports: true,
-  },
-  devtool: "source-map",
-  performance: { hints: false },
-};
+  outputPath: 'dist/lib',
+  filename: 'index.js',
+  libraryName: 'AIChatViewer',
+});

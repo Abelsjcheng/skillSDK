@@ -1,13 +1,15 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import backIcon from '../../imgs/back_icon.svg';
-import closeIcon from '../../imgs/close_icon.svg';
-import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
 import type { AssistantPageHeaderAction, AssistantPageHeaderProps } from '../../types/components';
-import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { useMobileStatusBarHeight } from '../../utils/useMobileStatusBarHeight';
+import {
+  createDefaultPcCloseAction,
+  createDefaultPcServiceAction,
+  renderAssistantHeaderActionIcon,
+} from './assistantHeaderActions';
 
 const noop = () => {};
 
@@ -25,77 +27,35 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
   const { t } = useTranslation();
   useMobileStatusBarHeight(isPcMiniApp);
 
-  const resolvedDefaultPcCloseAction: AssistantPageHeaderAction = {
-    label: t('common.close'),
-    icon: closeIcon,
-    onClick: () => {
-      dispatchAssistantCloseEvent();
-      onClose();
-    },
-  };
+  const resolvedPcLeftActions = pcLeftActions ?? [createDefaultPcServiceAction(onService, t('common.service'))];
+  const resolvedPcRightActions = pcRightActions ?? [createDefaultPcCloseAction(onClose, t('common.close'))];
 
-  const resolvedDefaultPcServiceAction: AssistantPageHeaderAction = {
-    label: t('common.service'),
-    icon: serviceIcon,
-    onClick: () => {
-      onService();
-    },
-  };
-
-  const resolvedPcLeftActions = pcLeftActions ?? [resolvedDefaultPcServiceAction];
-  const resolvedPcRightActions = pcRightActions ?? [resolvedDefaultPcCloseAction];
+  const renderPcActionButton = (action: AssistantPageHeaderAction, side: 'left' | 'right') => (
+    <button
+      key={`${action.label}-${side}`}
+      ref={action.buttonRef}
+      type="button"
+      className="assistant-page-header__pc-btn"
+      aria-label={action.label}
+      onClick={(event) => {
+        runButtonClickWithDebounce(event, () => {
+          action.onClick();
+        });
+      }}
+    >
+      {renderAssistantHeaderActionIcon(action)}
+    </button>
+  );
 
   if (isPcMiniApp) {
     return (
       <header className="assistant-page-header assistant-page-header--pc">
         <div className="assistant-page-header__pc-side assistant-page-header__pc-side--left">
-          {resolvedPcLeftActions.map((action) => (
-            <button
-              key={`${action.label}-left`}
-              ref={action.buttonRef}
-              type="button"
-              className="assistant-page-header__pc-btn"
-              aria-label={action.label}
-              onClick={(event) => {
-                runButtonClickWithDebounce(event, () => {
-                  action.onClick();
-                });
-              }}
-            >
-              {action.iconNode ? (
-                <span className="assistant-page-header__pc-icon assistant-page-header__pc-icon--svg">
-                  {action.iconNode}
-                </span>
-              ) : action.icon ? (
-                <img src={action.icon} alt="" className="assistant-page-header__pc-icon" aria-hidden="true" />
-              ) : null}
-            </button>
-          ))}
+          {resolvedPcLeftActions.map((action) => renderPcActionButton(action, 'left'))}
         </div>
         <span className="assistant-page-header__title">{title}</span>
         <div className="assistant-page-header__pc-side assistant-page-header__pc-side--right">
-          {resolvedPcRightActions.map((action) => (
-            <button
-              key={`${action.label}-right`}
-              ref={action.buttonRef}
-              type="button"
-              className="assistant-page-header__pc-btn"
-              aria-label={action.label}
-              onClick={(event) => {
-                runButtonClickWithDebounce(event, () => {
-                  action.onClick();
-                });
-              }}
-            >
-              {action.iconNode ? (
-                <span className="assistant-page-header__pc-icon assistant-page-header__pc-icon--svg">
-                  {action.iconNode}
-                </span>
-              ) : action.icon ? (
-                <img src={action.icon} alt="" className="assistant-page-header__pc-icon" aria-hidden="true" />
-              ) : null}
-            </button>
-          ))}
+          {resolvedPcRightActions.map((action) => renderPcActionButton(action, 'right'))}
         </div>
       </header>
     );

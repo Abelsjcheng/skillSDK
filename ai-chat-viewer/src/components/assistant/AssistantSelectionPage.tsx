@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import '../../styles/SwitchAssistant.less';
-import closeIcon from '../../imgs/close_icon.svg';
-import serviceIcon from '../../imgs/icon-service.svg';
 import {
   dispatchAssistantCloseEvent,
   dispatchSwitchAssistantSelectEvent,
@@ -10,8 +8,12 @@ import {
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import AssistantCardList from './AssistantCardList';
 import AssistantPageHeader from './AssistantPageHeader';
-import type { AssistantPageHeaderAction, AssistantSelectionPageProps } from '../../types/components';
+import type { AssistantSelectionPageProps } from '../../types/components';
 import type { AssistantItem } from '../../types/assistant';
+import {
+  createDefaultPcCloseAction,
+  createDefaultPcServiceAction,
+} from './assistantHeaderActions';
 
 const EMPTY_ASSISTANT_LIST: AssistantItem[] = [];
 const noop = () => {};
@@ -52,27 +54,13 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
 
   const currentSelectedAssistantId = isSelectionControlled ? (selectedAssistantId ?? '') : internalSelectedAssistantId;
 
-  const pcLeftActions = useMemo<AssistantPageHeaderAction[]>(
-    () => [
-      {
-        label: t('common.service'),
-        icon: serviceIcon,
-        onClick: onService,
-      },
-    ],
+  const pcLeftActions = useMemo(
+    () => [createDefaultPcServiceAction(onService, t('common.service'))],
     [onService, t],
   );
 
-  const pcRightActions = useMemo<AssistantPageHeaderAction[]>(
-    () => [
-      {
-        label: t('common.close'),
-        icon: closeIcon,
-        onClick: () => {
-          dispatchAssistantCloseEvent();
-        },
-      },
-    ],
+  const pcRightActions = useMemo(
+    () => [createDefaultPcCloseAction(() => {}, t('common.close'))],
     [t],
   );
 
