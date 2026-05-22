@@ -440,6 +440,7 @@ export function useChatSession({
   const sendUserMessage = useCallback(async (
     content: string,
     toolCallId?: string,
+    questionId?: string,
     subagentSessionId?: string,
   ) => {
     if (!welinkSessionId) {
@@ -451,7 +452,9 @@ export function useChatSession({
       welinkSessionId,
       content: content.trim(),
       ...(toolCallId ? { toolCallId } : {}),
+      ...(questionId ? { questionId } : {}),
       ...(subagentSessionId ? { subagentSessionId } : {}),
+      ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
     });
 
     const userMessage = messageOperationToMessage(result);
@@ -465,20 +468,21 @@ export function useChatSession({
     });
     setScrollToBottomSignal((prev) => prev + 1);
     return result;
-  }, [welinkSessionId]);
+  }, [mode, welinkSessionId]);
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
     toolCallId,
+    questionId,
     subagentSessionId,
   }: QuestionAnswerSubmission) => {
     finalizeStreamingMessage();
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId, subagentSessionId);
+      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
     } catch (err) {
-      WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, toolCallId, subagentSessionId })} | error=${JSON.stringify(err)}`);
+      WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
       showToast(tRef.current('weAgent.submitAnswerFailed'));
       throw err;

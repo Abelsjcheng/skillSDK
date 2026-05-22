@@ -391,7 +391,7 @@ window.HWH5EXT.getSessionMessageHistory({
 
 说明：
 - 同一个 `welinkSessionId` 只允许注册一次监听器。
-- 重复注册不会报错，SDK 会 no-op，并返回成功语义。
+- 同一 `welinkSessionId` 重复注册时，会覆盖旧监听器。
 - 可在任意时机注册，SDK 保证时序安全，不因注册时机导致漏消息。
 - WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外没有外层 envelope。
 - SDK 会按 `welinkSessionId` 本地缓存“当前未完成轮次”的全部原始 `onmessage` 事件；若页面晚于会话开始时机打开，注册监听后会先补发缓存，再继续接收实时事件。
@@ -463,7 +463,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | partSeq | number \| null | Part 顺序；`permission.ask` / `permission.reply` 可能缺失 |
 
 说明：
-- `question` 是两阶段事件：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段前端应按 `partId` 关联此前的问题状态。
+- `question` 是两阶段事件：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam` / `questionId`，`completed` / `error` 阶段前端应按 `partId` 关联此前的问题状态。
 - `permission.reply` 是极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
 
 #### 常用附加字段（按事件返回）
@@ -516,7 +516,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 ### 行为说明
 
 1. SDK 内部维护每个会话唯一监听器（`onMessage` / `onError` / `onClose`）。
-2. 同一 `welinkSessionId` 重复调用 `registerSessionListener` 时，不替换原监听器，直接返回成功。
+2. 同一 `welinkSessionId` 重复注册时，会覆盖旧监听器。
 3. SDK 在本地按 `welinkSessionId` 缓存“当前未完成轮次”的全部原始 `StreamMessage` 事件：
    - 缓存内容为当前轮次收到的全部原始 `onmessage` 事件
    - 不区分事件类型，不做消息聚合，不改写字段结构
@@ -702,7 +702,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessag
 | welinkSessionId | string | 是 | 会话 ID |
 | content | string | 是 | 用户输入内容 |
 | toolCallId | string | 否 | 回答 AI `question` 时携带的工具调用 ID |
+| questionId | string | 否 | 回答 AI `question` 时携带的问题 ID。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
 | subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 `question` 时，必须回传事件中的真实子会话 ID |
+| businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### 返回值
 
@@ -733,6 +735,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessag
 
 ### 说明
 
+- 若当前回复的是 `question`，且服务端事件中带有问题 ID，则 SDK 应透传 `questionId`。
 - 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`，否则服务端会把应答路由到主对话。
 
 ### 调用示例
@@ -753,7 +756,9 @@ window.HWH5EXT.sendMessage({
   welinkSessionId: '42',
   content: '继续执行',
   toolCallId: 'call_q_1',
-  subagentSessionId: 'child-session-001'
+  questionId: 'question_q_1',
+  subagentSessionId: 'child-session-001',
+  businessExtParam: { scene: 'miniapp' }
 }).then((result) => {
   console.log('子 agent 应答发送成功:', result.id);
 }).catch((error) => {
@@ -1617,6 +1622,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createNewS
 | businessSessionId | string | 是 | 业务侧外部 ID 三元组中的 id；单聊可传用户 ID，群聊可传群 ID |
 | businessSessionType | string | 否 | 业务侧外部 ID 三元组中的 type |
 | assistantAccount | string | 否 | 助理账号 ID；为空时是否允许创建由服务端开关控制 |
+| businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### 返回值
 
@@ -1654,7 +1660,8 @@ window.HWH5EXT.createNewSession({
   businessSessionDomain: null,
   businessSessionType: null,
   assistantAccount: 'x00_1',
-  businessSessionId: 'x00123456'
+  businessSessionId: 'x00123456',
+  businessExtParam: { traceId: 'trace_001' }
 }).then((session) => {
   console.log('会话创建成功:', session.welinkSessionId);
 }).catch((error) => {
@@ -1693,6 +1700,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getHistory
 | businessSessionId | string | 否 | 按会话归属 ID 过滤 |
 | assistantAccount | string | 否 | 按助理账号 ID 过滤 |
 | businessSessionDomain | string | 否 | 会话来源域过滤：`miniapp` / `im` |
+| businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
 ### 返回值
 
@@ -1742,7 +1750,8 @@ window.HWH5EXT.getHistorySessionsList({
   page: 0,
   size: 50,
   status: 'IDLE',
-  assistantAccount: 'x001_1'
+  assistantAccount: 'x001_1',
+  businessExtParam: { traceId: 'trace_001' }
 }).then((result) => {
   console.log('历史会话总数:', result.total);
 }).catch((error) => {

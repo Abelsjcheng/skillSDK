@@ -73,6 +73,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       await onAnswered({
         answer,
         toolCallId: part.toolCallId,
+        questionId: part.questionId,
         subagentSessionId: part.subagentSessionId,
       });
       setAnswered(true);

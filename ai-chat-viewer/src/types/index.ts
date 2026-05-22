@@ -55,6 +55,7 @@ export interface QuestionOption {
 export interface QuestionAnswerSubmission {
   answer: string;
   toolCallId?: string;
+  questionId?: string;
   subagentSessionId?: string;
 }
 
@@ -79,6 +80,7 @@ interface ToolPartFields<TValue, TStatus> {
 interface QuestionPartFields<TValue, TOptions> {
   header?: TValue;
   question?: TValue;
+  questionId?: TValue;
   options?: TOptions;
   multiSelect?: boolean | null;
   questions?: QuestionItemInput[] | null;
