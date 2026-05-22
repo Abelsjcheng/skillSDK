@@ -10,10 +10,6 @@ import AssistantCardList from './AssistantCardList';
 import AssistantPageHeader from './AssistantPageHeader';
 import type { AssistantSelectionPageProps } from '../../types/components';
 import type { AssistantItem } from '../../types/assistant';
-import {
-  createDefaultPcCloseAction,
-  createDefaultPcServiceAction,
-} from './assistantHeaderActions';
 
 const EMPTY_ASSISTANT_LIST: AssistantItem[] = [];
 const noop = () => {};
@@ -54,16 +50,6 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
 
   const currentSelectedAssistantId = isSelectionControlled ? (selectedAssistantId ?? '') : internalSelectedAssistantId;
 
-  const pcLeftActions = useMemo(
-    () => [createDefaultPcServiceAction(onService, t('common.service'))],
-    [onService, t],
-  );
-
-  const pcRightActions = useMemo(
-    () => [createDefaultPcCloseAction(() => {}, t('common.close'))],
-    [t],
-  );
-
   const handleSelectAssistant = (assistantId: string) => {
     if (!isSelectionControlled) {
       setInternalSelectedAssistantId(assistantId);
@@ -85,8 +71,6 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         title={title}
         isPcMiniApp={isPcMiniApp}
         onService={onService}
-        pcLeftActions={isPcMiniApp ? pcLeftActions : undefined}
-        pcRightActions={isPcMiniApp ? pcRightActions : undefined}
       />
 
       <main className="switch-assistant__content">

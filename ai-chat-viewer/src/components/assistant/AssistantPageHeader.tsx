@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import backIcon from '../../imgs/back_icon.svg';
+import serviceIcon from '../../imgs/icon-service.svg';
 import '../../styles/AssistantPageHeader.less';
 import type { AssistantPageHeaderAction, AssistantPageHeaderProps } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
