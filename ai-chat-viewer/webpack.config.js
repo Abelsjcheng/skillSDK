@@ -22,17 +22,17 @@ module.exports = (env = {}, argv = {}) => {
     target: WEBPACK_ES5_TARGET,
     entry: './src/index.tsx',
     output: createEs5Output({
-      path: path.resolve(__dirname, 'dist'),
+      path: path.resolve(__dirname, env.platform === 'pc' ? 'dist/CUI' : 'dist'),
       filename: isDevelopment ? 'js/[name].js' : 'js/bundle.[contenthash].js',
       chunkFilename: isDevelopment ? 'js/[name].chunk.js' : 'js/[name].[contenthash].js',
-      assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
+      assetModuleFilename: env.platform === 'pc' ? undefined : 'asset/[name].[contenthash][ext][query]',
       clean: true,
     }),
     resolve: {
       extensions: RESOLVE_EXTENSIONS,
     },
     module: {
-      rules: createModuleRules({ includePolyfills: true }),
+      rules: createModuleRules({ includePolyfills: true, platform: env.platform, product: 'CUI' }),
     },
     plugins: [
       new webpack.DefinePlugin({

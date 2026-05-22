@@ -1,7 +1,7 @@
 const path = require('path');
 const { RESOLVE_EXTENSIONS, WEBPACK_ES5_TARGET, createEs5Output, createModuleRules } = require('./webpack.shared');
 
-const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName, singletonStyleTag = true }) => ({
+const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName, singletonStyleTag = true }, env = {}) => ({
   mode: 'production',
   target: WEBPACK_ES5_TARGET,
   entry,
@@ -40,7 +40,7 @@ const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName
     },
   },
   module: {
-    rules: createModuleRules({ singletonStyleTag }),
+    rules: createModuleRules({ singletonStyleTag, platform: env.platform, product: 'skillCUI' }),
   },
   optimization: {
     minimize: false,
