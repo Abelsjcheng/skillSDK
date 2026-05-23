@@ -6,4 +6,5 @@ module.exports = (env = {}) => createSharedLibWebpackConfig({
   filename: 'skill-cui.js',
   libraryName: 'AISkillCUI',
   singletonStyleTag: env.platform === 'pc' ? false : true,
+  needExternals: false,
 }, env);

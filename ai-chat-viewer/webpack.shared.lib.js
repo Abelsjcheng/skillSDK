@@ -1,7 +1,7 @@
 const path = require('path');
 const { RESOLVE_EXTENSIONS, WEBPACK_ES5_TARGET, createEs5Output, createModuleRules } = require('./webpack.shared');
 
-const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName, singletonStyleTag = true }, env = {}) => ({
+const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName, singletonStyleTag = true, needExternals = true }, env = {}) => ({
   mode: 'production',
   target: WEBPACK_ES5_TARGET,
   entry,
@@ -19,7 +19,7 @@ const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName
   resolve: {
     extensions: RESOLVE_EXTENSIONS,
   },
-  externals: {
+  externals: needExternals ? {
     react: {
       commonjs: 'react',
       commonjs2: 'react',
@@ -38,7 +38,7 @@ const createSharedLibWebpackConfig = ({ entry, outputPath, filename, libraryName
       amd: 'react/jsx-runtime',
       root: 'ReactJSXRuntime',
     },
-  },
+  } : {},
   module: {
     rules: createModuleRules({ singletonStyleTag, platform: env.platform, product: 'skillCUI' }),
   },
