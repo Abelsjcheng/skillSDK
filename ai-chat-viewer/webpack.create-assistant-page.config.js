@@ -7,20 +7,21 @@ const {
   createModuleRules,
 } = require('./webpack.shared');
 
-module.exports = {
+module.exports = (env = {}, argv = {}) => {
+  return {
   target: WEBPACK_ES5_TARGET,
   entry: './src/pages/createAssistant.tsx',
   output: createEs5Output({
-    path: path.resolve(__dirname, 'dist/create-assistant-page'),
+    path: path.resolve(__dirname, env.platform === 'pc' ? 'dist/digitalTwin' : 'dist/create-assistant-page'),
     filename: 'js/create-assistant-page.[contenthash].js',
-    assetModuleFilename: 'asset/[name].[contenthash][ext][query]',
+    assetModuleFilename: env.platform === 'pc' ? undefined : 'asset/[name].[contenthash][ext][query]',
     clean: true,
   }),
   resolve: {
     extensions: RESOLVE_EXTENSIONS,
   },
   module: {
-    rules: createModuleRules({ includePolyfills: true }),
+    rules: createModuleRules({ includePolyfills: true, platform: env.platform, product: 'digitalTwin' }),
   },
   plugins: [
     new HtmlWebpackPlugin({
@@ -49,9 +50,10 @@ module.exports = {
     hot: true,
     historyApiFallback: true,
   },
-  devtool: false,
-  performance: {
-    hints: false,
-  },
+devtool: false,
+    performance: {
+      hints: false,
+    },
+  };
 };
 

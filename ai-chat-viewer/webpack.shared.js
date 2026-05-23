@@ -106,11 +106,21 @@ function createStyleRules({ singletonStyleTag = false } = {}) {
   ];
 }
 
-function createAssetRule({ singletonStyleTag = false } = {}) {
+function createAssetRule({ singletonStyleTag = false, platform = null, product = null } = {}) {
   if (singletonStyleTag) {
     return {
       test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
       type: "asset/inline"
+    };
+  } else if (platform === 'pc' && product) {
+    return {
+      test: /\.(png|jpe?g|gif|svg|ico|woff|woff2|ttf|eot)$/i,
+      type: "asset",
+      generator: {
+        filename: '[name].[contenthash][ext]',
+        outputPath: `../resources/${product}`,
+        publicPath: `welink-static://agentSkills/${product}/`,
+      },
     };
   } else {
     return {
@@ -125,11 +135,11 @@ function createAssetRule({ singletonStyleTag = false } = {}) {
   } 
 }
 
-function createModuleRules({ includePolyfills = false, singletonStyleTag = false } = {}) {
+function createModuleRules({ includePolyfills = false, singletonStyleTag = false, platform = null, product = null } = {}) {
   return [
     createBabelRule({ includePolyfills }),
     ...createStyleRules({ singletonStyleTag }),
-    createAssetRule({ singletonStyleTag }),
+    createAssetRule({ singletonStyleTag, platform, product }),
   ];
 }
 
