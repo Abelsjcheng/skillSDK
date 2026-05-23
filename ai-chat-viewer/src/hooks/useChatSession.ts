@@ -21,7 +21,6 @@ import {
   updateLatestQuestionPart,
 } from '../utils/message';
 import {
-  controlSkillWeCode,
   getSessionMessageHistory,
   registerSessionListener,
   sendMessage as sendMessageApi,
@@ -878,26 +877,6 @@ export function useChatSession({
     }
   }, [mode, welinkSessionId]);
 
-  const onMinimize = useCallback(async () => {
-    try {
-      await controlSkillWeCode({ action: 'minimize' });
-    } catch (err) {
-      WeLog(`useChatSession minimize failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-    } finally {
-      window.HWH5?.close?.();
-    }
-  }, [mode, welinkSessionId]);
-
-  const onClose = useCallback(async () => {
-    try {
-      await controlSkillWeCode({ action: 'close' });
-    } catch (err) {
-      WeLog(`useChatSession close failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-    } finally {
-      window.HWH5?.close?.();
-    }
-  }, [mode, welinkSessionId]);
-
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
@@ -924,8 +903,6 @@ export function useChatSession({
     onSend,
     onStop,
     onSendToIM,
-    onMinimize,
-    onClose,
     onCopy,
     resetTransientState,
   }), [
@@ -935,9 +912,7 @@ export function useChatSession({
     isLoadingHistory,
     loadMoreHistory,
     messages,
-    onClose,
     onCopy,
-    onMinimize,
     onSend,
     onSendToIM,
     onStop,
