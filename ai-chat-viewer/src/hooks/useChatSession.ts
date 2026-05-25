@@ -72,10 +72,10 @@ export function useChatSession({
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
 
-  const assemblerRef = useRef(new StreamAssembler());
-  const replayAssemblerRef = useRef(new StreamAssembler());
-  const streamingMsgIdRef = useRef<string | null>(null);
-  const replayStreamingMsgIdRef = useRef<string | null>(null);
+  const streamingAssemblersRef = useRef(new Map<string, StreamAssembler>());
+  const replayAssemblersRef = useRef(new Map<string, StreamAssembler>());
+  const latestStreamingMsgIdRef = useRef<string | null>(null);
+  const latestReplayMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const replayMessagesRef = useRef(new Map<string, Message>());
@@ -111,10 +111,10 @@ export function useChatSession({
 
   const resetTransientState = useCallback(() => {
     historyEpochRef.current += 1;
-    assemblerRef.current.reset();
-    replayAssemblerRef.current.reset();
-    streamingMsgIdRef.current = null;
-    replayStreamingMsgIdRef.current = null;
+    streamingAssemblersRef.current.clear();
+    replayAssemblersRef.current.clear();
+    latestStreamingMsgIdRef.current = null;
+    latestReplayMsgIdRef.current = null;
     replayMessagesRef.current.clear();
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
@@ -129,33 +129,101 @@ export function useChatSession({
     hidePendingAssistantPreview();
   }, [hidePendingAssistantPreview]);
 
-  const finalizeStreamingMessage = useCallback(() => {
-    assemblerRef.current.complete();
-    if (streamingMsgIdRef.current) {
-      const finalId = streamingMsgIdRef.current;
-      const finalText = assemblerRef.current.getText();
-      const finalParts = assemblerRef.current.getParts();
-      setMessages((prev) => prev.map((message) => (
-        message.id === finalId
-          ? {
-            ...message,
-            content: finalText || message.content,
-            isStreaming: false,
-            parts: finalParts.length > 0 ? [...finalParts] : message.parts,
-          }
-          : message
-      )));
+  const getLatestStreamingMessageId = useCallback(() => {
+    const latestMessageId = latestStreamingMsgIdRef.current;
+    if (latestMessageId && streamingAssemblersRef.current.has(latestMessageId)) {
+      return latestMessageId;
     }
-    assemblerRef.current.reset();
-    streamingMsgIdRef.current = null;
+
+    const activeMessageIds = Array.from(streamingAssemblersRef.current.keys());
+    return activeMessageIds.length > 0 ? activeMessageIds[activeMessageIds.length - 1] : null;
+  }, []);
+
+  const getLatestReplayMessageId = useCallback(() => {
+    const latestMessageId = latestReplayMsgIdRef.current;
+    if (latestMessageId && replayAssemblersRef.current.has(latestMessageId)) {
+      return latestMessageId;
+    }
+
+    const activeMessageIds = Array.from(replayAssemblersRef.current.keys());
+    return activeMessageIds.length > 0 ? activeMessageIds[activeMessageIds.length - 1] : null;
+  }, []);
+
+  const getOrCreateStreamingAssembler = useCallback((messageId: string) => {
+    const current = streamingAssemblersRef.current.get(messageId);
+    if (current) {
+      latestStreamingMsgIdRef.current = messageId;
+      return current;
+    }
+
+    const next = new StreamAssembler();
+    streamingAssemblersRef.current.set(messageId, next);
+    latestStreamingMsgIdRef.current = messageId;
+    return next;
+  }, []);
+
+  const getOrCreateReplayAssembler = useCallback((messageId: string) => {
+    const current = replayAssemblersRef.current.get(messageId);
+    if (current) {
+      latestReplayMsgIdRef.current = messageId;
+      return current;
+    }
+
+    const next = new StreamAssembler();
+    replayAssemblersRef.current.set(messageId, next);
+    latestReplayMsgIdRef.current = messageId;
+    return next;
+  }, []);
+
+  const finalizeStreamingMessageById = useCallback((messageId: string | null) => {
+    if (!messageId) {
+      return;
+    }
+
+    const assembler = streamingAssemblersRef.current.get(messageId);
+    if (!assembler) {
+      if (latestStreamingMsgIdRef.current === messageId) {
+        latestStreamingMsgIdRef.current = getLatestStreamingMessageId();
+      }
+      return;
+    }
+
+    assembler.complete();
+    const finalText = assembler.getText();
+    const finalParts = assembler.getParts();
+    setMessages((prev) => prev.map((message) => (
+      message.id === messageId
+        ? {
+          ...message,
+          content: finalText || message.content,
+          isStreaming: false,
+          parts: finalParts.length > 0 ? [...finalParts] : message.parts,
+        }
+        : message
+    )));
+    streamingAssemblersRef.current.delete(messageId);
+    if (latestStreamingMsgIdRef.current === messageId) {
+      latestStreamingMsgIdRef.current = getLatestStreamingMessageId();
+    }
+  }, [getLatestStreamingMessageId]);
+
+  const finalizeStreamingMessage = useCallback(() => {
+    const activeMessageIds = Array.from(streamingAssemblersRef.current.keys());
+    activeMessageIds.forEach((messageId) => {
+      finalizeStreamingMessageById(messageId);
+    });
+    latestStreamingMsgIdRef.current = null;
     hidePendingAssistantPreview();
-  }, [hidePendingAssistantPreview]);
+  }, [finalizeStreamingMessageById, hidePendingAssistantPreview]);
 
   const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
     const normalizedMessage = message || fallbackMessage;
-    const currentStreamingMessageId = streamingMsgIdRef.current;
-    const assemblerText = assemblerRef.current.getText();
-    const assemblerParts = assemblerRef.current.getParts().map((part) => ({ ...part, isStreaming: false }));
+    const currentStreamingMessageId = latestStreamingMsgIdRef.current;
+    const currentAssembler = currentStreamingMessageId
+      ? streamingAssemblersRef.current.get(currentStreamingMessageId)
+      : undefined;
+    const assemblerText = currentAssembler?.getText() ?? '';
+    const assemblerParts = currentAssembler?.getParts().map((part) => ({ ...part, isStreaming: false })) ?? [];
     const errorPart: MessagePart = {
       partId: genMessageId('error_part'),
       type: 'error',
@@ -196,10 +264,14 @@ export function useChatSession({
       ];
     });
 
-    assemblerRef.current.reset();
-    streamingMsgIdRef.current = null;
+    if (currentStreamingMessageId) {
+      streamingAssemblersRef.current.delete(currentStreamingMessageId);
+      if (latestStreamingMsgIdRef.current === currentStreamingMessageId) {
+        latestStreamingMsgIdRef.current = getLatestStreamingMessageId();
+      }
+    }
     hidePendingAssistantPreview();
-  }, [hidePendingAssistantPreview]);
+  }, [getLatestStreamingMessageId, hidePendingAssistantPreview]);
 
   const upsertAssistantMessage = useCallback((messageId: string, updater: (current?: Message) => Message) => {
     setMessages((prev) => {
@@ -213,21 +285,11 @@ export function useChatSession({
     });
   }, []);
 
-  const ensureStreamingMessageContext = useCallback((messageId: string) => {
-    if (streamingMsgIdRef.current && streamingMsgIdRef.current !== messageId) {
-      finalizeStreamingMessage();
-    }
-    if (streamingMsgIdRef.current !== messageId) {
-      assemblerRef.current.reset();
-      streamingMsgIdRef.current = messageId;
-    }
-  }, [finalizeStreamingMessage]);
-
   const flushReplayMessages = useCallback(() => {
     const replayMessages = Array.from(replayMessagesRef.current.values());
     replayMessagesRef.current.clear();
-    replayAssemblerRef.current.reset();
-    replayStreamingMsgIdRef.current = null;
+    replayAssemblersRef.current.clear();
+    latestReplayMsgIdRef.current = null;
 
     if (replayMessages.length === 0) {
       return;
@@ -272,21 +334,17 @@ export function useChatSession({
           break;
         }
 
-        if (replayStreamingMsgIdRef.current && replayStreamingMsgIdRef.current !== messageId) {
-          replayAssemblerRef.current.reset();
-        }
-        replayStreamingMsgIdRef.current = messageId;
-
-        replayAssemblerRef.current.handleMessage(msg);
+        const replayAssembler = getOrCreateReplayAssembler(messageId);
+        replayAssembler.handleMessage(msg);
         const current = replayMessagesRef.current.get(messageId);
         replayMessagesRef.current.set(messageId, {
           id: messageId,
           role: current?.role ?? 'assistant',
-          content: replayAssemblerRef.current.getText(),
+          content: replayAssembler.getText(),
           contentType: current?.contentType ?? 'markdown',
           timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
           isStreaming: false,
-          parts: replayAssemblerRef.current.getParts().map((part) => ({ ...part, isStreaming: false })),
+          parts: replayAssembler.getParts().map((part) => ({ ...part, isStreaming: false })),
           meta: current?.meta,
           isHistory: current?.isHistory,
         });
@@ -334,7 +392,7 @@ export function useChatSession({
         break;
       }
       case 'step.done': {
-        const currentReplayMessageId = replayStreamingMsgIdRef.current;
+        const currentReplayMessageId = latestReplayMsgIdRef.current ?? getLatestReplayMessageId();
         if (!currentReplayMessageId || !msg.tokens) {
           break;
         }
@@ -355,8 +413,8 @@ export function useChatSession({
         break;
       }
       case 'snapshot': {
-        replayAssemblerRef.current.reset();
-        replayStreamingMsgIdRef.current = null;
+        replayAssemblersRef.current.clear();
+        latestReplayMsgIdRef.current = null;
         replayMessagesRef.current.clear();
         (msg.messages ?? []).slice().reverse().forEach((snapshot) => {
           const mapped = snapshotMessageToMessage(snapshot);
@@ -389,7 +447,7 @@ export function useChatSession({
     if (msg.replayDone) {
       flushReplayMessages();
     }
-  }, [flushReplayMessages]);
+  }, [flushReplayMessages, getLatestReplayMessageId, getOrCreateReplayAssembler]);
 
   const loadMoreHistory = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -528,7 +586,8 @@ export function useChatSession({
       if (
         msg.type === 'question'
         && (msg.status === 'completed' || msg.status === 'error')
-        && !streamingMsgIdRef.current
+        && !latestStreamingMsgIdRef.current
+        && streamingAssemblersRef.current.size === 0
       ) {
         const hasMatchingQuestion = messagesRef.current.some((message) =>
           message.parts?.some((part) => (
@@ -572,9 +631,7 @@ export function useChatSession({
           }
 
           setSessionStatus('busy');
-          ensureStreamingMessageContext(messageId);
-
-          const assembler = assemblerRef.current;
+          const assembler = getOrCreateStreamingAssembler(messageId);
           assembler.handleMessage(msg);
           const currentText = assembler.getText();
           const currentParts = assembler.getParts();
@@ -616,18 +673,24 @@ export function useChatSession({
           break;
         }
         case 'permission.reply': {
-          const hasStreamingPermission = Boolean(
-            msg.permissionId && assemblerRef.current.getParts().some(
-              (part) => part.type === 'permission' && part.permissionId === msg.permissionId,
-            ),
-          );
+          let currentStreamingMessageId: string | null = null;
+          let currentParts: MessagePart[] | null = null;
 
-          if (hasStreamingPermission) {
-            assemblerRef.current.handleMessage(msg);
+          if (msg.permissionId) {
+            Array.from(streamingAssemblersRef.current.entries()).some(([messageId, assembler]) => {
+              if (!assembler.getParts().some(
+                (part) => part.type === 'permission' && part.permissionId === msg.permissionId,
+              )) {
+                return false;
+              }
+
+              assembler.handleMessage(msg);
+              currentStreamingMessageId = messageId;
+              currentParts = assembler.getParts();
+              latestStreamingMsgIdRef.current = messageId;
+              return true;
+            });
           }
-
-          const currentParts = hasStreamingPermission ? assemblerRef.current.getParts() : null;
-          const currentStreamingMessageId = streamingMsgIdRef.current;
 
           setMessages((prev) => prev.map((messageItem) => {
             if (currentStreamingMessageId && currentParts && messageItem.id === currentStreamingMessageId) {
@@ -662,8 +725,8 @@ export function useChatSession({
           setSessionStatus('busy');
           break;
         case 'step.done':
-          if (streamingMsgIdRef.current && msg.tokens) {
-            const finalId = streamingMsgIdRef.current;
+          if (latestStreamingMsgIdRef.current && msg.tokens) {
+            const finalId = latestStreamingMsgIdRef.current;
             setMessages((prev) => prev.map((message) => (
               message.id === finalId
                 ? {
@@ -710,8 +773,8 @@ export function useChatSession({
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'snapshot':
-          assemblerRef.current.reset();
-          streamingMsgIdRef.current = null;
+          streamingAssemblersRef.current.clear();
+          latestStreamingMsgIdRef.current = null;
           hidePendingAssistantPreview();
           setMessages((msg.messages ?? []).map((item) => snapshotMessageToMessage(item)).reverse());
           break;
@@ -722,7 +785,7 @@ export function useChatSession({
           }
 
           setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
-          ensureStreamingMessageContext(messageId);
+          latestStreamingMsgIdRef.current = messageId;
 
           const nextRole = normalizeRole(msg.role);
           const nextParts = mapRawParts(msg.parts, true);
@@ -829,9 +892,9 @@ export function useChatSession({
     };
   }, [
     appendAssistantErrorBlock,
-    ensureStreamingMessageContext,
     finalizeStreamingMessage,
     flushReplayMessages,
+    getOrCreateStreamingAssembler,
     handleReplayMessage,
     hidePendingAssistantPreview,
     mode,
