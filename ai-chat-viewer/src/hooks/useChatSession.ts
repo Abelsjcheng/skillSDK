@@ -175,7 +175,7 @@ export function useChatSession({
     return next;
   }, []);
 
-  const finalizeStreamingMessageById = useCallback((messageId: string | null) => {
+  const finalizeStreamingMessageById = useCallback((messageId: string | null | undefined) => {
     if (!messageId) {
       return;
     }
@@ -529,22 +529,23 @@ export function useChatSession({
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
+    messageId,
     toolCallId,
     questionId,
     subagentSessionId,
   }: QuestionAnswerSubmission) => {
-    finalizeStreamingMessage();
+    finalizeStreamingMessageById(messageId ?? getLatestStreamingMessageId());
     setSessionStatus('busy');
 
     try {
       await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
     } catch (err) {
-      WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
+      WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, messageId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
       showToast(tRef.current('weAgent.submitAnswerFailed'));
       throw err;
     }
-  }, [finalizeStreamingMessage, mode, sendUserMessage, welinkSessionId]);
+  }, [finalizeStreamingMessageById, getLatestStreamingMessageId, mode, sendUserMessage, welinkSessionId]);
 
   useEffect(() => {
     activeWelinkSessionIdRef.current = welinkSessionId || null;
@@ -764,7 +765,7 @@ export function useChatSession({
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
             setSessionStatus('idle');
-            finalizeStreamingMessageById(getLatestStreamingMessageId());
+            finalizeStreamingMessageById(msg.messageId);
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {

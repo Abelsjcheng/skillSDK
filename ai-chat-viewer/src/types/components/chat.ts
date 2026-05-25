@@ -40,6 +40,7 @@ export interface PermissionCardProps {
 
 export interface QuestionCardProps {
   part: MessagePart;
+  messageId?: string;
   onAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
   readonly?: boolean;
 }

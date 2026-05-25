@@ -105,6 +105,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <QuestionCard
             key={part.partId}
             part={part}
+            messageId={message.id}
             onAnswered={onQuestionAnswered}
             readonly={isHistoryAssistantReadonly}
           />

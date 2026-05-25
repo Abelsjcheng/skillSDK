@@ -54,6 +54,7 @@ export interface QuestionOption {
 
 export interface QuestionAnswerSubmission {
   answer: string;
+  messageId?: string;
   toolCallId?: string;
   questionId?: string;
   subagentSessionId?: string;

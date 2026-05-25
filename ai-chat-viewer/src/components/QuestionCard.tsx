@@ -16,6 +16,7 @@ function matchesOptionLabel(part: MessagePart, answer: string): boolean {
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   part,
+  messageId,
   onAnswered,
   readonly = false,
 }) => {
@@ -72,6 +73,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     try {
       await onAnswered({
         answer,
+        messageId,
         toolCallId: part.toolCallId,
         questionId: part.questionId,
         subagentSessionId: part.subagentSessionId,
