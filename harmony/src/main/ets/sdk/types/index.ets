@@ -501,7 +501,7 @@ export interface GetIsShowWeAgentResult {
 }
 
 export interface OpenWeAgentParams {
-  partnerAccount: string;
+  partnerAccount?: string;
 }
 
 export interface OpenWeAgentResult {

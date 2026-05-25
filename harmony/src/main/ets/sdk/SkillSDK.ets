@@ -763,9 +763,9 @@ export class SkillSDK {
   }
 
   // 20. getWeAgentUri
-  getWeAgentUri(): WeAgentUriResult {
+  async getWeAgentUri(): Promise<WeAgentUriResult> {
     try {
-      return this.buildWeAgentUriResult(this.weAgentStore.loadCurrentDetail());
+      return await this.buildWeAgentUriResult(this.weAgentStore.loadCurrentDetail());
     } catch (error) {
       throw this.normalizeError('getWeAgentUri', error);
     }
@@ -868,22 +868,25 @@ export class SkillSDK {
   async openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult> {
     try {
       Validator.requireObject(params, 'params');
-      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
+      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
 
       // TODO: save isShowWeAgent = true by calling host saveSettings.
       // TODO: broadcast isShowWeAgent = true to host.
-      const result = await this.getAssistantDetails({ partnerAccount });
-      const targetDetail = result.weAgentDetailsArray.length > 0 ? result.weAgentDetailsArray[0] : undefined;
-      if (targetDetail === undefined) {
-        throw new SkillSdkException(7000, 'getAssistantDetails returned empty detail');
+      let uris: WeAgentUriResult;
+      if (partnerAccount !== undefined) {
+        const result = await this.getAssistantDetails({ partnerAccount });
+        const targetDetail = result.weAgentDetailsArray.length > 0 ? result.weAgentDetailsArray[0] : undefined;
+        if (targetDetail === undefined) {
+          throw new SkillSdkException(7000, 'getAssistantDetails returned empty detail');
+        }
+        if (this.normalizeOptionalString(targetDetail.weCodeUrl) === undefined) {
+          throw new SkillSdkException(7000, 'getAssistantDetails returned empty weCodeUrl');
+        }
+        this.weAgentStore.saveCurrentDetail(targetDetail);
+        uris = await this.buildWeAgentUriResult(targetDetail);
+      } else {
+        uris = await this.getWeAgentUri();
       }
-      const weCodeUrl = this.normalizeOptionalString(targetDetail.weCodeUrl);
-      if (weCodeUrl === undefined) {
-        throw new SkillSdkException(7000, 'getAssistantDetails returned empty weCodeUrl');
-      }
-
-      this.weAgentStore.saveCurrentDetail(targetDetail);
-      const uris = this.buildWeAgentUriResult(targetDetail);
       void uris;
       // TODO: open we-agent tab by calling host capability.
       // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
@@ -1105,6 +1108,42 @@ export class SkillSDK {
     };
   }
 
+  private cacheMyWeAgentDetail(detail: WeAgentDetails): void {
+    const currentDetail = this.weAgentStore.loadCurrentDetail();
+    if (currentDetail === null || this.isMyAgentDetail(currentDetail)) {
+      this.weAgentStore.saveCurrentDetail(detail);
+    }
+  }
+
+  private async requestMyWeAgentDetail(): Promise<WeAgentDetails | undefined> {
+    const payload = await this.httpClient.get<Object>(
+      '/v4-1/we-crew/my-agent',
+      undefined,
+      { useAssistantBaseUrl: true }
+    );
+    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+      return undefined;
+    }
+    return this.normalizeMyWeAgentDetail(payload as Record<string, Object>);
+  }
+
+  private async resolveMyWeAgentDetail(): Promise<WeAgentDetails | undefined> {
+    const detail = await this.requestMyWeAgentDetail();
+    if (detail !== undefined) {
+      this.cacheMyWeAgentDetail(detail);
+    }
+    return detail;
+  }
+
+  private normalizeMyWeAgentDetail(payload: Record<string, Object>): WeAgentDetails {
+    const normalizedPayload: Record<string, Object> = {};
+    Object.keys(payload).forEach((key: string) => {
+      normalizedPayload[key] = payload[key];
+    });
+    normalizedPayload.id = payload.robotId ?? '';
+    return this.normalizeWeAgentDetails(normalizedPayload);
+  }
+
   private async prepareDeleteWeAgentTransition(
     partnerAccount: string | undefined,
     robotId: string | undefined
@@ -1221,15 +1260,15 @@ export class SkillSDK {
     let nextUris: WeAgentUriResult;
     if (deletePlan.nextPartnerAccount === undefined) {
       this.weAgentStore.clearCurrentDetail();
-      nextUris = this.buildWeAgentUriResult(null);
+      nextUris = await this.buildWeAgentUriResult(null);
     } else {
       const nextDetail = await this.resolveDeleteNextDetail(deletePlan.nextPartnerAccount);
       if (nextDetail === null) {
         this.weAgentStore.clearCurrentDetail();
-        nextUris = this.buildWeAgentUriResult(null);
+        nextUris = await this.buildWeAgentUriResult(null);
       } else {
         this.weAgentStore.saveCurrentDetail(nextDetail);
-        nextUris = this.buildWeAgentUriResult(nextDetail);
+        nextUris = await this.buildWeAgentUriResult(nextDetail);
       }
     }
     void deleteResult;
@@ -1267,19 +1306,43 @@ export class SkillSDK {
     return robotId !== undefined && this.normalizeOptionalString(detail.id) === robotId;
   }
 
-  private buildWeAgentUriResult(details: WeAgentDetails | null): WeAgentUriResult {
-    if (details === null) {
-      const weAgentUri = this.appendHashFragment(
-        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'wecodePlace', 'weAgent'),
-        'activateAssistant'
-      );
-      return {
-        weAgentUri,
-        assistantDetailUri: '',
-        switchAssistantUri: ''
-      };
+  private async buildWeAgentUriResult(details: WeAgentDetails | null): Promise<WeAgentUriResult> {
+    if (details !== null) {
+      if (this.normalizeOptionalString(details.weCodeUrl) === undefined) {
+        return this.buildActivateAssistantFallbackUriResult();
+      }
+      return this.isMyAgentDetail(details)
+        ? this.buildMyAgentWeAgentUriResult(details)
+        : this.buildLegacyWeAgentUriResult(details);
     }
 
+    let myAgentDetail: WeAgentDetails | undefined;
+    try {
+      myAgentDetail = await this.resolveMyWeAgentDetail();
+    } catch (_error) {
+      return this.buildActivateAssistantFallbackUriResult();
+    }
+    if (myAgentDetail === undefined) {
+      return this.buildActivateAssistantFallbackUriResult();
+    }
+    if (this.normalizeOptionalString(myAgentDetail.weCodeUrl) === undefined) {
+      return this.buildActivateAssistantFallbackUriResult();
+    }
+    return this.buildMyAgentWeAgentUriResult(myAgentDetail);
+  }
+
+  private buildActivateAssistantFallbackUriResult(): WeAgentUriResult {
+    return {
+      weAgentUri: this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'wecodePlace', 'weAgent'),
+        'activateAssistant'
+      ),
+      assistantDetailUri: '',
+      switchAssistantUri: ''
+    };
+  }
+
+  private buildLegacyWeAgentUriResult(details: WeAgentDetails): WeAgentUriResult {
     const partnerAccount = details.partnerAccount ?? '';
     const weCodeUrl = details.weCodeUrl ?? '';
     const detailId = details.id ?? '';
@@ -1293,19 +1356,31 @@ export class SkillSDK {
       weAgentUri = this.appendQueryParam(baseWeAgentUri, 'robotId', detailId);
     }
 
-    const assistantDetailUri = this.appendHashFragment(
-      this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
-      'assistantDetail'
-    );
-    const switchAssistantUri = this.appendHashFragment(
-      this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
-      'switchAssistant'
-    );
-
     return {
       weAgentUri,
-      assistantDetailUri,
-      switchAssistantUri
+      assistantDetailUri: this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        'assistantDetail'
+      ),
+      switchAssistantUri: this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        'switchAssistant'
+      )
+    };
+  }
+
+  private buildMyAgentWeAgentUriResult(details: WeAgentDetails): WeAgentUriResult {
+    const partnerAccount = details.partnerAccount ?? '';
+    return {
+      weAgentUri: this.appendQueryParam(details.weCodeUrl ?? '', 'from', 'weAgent'),
+      assistantDetailUri: this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        'assistantDetail'
+      ),
+      switchAssistantUri: this.appendHashFragment(
+        this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
+        'switchAssistant'
+      )
     };
   }
 
@@ -1429,6 +1504,7 @@ export class SkillSDK {
         partnerAccount: TypeConverter.toOptionalString(row.partnerAccount, 'partnerAccount') ?? '',
         bizRobotName: TypeConverter.toOptionalString(row.bizRobotName, 'bizRobotName') ?? '',
         bizRobotNameEn: TypeConverter.toOptionalString(row.bizRobotNameEn, 'bizRobotNameEn') ?? '',
+        bizRobotTag: TypeConverter.toOptionalString(row.bizRobotTag, 'bizRobotTag') ?? '',
         robotId: TypeConverter.toOptionalString(row.robotId, 'robotId') ?? ''
       });
     }
@@ -1481,6 +1557,13 @@ export class SkillSDK {
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };
+  }
+
+  private isMyAgentDetail(detail: WeAgentDetails | null): boolean {
+    if (detail === null) {
+      return false;
+    }
+    return (this.normalizeOptionalString(detail.bizRobotTag) ?? '').toLowerCase() === 'myagent';
   }
 
 
