@@ -160,6 +160,67 @@ describe('useChatSession', () => {
     expect(result.current.messages.find((message) => message.id === 'assistant_b')?.content).toBe('World');
   });
 
+  it('only finalizes the latest message when a later idle status arrives', async () => {
+    const { result } = renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+
+    act(() => {
+      emitTextMessage(listener.onMessage, {
+        type: 'text.delta',
+        messageId: 'assistant_a',
+        partId: 'part_a',
+        content: 'Hello ',
+      });
+      emitTextMessage(listener.onMessage, {
+        type: 'text.delta',
+        messageId: 'assistant_b',
+        partId: 'part_b',
+        content: 'World',
+      });
+      listener.onMessage({
+        type: 'session.status',
+        welinkSessionId: 'session_1',
+        seq: 3,
+        sessionStatus: 'idle',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(2);
+    });
+
+    expect(result.current.messages.find((message) => message.id === 'assistant_a')).toEqual(
+      expect.objectContaining({
+        content: 'Hello ',
+        isStreaming: true,
+        parts: [expect.objectContaining({
+          partId: 'part_a',
+          content: 'Hello ',
+          isStreaming: true,
+        })],
+      }),
+    );
+    expect(result.current.messages.find((message) => message.id === 'assistant_b')).toEqual(
+      expect.objectContaining({
+        content: 'World',
+        isStreaming: false,
+        parts: [expect.objectContaining({
+          partId: 'part_b',
+          content: 'World',
+          isStreaming: false,
+        })],
+      }),
+    );
+  });
+
   it('unregisters listener on cleanup', async () => {
     const { unmount } = renderHook(() => useChatSession({
       mode: 'weAgentCUI',

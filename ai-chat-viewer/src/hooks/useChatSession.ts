@@ -635,6 +635,7 @@ export function useChatSession({
           assembler.handleMessage(msg);
           const currentText = assembler.getText();
           const currentParts = assembler.getParts();
+          const isMessageStreaming = assembler.hasActiveStreaming();
 
           upsertAssistantMessage(messageId, (current) => ({
             id: messageId,
@@ -642,11 +643,14 @@ export function useChatSession({
             content: currentText,
             contentType: current?.contentType ?? 'markdown',
             timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
-            isStreaming: true,
+            isStreaming: isMessageStreaming,
             parts: [...currentParts],
             meta: current?.meta,
             isHistory: current?.isHistory,
           }));
+          if (!isMessageStreaming) {
+            finalizeStreamingMessageById(messageId);
+          }
           window.requestAnimationFrame(() => {
             hidePendingAssistantPreview();
           });
@@ -760,7 +764,7 @@ export function useChatSession({
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
             setSessionStatus('idle');
-            finalizeStreamingMessage();
+            finalizeStreamingMessageById(getLatestStreamingMessageId());
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
@@ -893,7 +897,9 @@ export function useChatSession({
   }, [
     appendAssistantErrorBlock,
     finalizeStreamingMessage,
+    finalizeStreamingMessageById,
     flushReplayMessages,
+    getLatestStreamingMessageId,
     getOrCreateStreamingAssembler,
     handleReplayMessage,
     hidePendingAssistantPreview,
