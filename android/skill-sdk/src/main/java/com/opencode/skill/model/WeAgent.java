@@ -20,6 +20,8 @@ public class WeAgent {
     @NonNull
     private String bizRobotNameEn = "";
     @NonNull
+    private String bizRobotTag = "";
+    @NonNull
     private String robotId = "";
 
     @NonNull
@@ -74,6 +76,15 @@ public class WeAgent {
 
     public void setBizRobotNameEn(@NonNull String bizRobotNameEn) {
         this.bizRobotNameEn = Objects.requireNonNull(bizRobotNameEn, "bizRobotNameEn == null");
+    }
+
+    @NonNull
+    public String getBizRobotTag() {
+        return bizRobotTag;
+    }
+
+    public void setBizRobotTag(@NonNull String bizRobotTag) {
+        this.bizRobotTag = Objects.requireNonNull(bizRobotTag, "bizRobotTag == null");
     }
 
     @NonNull
