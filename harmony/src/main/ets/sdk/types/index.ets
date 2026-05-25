@@ -574,6 +574,7 @@ export interface WeAgent {
   partnerAccount: string;
   bizRobotName: string;
   bizRobotNameEn: string;
+  bizRobotTag: string;
   robotId: string;
 }
 
