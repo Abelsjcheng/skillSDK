@@ -55,6 +55,9 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                      success:(WLAgentSkillsHTTPSuccessBlock)success
                                      failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
+- (void)getMyWeAgentWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
+                        failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
 - (void)updateWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
                                 robotId:(nullable NSString *)robotId
                                    name:(NSString *)name

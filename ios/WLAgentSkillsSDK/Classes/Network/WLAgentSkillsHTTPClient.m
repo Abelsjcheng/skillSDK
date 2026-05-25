@@ -163,6 +163,15 @@
          failure:failure];
 }
 
+- (void)getMyWeAgentWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
+                        failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self GET:@"/v4-1/we-crew/my-agent"
+    parameters:nil
+  useAssistantBaseURL:YES
+       success:success
+       failure:failure];
+}
+
 - (void)updateWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
                                 robotId:(nullable NSString *)robotId
                                    name:(NSString *)name
