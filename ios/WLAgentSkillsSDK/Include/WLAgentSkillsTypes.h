@@ -336,6 +336,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *partnerAccount;
 @property (nonatomic, copy) NSString *bizRobotName;
 @property (nonatomic, copy) NSString *bizRobotNameEn;
+@property (nonatomic, copy) NSString *bizRobotTag;
 @property (nonatomic, copy) NSString *robotId;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;

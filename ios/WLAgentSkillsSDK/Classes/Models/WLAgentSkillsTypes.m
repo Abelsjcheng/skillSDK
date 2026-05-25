@@ -291,6 +291,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _partnerAccount = WLAgentSkillsStringValue(dictionary[@"partnerAccount"], @"");
         _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
+        _bizRobotTag = WLAgentSkillsStringValue(dictionary[@"bizRobotTag"], @"");
         _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
     }
     return self;
@@ -304,6 +305,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"partnerAccount" : self.partnerAccount ?: @"",
         @"bizRobotName" : self.bizRobotName ?: @"",
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
+        @"bizRobotTag" : self.bizRobotTag ?: @"",
         @"robotId" : self.robotId ?: @""
     };
 }
