@@ -205,6 +205,21 @@ public class ApiClient {
         });
     }
 
+    public void getMyWeAgentDetail(@NonNull SkillCallback<WeAgentDetails> callback) {
+        AssistantApiService service = requireAssistantApiService();
+        enqueueEnvelope(service.getMyWeAgent(), JsonElement.class, new SkillCallback<JsonElement>() {
+            @Override
+            public void onSuccess(@Nullable JsonElement result) {
+                callback.onSuccess(parseMyWeAgentDetail(result));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(error);
+            }
+        });
+    }
+
     public void updateWeAgent(
             @Nullable String partnerAccount,
             @Nullable String robotId,
@@ -316,6 +331,21 @@ public class ApiClient {
             return single;
         }
         return new ArrayList<>();
+    }
+
+    @Nullable
+    private WeAgentDetails parseMyWeAgentDetail(@Nullable JsonElement payload) {
+        if (payload == null || payload.isJsonNull() || !payload.isJsonObject()) {
+            return null;
+        }
+
+        JsonObject rootObject = payload.getAsJsonObject();
+        WeAgentDetails detail = gson.fromJson(rootObject, WeAgentDetails.class);
+        if (detail == null) {
+            detail = new WeAgentDetails();
+        }
+        detail.setId(getString(rootObject, "robotId", detail.getId()));
+        return detail;
     }
 
     public void listSessions(@Nullable String imGroupId, @Nullable String ak, @Nullable String status, int page, int size,

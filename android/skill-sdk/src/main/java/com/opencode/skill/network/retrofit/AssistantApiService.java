@@ -35,6 +35,9 @@ public interface AssistantApiService {
     @GET("v1/robot-partners/{partnerAccount}")
     Call<JsonElement> getWeAgentDetails(@Path("partnerAccount") String partnerAccount);
 
+    @GET("v4-1/we-crew/my-agent")
+    Call<JsonElement> getMyWeAgent();
+
     @PUT("v4-1/we-crew")
     Call<JsonElement> updateWeAgent(@Body UpdateWeAgentBody body);
 
