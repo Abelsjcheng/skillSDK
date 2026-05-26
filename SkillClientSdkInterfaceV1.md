@@ -2116,6 +2116,7 @@ try {
 | title | string \| null | 标题（工具标题或权限标题） |
 | header | string \| null | 问题分组标题（`question` 类型） |
 | question | string \| null | 问题正文（`question` 类型） |
+| questionId | string \| null | 问题 ID（`question` 类型）；服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
 | options | string[] \| null | 问题选项（`question` 类型） |
 | permissionId | string \| null | 权限请求 ID（`permission` 类型） |
 | permType | string \| null | 权限类型（`permission` 类型） |

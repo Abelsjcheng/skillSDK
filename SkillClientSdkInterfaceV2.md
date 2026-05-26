@@ -22,12 +22,13 @@
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
 | `setIsShowWeAgent` | 无（SDK 本地扩展能力） | 设置是否展示助理 tab 的持久化缓存并同步基座展示态 |
 | `getIsShowWeAgent` | 无（SDK 本地扩展能力） | 获取是否展示助理 tab 的持久化缓存值 |
-| `openWeAgent` | 无（SDK 本地扩展能力） | 根据助理账号打开助理 |
+| `openWeAgent` | 无（SDK 本地扩展能力；未传 `partnerAccount` 时复用 `getWeAgentUri`） | 打开助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
 | `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
 | `queryQrcodeInfo` | `GET /v4-1/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
 | `updateQrcodeInfo` | `PUT /v4-1/we-crew/im-register/qrcode` | 更新二维码信息 |
 | `queryAssistantGraySingle` | `GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}` | 查询助理单人灰度标记 |
+| `getMyAgentDetail` | `GET /v4-1/we-crew/my-agent` | 获取主助理详情 |
 | `getWeAgentUri` | 无（SDK 本地扩展能力） | 获取当前助理相关页面 URI |
 
 > 说明：新增接口遵循 Skill SDK 文档约定，SDK 对外不透出服务端通用状态包装字段（`code`），并按接口语义返回业务字段（如 `message`、`content`）。
@@ -71,8 +72,6 @@ type ServerResponse<T> = {
    - `isShowWeAgent`：是否展示助理 tab，布尔值；该值通过基座 `saveSettings` / `getSettings` 维护
    - `assistant_gray_single_cache`：助理单人灰度缓存对象，key 为 `partnerAccount`，value 为对应灰度布尔值
 6. SP 持久化文档路径：待填写。
-
----
 
 ## 1. 创建分身接口
 
@@ -253,6 +252,7 @@ getWeAgentList(params: PageParams): Promise<WeAgentList>
       "partnerAccount": "x00_1",
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "yuangongzhushou",
+      "bizRobotTag": "main-agent",
       "robotId": "78985451212"
     }
   ]
@@ -262,7 +262,7 @@ getWeAgentList(params: PageParams): Promise<WeAgentList>
 ### 实现方法
 
 1. SDK 调用服务端 REST API：`GET /v4-1/we-crew/list`，透传查询参数 `pageSize`、`pageNumber`。
-2. SDK 解析返回 `data[]` 并组装为 `WeAgentList`。
+2. SDK 解析返回 `data[]` 并组装为 `WeAgentList`，其中服务端新增字段 `data[].bizRobotTag` 需同步透传到 SDK 出参 `content[].bizRobotTag`。
 3. SDK 可按 `userId`（当前 mock 值：`mock_user_id`）维度更新本地 `we_agent_list_cache` 缓存，供后续读取优化。
 4. SDK 返回 `Promise<WeAgentList>`。
 
@@ -280,6 +280,11 @@ Skill 小程序调用
 
 调用成功后，SDK 可按需将助理详情写入 SP 持久化存储。
 
+移动端 `partnerAccount` 入参为非必填：
+
+- 传入 `partnerAccount` 时，沿用原有服务端接口 `GET /v1/robot-partners/{partnerAccount}` 获取详情；
+- 未传 `partnerAccount` 时，SDK 改为调用服务端接口 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情。
+
 ### 接口名
 
 ```typescript
@@ -290,7 +295,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `partnerAccount` | `string` | 否（移动端） | 助理账号 ID；移动端未传时，SDK 调用 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情 |
 
 ### 入参示例
 
@@ -298,6 +303,12 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 {
   "partnerAccount": "x00_1"
 }
+```
+
+### 入参示例（移动端未传 `partnerAccount`）
+
+```json
+{}
 ```
 
 ### 出参
@@ -345,10 +356,17 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ### 实现方法
 
-1. 调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-2. SDK 解析返回 `data[]` 并组装为 `weAgentDetailsArray`。
-3. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
-4. SDK 返回 `Promise<weAgentDetailsArray>`。
+1. 当传入 `partnerAccount` 时，调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
+2. 当移动端未传 `partnerAccount` 时，调用服务端 REST API：`GET /v4-1/we-crew/my-agent`；该接口无入参，服务端返回通用包装结构 `code`、`message`、`data`，其中 `data` 为对象，包含：`partnerAccount`、`name`、`icon`、`description`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`robotId`、`weCodeUrl`。
+3. SDK 统一将返回结果组装为 `weAgentDetailsArray`：
+   - `GET /v1/robot-partners/{partnerAccount}` 场景直接解析服务端返回的 `data[]`；
+   - `GET /v4-1/we-crew/my-agent` 场景将 `data` 单对象适配为仅包含一个元素的 `weAgentDetailsArray`，其中：
+     - `description` 映射到 `desc`
+     - `robotId` 映射到 `id`
+     - `partnerAccount`、`name`、`icon`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`weCodeUrl` 按字段语义写入对应的 `WeAgentDetails`
+     - `moduleId`、`appKey`、`appSecret`、`createdBy`、`creatorWorkId`、`creatorW3Account`、`creatorName`、`creatorNameEn`、`ownerWelinkId`、`ownerW3Account`、`ownerName`、`ownerNameEn`、`ownerDeptName`、`ownerDeptNameEn` 等服务端未返回字段，SDK 使用空字符串兜底
+4. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
+5. SDK 返回 `Promise<weAgentDetailsArray>`。
 
 ---
 
@@ -716,9 +734,12 @@ IM 模块调用
 
 ### 接口说明
 
-根据 `partnerAccount` 获取指定助理详情，并组装打开助理所需的 URI 信息。
+根据 `partnerAccount` 或当前主助理详情，组装并打开助理所需的 URI 信息。
 
-该接口为 SDK 本地扩展接口，无对应服务端接口。
+该接口为 SDK 本地扩展接口，`partnerAccount` 为非必填：
+
+- 当传入 `partnerAccount` 时，按指定助理打开，并沿用历史 URI 组装逻辑；
+- 当未传 `partnerAccount` 时，SDK 直接调用 `getWeAgentUri` 获取 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`。
 
 ### 接口名
 
@@ -730,7 +751,7 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 是 | 助理账号 ID |
+| `partnerAccount` | `string` | 否 | 助理账号 ID；传入时按指定助理打开，不传时默认打开当前主助理 |
 
 ### 入参示例
 
@@ -756,18 +777,22 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 
 ### 实现方法
 
-1. SDK 接收入参 `partnerAccount`，并校验其为非空字符串。
+1. SDK 接收入参 `partnerAccount`；当传入时，校验其为非空字符串。
 2. `todo`：SDK 调用基座提供的 `saveSettings` 方法，保存 `isShowWeAgent = true`。
 3. `todo`：调用基座广播接口，广播 `{ isShowWeAgent: true }`。
-4. SDK 调用 `getAssistantDetails(params: QueryWeAgentParams)` 获取指定助理详情。
-5. 若成功获取到助理详情，则 SDK 取首个助理详情对象作为当前目标助理详情，并校验其中 `weCodeUrl` 为非空字符串；若 `weCodeUrl` 为空，则 SDK 抛出 `7000` 异常。
-6. 当目标助理详情有效且 `weCodeUrl` 非空时，SDK 将该助理详情设置到 `current_we_agent_detail` 缓存中。
-7. 若服务端未返回有效助理详情，或接口调用失败，则 SDK 抛出异常。
-8. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，URI 组装规则与 `getWeAgentUri` 保持一致：
-   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
-   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；
-   - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；
-   - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
+4. 当传入 `partnerAccount` 时，SDK 调用 `getAssistantDetails(params: QueryWeAgentParams)` 获取指定助理详情。
+5. 当未传 `partnerAccount` 时，SDK 直接调用 `getWeAgentUri`，复用其内部对 `current_we_agent_detail` 以及 URI 组装规则的完整处理逻辑。
+6. SDK 需将目标助理详情统一归一化为本地缓存结构后写入 `current_we_agent_detail`：
+   - 指定助理场景复用 `getAssistantDetails` 返回的详情对象；
+   - 主助理场景由 `getWeAgentUri` 内部负责处理和更新。
+7. 若目标助理详情不存在，或 `weCodeUrl` 为空字符串，则 SDK 抛出 `7000` 异常。
+8. SDK 在内存中直接组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，并与 `getWeAgentUri` 保持一致：
+   - 当传入 `partnerAccount` 时，沿用历史组装逻辑不变：
+     - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
+     - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；
+     - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；
+     - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
+   - 当未传 `partnerAccount` 时，直接复用 `getWeAgentUri` 的返回结果，不在 `openWeAgent` 内重复实现主助理 URI 组装逻辑。
 9. `todo`：调用基座方法打开助理 tab，并使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理 CUI。
 10. SDK 返回 `OpenWeAgentResult`，其中 `status` 固定为 `success`。
 
@@ -775,7 +800,7 @@ openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult>
 
 | 错误码 | 错误消息 | 说明 |
 |---|---|---|
-| `1000` | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| `1000` | 无效的参数 | `partnerAccount` 传入但格式错误 |
 | `5000` | 内部错误 | `saveSettings` 调用失败、基座广播失败、打开助理 tab 失败，或 `openWeAgentCUI` 调用失败 |
 | `7000` | 服务端错误 | `getAssistantDetails` 调用失败、服务端未返回有效助理详情、助理详情中的 `weCodeUrl` 为空，或返回结构异常 |
 
@@ -1116,7 +1141,80 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 
 ---
 
-## 15. 获取当前 WeAgentUri 接口
+## 15. 获取主助理详情接口
+
+### 调用方
+
+IM 模块调用
+
+### 接口说明
+
+调用服务端接口 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情。
+
+该接口无入参，SDK 对外直接透传服务端返回的 `data` 对象，不透出通用包装字段 `code`、`message`。
+
+### 接口名
+
+```typescript
+getMyAgentDetail(): Promise<MyAgentDetail>
+```
+
+### 入参
+
+无
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `partnerAccount` | `string` | 主助理账号 |
+| `name` | `string` | 主助理名称 |
+| `icon` | `string` | 主助理头像 |
+| `description` | `string` | 主助理简介 |
+| `bizRobotId` | `string` | 助理类型 ID |
+| `bizRobotName` | `string` | 助理类型名称 |
+| `bizRobotNameEn` | `string` | 助理类型英文名称 |
+| `bizRobotTag` | `string` | 助理标签 |
+| `robotId` | `string` | 主助理 ID |
+| `weCodeUrl` | `string` | 主助理 WeCode 地址 |
+
+### 出参示例
+
+```json
+{
+  "partnerAccount": "x00_1",
+  "name": "员工助手",
+  "icon": "https://example.com/icon.png",
+  "description": "我是xxx",
+  "bizRobotId": "123456",
+  "bizRobotName": "员工助手",
+  "bizRobotNameEn": "staffAssistant",
+  "bizRobotTag": "myAgent",
+  "robotId": "78985451212",
+  "weCodeUrl": "h5://S008623/index.html"
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`GET /v4-1/we-crew/my-agent`。
+2. 该接口无入参。
+3. 服务端返回通用包装结构：
+   - `code`：状态码，正常为 `200`
+   - `message`：响应消息
+   - `data`：主助理详情对象，包含 `partnerAccount`、`name`、`icon`、`description`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`robotId`、`weCodeUrl`
+4. SDK 对外直接返回 `data` 对象，不新增字段，不改写字段名。
+5. SDK 返回 `Promise<MyAgentDetail>`。
+
+### 错误码
+
+| 错误码 | 错误消息 | 说明 |
+|---|---|---|
+| `7000` | 服务端错误 | `/v4-1/we-crew/my-agent` 调用失败、返回结构异常，或服务端返回非成功状态码 |
+
+---
+
+## 16. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -1125,7 +1223,7 @@ Skill 小程序调用
 ### 接口说明
 
 读取持久化的当前助理详情，组装并返回当前助理相关页面 URI。
-该接口为 SDK 本地扩展接口，`DigitalTwinSdkInterfaceV1.md` 无对应服务端接口。
+当可读取到持久化助理详情且其 `weCodeUrl` 为空时，SDK 需直接走固定激活页兜底；当可读取到持久化助理详情且其 `bizRobotTag = myAgent` 时，使用新的 URI 组装规则；当可读取到持久化助理详情但不满足该条件时，沿用历史 URI 组装逻辑不变；当读取不到持久化助理详情时，SDK 不再请求服务端接口，而是直接返回主助理固定页面地址。
 
 ### 接口名
 
@@ -1141,30 +1239,62 @@ getWeAgentUri(): WeAgentUriResult
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `weAgentUri` | `string` | 当前助理 CUI 地址：若可读取到持久化助理详情，且解析 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `robotId={id}`（`id` 来自助理详情）；若可读取到持久化助理详情，且解析 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致，则按 `weCodeUrl` 追加 query `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；若读取不到持久化助理详情，则返回 `h5://S008623/index.html` 并追加 query `wecodePlace=weAgent` 与 hash `activateAssistant` |
-| `assistantDetailUri` | `string` | 助理详情地址：`h5://S008623/index.html` 并追加 `partnerAccount` query 与 hash `assistantDetail`；若读取不到持久化助理详情则返回空字符串 |
-| `switchAssistantUri` | `string` | 切换助理地址：`h5://S008623/index.html` 并追加 `partnerAccount` query 与 hash `switchAssistant`；若读取不到持久化助理详情则返回空字符串 |
+| `weAgentUri` | `string` | 当前助理 CUI 地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，使用持久化详情中的 `weCodeUrl` 并追加 query 参数 `from=weAgent`；当读取不到持久化助理详情时，固定返回 `MyAgentUri + /index.html?wecodePlace=weAgent&from=weAgent`；其余场景沿用历史组装逻辑 |
+| `assistantDetailUri` | `string` | 助理详情地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；当读取不到持久化助理详情时，固定返回 `h5://S008623/index.html?type=myAgent#assistantDetail`；其余场景沿用历史组装逻辑 |
+| `switchAssistantUri` | `string` | 切换助理地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`；当读取不到持久化助理详情时，固定返回 `h5://S008623/index.html?type=myAgent#switchAssistant`；其余场景沿用历史组装逻辑 |
 
-### 出参示例
+### 出参示例（持久化助理详情 `bizRobotTag = myAgent` 场景）
+
+```json
+{
+  "weAgentUri": "h5://S008623/index.html?from=weAgent",
+  "assistantDetailUri": "h5://S008623/index.html?partnerAccount=x00_1#assistantDetail",
+  "switchAssistantUri": "h5://S008623/index.html?partnerAccount=x00_1#switchAssistant"
+}
+```
+
+### 出参示例（无持久化助理详情场景）
+
+```json
+{
+  "weAgentUri": "h5://2317/index.html?wecodePlace=weAgent&from=weAgent",
+  "assistantDetailUri": "h5://S008623/index.html?type=myAgent#assistantDetail",
+  "switchAssistantUri": "h5://S008623/index.html?type=myAgent#switchAssistant"
+}
+```
+
+### 出参示例（已读取到助理详情，但该详情的 `weCodeUrl` 为空的兜底场景）
 
 ```json
 {
   "weAgentUri": "h5://S008623/index.html?wecodePlace=weAgent#activateAssistant",
-  "assistantDetailUri": "h5://S008623/index.html?partnerAccount=x00_1#assistantDetail",
-  "switchAssistantUri": "h5://S008623/index.html?partnerAccount=x00_1#switchAssistant"
+  "assistantDetailUri": "",
+  "switchAssistantUri": ""
 }
 ```
 
 ### 实现方法
 
 1. 从 SP 持久化存储中读取当前助理详情（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`）。
-2. 若读取不到持久化助理详情，`weAgentUri` 固定返回：`h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`，`assistantDetailUri` 与 `switchAssistantUri` 返回空字符串。
-3. 若读取到持久化助理详情，读取其中的 `weCodeUrl`、`partnerAccount`、`id`，解析 `weCodeUrl` 的 host，并按以下规则组装 `weAgentUri`：
+2. 若读取到的持久化助理详情中 `weCodeUrl` 为空字符串，则 SDK 直接走兜底逻辑：
+   - `weAgentUri` 固定返回 `h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`
+   - `assistantDetailUri` 返回空字符串
+   - `switchAssistantUri` 返回空字符串
+3. 当读取到的持久化助理详情满足 `bizRobotTag = myAgent` 时，使用新的组装规则：
+   - `weAgentUri` 组装为：持久化助理详情中的 `weCodeUrl` + query 参数 `from=weAgent`；
+   - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={持久化助理详情.partnerAccount}` + hash `assistantDetail`；
+   - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={持久化助理详情.partnerAccount}` + hash `switchAssistant`。
+4. 当读取到的持久化助理详情不满足 `bizRobotTag = myAgent` 时，沿用历史组装逻辑返回：
    - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 不一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `robotId={id}`；
-   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`。
-4. 组装 `assistantDetailUri`：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`。
-5. 组装 `switchAssistantUri`：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
-6. 返回 `WeAgentUriResult`。
+   - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；
+   - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；
+   - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
+5. SDK 定义常量 `MyAgentUri = h5://2317`。
+6. 若读取不到持久化助理详情，则 SDK 直接返回主助理固定页面地址：
+   - `weAgentUri` 固定返回 `MyAgentUri + /index.html?wecodePlace=weAgent&from=weAgent`，即 `h5://2317/index.html?wecodePlace=weAgent&from=weAgent`
+   - `assistantDetailUri` 固定返回 `h5://S008623/index.html?type=myAgent#assistantDetail`
+   - `switchAssistantUri` 固定返回 `h5://S008623/index.html?type=myAgent#switchAssistant`
+7. 返回 `WeAgentUriResult`。
 
 ---
 
@@ -1293,7 +1423,7 @@ type GetIsShowWeAgentResult = {
 
 ```typescript
 type OpenWeAgentParams = {
-  partnerAccount: string
+  partnerAccount?: string
 }
 ```
 
@@ -1408,6 +1538,23 @@ type QueryAssistantGraySingleResult = {
 }
 ```
 
+### MyAgentDetail
+
+```typescript
+type MyAgentDetail = {
+  partnerAccount: string
+  name: string
+  icon: string
+  description: string
+  bizRobotId: string
+  bizRobotName: string
+  bizRobotNameEn: string
+  bizRobotTag: string
+  robotId: string
+  weCodeUrl: string
+}
+```
+
 ### WeAgent
 
 ```typescript
@@ -1418,6 +1565,7 @@ type WeAgent = {
   partnerAccount: string
   bizRobotName: string
   bizRobotNameEn: string
+  bizRobotTag: string
   robotId: string
 }
 ```

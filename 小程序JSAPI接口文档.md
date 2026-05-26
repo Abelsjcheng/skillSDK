@@ -259,6 +259,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getSession
 | title | string \| null | 工具/权限标题 |
 | header | string \| null | question 分组标题 |
 | question | string \| null | 问题正文 |
+| questionId | string \| null | 问题 ID（`question` 类型）；服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
 | options | string[] \| null | 选项 |
 | multiSelect | boolean \| null | 是否多选（question running 阶段可选） |
 | questions | object[] \| null | 多题结构（question running 阶段可选） |
@@ -1157,6 +1158,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | partnerAccount | string | 助理账号 ID |
 | bizRobotName | string | 助理对应业务机器人名称（中文） |
 | bizRobotNameEn | string | 助理对应业务机器人名称（英文） |
+| bizRobotTag | string | 大脑机器人 tag |
 | robotId | string | 助理机器人 ID |
 
 ### 错误处理
@@ -1175,12 +1177,19 @@ window.HWH5EXT.getWeAgentList({
   pageNumber: 1
 }).then((result) => {
   result.content.forEach((item) => {
-    console.log(item.name, item.partnerAccount);
+    console.log(item.name, item.partnerAccount, item.bizRobotTag);
   });
 }).catch((error) => {
   console.error('获取助理列表失败:', error.errorCode, error.errorMessage);
 });
 ```
+
+### 行为说明
+
+1. JSAPI 调用 SDK `getWeAgentList` 接口。
+2. SDK 调用服务端 `GET /v4-1/we-crew/list`，透传查询参数 `pageSize`、`pageNumber`。
+3. SDK 解析服务端返回 `data[]` 并组装为 `WeAgentList`。
+4. 服务端新增字段 `data[].bizRobotTag` 需同步透传到 JSAPI 出参 `content[].bizRobotTag`。
 
 ---
 
@@ -1211,7 +1220,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| partnerAccount | string | 移动端必填 | 助理账号 ID（移动端） |
+| partnerAccount | string | 移动端非必填 | 助理账号 ID（移动端）；未传时，SDK 调用 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情 |
 | partnerAccounts | Array<string> | PC端必填 | 助理账号 ID 数组（PC端，保持不变） |
 
 ### 返回值
@@ -1253,7 +1262,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 ### 行为说明
 
-1. 移动端：SDK 调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情。
+1. 移动端：传入 `partnerAccount` 时，SDK 调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；未传时，SDK 调用 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情。
 2. PC端：保持原有实现，使用 `partnerAccounts` 数组入参获取详情列表。
 3. 当最终查询对象仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离），供 `getWeAgentUri` 使用。
 
@@ -1277,6 +1286,18 @@ window.HWH5EXT.getWeAgentDetails({
 }).catch((error) => {
   console.error('获取助理详情失败:', error.errorCode, error.errorMessage);
 });
+```
+
+### 调用示例（移动端未传 `partnerAccount`）
+
+```javascript
+window.HWH5EXT.getWeAgentDetails({})
+  .then((result) => {
+    console.log('当前主助理详情:', result.weAgentDetailsArray);
+  })
+  .catch((error) => {
+    console.error('获取当前主助理详情失败:', error.errorCode, error.errorMessage);
+  });
 ```
 
 ### 调用示例（PC端）
