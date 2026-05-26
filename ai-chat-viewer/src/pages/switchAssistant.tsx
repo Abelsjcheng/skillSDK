@@ -20,6 +20,7 @@ import {
   getWeAgentList,
   openH5Webview,
 } from '../utils/hwext';
+import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from '../utils/assistantTag';
 import { showToast } from '../utils/toast';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
 import { reportSwitchAssistantClick } from '../utils/uemUtil';
@@ -31,6 +32,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+  const assistantType = useMemo(() => getQueryParam('type') ?? '', []);
   const preferredDefaultPartnerAccount = useMemo(
     () => defaultSelectedAssistantId?.trim() ?? '',
     [defaultSelectedAssistantId],
@@ -48,10 +50,14 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     try {
       const result = await getWeAgentList(DEFAULT_ASSISTANT_LIST_QUERY);
       const list = result && Array.isArray(result.content) ? result.content : [];
+      const myAgentPartnerAccount = assistantType === EXCLUSIVE_ASSISTANT_BIZ_TAG
+        ? list.find((assistant) => (assistant.bizRobotTag?.trim() ?? '') === assistantType)?.partnerAccount ?? ''
+        : '';
+
       setAssistantList(list);
       setSelectedPartnerAccount((current) => resolveSelectableAssistantId(
         list,
-        current,
+        current || myAgentPartnerAccount,
         preferredDefaultPartnerAccount,
         partnerAccount,
       ));
@@ -61,7 +67,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       setAssistantList([]);
       setSelectedPartnerAccount('');
     }
-  }, [partnerAccount, preferredDefaultPartnerAccount, t]);
+  }, [assistantType, partnerAccount, preferredDefaultPartnerAccount, t]);
 
   useEffect(() => {
     void loadAssistantList();

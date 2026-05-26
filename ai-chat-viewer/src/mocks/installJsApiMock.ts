@@ -2713,9 +2713,11 @@ function buildMockApi(): HWH5EXT {
     },
 
     getWeAgentDetails: async (params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> => {
-      const partnerAccounts = 'partnerAccount' in params
-        ? [params.partnerAccount]
-        : params.partnerAccounts;
+      const partnerAccounts = 'partnerAccounts' in params
+        ? params.partnerAccounts
+        : params.partnerAccount
+          ? [params.partnerAccount]
+          : [currentAssistantAccount];
       const details = partnerAccounts
         .map((partnerAccount) => assistantDetailsStore.get(partnerAccount))
         .filter((detail): detail is WeAgentDetails => Boolean(detail))

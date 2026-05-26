@@ -135,7 +135,7 @@ export interface WeAgentListItem {
 }
 
 export interface GetWeAgentDetailsMobileParams {
-  partnerAccount: string;
+  partnerAccount?: string;
 }
 
 export interface GetWeAgentDetailsPcParams {

@@ -186,14 +186,16 @@ function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetW
     if ('partnerAccounts' in params) {
       return { partnerAccounts: params.partnerAccounts };
     }
-    return { partnerAccounts: [params.partnerAccount] };
+    const partnerAccount = params.partnerAccount?.trim() ?? '';
+    return { partnerAccounts: partnerAccount ? [partnerAccount] : [] };
   }
 
   if ('partnerAccount' in params) {
-    return { partnerAccount: params.partnerAccount };
+    const partnerAccount = params.partnerAccount?.trim() ?? '';
+    return partnerAccount ? { partnerAccount } : {};
   }
 
-  return { partnerAccount: params.partnerAccounts[0] ?? '' };
+  return {};
 }
 
 function parseUrl(value: string, base = URL_PARSE_BASE): URL | null {

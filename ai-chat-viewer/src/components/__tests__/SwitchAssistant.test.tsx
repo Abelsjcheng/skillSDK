@@ -76,9 +76,12 @@ describe('SwitchAssistant', () => {
     isPcMiniAppSpy.mockRestore();
     delete (window as any).Pedestal;
     delete (window as any).HWH5EXT;
+    window.location.hash = '';
   });
 
   it('renders switch assistant page header and list items', async () => {
+    window.location.hash = '/switchAssistant?partnerAccount=x00_2&type=myAgent';
+
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
         getWeAgentList: jest.fn(async () => ({
@@ -91,6 +94,16 @@ describe('SwitchAssistant', () => {
               bizRobotName: 'staffAssistant',
               bizRobotNameEn: 'staffAssistant',
               bizRobotTag: 'myAgent',
+              robotId: '',
+            },
+            {
+              name: '通用助手',
+              icon: '',
+              description: '常规助理',
+              partnerAccount: 'x00_2',
+              bizRobotName: 'generalAssistant',
+              bizRobotNameEn: 'generalAssistant',
+              bizRobotTag: '',
               robotId: '',
             },
           ],
@@ -129,7 +142,7 @@ describe('SwitchAssistant', () => {
       writable: true,
     });
 
-    render(<SwitchAssistant />);
+    const { container } = render(<SwitchAssistant />);
 
     expect(screen.getByText('切换助手')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '返回' })).toBeInTheDocument();
@@ -140,5 +153,8 @@ describe('SwitchAssistant', () => {
     expect(await screen.findByText('编程助手')).toBeInTheDocument();
     expect(await screen.findByText('专属助手')).toBeInTheDocument();
     expect(await screen.findByText(/设计师一枚/)).toBeInTheDocument();
+    expect(
+      container.querySelector('.switch-assistant__card--selected .switch-assistant__name')?.textContent,
+    ).toBe('编程助手');
   });
 });
