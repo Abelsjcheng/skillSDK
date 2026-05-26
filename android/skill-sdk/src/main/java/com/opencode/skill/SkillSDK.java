@@ -99,6 +99,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class SkillSDK {
     private static volatile SkillSDK instance;
     private static final String ASSISTANT_H5_URI = "h5://S008623/index.html";
+    private static final String MY_AGENT_URI = "h5://2317";
     private static final String WE_AGENT_CUI_APPID = "S008623";
     private static final int DEFAULT_WE_AGENT_LIST_PAGE_SIZE = 100;
     private static final int DEFAULT_WE_AGENT_LIST_PAGE_NUMBER = 1;
@@ -988,11 +989,25 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount;
-        try {
-            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
-        } catch (SkillSdkException e) {
-            callback.onError(e);
+        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
+        if (partnerAccount == null) {
+            apiClient.getMyWeAgentDetail(new SkillCallback<WeAgentDetails>() {
+                @Override
+                public void onSuccess(@Nullable WeAgentDetails result) {
+                    if (result == null) {
+                        callback.onSuccess(new WeAgentDetailsArrayResult());
+                        return;
+                    }
+                    WeAgentDetailsArrayResult resolved = wrapWeAgentDetail(result);
+                    weAgentStorage.saveCurrentWeAgentDetail(result);
+                    callback.onSuccess(resolved);
+                }
+
+                @Override
+                public void onError(@NonNull Throwable error) {
+                    callback.onError(wrapError(error));
+                }
+            });
             return;
         }
 
@@ -1055,15 +1070,10 @@ public final class SkillSDK {
     }
 
     // 20. getWeAgentUri
-    public void getWeAgentUri(@NonNull SkillCallback<WeAgentUriResult> callback) {
-        if (callback == null) {
-            throw new IllegalArgumentException("callback == null");
-        }
-        if (!isInitialized()) {
-            callback.onError(error(5000, "SkillSDK is not initialized"));
-            return;
-        }
-        buildWeAgentUriResult(weAgentStorage.getCurrentWeAgentDetail(), callback);
+    @NonNull
+    public WeAgentUriResult getWeAgentUri() {
+        ensureInitializedForVoid();
+        return buildWeAgentUriResult(weAgentStorage.getCurrentWeAgentDetail());
     }
 
     // 21. updateWeAgent
@@ -1220,25 +1230,11 @@ public final class SkillSDK {
                         callback.onError(error(7000, "getAssistantDetails returned empty detail"));
                         return;
                     }
-                    String weCodeUrl = normalizeOptionalString(targetDetail.getWeCodeUrl());
-                    if (weCodeUrl == null) {
-                        callback.onError(error(7000, "getAssistantDetails returned empty weCodeUrl"));
-                        return;
-                    }
                     weAgentStorage.saveCurrentWeAgentDetail(targetDetail);
-                    buildWeAgentUriResult(targetDetail, new SkillCallback<WeAgentUriResult>() {
-                        @Override
-                        public void onSuccess(@Nullable WeAgentUriResult uris) {
-                            // TODO: open we-agent tab by calling host capability.
-                            // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
-                            callback.onSuccess(new OpenWeAgentResult("success"));
-                        }
-
-                        @Override
-                        public void onError(@NonNull Throwable error) {
-                            callback.onError(wrapError(error));
-                        }
-                    });
+                    WeAgentUriResult uris = buildWeAgentUriResult(targetDetail);
+                    // TODO: open we-agent tab by calling host capability.
+                    // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
+                    callback.onSuccess(new OpenWeAgentResult("success"));
                 }
 
                 @Override
@@ -1249,19 +1245,10 @@ public final class SkillSDK {
             return;
         }
 
-        getWeAgentUri(new SkillCallback<WeAgentUriResult>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentUriResult uris) {
-                // TODO: open we-agent tab by calling host capability.
-                // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
-                callback.onSuccess(new OpenWeAgentResult("success"));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(wrapError(error));
-            }
-        });
+        WeAgentUriResult uris = getWeAgentUri();
+        // TODO: open we-agent tab by calling host capability.
+        // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
+        callback.onSuccess(new OpenWeAgentResult("success"));
     }
 
     // 26. openAssistantEditPage
@@ -1732,18 +1719,9 @@ public final class SkillSDK {
         } else {
             weAgentStorage.saveCurrentWeAgentDetail(nextDetail);
         }
-        buildWeAgentUriResult(nextDetail, new SkillCallback<WeAgentUriResult>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentUriResult nextUris) {
-                // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
-                callback.onSuccess(result);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(wrapError(error));
-            }
-        });
+        WeAgentUriResult nextUris = buildWeAgentUriResult(nextDetail);
+        // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+        callback.onSuccess(result);
     }
 
     private boolean isCurrentWeAgent(@Nullable String partnerAccount, @Nullable String robotId) {
@@ -1764,64 +1742,17 @@ public final class SkillSDK {
         return robotId != null && robotId.equals(normalizeOptionalString(details.getId()));
     }
 
-    private void buildWeAgentUriResult(
-            @Nullable WeAgentDetails details,
-            @NonNull SkillCallback<WeAgentUriResult> callback
-    ) {
-        if (details != null) {
-            if (normalizeOptionalString(details.getWeCodeUrl()) == null) {
-                callback.onSuccess(buildActivateAssistantFallbackUriResult());
-                return;
-            }
-            callback.onSuccess(isMyAgentDetail(details)
-                    ? buildMyAgentWeAgentUriResult(details)
-                    : buildLegacyWeAgentUriResult(details));
-            return;
+    @NonNull
+    private WeAgentUriResult buildWeAgentUriResult(@Nullable WeAgentDetails details) {
+        if (details == null) {
+            return buildDefaultMyAgentUriResult();
         }
-
-        resolveMyWeAgentDetail(new SkillCallback<WeAgentDetails>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetails myAgentDetail) {
-                if (myAgentDetail == null) {
-                    callback.onSuccess(buildActivateAssistantFallbackUriResult());
-                    return;
-                }
-                if (normalizeOptionalString(myAgentDetail.getWeCodeUrl()) == null) {
-                    callback.onSuccess(buildActivateAssistantFallbackUriResult());
-                    return;
-                }
-                callback.onSuccess(buildMyAgentWeAgentUriResult(myAgentDetail));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onSuccess(buildActivateAssistantFallbackUriResult());
-            }
-        });
-    }
-
-    private void resolveMyWeAgentDetail(@NonNull SkillCallback<WeAgentDetails> callback) {
-        apiClient.getMyWeAgentDetail(new SkillCallback<WeAgentDetails>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetails detail) {
-                if (detail != null) {
-                    cacheMyWeAgentDetail(detail);
-                }
-                callback.onSuccess(detail);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    private void cacheMyWeAgentDetail(@NonNull WeAgentDetails detail) {
-        WeAgentDetails currentDetail = weAgentStorage.getCurrentWeAgentDetail();
-        if (currentDetail == null || isMyAgentDetail(currentDetail)) {
-            weAgentStorage.saveCurrentWeAgentDetail(detail);
+        if (normalizeOptionalString(details.getWeCodeUrl()) == null) {
+            return buildActivateAssistantFallbackUriResult();
         }
+        return isMyAgentDetail(details)
+                ? buildMyAgentWeAgentUriResult(details)
+                : buildLegacyWeAgentUriResult(details);
     }
 
     private boolean isMyAgentDetail(@Nullable WeAgentDetails detail) {
@@ -1837,6 +1768,21 @@ public final class SkillSDK {
                 weAgentUri == null ? "" : weAgentUri,
                 "",
                 ""
+        );
+    }
+
+    @NonNull
+    private WeAgentUriResult buildDefaultMyAgentUriResult() {
+        String weAgentUri = appendQueryParameter(MY_AGENT_URI + "/index.html", "wecodePlace", "weAgent");
+        weAgentUri = appendQueryParameter(weAgentUri, "from", "weAgent");
+        String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "type", "myAgent");
+        assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
+        String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "type", "myAgent");
+        switchAssistantUri = appendHashFragment(switchAssistantUri, "switchAssistant");
+        return new WeAgentUriResult(
+                weAgentUri == null ? "" : weAgentUri,
+                assistantDetailUri == null ? "" : assistantDetailUri,
+                switchAssistantUri == null ? "" : switchAssistantUri
         );
     }
 
@@ -1871,7 +1817,8 @@ public final class SkillSDK {
     @NonNull
     private WeAgentUriResult buildMyAgentWeAgentUriResult(@NonNull WeAgentDetails details) {
         String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
-        String weAgentUri = appendQueryParameter(details.getWeCodeUrl(), "from", "weAgent");
+        String weAgentUri = appendQueryParameter(details.getWeCodeUrl(), "wecodePlace", "weAgent");
+        weAgentUri = appendQueryParameter(weAgentUri, "from", "weAgent");
         String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
         assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
         String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
