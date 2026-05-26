@@ -2700,8 +2700,9 @@ function buildMockApi(): HWH5EXT {
         icon: detail.icon,
         description: detail.desc,
         partnerAccount: detail.partnerAccount,
-        bizRobotName: detail.bizRobotName,
-        bizRobotNameEn: detail.bizRobotNameEn,
+        bizRobotName: detail.bizRobotName ?? '',
+        bizRobotNameEn: detail.bizRobotNameEn ?? '',
+        bizRobotTag: detail.bizRobotTag,
         robotId: detail.bizRobotId,
       }));
       const start = (pageNumber - 1) * pageSize;

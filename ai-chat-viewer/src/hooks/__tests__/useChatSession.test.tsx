@@ -46,14 +46,16 @@ function emitTextMessage(
   onMessage: ListenerParams['onMessage'],
   overrides: Partial<StreamMessage> & Pick<StreamMessage, 'type' | 'messageId'>,
 ): void {
+  const { type, messageId, ...restOverrides } = overrides;
+
   onMessage({
-    type: overrides.type,
-    messageId: overrides.messageId,
+    type,
+    messageId,
     welinkSessionId: 'session_1',
     seq: 1,
     role: 'assistant',
     emittedAt: '2026-05-25T10:00:00.000Z',
-    ...overrides,
+    ...restOverrides,
   });
 }
 

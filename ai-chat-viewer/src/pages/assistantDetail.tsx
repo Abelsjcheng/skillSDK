@@ -39,6 +39,11 @@ import {
   getWeAgentDetails,
   openH5Webview,
 } from '../utils/hwext';
+import {
+  CUSTOM_ASSISTANT_TAG,
+  EXCLUSIVE_ASSISTANT_BIZ_TAG,
+  EXCLUSIVE_ASSISTANT_TAG,
+} from '../utils/assistantTag';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
@@ -110,7 +115,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
-  const displayTag = detail?.bizRobotName || detail?.bizRobotNameEn || '';
+  const bizRobotTag = detail?.bizRobotTag?.trim() ?? '';
+  const displayTag = bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG
+    ? EXCLUSIVE_ASSISTANT_TAG
+    : detail?.bizRobotName?.trim()
+      || detail?.bizRobotNameEn?.trim()
+      || CUSTOM_ASSISTANT_TAG;
   const displayDescription = detail?.desc ?? '';
   const creatorDisplayName = (i18n.resolvedLanguage ?? i18n.language) === 'en'
     ? detail?.creatorNameEn
@@ -118,6 +128,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const displayCreator = joinDisplayValue(creatorDisplayName, detail?.creatorW3Account);
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
+  const shouldHideCreatorRow = isInternalAssistant && bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG;
   const secret = detail?.appSecret ?? '';
   const displaySecret = isSecretVisible ? secret : maskSecret(secret);
 
@@ -355,10 +366,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         <section className="assistant-detail__card assistant-detail__card--intro">
           <h3 className="assistant-detail__section-title">{t('assistantDetail.introTitle')}</h3>
           <p className="assistant-detail__section-desc">{displayDescription}</p>
-          <DetailInfoRow
-            label={t('assistantDetail.creator')}
-            valueNode={<span className="assistant-detail__org-value">{displayCreator}</span>}
-          />
+          {shouldHideCreatorRow ? null : (
+            <DetailInfoRow
+              label={t('assistantDetail.creator')}
+              valueNode={<span className="assistant-detail__org-value">{displayCreator}</span>}
+            />
+          )}
         </section>
 
         <section className="assistant-detail__card assistant-detail__card--org">

@@ -831,6 +831,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
             partnerAccount: config.assistantAccount,
             bizRobotName: config.assistantName,
             bizRobotNameEn: config.assistantName,
+            bizRobotTag: assistantDetail.bizRobotTag,
             robotId: '',
           },
         ],

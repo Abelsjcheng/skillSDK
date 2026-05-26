@@ -128,9 +128,10 @@ export interface WeAgentListItem {
   icon: string;
   description: string;
   partnerAccount: string;
-  bizRobotName?: string;
-  bizRobotNameEn?: string;
-  robotId?: string;
+  bizRobotName: string;
+  bizRobotNameEn: string;
+  bizRobotTag: string;
+  robotId: string;
 }
 
 export interface GetWeAgentDetailsMobileParams {

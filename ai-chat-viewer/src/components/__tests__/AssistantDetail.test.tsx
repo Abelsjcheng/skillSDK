@@ -13,11 +13,11 @@ function renderAssistantDetail(): void {
   );
 }
 
-function installAssistantDetailMock(kind: 'internal' | 'external'): void {
+function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'external'): void {
   Object.defineProperty(window, 'HWH5EXT', {
     value: {
       getWeAgentDetails: jest.fn(() => {
-        if (kind === 'internal') {
+        if (kind === 'internal' || kind === 'internalMyAgent') {
           return {
             weAgentDetailsArray: [
               {
@@ -41,7 +41,7 @@ function installAssistantDetailMock(kind: 'internal' | 'external'): void {
                 ownerDeptNameEn: 'dept-en',
                 id: 'robot_1',
                 bizRobotId: '8041241',
-                bizRobotTag: '',
+                bizRobotTag: kind === 'internalMyAgent' ? 'myAgent' : '',
                 bizRobotName: 'Staff Assistant',
                 bizRobotNameEn: 'Staff Assistant',
                 weCodeUrl: 'h5://123456/html/index.html',
@@ -135,6 +135,16 @@ describe('AssistantDetail', () => {
     renderAssistantDetail();
 
     expect(await screen.findByText('creator-en creator_w3')).toBeInTheDocument();
+  });
+
+  it('hides creator row and shows exclusive assistant tag for internal myAgent assistant', async () => {
+    installAssistantDetailMock('internalMyAgent');
+
+    renderAssistantDetail();
+
+    expect(await screen.findAllByText('专属助手')).toHaveLength(2);
+    expect(screen.queryByText(i18n.t('assistantDetail.creator'))).not.toBeInTheDocument();
+    expect(screen.queryByText('creator-zh creator_w3')).not.toBeInTheDocument();
   });
 
   it('renders appid and secret actions for external assistant', async () => {
