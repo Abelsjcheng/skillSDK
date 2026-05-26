@@ -262,6 +262,7 @@ export interface OpenIMChatParams {
 export interface BuildOpenWeAgentCUIOptions {
   bizRobotId?: string;
   robotId?: string;
+  bizRobotTag?: string;
 }
 
 export interface ResolveRobotIdOptions {

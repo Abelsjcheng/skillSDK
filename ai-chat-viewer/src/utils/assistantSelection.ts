@@ -75,6 +75,7 @@ export async function openAssistantByPartnerAccount(
     const params = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
       bizRobotId: detail.bizRobotId,
       robotId,
+      bizRobotTag: detail.bizRobotTag || selectedAssistant?.bizRobotTag,
     });
     await openWeAgentCUI(params);
     return true;

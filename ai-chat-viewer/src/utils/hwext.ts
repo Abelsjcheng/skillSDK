@@ -57,6 +57,7 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import { APP_ID, isPcMiniApp } from '../constants';
+import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
@@ -305,14 +306,19 @@ export function buildOpenWeAgentCUIParams(
   const weCodeUrlHost = getUrlHost(normalizedWeCodeUrl);
   const isSameAppIdHost = weCodeUrlHost === APP_ID();
   const normalizedRobotId = normalizeString(options?.robotId);
+  const normalizedBizRobotTag = normalizeString(options?.bizRobotTag);
   let weAgentUri = appendQueryParam(normalizedWeCodeUrl, 'wecodePlace', 'weAgent');
 
   if (!weCodeUrlHost || isSameAppIdHost) {
     weAgentUri = appendQueryParam(weAgentUri, 'assistantAccount', normalizedPartnerAccount);
   }
 
-  if (weCodeUrlHost && !isSameAppIdHost && normalizedRobotId) {
-    weAgentUri = appendQueryParam(weAgentUri, 'robotId', normalizedRobotId);
+  if (weCodeUrlHost && !isSameAppIdHost) {
+    if (normalizedBizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG) {
+      weAgentUri = appendQueryParam(weAgentUri, 'from', 'weAgent');
+    } else if (normalizedRobotId) {
+      weAgentUri = appendQueryParam(weAgentUri, 'robotId', normalizedRobotId);
+    }
   }
 
   return {

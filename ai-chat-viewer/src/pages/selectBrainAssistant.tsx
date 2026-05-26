@@ -125,6 +125,7 @@ const SelectBrainAssistantPage: React.FC = () => {
         const openParams = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
           bizRobotId: detail.bizRobotId,
           robotId,
+          bizRobotTag: detail.bizRobotTag,
         });
 
         await openWeAgentCUI(openParams);
