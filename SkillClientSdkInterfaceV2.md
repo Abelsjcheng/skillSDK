@@ -1,4 +1,4 @@
-﻿# Skill Client SDK 2.0 新增接口文档
+# Skill Client SDK 2.0 新增接口文档
 
 ## 文档范围
 
@@ -1239,7 +1239,7 @@ getWeAgentUri(): WeAgentUriResult
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `weAgentUri` | `string` | 当前助理 CUI 地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，使用持久化详情中的 `weCodeUrl` 并追加 query 参数 `from=weAgent`；当读取不到持久化助理详情时，固定返回 `MyAgentUri + /index.html?wecodePlace=weAgent&from=weAgent`；其余场景沿用历史组装逻辑 |
+| `weAgentUri` | `string` | 当前助理 CUI 地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，使用持久化详情中的 `weCodeUrl` 并追加 query 参数 `wecodePlace=weAgent&from=weAgent`；当读取不到持久化助理详情时，固定返回 `MyAgentUri + /index.html?wecodePlace=weAgent&from=weAgent`；其余场景沿用历史组装逻辑 |
 | `assistantDetailUri` | `string` | 助理详情地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；当读取不到持久化助理详情时，固定返回 `h5://S008623/index.html?type=myAgent#assistantDetail`；其余场景沿用历史组装逻辑 |
 | `switchAssistantUri` | `string` | 切换助理地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`；当读取不到持久化助理详情时，固定返回 `h5://S008623/index.html?type=myAgent#switchAssistant`；其余场景沿用历史组装逻辑 |
 
@@ -1247,7 +1247,7 @@ getWeAgentUri(): WeAgentUriResult
 
 ```json
 {
-  "weAgentUri": "h5://S008623/index.html?from=weAgent",
+  "weAgentUri": "h5://S008623/index.html?wecodePlace=weAgent&from=weAgent",
   "assistantDetailUri": "h5://S008623/index.html?partnerAccount=x00_1#assistantDetail",
   "switchAssistantUri": "h5://S008623/index.html?partnerAccount=x00_1#switchAssistant"
 }
@@ -1281,7 +1281,7 @@ getWeAgentUri(): WeAgentUriResult
    - `assistantDetailUri` 返回空字符串
    - `switchAssistantUri` 返回空字符串
 3. 当读取到的持久化助理详情满足 `bizRobotTag = myAgent` 时，使用新的组装规则：
-   - `weAgentUri` 组装为：持久化助理详情中的 `weCodeUrl` + query 参数 `from=weAgent`；
+   - `weAgentUri` 组装为：持久化助理详情中的 `weCodeUrl` + query 参数 `wecodePlace=weAgent&from=weAgent`；
    - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={持久化助理详情.partnerAccount}` + hash `assistantDetail`；
    - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={持久化助理详情.partnerAccount}` + hash `switchAssistant`。
 4. 当读取到的持久化助理详情不满足 `bizRobotTag = myAgent` 时，沿用历史组装逻辑返回：

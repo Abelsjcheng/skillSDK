@@ -26,7 +26,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `sendMessage` | `POST /api/skill/sessions/{sessionId}/messages` | 出参按 `ProtocolMessageView` 对齐 |
 | `getSessionMessage` | `GET /api/skill/sessions/{sessionId}/messages` | 出参按 `PageResult<ProtocolMessageView>` 对齐 |
 | `getSessionMessageHistory` | `GET /api/skill/sessions/{sessionId}/messages/history` | 游标查询历史消息，适用于聊天首屏与上拉加载 |
-| `sendMessageToIM` | `POST /api/skill/sessions/{sessionId}/send-to-im` | SDK 按 `messageId` 本地取完成的消息内容并透传 `chatId` |
+| `sendMessageToIM` | `POST /api/skill/sessions/{sessionId}/send-to-im` | SDK 优先透传入参 `content`；未传时先查询当前会话最后一条完成消息内容，再透传 `chatId` |
 | `replyPermission` | `POST /api/skill/sessions/{sessionId}/permissions/{permId}` | 出参字段与服务端一致 |
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
@@ -596,23 +596,20 @@ try {
 
 ---
 
-## 7. 发送 AI 生成消息结果接口
+## 7. 发送AI生成消息结果接口
 ### 调用方
 
-IM 客户端、we码调用
+IM 客户端、We码调用
 ### 接口说明
 
-将用户在 Skill 小程序中最终确认的消息内容（完成的消息内容）发送到 IM 聊天，用于“选中消息发送到聊天”场景。
-
-SDK 内部维护消息缓存，记录每条消息完成后的消息内容。调用此接口时，SDK 从缓存中获取消息的完成的消息内容，然后发送到 IM。
+将用户在 Skill 小程序中最终确认的消息内容（已完成的消息内容）发送到 IM 聊天，用于“选中消息发送到聊天”场景。
 
 **重要说明**：
 
-- SDK 会记录每条消息完成后的消息内容
 - 调用此接口时：
-  - 若提供 `messageId`，则获取对应消息的完成的消息内容
-  - 若不提供 `messageId`，则获取当前会话最后一条完成的消息内容
-- 服务端 `send-to-im` REST 接口已定义；SDK 负责从本地缓存组装请求内容并发起调用
+  - 若提供 `content`，则 SDK 直接将该内容透传给服务端
+  - 若不提供 `content`，则 SDK 先请求 `/api/skill/sessions/{welinkSessionId}/messages/history`，获取当前会话最后一条完成的消息内容，再发送到 IM
+- 服务端 `send-to-im` REST 接口已定义；SDK 负责组装请求内容并发起调用
 
 ### 接口名
 
@@ -625,10 +622,12 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
-| messageId | string | 否 | 要发送到 IM 的消息 ID，SDK 会从缓存中获取该消息的完成的消息内容。不填则获取当前会话最后一条完成的消息内容 |
+| content | string | 否 | 要发送到 IM 的消息内容。若传入则直接透传给服务端；不传则由 SDK 查询当前会话最后一条完成的消息内容 |
 | chatId | string | 否 | 目标 IM 群组 ID。SDK 仅透传给服务端，不做会话 `imGroupId` 到 `chatId` 的映射 |
 
-> 说明：`chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
+> 说明：
+> - `content` 为可选入参；若传入则建议使用最终确认后的完整文本内容
+> - `chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
 
 ### 出参
 
@@ -646,21 +645,18 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 
 ### 实现方法
 
-1. SDK 内部维护消息缓存，记录每条消息完成后的消息内容：
-   - 监听 `text.done` / `thinking.done` 事件，落定完成的消息内容
-   - 按 `welinkSessionId + messageStableId` 存储消息的完成的消息内容（`messageStableId` 来源于 `messageId` 或 `snapshot.messages[].id`）
-   - 同时维护每个会话的消息顺序，以便获取最后一条消息
-   - 缓存结构与 `getSessionMessage` 共享，确保数据一致性
-2. 调用 `sendMessageToIM` 时：
-   - 若提供 `messageId`：根据 `welinkSessionId` 和 `messageId` 从 SDK 缓存中获取该消息的完成的消息内容
-   - 若未提供 `messageId`：获取当前会话最后一条完成的消息内容
-   - 若缓存中不存在对应消息的完成的消息内容，返回错误
-   - `messageId` 仅用于 SDK 本地缓存定位，不会透传到服务端请求体
+1. 调用 `sendMessageToIM` 时：
+   - 若提供 `content`：SDK 直接使用该内容作为发送到 IM 的消息内容
+   - 若未提供 `content`：SDK 先请求 `GET /api/skill/sessions/{welinkSessionId}/messages/history` 获取当前会话历史消息，并从返回结果中取当前会话最后一条完成的消息内容
+   - 若未提供 `content` 且历史接口中不存在可用的完成消息内容，则返回错误
+2. 当 `content` 为空时，SDK 查询历史消息：
+   - **URL**: `GET /api/skill/sessions/{welinkSessionId}/messages/history`
+   - **查询参数**: 首次请求不传 `beforeSeq`，`size` 使用服务端 / SDK 默认值或按实现侧约定传入
+   - **消息选择规则**: 以历史接口返回的当前批次消息为准，取其中最后一条完成消息的内容；若该消息 `content` 为空，可按其 `parts` 聚合最终展示内容
 3. SDK 调用 Skill 服务端“发送到 IM”接口时，会传入：
-   - `content`：从 SDK 缓存中获取的完成的消息内容
+   - `content`：来自入参 `content`，或由历史接口解析出的最后一条完成消息内容
    - `chatId`：若入参提供则原样透传；若未提供则不由 SDK 补齐，按服务端接口规则处理
-4. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
-5. 调用服务端 REST API 发送消息到 IM：
+4. 调用服务端 REST API 发送消息到 IM：
    - **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
    - **请求体**:
      ```json
@@ -671,54 +667,16 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
      ```
    - **响应**:
      ```json
-     { "success": true }
+     {
+       "success": true
+     }
      ```
-
-### 缓存管理
-
-#### 缓存键设计
-
-| 键 | 说明 |
-|---|---|
-| `welinkSessionId` | 会话 ID |
-| `messageStableId` | 稳定消息 ID（`messageId` 或 `snapshot.messages[].id`） |
-
-#### 缓存更新时机
-
-| 事件类型 | 缓存操作 |
-|---------|---------|
-| `text.delta` | 追加临时缓存，用于实时预览 |
-| `text.done` | 落定完成的消息内容，更新缓存为已完成状态 |
-| `thinking.done` | 可选：是否计入完成的消息内容由上层决定 |
-| `step.done` | 标记当前步骤完成，缓存已就绪 |
-| `streaming` | 用于断线重连时恢复缓存状态 |
-
-### 完成的消息内容获取机制
-
-#### 从缓存获取完成的消息内容的流程
-
-1. **定位消息**：根据 `welinkSessionId` 和稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）定位缓存中的消息
-2. **检查完整性**：验证消息是否已标记为 `isCompleted`
-3. **内容聚合**：
-   - 对于文本类型的消息，使用 `text.done` 事件中的完成的消息内容
-   - 对于包含多个 part 的消息，按 `partSeq` 顺序聚合所有 part 的内容
-   - 对于工具调用等非文本消息，根据业务需求决定是否包含其结果
-4. **返回内容**：返回聚合后的完成的消息内容
-
-#### 缓存一致性保证
-
-- **实时更新**：当 WebSocket 收到 `text.delta` 等增量消息时，实时更新缓存
-- **完成确认**：当收到 `text.done` 等完成消息时，更新为已完成状态
-- **顺序保证**：按 `messageSeq` 维护消息顺序，确保获取最后一条消息时的正确性
-- **断线恢复**：通过 `snapshot` 和 `streaming` 事件恢复缓存状态，确保数据不丢失
 
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
-| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
-| 4003 | 消息不存在 | 请求的消息在缓存中不存在 |
-| 4004 | 消息未完成 | 请求的消息尚未收到完成事件 |
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误，或 `content` 传入后为空字符串 |
 | 4005 | 无完成消息 | 会话中没有已完成的消息 |
 | 6000 | 网络错误 | 网络请求失败 |
 | 7000 | 服务端错误 | 服务端处理失败 |
@@ -726,18 +684,18 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 ### 组合调用场景
 
 在与其他接口组合调用时：
-1. 建议在 `getSessionMessage` 获取消息后再调用 `sendMessageToIM`，确保消息已完成
+1. 若页面已拿到最终确认的消息内容，建议直接传入 `content` 调用 `sendMessageToIM`，避免额外查询历史接口
 2. 若 `sendMessageToIM` 失败，可重试发送，但需注意避免重复发送
 
 ### 调用示例
 
-#### 示例 1：指定消息 ID
+#### 示例 1：直接透传内容
 
 ```typescript
 try {
   const result = await sendMessageToIM({
     welinkSessionId: "42",
-    messageId: "m_2",
+    content: "代码重构已完成，请查看 PR #42",
     chatId: "group_abc123"
   });
 
@@ -746,17 +704,17 @@ try {
   }
 } catch (error) {
   console.error("发送到 IM 失败:", error.errorCode, error.errorMessage);
-  // 可能原因：消息尚未完成、缓存不存在、网络错误等
+  // 可能原因：content 非法、网络错误等
 }
 ```
 
-#### 示例 2：使用最后一条消息
+#### 示例 2：未传 `content`，自动取最后一条完成消息
 
 ```typescript
 try {
   const result = await sendMessageToIM({
     welinkSessionId: "42",
-    // 不提供 messageId，使用最后一条完成的消息内容
+    // 不提供 content，SDK 自动查询当前会话最后一条完成的消息内容
     // 不提供 chatId，按服务端接口规则处理
   });
 
@@ -765,7 +723,7 @@ try {
   }
 } catch (error) {
   console.error("发送到 IM 失败:", error.errorCode, error.errorMessage);
-  // 可能原因：无消息缓存、网络错误等
+  // 可能原因：无已完成消息、网络错误等
 }
 ```
 
@@ -2034,12 +1992,12 @@ try {
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
-| messageId | string | 否 | 要发送到 IM 的消息 ID，SDK 会从缓存中获取该消息的完成的消息内容。不填则获取当前会话最后一条完成的消息内容 |
+| content | string | 否 | 要发送到 IM 的消息内容。若传入则直接透传给服务端；不传则由 SDK 查询当前会话最后一条完成的消息内容 |
 | chatId | string | 否 | 目标 IM 群组 ID。SDK 仅透传给服务端，不做会话 `imGroupId` 到 `chatId` 的映射 |
 
-> 说明：`chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
-
-### SessionListener
+> 说明：
+> - `content` 为可选入参；若传入则建议使用最终确认后的完整文本内容
+> - `chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
