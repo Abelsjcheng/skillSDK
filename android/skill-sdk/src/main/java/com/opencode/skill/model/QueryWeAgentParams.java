@@ -1,22 +1,20 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
-import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
+
+import java.util.Objects;
 
 @Keep
 public class QueryWeAgentParams {
-    @Nullable
+    @NonNull
     private final String partnerAccount;
 
-    public QueryWeAgentParams() {
-        this.partnerAccount = null;
+    public QueryWeAgentParams(@NonNull String partnerAccount) {
+        this.partnerAccount = Objects.requireNonNull(partnerAccount, "partnerAccount == null");
     }
 
-    public QueryWeAgentParams(@Nullable String partnerAccount) {
-        this.partnerAccount = partnerAccount;
-    }
-
-    @Nullable
+    @NonNull
     public String getPartnerAccount() {
         return partnerAccount;
     }
