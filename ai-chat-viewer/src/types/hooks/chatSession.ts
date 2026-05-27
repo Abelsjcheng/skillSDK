@@ -21,7 +21,7 @@ export interface UseChatSessionResult {
   onQuestionAnswered: (submission: QuestionAnswerSubmission) => Promise<void>;
   onSend: (content: string) => Promise<void>;
   onStop: () => Promise<void>;
-  onSendToIM: () => Promise<void>;
+  onSendToIM: (messageId:string) => Promise<void>;
   onCopy: (content: string) => Promise<void>;
   resetTransientState: () => void;
 }
