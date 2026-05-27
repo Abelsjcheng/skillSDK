@@ -13,32 +13,37 @@
 | 已有 | `switch_assistant_confirm_click` | 确认切换助理 | `{ clientType, entry, operationTime }` |
 | 已有 | `weagent_history_click` | 打开历史会话 | `{ clientType, entry, operationTime }` |
 | 已有 | `weagent_create_session_click` | 创建会话 | `{ clientType, entry, operationTime }` |
-| 待新增 | `api_*` 系列 | 所有请求服务端的接口成功 / 失败 | `{ type, duration, ...requestData, ...responseData }` |
+| 待新增 | `api_*` 系列 | 所有请求服务端的接口成功 / 失败 | `{ type, ...requestData, ...responseData }` |
 | 待新增 | `*_click` 补充项 | 发送消息、停止生成、发送到 IM、最小化、关闭、复制、编辑、删除、权限按钮、问题卡片 | `{ page, clientType, entry, operationTime, ...bizData }` |
-| 待新增 | `flow_*` | 会话初始化、历史消息加载、onMessage 消息开始 / 结束 / 错误、AI 回复完成 / 失败、创建 / 编辑 / 删除助理结果 | `{ type, duration, errorCode, errorMessage, ...bizData }` |
+| 待新增 | `flow_*` | 会话初始化、历史消息加载、onMessage 消息开始 / 结束 / 错误、AI 回复完成 / 失败、创建 / 编辑 / 删除助理结果 | `{ type, errorCode, errorMessage, ...bizData }` |
 | 待新增 | `browser_js_error` | 浏览器脚本运行时异常 | `{ page, clientType, entry, errorType, message, filename, lineno, colno, stack, operationTime }` |
 
 ## 待新增埋码明细
 
 | 类别 | 埋码 | 场景 | 数据 |
 |---|---|---|---|
-| 接口 | `api_create_new_session` | 创建会话成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识；成功为 ok，失败为 error duration, // 接口耗时，单位 ms request: { assistantAccount, // 助理账号 businessSessionDomain, // 会话域 businessSessionType, // 会话类型 businessSessionId, // 业务会话标识 ak, // 助理 appKey 或 ak }, response: { welinkSessionId, // 创建成功后的会话 id status, // 会话状态 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 接口 | `api_get_history_sessions` | 获取历史会话成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 duration, // 接口耗时，单位 ms request: { assistantAccount, // 助理账号 businessSessionDomain, // 会话域 page, // 页码 size, // 每页数量 }, response: { sessionCount, // 返回的历史会话数量 latestWelinkSessionId, // 最新会话 id }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 接口 | `api_get_session_message_history` | 获取历史消息成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 duration, // 接口耗时，单位 ms request: { welinkSessionId, // 当前会话 id beforeSeq, // 历史消息游标 size, // 每页数量 }, response: { messageCount, // 返回的历史消息数量 nextBeforeSeq, // 下一页游标 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 接口 | `api_send_message` | 发送消息成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 duration, // 接口耗时，单位 ms request: { welinkSessionId, // 当前会话 id contentLength, // 发送内容长度，不上报原文 toolCallId, // 工具调用 id questionId, // 问题卡片 id subagentSessionId, // subagent 会话 id }, response: { messageId, // 新创建的消息 id }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 接口 | `api_reply_permission` | 权限回复成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 duration, // 接口耗时，单位 ms request: { welinkSessionId, // 当前会话 id permId, // 权限 id response, // 权限回复结果 once / always / reject subagentSessionId, // subagent 会话 id }, response: { permissionId, // 返回的权限 id }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 接口 | `api_create_digital_twin` | 创建助理成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 duration, // 接口耗时，单位 ms request: { name, // 助理名称 descriptionLength, // 助理描述长度，不上报原文 bizRobotId, // 内置助手类型 id qrcode, // 二维码标识 weCrewType, // 助理类型 }, response: { partnerAccount, // 创建成功后的助理账号 robotId, // 创建成功后的 robotId isInternalAssistant, // 是否为内置助手 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_create_new_session` | 创建会话成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识；成功为 ok，失败为 error request: { assistantAccount, // 助理账号 businessSessionDomain, // 会话域 businessSessionType, // 会话类型 businessSessionId, // 业务会话标识 ak, // 助理 appKey 或 ak }, response: { welinkSessionId, // 创建成功后的会话 id status, // 会话状态 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_get_history_sessions` | 获取历史会话成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { assistantAccount, // 助理账号 businessSessionDomain, // 会话域 page, // 页码 size, // 每页数量 }, response: { sessionCount, // 返回的历史会话数量 latestWelinkSessionId, // 最新会话 id }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_get_session_message_history` | 获取历史消息成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { welinkSessionId, // 当前会话 id beforeSeq, // 历史消息游标 size, // 每页数量 }, response: { messageCount, // 返回的历史消息数量 nextBeforeSeq, // 下一页游标 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_send_message` | 发送消息成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { welinkSessionId, // 当前会话 id contentLength, // 发送内容长度，不上报原文 toolCallId, // 工具调用 id questionId, // 问题卡片 id subagentSessionId, // subagent 会话 id }, response: { messageId, // 新创建的消息 id }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_reply_permission` | 权限回复成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { welinkSessionId, // 当前会话 id permId, // 权限 id response, // 权限回复结果 once / always / reject subagentSessionId, // subagent 会话 id }, response: { permissionId, // 返回的权限 id }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_create_digital_twin` | 创建助理成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { name, // 助理名称 descriptionLength, // 助理描述长度，不上报原文 bizRobotId, // 内置助手类型 id qrcode, // 二维码标识 weCrewType, // 助理类型 }, response: { partnerAccount, // 创建成功后的助理账号 robotId, // 创建成功后的 robotId isInternalAssistant, // 是否为内置助手 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_query_qrcode_info` | 查询二维码信息成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { qrcode, // 二维码标识 }, response: { status, // 二维码状态 expired, // 是否已过期 expireTime, // 过期时间 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_update_qrcode_info` | 更新二维码状态成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { qrcode, // 二维码标识 robotId, // 助理 robotId status, // 二维码状态 }, response: { status, // 接口返回状态 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_get_weagent_details` | 获取助理详情成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { partnerAccount, // 助理账号 partnerAccounts, // PC 端批量助理账号列表 }, response: { detailCount, // 返回的详情数量 bizRobotId, // 助理类型 id bizRobotTag, // 助理标签 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_get_weagent_list` | 获取助理列表成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { pageNumber, // 页码 pageSize, // 每页数量 }, response: { listCount, // 返回的助理数量 hasMyAgent, // 是否包含专属助手 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 接口 | `api_stop_skill` | 停止生成成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 接口结果标识 request: { welinkSessionId, // 当前会话 id subagentSessionId, // subagent 会话 id }, response: { status, // 接口返回状态 }, errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
 | 点击 | `weagent_send_message_click` | 点击发送消息 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 welinkSessionId, // 当前会话 id contentLength, // 发送内容长度，不上报原文 operationTime // 操作时间戳 }` |
 | 点击 | `weagent_stop_generate_click` | 点击停止生成 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 welinkSessionId, // 当前会话 id operationTime // 操作时间戳 }` |
 | 点击 | `weagent_send_to_im_click` | 点击发送到 IM | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 welinkSessionId, // 当前会话 id operationTime // 操作时间戳 }` |
 | 点击 | `weagent_permission_allow_click` | 点击允许权限 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 welinkSessionId, // 当前会话 id permType, // 权限类型 operationTime // 操作时间戳 }` |
 | 点击 | `weagent_delete_assistant_click` | 点击删除助理 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 partnerAccount, // 助理账号 operationTime // 操作时间戳 }` |
-| 流程 | `flow_chat_init_result` | 会话初始化成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 duration, // 流程耗时，单位 ms assistantAccount, // 助理账号 welinkSessionId, // 初始化后的会话 id errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 流程 | `flow_onmessage_start` | `onMessage` 收到一轮消息开始 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok', // 固定为 ok duration, // 可先记为 0，消息开始阶段尚未结束 welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id role, // 消息角色，例如 assistant / user deliveryMode, // 消息投递模式，例如 realtime / replay messageType, // 当前消息类型，例如 text.delta / question / permission.ask operationTime // 触发时间戳 }` |
-| 流程 | `flow_onmessage_finish` | `onMessage` 一轮消息结束 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok', // 消息正常结束固定为 ok duration, // 本轮消息从开始到结束的耗时，单位 ms welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id finishReason, // 结束原因，例如 done / session_idle / replay_done messageType, // 当前消息主类型 operationTime // 触发时间戳 }` |
-| 流程 | `flow_onmessage_error` | `onMessage` 处理消息出错或收到错误消息 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'error', // 消息异常固定为 error duration, // 本轮消息从开始到报错的耗时，单位 ms welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id messageType, // 当前消息类型 errorCode, // 错误码 errorMessage, // 错误信息 operationTime // 触发时间戳 }` |
-| 流程 | `flow_ai_reply_result` | AI 回复完成 / 中断 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 duration, // 流程耗时，单位 ms welinkSessionId, // 当前会话 id finishReason, // 回复结束原因 errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
-| 流程 | `flow_create_assistant_result` | 创建助理流程成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 duration, // 流程耗时，单位 ms partnerAccount, // 创建后的助理账号 errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 流程 | `flow_chat_init_result` | 会话初始化成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 assistantAccount, // 助理账号 welinkSessionId, // 初始化后的会话 id errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 流程 | `flow_onmessage_start` | `onMessage` 收到一轮消息开始 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok', // 固定为 ok welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id role, // 消息角色，例如 assistant / user deliveryMode, // 消息投递模式，例如 realtime / replay messageType, // 当前消息类型，例如 text.delta / question / permission.ask operationTime // 触发时间戳 }` |
+| 流程 | `flow_onmessage_finish` | `onMessage` 一轮消息结束 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok', // 消息正常结束固定为 ok welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id finishReason, // 结束原因，例如 done / session_idle / replay_done messageType, // 当前消息主类型 operationTime // 触发时间戳 }` |
+| 流程 | `flow_onmessage_error` | `onMessage` 处理消息出错或收到错误消息 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'error', // 消息异常固定为 error welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id messageType, // 当前消息类型 errorCode, // 错误码 errorMessage, // 错误信息 operationTime // 触发时间戳 }` |
+| 流程 | `flow_ai_reply_result` | AI 回复完成 / 中断 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 welinkSessionId, // 当前会话 id finishReason, // 回复结束原因 errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 流程 | `flow_create_assistant_result` | 创建助理流程成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 partnerAccount, // 创建后的助理账号 errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
 | 浏览器异常 | `browser_js_error` | `window error` 捕获脚本运行时异常 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 errorType: 'js_error', // 错误类型 message, // 错误信息 filename, // 报错脚本文件名 lineno, // 报错行号 colno, // 报错列号 stack, // 错误堆栈 assistantAccount, // 当前助理账号 welinkSessionId, // 当前会话 id operationTime // 触发时间戳 }` |
 
 ## 新增埋码字段说明
@@ -51,7 +56,6 @@
   versionName?: string, // 应用版本名称；从 HWH5.getAppInfo().versionName 获取
   environment?: string, // 环境；从 HWH5.getAppInfo().environment 获取
   type: 'ok' \| 'error', // 接口结果标识；成功固定为 'ok'，失败固定为 'error'
-  duration: number, // 接口调用耗时，单位 ms
   request: {
     // 接口请求入参，按接口实际透传的关键字段上报
   },
@@ -76,6 +80,8 @@
   page?: number, // 分页页码
   size?: number, // 分页大小
   beforeSeq?: number, // 历史消息游标
+  pageNumber?: number, // 列表页码
+  pageSize?: number, // 列表每页数量
   contentLength?: number, // 用户输入长度，不上报原文
   toolCallId?: string, // 工具调用 id
   questionId?: string, // 问题卡片 id
@@ -86,6 +92,7 @@
   descriptionLength?: number, // 助理描述长度，不上报原文
   bizRobotId?: string, // 内置助手类型 id
   qrcode?: string, // 二维码标识；如过于敏感可改为脱敏值
+  expireTime?: string, // 二维码过期时间
   weCrewType?: number, // 助理类型，内部/外部
   sessionCount?: number, // 历史会话数量
   latestWelinkSessionId?: string, // 最新会话 id
@@ -95,6 +102,11 @@
   permissionId?: string, // 权限结果中的权限 id
   robotId?: string, // 创建助理后的 robotId
   isInternalAssistant?: boolean, // 是否为内置助手
+  expired?: boolean, // 二维码是否已过期
+  detailCount?: number, // 助理详情返回数量
+  listCount?: number, // 助理列表返回数量
+  hasMyAgent?: boolean, // 是否包含专属助手
+  bizRobotTag?: string, // 助理标签
   status?: string, // 接口返回状态
 }
 ```
