@@ -115,7 +115,8 @@ NS_ASSUME_NONNULL_BEGIN
                     failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 20. getWeAgentUri
-- (WLAgentSkillsWeAgentUriResult *)getWeAgentUri;
+- (void)getWeAgentUri:(void (^)(WLAgentSkillsWeAgentUriResult *result))success
+              failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 21. updateWeAgent
 - (void)updateWeAgent:(WLAgentSkillsUpdateWeAgentParams *)params

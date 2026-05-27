@@ -13,7 +13,6 @@
 
 static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html";
-static NSString * const WLAgentSkillsMyAgentURI = @"h5://2317";
 static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
 static NSInteger const WLAgentSkillsDefaultWeAgentListPageSize = 100;
 static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
@@ -852,30 +851,16 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         return;
     }
 
-    NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.partnerAccount];
-    __weak typeof(self) weakSelf = self;
-    if (partnerAccount.length == 0) {
-        [[WLAgentSkillsHTTPClient sharedClient] getMyWeAgentWithSuccess:^(id  _Nullable responseObject) {
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (strongSelf == nil) {
-                return;
-            }
-            WLAgentSkillsWeAgentDetailsArrayResult *result =
-                [strongSelf weAgentDetailsArrayResultFromMyAgentPayload:responseObject];
-            if (result.weAgentDetailsArray.count > 0) {
-                [[WLAgentSkillsWeAgentStore sharedStore]
-                    saveCurrentWeAgentDetailDictionary:[result.weAgentDetailsArray.firstObject toDictionary]];
-            }
-            if (success) {
-                success(result);
-            }
-        }
-                                                                      failure:^(NSError * _Nonnull error) {
-            [weakSelf dispatchFailureObject:failure error:error];
-        }];
+    NSString *errorMessage = nil;
+    NSString *partnerAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.partnerAccount
+                                                                          fieldName:@"partnerAccount"
+                                                                       errorMessage:&errorMessage];
+    if (partnerAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
 
+    __weak typeof(self) weakSelf = self;
     [[WLAgentSkillsHTTPClient sharedClient] getWeAgentDetailsWithPartnerAccount:partnerAccount
                                                                          success:^(id  _Nullable responseObject) {
         WLAgentSkillsWeAgentDetailsArrayResult *result = [self weAgentDetailsArrayResultFromPayload:responseObject];
@@ -942,13 +927,14 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 
 #pragma mark - 20. getWeAgentUri
 
-- (WLAgentSkillsWeAgentUriResult *)getWeAgentUri {
+- (void)getWeAgentUri:(void (^)(WLAgentSkillsWeAgentUriResult *result))success
+              failure:(void (^)(NSError *error))failure {
     NSDictionary *detailDictionary = [[WLAgentSkillsWeAgentStore sharedStore] loadCurrentWeAgentDetailDictionary];
     WLAgentSkillsWeAgentDetails *details = nil;
     if ([detailDictionary isKindOfClass:[NSDictionary class]] && detailDictionary.count > 0) {
         details = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:detailDictionary];
     }
-    return [self buildWeAgentUriResultFromDetails:details];
+    [self buildWeAgentUriResultFromDetails:details success:success failure:failure];
 }
 
 #pragma mark - 21. updateWeAgent
@@ -1141,16 +1127,27 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
                 [strongSelf dispatchFailure:failure code:7000 message:@"getAssistantDetails returned empty detail."];
                 return;
             }
-            [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[targetDetail toDictionary]];
-            WLAgentSkillsWeAgentUriResult *uris = [strongSelf buildWeAgentUriResultFromDetails:targetDetail];
-            (void)uris;
-            // TODO: open we-agent tab by calling host capability.
-            // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
-            WLAgentSkillsOpenWeAgentResult *openResult = [[WLAgentSkillsOpenWeAgentResult alloc] init];
-            openResult.status = @"success";
-            if (success) {
-                success(openResult);
+            NSString *weCodeUrl = [WLAgentSkillsTypeConverter optionalStringFromValue:targetDetail.weCodeUrl];
+            if (weCodeUrl == nil) {
+                [strongSelf dispatchFailure:failure code:7000 message:@"getAssistantDetails returned empty weCodeUrl."];
+                return;
             }
+
+            [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[targetDetail toDictionary]];
+            [strongSelf buildWeAgentUriResultFromDetails:targetDetail
+                                                 success:^(WLAgentSkillsWeAgentUriResult *uris) {
+                (void)uris;
+                // TODO: open we-agent tab by calling host capability.
+                // TODO: call host openWeAgentCUI with uris.weAgentUri, uris.assistantDetailUri and uris.switchAssistantUri.
+                WLAgentSkillsOpenWeAgentResult *openResult = [[WLAgentSkillsOpenWeAgentResult alloc] init];
+                openResult.status = @"success";
+                if (success) {
+                    success(openResult);
+                }
+            }
+                                                 failure:^(NSError *error) {
+                [strongSelf dispatchFailureObject:failure error:error];
+            }];
         }
                           failure:^(NSError *error) {
             [weakSelf dispatchFailureObject:failure error:error];
@@ -1158,15 +1155,19 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         return;
     }
 
-    WLAgentSkillsWeAgentUriResult *result = [self getWeAgentUri];
-    (void)result;
-    // TODO: open we-agent tab by calling host capability.
-    // TODO: call host openWeAgentCUI with result.weAgentUri, result.assistantDetailUri and result.switchAssistantUri.
-    WLAgentSkillsOpenWeAgentResult *openResult = [[WLAgentSkillsOpenWeAgentResult alloc] init];
-    openResult.status = @"success";
-    if (success) {
-        success(openResult);
+    [self getWeAgentUri:^(WLAgentSkillsWeAgentUriResult *result) {
+        (void)result;
+        // TODO: open we-agent tab by calling host capability.
+        // TODO: call host openWeAgentCUI with result.weAgentUri, result.assistantDetailUri and result.switchAssistantUri.
+        WLAgentSkillsOpenWeAgentResult *openResult = [[WLAgentSkillsOpenWeAgentResult alloc] init];
+        openResult.status = @"success";
+        if (success) {
+            success(openResult);
+        }
     }
+               failure:^(NSError *error) {
+        [weakSelf dispatchFailureObject:failure error:error];
+    }];
 }
 
 #pragma mark - 26. openAssistantEditPage
@@ -1717,25 +1718,25 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 }
 
 - (void)cacheWeAgentDetailsArrayResult:(WLAgentSkillsWeAgentDetailsArrayResult *)result
-                        partnerAccount:(nullable NSString *)partnerAccount {
+                        partnerAccount:(NSString *)partnerAccount {
     [self cacheWeAgentDetailsArrayResult:result
                           partnerAccount:partnerAccount
                        updateCurrentDetail:YES];
 }
 
 - (void)cacheWeAgentDetailsArrayResult:(WLAgentSkillsWeAgentDetailsArrayResult *)result
-                        partnerAccount:(nullable NSString *)partnerAccount
+                        partnerAccount:(NSString *)partnerAccount
                    updateCurrentDetail:(BOOL)updateCurrentDetail {
     if (result.weAgentDetailsArray.count == 0) {
         return;
     }
-    NSDictionary *detailDictionary = [result.weAgentDetailsArray.firstObject toDictionary];
     if (partnerAccount.length > 0) {
+        NSDictionary *detailDictionary = [result.weAgentDetailsArray.firstObject toDictionary];
         [[WLAgentSkillsWeAgentStore sharedStore] saveWeAgentDetailDictionary:detailDictionary
                                                            forPartnerAccount:partnerAccount];
-    }
-    if (updateCurrentDetail) {
-        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:detailDictionary];
+        if (updateCurrentDetail) {
+            [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:detailDictionary];
+        }
     }
 }
 
@@ -1787,21 +1788,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:dictionary]
     ];
     return result;
-}
-
-- (WLAgentSkillsWeAgentDetailsArrayResult *)weAgentDetailsArrayResultFromMyAgentPayload:(id)payload {
-    if (![payload isKindOfClass:[NSDictionary class]]) {
-        return [self weAgentDetailsArrayResultFromDetailDictionary:@{}];
-    }
-
-    NSMutableDictionary *dictionary = [NSMutableDictionary dictionaryWithDictionary:(NSDictionary *)payload];
-    if ([self normalizedOptionalString:dictionary[@"id"]] == nil) {
-        dictionary[@"id"] = [WLAgentSkillsTypeConverter optionalStringFromValue:dictionary[@"robotId"]] ?: @"";
-    }
-    if ([self normalizedOptionalString:dictionary[@"desc"]] == nil) {
-        dictionary[@"desc"] = [WLAgentSkillsTypeConverter optionalStringFromValue:dictionary[@"description"]] ?: @"";
-    }
-    return [self weAgentDetailsArrayResultFromDetailDictionary:dictionary];
 }
 
 - (NSArray<NSDictionary *> *)dictionariesFromWeAgentList:(NSArray<WLAgentSkillsWeAgent *> *)list {
@@ -2051,12 +2037,20 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     } else {
         [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[nextDetail toDictionary]];
     }
-    WLAgentSkillsWeAgentUriResult *nextUris = [self buildWeAgentUriResultFromDetails:nextDetail];
-    (void)nextUris;
-    // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
-    if (success) {
-        success(deleteResult);
+    [self buildWeAgentUriResultFromDetails:nextDetail
+                                   success:^(WLAgentSkillsWeAgentUriResult *nextUris) {
+        (void)nextUris;
+        // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+        if (success) {
+            success(deleteResult);
+        }
     }
+                                   failure:^(NSError *error) {
+        (void)error;
+        if (success) {
+            success(deleteResult);
+        }
+    }];
 }
 
 - (BOOL)isCurrentWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
@@ -2080,16 +2074,92 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         && [normalizedRobotId isEqualToString:[self normalizedOptionalString:dictionary[@"id"]]];
 }
 
-- (WLAgentSkillsWeAgentUriResult *)buildWeAgentUriResultFromDetails:(nullable WLAgentSkillsWeAgentDetails *)details {
+- (void)buildWeAgentUriResultFromDetails:(nullable WLAgentSkillsWeAgentDetails *)details
+                                 success:(void (^)(WLAgentSkillsWeAgentUriResult *result))success
+                                 failure:(void (^)(NSError *error))failure {
     if (details != nil) {
         if ([self normalizedOptionalString:details.weCodeUrl] == nil) {
-            return [self buildActivateAssistantFallbackUriResult];
+            if (success) {
+                success([self buildActivateAssistantFallbackUriResult]);
+            }
+            return;
         }
-        return [self isMyAgentDetail:details]
+        WLAgentSkillsWeAgentUriResult *result = [self isMyAgentDetail:details]
             ? [self buildMyAgentWeAgentUriResult:details]
             : [self buildLegacyWeAgentUriResult:details];
+        if (success) {
+            success(result);
+        }
+        return;
     }
-    return [self buildDefaultMyAgentUriResult];
+
+    __weak typeof(self) weakSelf = self;
+    [self resolveMyWeAgentDetailWithSuccess:^(WLAgentSkillsWeAgentDetails *detail) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        if (detail == nil) {
+            if (success) {
+                success([strongSelf buildActivateAssistantFallbackUriResult]);
+            }
+            return;
+        }
+        if ([strongSelf normalizedOptionalString:detail.weCodeUrl] == nil) {
+            if (success) {
+                success([strongSelf buildActivateAssistantFallbackUriResult]);
+            }
+            return;
+        }
+        if (success) {
+            success([strongSelf buildMyAgentWeAgentUriResult:detail]);
+        }
+    }
+                                 failure:failure];
+}
+
+- (void)resolveMyWeAgentDetailWithSuccess:(void (^)(WLAgentSkillsWeAgentDetails *detail))success
+                                  failure:(void (^)(NSError *error))failure {
+    __weak typeof(self) weakSelf = self;
+    [[WLAgentSkillsHTTPClient sharedClient] getMyWeAgentWithSuccess:^(id  _Nullable responseObject) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        WLAgentSkillsWeAgentDetails *detail = [strongSelf myWeAgentDetailFromPayload:responseObject];
+        if (detail != nil) {
+            [strongSelf cacheMyWeAgentDetail:detail];
+        }
+        if (success) {
+            success(detail);
+        }
+    }
+                                                          failure:^(NSError * _Nonnull error) {
+        (void)error;
+        if (failure) {
+            failure(nil);
+        }
+    }];
+}
+
+- (nullable WLAgentSkillsWeAgentDetails *)myWeAgentDetailFromPayload:(id)payload {
+    if (![payload isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSMutableDictionary *dictionary = [NSMutableDictionary dictionaryWithDictionary:(NSDictionary *)payload];
+    dictionary[@"id"] = [WLAgentSkillsTypeConverter optionalStringFromValue:dictionary[@"robotId"]] ?: @"";
+    return [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:dictionary];
+}
+
+- (void)cacheMyWeAgentDetail:(WLAgentSkillsWeAgentDetails *)detail {
+    NSDictionary *currentDetailDictionary = [[WLAgentSkillsWeAgentStore sharedStore] loadCurrentWeAgentDetailDictionary];
+    WLAgentSkillsWeAgentDetails *currentDetail = nil;
+    if ([currentDetailDictionary isKindOfClass:[NSDictionary class]] && currentDetailDictionary.count > 0) {
+        currentDetail = [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:currentDetailDictionary];
+    }
+    if (currentDetail == nil || [self isMyAgentDetail:currentDetail]) {
+        [[WLAgentSkillsWeAgentStore sharedStore] saveCurrentWeAgentDetailDictionary:[detail toDictionary]];
+    }
 }
 
 - (BOOL)isMyAgentDetail:(nullable WLAgentSkillsWeAgentDetails *)detail {
@@ -2105,23 +2175,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     result.weAgentUri = [self appendHashToUri:weAgentUri hash:@"activateAssistant"] ?: @"";
     result.assistantDetailUri = @"";
     result.switchAssistantUri = @"";
-    return result;
-}
-
-- (WLAgentSkillsWeAgentUriResult *)buildDefaultMyAgentUriResult {
-    WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
-    NSString *weAgentUri = [self appendQueryItemToUri:[WLAgentSkillsMyAgentURI stringByAppendingString:@"/index.html"]
-                                                  key:@"wecodePlace"
-                                                value:@"weAgent"];
-    result.weAgentUri = [self appendQueryItemToUri:weAgentUri key:@"from" value:@"weAgent"] ?: @"";
-    NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                          key:@"type"
-                                                        value:@"myAgent"];
-    result.assistantDetailUri = [self appendHashToUri:assistantDetailUri hash:@"assistantDetail"] ?: @"";
-    NSString *switchAssistantUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
-                                                          key:@"type"
-                                                        value:@"myAgent"];
-    result.switchAssistantUri = [self appendHashToUri:switchAssistantUri hash:@"switchAssistant"] ?: @"";
     return result;
 }
 
@@ -2154,8 +2207,7 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 - (WLAgentSkillsWeAgentUriResult *)buildMyAgentWeAgentUriResult:(WLAgentSkillsWeAgentDetails *)details {
     WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
-    NSString *weAgentUri = [self appendQueryItemToUri:details.weCodeUrl key:@"wecodePlace" value:@"weAgent"];
-    result.weAgentUri = [self appendQueryItemToUri:weAgentUri key:@"from" value:@"weAgent"] ?: @"";
+    result.weAgentUri = [self appendQueryItemToUri:details.weCodeUrl key:@"from" value:@"weAgent"] ?: @"";
 
     NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
                                                           key:@"partnerAccount"
