@@ -936,11 +936,11 @@ export function useChatSession({
     }
   }, [finalizeStreamingMessage, mode, welinkSessionId]);
 
-  const onSendToIM = useCallback(async () => {
+  const onSendToIM = useCallback(async (messageId:string) => {
     if (!welinkSessionId) return;
 
     try {
-      await sendMessageToIM({ welinkSessionId });
+      await sendMessageToIM({ welinkSessionId, messageId: messageId });
       showToast('已发送到IM');
     } catch (err) {
       WeLog(`useChatSession sendMessageToIM failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
