@@ -15,7 +15,7 @@
 | 已有 | `weagent_create_session_click` | 创建会话 | `{ clientType, entry, operationTime }` |
 | 待新增 | `api_*` 系列 | 所有请求服务端的接口成功 / 失败 | `{ type, duration, ...requestData, ...responseData }` |
 | 待新增 | `*_click` 补充项 | 发送消息、停止生成、发送到 IM、最小化、关闭、复制、编辑、删除、权限按钮、问题卡片 | `{ page, clientType, entry, operationTime, ...bizData }` |
-| 待新增 | `flow_*` | 会话初始化、历史消息加载、AI 回复完成 / 失败、创建 / 编辑 / 删除助理结果 | `{ type, duration, errorCode, errorMessage, ...bizData }` |
+| 待新增 | `flow_*` | 会话初始化、历史消息加载、onMessage 消息开始 / 结束 / 错误、AI 回复完成 / 失败、创建 / 编辑 / 删除助理结果 | `{ type, duration, errorCode, errorMessage, ...bizData }` |
 | 待新增 | `browser_js_error` | 浏览器脚本运行时异常 | `{ page, clientType, entry, errorType, message, filename, lineno, colno, stack, operationTime }` |
 
 ## 待新增埋码明细
@@ -34,6 +34,9 @@
 | 点击 | `weagent_permission_allow_click` | 点击允许权限 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 welinkSessionId, // 当前会话 id permType, // 权限类型 operationTime // 操作时间戳 }` |
 | 点击 | `weagent_delete_assistant_click` | 点击删除助理 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 partnerAccount, // 助理账号 operationTime // 操作时间戳 }` |
 | 流程 | `flow_chat_init_result` | 会话初始化成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 duration, // 流程耗时，单位 ms assistantAccount, // 助理账号 welinkSessionId, // 初始化后的会话 id errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
+| 流程 | `flow_onmessage_start` | `onMessage` 收到一轮消息开始 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok', // 固定为 ok duration, // 可先记为 0，消息开始阶段尚未结束 welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id role, // 消息角色，例如 assistant / user deliveryMode, // 消息投递模式，例如 realtime / replay messageType, // 当前消息类型，例如 text.delta / question / permission.ask operationTime // 触发时间戳 }` |
+| 流程 | `flow_onmessage_finish` | `onMessage` 一轮消息结束 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok', // 消息正常结束固定为 ok duration, // 本轮消息从开始到结束的耗时，单位 ms welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id finishReason, // 结束原因，例如 done / session_idle / replay_done messageType, // 当前消息主类型 operationTime // 触发时间戳 }` |
+| 流程 | `flow_onmessage_error` | `onMessage` 处理消息出错或收到错误消息 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'error', // 消息异常固定为 error duration, // 本轮消息从开始到报错的耗时，单位 ms welinkSessionId, // 当前会话 id messageId, // 当前消息 id subagentSessionId, // subagent 会话 id messageType, // 当前消息类型 errorCode, // 错误码 errorMessage, // 错误信息 operationTime // 触发时间戳 }` |
 | 流程 | `flow_ai_reply_result` | AI 回复完成 / 中断 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 duration, // 流程耗时，单位 ms welinkSessionId, // 当前会话 id finishReason, // 回复结束原因 errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
 | 流程 | `flow_create_assistant_result` | 创建助理流程成功 / 失败 | `{ clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 type: 'ok' \| 'error', // 流程结果标识 duration, // 流程耗时，单位 ms partnerAccount, // 创建后的助理账号 errorCode, // 失败错误码 errorMessage // 失败错误信息 }` |
 | 浏览器异常 | `browser_js_error` | `window error` 捕获脚本运行时异常 | `{ page, // 页面标识 clientType, // 端类型 versionName, // 应用版本名称 environment, // 环境 entry, // 入口来源 errorType: 'js_error', // 错误类型 message, // 错误信息 filename, // 报错脚本文件名 lineno, // 报错行号 colno, // 报错列号 stack, // 错误堆栈 assistantAccount, // 当前助理账号 welinkSessionId, // 当前会话 id operationTime // 触发时间戳 }` |
@@ -107,6 +110,9 @@
   entry?: string, // 入口来源，当前固定为 WeAgent
   operationTime?: number, // 触发时间戳，单位 ms
   partnerAccount?: string, // 助理 partnerAccount
+  messageType?: string, // 消息类型，例如 text.delta / text.done / question / permission.ask
+  deliveryMode?: string, // 消息投递模式，例如 realtime / replay
+  role?: string, // 消息角色，例如 assistant / user / tool
   permType?: string, // 权限类型，例如 file_write / command / network
   finishReason?: string, // AI 回复结束原因，例如 done / stopped / error
   errorType?: string, // 浏览器异常类型，例如 js_error
