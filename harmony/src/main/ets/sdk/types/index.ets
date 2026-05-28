@@ -263,8 +263,6 @@ export interface StreamMessage {
   subagentName?: string;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
-  deliveryMode?: 'replay' | 'live';
-  replayDone?: boolean;
 }
 
 export interface SessionError {
@@ -349,7 +347,7 @@ export interface RegenerateAnswerParams {
 
 export interface SendMessageToIMParams {
   welinkSessionId: string;
-  messageId?: string;
+  content?: string;
   chatId?: string;
 }
 

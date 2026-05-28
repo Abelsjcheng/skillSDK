@@ -145,7 +145,6 @@ export class SkillSDK {
     try {
       await SkillSDK.instance.wsManager.disconnect();
       SkillSDK.instance.wsManager.clearAllListeners();
-      SkillSDK.instance.wsManager.clearAllRoundBuffers();
       SkillSDK.instance.sessionStateManager.clearAll();
       SkillSDK.instance.weCodeStateManager.clearAll();
       SkillSDK.instance.assistantDetailUpdatedCallbacks.clear();
@@ -258,7 +257,6 @@ export class SkillSDK {
       }
       await this.wsManager.disconnect();
       this.wsManager.clearAllListeners();
-      this.wsManager.clearAllRoundBuffers();
       this.sessionStateManager.clearAll();
       this.weCodeStateManager.clearAll();
       this.assistantDetailUpdatedCallbacks.clear();
@@ -328,9 +326,9 @@ export class SkillSDK {
     try {
       Validator.requireObject(params, 'params');
       Validator.requireString(params.welinkSessionId, 'welinkSessionId');
-      if (params.messageId !== undefined) {
-        if (typeof params.messageId !== 'string') {
-          throw new SkillSdkException(1000, 'messageId must be a string');
+      if (params.content !== undefined) {
+        if (typeof params.content !== 'string') {
+          throw new SkillSdkException(1000, 'content must be a string');
         }
       }
       if (params.chatId !== undefined) {
@@ -338,18 +336,18 @@ export class SkillSDK {
           throw new SkillSdkException(1000, 'chatId must be a string');
         }
       }
-      const messageId = this.normalizeOptionalString(params.messageId);
+      const content = this.normalizeOptionalString(params.content);
+      if (params.content !== undefined && content === undefined) {
+        throw new SkillSdkException(1000, 'content must be a non-empty string');
+      }
       const chatId = this.normalizeOptionalString(params.chatId);
       await this.ensureWebSocketConnected();
-      const history = await this.fetchServerMessages(params.welinkSessionId, 0, 100);
-      const resolvedContent = this.resolveSendToImContent(history.content, messageId);
+      let resolvedContent = content ?? null;
       if (resolvedContent === null) {
-        if (messageId !== undefined) {
-          const exists = this.containsMessageId(history.content, messageId);
-          if (!exists) {
-            throw new SkillSdkException(4003, 'Message not found in server messages');
-          }
-        }
+        const history = await this.fetchServerMessageHistory(params.welinkSessionId, undefined, 100);
+        resolvedContent = this.resolveSendToImContent(history.content);
+      }
+      if (resolvedContent === null) {
         throw new SkillSdkException(4005, 'No completed message found in server messages');
       }
 
@@ -1672,20 +1670,9 @@ export class SkillSDK {
     return null;
   }
 
-  private resolveSendToImContent(messages: SessionMessage[], messageId?: string): string | null {
-    const normalizedMessageId = this.normalizeOptionalString(messageId);
-    if (normalizedMessageId !== undefined) {
-      for (const message of messages) {
-        if (this.normalizeOptionalString(message.id) !== normalizedMessageId) {
-          continue;
-        }
-        return this.normalizeOptionalString(message.content ?? undefined) ?? null;
-      }
-      return null;
-    }
-
-    for (const message of messages) {
-      const content = this.normalizeOptionalString(message.content ?? undefined);
+  private resolveSendToImContent(messages: SessionMessage[]): string | null {
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const content = this.resolveMessageDisplayContent(messages[index]);
       if (content !== undefined) {
         return content;
       }
@@ -1693,12 +1680,21 @@ export class SkillSDK {
     return null;
   }
 
-  private containsMessageId(messages: SessionMessage[], messageId: string): boolean {
-    const normalizedMessageId = this.normalizeOptionalString(messageId);
-    if (normalizedMessageId === undefined) {
-      return false;
+  private resolveMessageDisplayContent(message: SessionMessage): string | undefined {
+    const content = this.normalizeOptionalString(message.content ?? undefined);
+    if (content !== undefined) {
+      return content;
     }
-    return messages.some((message: SessionMessage) => this.normalizeOptionalString(message.id) === normalizedMessageId);
+    const parts = Array.isArray(message.parts) ? message.parts : [];
+    const segments: string[] = [];
+    for (const part of parts) {
+      const partContent = this.normalizeOptionalString(part.content ?? undefined)
+        ?? this.normalizeOptionalString(part.output ?? undefined);
+      if (partContent !== undefined) {
+        segments.push(partContent);
+      }
+    }
+    return segments.length > 0 ? segments.join('\n') : undefined;
   }
 
   private normalizeSendToImResult(raw: Record<string, Object>): SendMessageToIMResult {
