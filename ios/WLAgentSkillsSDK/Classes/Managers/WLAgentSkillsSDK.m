@@ -2115,7 +2115,16 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
             success([strongSelf buildMyAgentWeAgentUriResult:detail]);
         }
     }
-                                 failure:failure];
+                                 failure:^(NSError *error) {
+        (void)error;
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        if (success) {
+            success([strongSelf buildActivateAssistantFallbackUriResult]);
+        }
+    }];
 }
 
 - (void)resolveMyWeAgentDetailWithSuccess:(void (^)(WLAgentSkillsWeAgentDetails *detail))success
@@ -2207,7 +2216,8 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 - (WLAgentSkillsWeAgentUriResult *)buildMyAgentWeAgentUriResult:(WLAgentSkillsWeAgentDetails *)details {
     WLAgentSkillsWeAgentUriResult *result = [[WLAgentSkillsWeAgentUriResult alloc] init];
     NSString *partnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:details.partnerAccount];
-    result.weAgentUri = [self appendQueryItemToUri:details.weCodeUrl key:@"from" value:@"weAgent"] ?: @"";
+    NSString *weAgentUri = [self appendQueryItemToUri:details.weCodeUrl key:@"wecodePlace" value:@"weAgent"];
+    result.weAgentUri = [self appendQueryItemToUri:weAgentUri key:@"from" value:@"weAgent"] ?: @"";
 
     NSString *assistantDetailUri = [self appendQueryItemToUri:WLAgentSkillsAssistantH5URI
                                                           key:@"partnerAccount"

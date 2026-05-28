@@ -1372,7 +1372,11 @@ export class SkillSDK {
   private buildMyAgentWeAgentUriResult(details: WeAgentDetails): WeAgentUriResult {
     const partnerAccount = details.partnerAccount ?? '';
     return {
-      weAgentUri: this.appendQueryParam(details.weCodeUrl ?? '', 'from', 'weAgent'),
+      weAgentUri: this.appendQueryParam(
+        this.appendQueryParam(details.weCodeUrl ?? '', 'wecodePlace', 'weAgent'),
+        'from',
+        'weAgent'
+      ),
       assistantDetailUri: this.appendHashFragment(
         this.appendQueryParam(SkillSDK.ASSISTANT_H5_URI, 'partnerAccount', partnerAccount),
         'assistantDetail'

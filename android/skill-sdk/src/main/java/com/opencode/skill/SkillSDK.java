@@ -1871,7 +1871,8 @@ public final class SkillSDK {
     @NonNull
     private WeAgentUriResult buildMyAgentWeAgentUriResult(@NonNull WeAgentDetails details) {
         String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
-        String weAgentUri = appendQueryParameter(details.getWeCodeUrl(), "from", "weAgent");
+        String weAgentUri = appendQueryParameter(details.getWeCodeUrl(), "wecodePlace", "weAgent");
+        weAgentUri = appendQueryParameter(weAgentUri, "from", "weAgent");
         String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
         assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
         String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
