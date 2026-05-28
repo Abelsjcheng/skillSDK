@@ -1,4 +1,4 @@
-import type { StreamMessage, MessagePart } from '../types';
+import type { StreamMessage, MessagePart, MessagePartSnapshot, PartStatus } from '../types';
 import { extractQuestionFields, normalizeQuestionOptions } from '../utils/message';
 
 export class StreamAssembler {
@@ -252,5 +252,26 @@ export class StreamAssembler {
     this.partOrder = [];
     this.completed = false;
     this.partIdCounter = 0;
+  }
+
+  initializeFromSnapshot(partSnapshots: MessagePartSnapshot[]): void {
+    if (this.completed) return;
+    this.partOrder = [];
+    partSnapshots.forEach((partSnapshot) => {
+      const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);
+      const part = this.getOrCreatePart(partId, partSnapshot.type);
+      part.content = partSnapshot.content ?? '';
+      part.isStreaming = true;
+      part.subagentSessionId = partSnapshot.subagentSessionId ?? undefined;
+      part.subagentName = partSnapshot.subagentName ?? undefined;
+      if (partSnapshot.toolCallId) part.toolCallId = partSnapshot.toolCallId;
+      if (partSnapshot.toolName) part.toolName = partSnapshot.toolName;
+      if (partSnapshot.status) part.status = partSnapshot.status as unknown as PartStatus;
+      if (partSnapshot.input) part.input = partSnapshot.input;
+      if (partSnapshot.output != null) part.output = partSnapshot.output;
+      if (partSnapshot.fileName) part.fileName = partSnapshot.fileName;
+      if (partSnapshot.fileUrl) part.fileUrl = partSnapshot.fileUrl;
+      if (partSnapshot.fileMime) part.fileMime = partSnapshot.fileMime;
+    });
   }
 }

@@ -590,6 +590,9 @@ export function useChatSession({
           setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           latestStreamingMsgIdRef.current = messageId;
 
+          const assembler = getOrCreateStreamingAssembler(messageId);
+          assembler.initializeFromSnapshot(msg.parts);
+
           const nextRole = normalizeRole(msg.role);
           const nextParts = mapRawParts(msg.parts, true);
           upsertAssistantMessage(messageId, (current) => ({
@@ -601,7 +604,7 @@ export function useChatSession({
             isStreaming: true,
             parts: nextParts,
             meta: current?.meta,
-            isHistory: current?.isHistory,
+            isHistory: false,
           }));
           window.requestAnimationFrame(() => {
             hidePendingAssistantPreview();
