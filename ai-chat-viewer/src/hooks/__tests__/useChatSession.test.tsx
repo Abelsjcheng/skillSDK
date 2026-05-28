@@ -239,4 +239,20 @@ describe('useChatSession', () => {
       welinkSessionId: 'session_1',
     });
   });
+
+  it('passes content when sending message to IM', async () => {
+    const { result } = renderHook(() => useChatSession({
+      mode: 'skillCUI',
+      welinkSessionId: 'session_1',
+    }));
+
+    await act(async () => {
+      await result.current.onSendToIM('final answer content');
+    });
+
+    expect(mockSendMessageToIM).toHaveBeenCalledWith({
+      welinkSessionId: 'session_1',
+      content: 'final answer content',
+    });
+  });
 });

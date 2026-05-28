@@ -73,12 +73,9 @@ export function useChatSession({
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
 
   const streamingAssemblersRef = useRef(new Map<string, StreamAssembler>());
-  const replayAssemblersRef = useRef(new Map<string, StreamAssembler>());
   const latestStreamingMsgIdRef = useRef<string | null>(null);
-  const latestReplayMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
-  const replayMessagesRef = useRef(new Map<string, Message>());
   const knownUserMessageIdsRef = useRef(new Set<string>());
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
@@ -112,10 +109,7 @@ export function useChatSession({
   const resetTransientState = useCallback(() => {
     historyEpochRef.current += 1;
     streamingAssemblersRef.current.clear();
-    replayAssemblersRef.current.clear();
     latestStreamingMsgIdRef.current = null;
-    latestReplayMsgIdRef.current = null;
-    replayMessagesRef.current.clear();
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
@@ -139,16 +133,6 @@ export function useChatSession({
     return activeMessageIds.length > 0 ? activeMessageIds[activeMessageIds.length - 1] : null;
   }, []);
 
-  const getLatestReplayMessageId = useCallback(() => {
-    const latestMessageId = latestReplayMsgIdRef.current;
-    if (latestMessageId && replayAssemblersRef.current.has(latestMessageId)) {
-      return latestMessageId;
-    }
-
-    const activeMessageIds = Array.from(replayAssemblersRef.current.keys());
-    return activeMessageIds.length > 0 ? activeMessageIds[activeMessageIds.length - 1] : null;
-  }, []);
-
   const getOrCreateStreamingAssembler = useCallback((messageId: string) => {
     const current = streamingAssemblersRef.current.get(messageId);
     if (current) {
@@ -159,19 +143,6 @@ export function useChatSession({
     const next = new StreamAssembler();
     streamingAssemblersRef.current.set(messageId, next);
     latestStreamingMsgIdRef.current = messageId;
-    return next;
-  }, []);
-
-  const getOrCreateReplayAssembler = useCallback((messageId: string) => {
-    const current = replayAssemblersRef.current.get(messageId);
-    if (current) {
-      latestReplayMsgIdRef.current = messageId;
-      return current;
-    }
-
-    const next = new StreamAssembler();
-    replayAssemblersRef.current.set(messageId, next);
-    latestReplayMsgIdRef.current = messageId;
     return next;
   }, []);
 
@@ -284,170 +255,6 @@ export function useChatSession({
       return [...prev, updater(undefined)];
     });
   }, []);
-
-  const flushReplayMessages = useCallback(() => {
-    const replayMessages = Array.from(replayMessagesRef.current.values());
-    replayMessagesRef.current.clear();
-    replayAssemblersRef.current.clear();
-    latestReplayMsgIdRef.current = null;
-
-    if (replayMessages.length === 0) {
-      return;
-    }
-
-    replayMessages.sort((left, right) => left.timestamp - right.timestamp);
-
-    setMessages((prev) => {
-      const next = [...prev];
-      replayMessages.forEach((message) => {
-        const existingIndex = next.findIndex((item) => item.id === message.id);
-        if (existingIndex >= 0) {
-          next[existingIndex] = {
-            ...next[existingIndex],
-            ...message,
-            isStreaming: false,
-          };
-        } else {
-          next.push({
-            ...message,
-            isStreaming: false,
-          });
-        }
-      });
-      knownUserMessageIdsRef.current = collectUserMessageIds(next);
-      return next;
-    });
-  }, []);
-
-  const handleReplayMessage = useCallback((msg: StreamMessage) => {
-    switch (msg.type) {
-      case 'text.delta':
-      case 'text.done':
-      case 'thinking.delta':
-      case 'thinking.done':
-      case 'tool.update':
-      case 'question':
-      case 'permission.ask':
-      case 'file': {
-        const messageId = msg.messageId;
-        if (!messageId) {
-          break;
-        }
-
-        const replayAssembler = getOrCreateReplayAssembler(messageId);
-        replayAssembler.handleMessage(msg);
-        const current = replayMessagesRef.current.get(messageId);
-        replayMessagesRef.current.set(messageId, {
-          id: messageId,
-          role: current?.role ?? 'assistant',
-          content: replayAssembler.getText(),
-          contentType: current?.contentType ?? 'markdown',
-          timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
-          isStreaming: false,
-          parts: replayAssembler.getParts().map((part) => ({ ...part, isStreaming: false })),
-          meta: current?.meta,
-          isHistory: current?.isHistory,
-        });
-        break;
-      }
-      case 'message.user': {
-        const nextMessage = buildUserMessage(msg);
-        if (!nextMessage) {
-          break;
-        }
-        if (
-          replayMessagesRef.current.has(nextMessage.id)
-          || knownUserMessageIdsRef.current.has(nextMessage.id)
-        ) {
-          break;
-        }
-        replayMessagesRef.current.set(nextMessage.id, nextMessage);
-        break;
-      }
-      case 'permission.reply': {
-        const permissionId = msg.permissionId;
-        if (!permissionId) {
-          break;
-        }
-
-        replayMessagesRef.current.forEach((message, messageId) => {
-          if (!message.parts?.some((part) => part.type === 'permission' && part.permissionId === permissionId)) {
-            return;
-          }
-
-          replayMessagesRef.current.set(messageId, {
-            ...message,
-            parts: message.parts.map((part) => (
-              part.type === 'permission' && part.permissionId === permissionId
-                ? {
-                  ...part,
-                  permResolved: true,
-                  response: msg.response ?? part.response,
-                  isStreaming: false,
-                }
-                : part
-            )),
-          });
-        });
-        break;
-      }
-      case 'step.done': {
-        const currentReplayMessageId = latestReplayMsgIdRef.current ?? getLatestReplayMessageId();
-        if (!currentReplayMessageId || !msg.tokens) {
-          break;
-        }
-
-        const current = replayMessagesRef.current.get(currentReplayMessageId);
-        if (!current) {
-          break;
-        }
-
-        replayMessagesRef.current.set(currentReplayMessageId, {
-          ...current,
-          meta: {
-            ...current.meta,
-            tokens: msg.tokens ?? undefined,
-            cost: msg.cost ?? undefined,
-          },
-        });
-        break;
-      }
-      case 'snapshot': {
-        replayAssemblersRef.current.clear();
-        latestReplayMsgIdRef.current = null;
-        replayMessagesRef.current.clear();
-        (msg.messages ?? []).slice().reverse().forEach((snapshot) => {
-          const mapped = snapshotMessageToMessage(snapshot);
-          replayMessagesRef.current.set(mapped.id, mapped);
-        });
-        break;
-      }
-      case 'streaming': {
-        const messageId = msg.messageId;
-        if (!messageId || !msg.parts || msg.parts.length === 0) {
-          break;
-        }
-
-        const nextRole = normalizeRole(msg.role);
-        replayMessagesRef.current.set(messageId, {
-          id: messageId,
-          role: nextRole,
-          content: '',
-          contentType: contentTypeForRole(nextRole),
-          timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
-          isStreaming: false,
-          parts: mapRawParts(msg.parts, false),
-        });
-        break;
-      }
-      default:
-        break;
-    }
-
-    if (msg.replayDone) {
-      flushReplayMessages();
-    }
-  }, [flushReplayMessages, getLatestReplayMessageId, getOrCreateReplayAssembler]);
 
   const loadMoreHistory = useCallback(async () => {
     if (!welinkSessionId) return;
@@ -573,15 +380,6 @@ export function useChatSession({
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
       if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
         return;
-      }
-
-      if (msg.deliveryMode === 'replay') {
-        handleReplayMessage(msg);
-        return;
-      }
-
-      if (replayMessagesRef.current.size > 0) {
-        flushReplayMessages();
       }
 
       if (
@@ -899,10 +697,8 @@ export function useChatSession({
     appendAssistantErrorBlock,
     finalizeStreamingMessage,
     finalizeStreamingMessageById,
-    flushReplayMessages,
     getLatestStreamingMessageId,
     getOrCreateStreamingAssembler,
-    handleReplayMessage,
     hidePendingAssistantPreview,
     mode,
     resetTransientState,
@@ -936,11 +732,11 @@ export function useChatSession({
     }
   }, [finalizeStreamingMessage, mode, welinkSessionId]);
 
-  const onSendToIM = useCallback(async (messageId:string) => {
+  const onSendToIM = useCallback(async (content: string) => {
     if (!welinkSessionId) return;
 
     try {
-      await sendMessageToIM({ welinkSessionId, messageId: messageId });
+      await sendMessageToIM({ welinkSessionId, content });
       showToast('已发送到IM');
     } catch (err) {
       WeLog(`useChatSession sendMessageToIM failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);

@@ -115,8 +115,6 @@ export interface StreamMessage
   seq: number | null;
   welinkSessionId?: string | null;
   emittedAt?: string | null;
-  deliveryMode?: 'replay' | 'live' | string | null;
-  replayDone?: boolean | null;
   raw?: object;
 
   // message-level fields

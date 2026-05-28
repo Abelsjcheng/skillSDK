@@ -198,7 +198,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleSendToIM = () => {
-    void onSendToIM?.(message.id);
+    void onSendToIM?.(message.content);
   };
 
   const renderActions = () => {

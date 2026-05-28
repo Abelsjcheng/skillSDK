@@ -57,7 +57,7 @@ export interface StopSkillParams {
 
 export interface SendMessageToIMParams {
   welinkSessionId: string;
-  messageId?: string;
+  content?: string;
   chatId?: string;
 }
 

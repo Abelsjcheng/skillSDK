@@ -65,17 +65,6 @@ type LocalEmitPayload = Omit<Parameters<RegisterSessionListenerParams['onMessage
   emittedAt?: string | null;
 };
 
-interface SessionRoundBuffer {
-  welinkSessionId: string;
-  events: Parameters<RegisterSessionListenerParams['onMessage']>[0][];
-  completed: boolean;
-}
-
-interface ReplayState {
-  replaying: boolean;
-  pendingLiveEvents: Parameters<RegisterSessionListenerParams['onMessage']>[0][];
-}
-
 const MOCK_CODEBLOCK_REPLY = [
   '下面给你一段用于验证代码块样式的 mock 返回：',
   '',
@@ -302,8 +291,6 @@ class SkillStreamSocket {
   private reconnectTimer: number | null = null;
   private connecting = false;
   private localSeq = 0;
-  private roundBufferStore = new Map<string, SessionRoundBuffer>();
-  private replayStateStore = new Map<string, ReplayState>();
 
   constructor(private readonly config: OpenCodeBridgeConfig) {}
 
@@ -314,16 +301,6 @@ class SkillStreamSocket {
     }
 
     this.listeners.set(sessionId, new Set<RegisterSessionListenerParams>([params]));
-    const replayState = this.getOrCreateReplayState(sessionId);
-    const buffer = this.roundBufferStore.get(sessionId);
-
-    if (buffer && !buffer.completed && !replayState.replaying) {
-      replayState.replaying = true;
-      window.setTimeout(() => {
-        this.replayBufferedEventsIfNeeded(sessionId);
-      }, 0);
-    }
-
     this.ensureConnected();
   }
 
@@ -344,54 +321,7 @@ class SkillStreamSocket {
       emittedAt: payload.emittedAt ?? nowIso(),
     };
 
-    this.publishEvent(sessionId, message);
-  }
-
-  private getOrCreateReplayState(sessionId: string): ReplayState {
-    const existing = this.replayStateStore.get(sessionId);
-    if (existing) {
-      return existing;
-    }
-
-    const nextState: ReplayState = {
-      replaying: false,
-      pendingLiveEvents: [],
-    };
-    this.replayStateStore.set(sessionId, nextState);
-    return nextState;
-  }
-
-  private getOrCreateRoundBuffer(sessionId: string): SessionRoundBuffer {
-    const existing = this.roundBufferStore.get(sessionId);
-    if (existing && !existing.completed) {
-      return existing;
-    }
-
-    const nextBuffer: SessionRoundBuffer = {
-      welinkSessionId: sessionId,
-      events: [],
-      completed: false,
-    };
-    this.roundBufferStore.set(sessionId, nextBuffer);
-    return nextBuffer;
-  }
-
-  private shouldCompleteCurrentRound(message: Parameters<RegisterSessionListenerParams['onMessage']>[0]): boolean {
-    if (message.type === 'session.status') {
-      return message.sessionStatus === 'idle';
-    }
-
-    return message.type === 'session.error'
-      || message.type === 'error'
-      || message.type === 'agent.offline';
-  }
-
-  private appendToRoundBuffer(sessionId: string, message: Parameters<RegisterSessionListenerParams['onMessage']>[0]): void {
-    const buffer = this.getOrCreateRoundBuffer(sessionId);
-    buffer.events.push(message);
-    if (this.shouldCompleteCurrentRound(message)) {
-      buffer.completed = true;
-    }
+    this.dispatchToSessionListeners(sessionId, message);
   }
 
   private dispatchToSessionListeners(
@@ -405,68 +335,6 @@ class SkillStreamSocket {
 
     sessionListeners.forEach((listener) => {
       listener.onMessage(message);
-    });
-  }
-
-  private flushPendingReplayEvents(sessionId: string): void {
-    const replayState = this.replayStateStore.get(sessionId);
-    if (!replayState) {
-      return;
-    }
-
-    if (replayState.pendingLiveEvents.length === 0) {
-      replayState.replaying = false;
-      return;
-    }
-
-    const pendingMessages = replayState.pendingLiveEvents.splice(0, replayState.pendingLiveEvents.length);
-    pendingMessages.forEach((message) => {
-      this.dispatchToSessionListeners(sessionId, {
-        ...message,
-        deliveryMode: 'live',
-      });
-    });
-    replayState.replaying = false;
-  }
-
-  private replayBufferedEventsIfNeeded(sessionId: string): void {
-    const buffer = this.roundBufferStore.get(sessionId);
-    const replayState = this.replayStateStore.get(sessionId);
-    if (!replayState) {
-      return;
-    }
-
-    if (!buffer || buffer.completed) {
-      replayState.replaying = false;
-      return;
-    }
-
-    const snapshot = buffer.events.slice();
-    snapshot.forEach((message, index) => {
-      this.dispatchToSessionListeners(sessionId, {
-        ...message,
-        deliveryMode: 'replay',
-        replayDone: index === snapshot.length - 1 ? true : undefined,
-      });
-    });
-    this.flushPendingReplayEvents(sessionId);
-  }
-
-  private publishEvent(
-    sessionId: string,
-    message: Parameters<RegisterSessionListenerParams['onMessage']>[0],
-  ): void {
-    this.appendToRoundBuffer(sessionId, message);
-
-    const replayState = this.replayStateStore.get(sessionId);
-    if (replayState?.replaying) {
-      replayState.pendingLiveEvents.push(message);
-      return;
-    }
-
-    this.dispatchToSessionListeners(sessionId, {
-      ...message,
-      deliveryMode: 'live',
     });
   }
 
@@ -508,7 +376,7 @@ class SkillStreamSocket {
         : '';
 
       if (sessionId) {
-        this.publishEvent(sessionId, message as any);
+        this.dispatchToSessionListeners(sessionId, message as any);
         return;
       }
 
@@ -645,7 +513,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         {
           method: 'POST',
           body: JSON.stringify({
-            content: params.messageId ?? '',
+            content: params.content ?? '',
             chatId: params.chatId ?? '',
           }),
         },
