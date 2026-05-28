@@ -582,13 +582,16 @@ export function useChatSession({
           setMessages((msg.messages ?? []).map((item) => snapshotMessageToMessage(item)).reverse());
           break;
         case 'streaming': {
+          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           const messageId = msg.messageId;
           if (!messageId || !msg.parts || msg.parts.length === 0) {
             break;
           }
 
-          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           latestStreamingMsgIdRef.current = messageId;
+
+          const assembler = getOrCreateStreamingAssembler(messageId);
+          assembler.initializeFromSnapshot(msg.parts);
 
           const nextRole = normalizeRole(msg.role);
           const nextParts = mapRawParts(msg.parts, true);
@@ -601,7 +604,7 @@ export function useChatSession({
             isStreaming: true,
             parts: nextParts,
             meta: current?.meta,
-            isHistory: current?.isHistory,
+            isHistory: false,
           }));
           window.requestAnimationFrame(() => {
             hidePendingAssistantPreview();
