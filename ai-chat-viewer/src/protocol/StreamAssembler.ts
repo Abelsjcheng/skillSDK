@@ -256,6 +256,7 @@ export class StreamAssembler {
 
   initializeFromSnapshot(partSnapshots: MessagePartSnapshot[]): void {
     if (this.completed) return;
+    this.parts.clear();
     this.partOrder = [];
     partSnapshots.forEach((partSnapshot) => {
       const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);

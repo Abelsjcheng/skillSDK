@@ -188,8 +188,8 @@ sequenceDiagram
 
 建议以 [ai-chat-viewer/src/hooks/useChatSession.ts](/F:/AIProject/skillSDK/ai-chat-viewer/src/hooks/useChatSession.ts) 为核心调整：
 
-1. 新增“历史是否已就绪”标记，例如 `historyReadyRef`。
-2. 新增“历史加载前待处理事件队列”，仅缓存当前 `welinkSessionId` 的原始 `StreamMessage`。
+1. 新增”历史是否已就绪”标记，例如 `historyReadyRef`。
+2. 新增”历史加载前待处理事件队列”，仅缓存当前 `welinkSessionId` 的原始 `StreamMessage`。
 3. 页面进入某会话时，执行顺序改为：
    - 重置本地 streaming 状态；
    - 立即 `registerSessionListener`；
@@ -199,18 +199,56 @@ sequenceDiagram
    - 标记 `historyReady=true`；
    - 依次 flush 待处理队列；
    - SDK 基于本次首屏历史请求自动触发当前会话 `resume`；
-   - 消费 resume 返回的 `snapshot` / `streaming` 以及后续实时消息。
+   - 消费 resume 返回的 `streaming` 以及后续实时消息。
 4. 页面上拉加载更早历史时，调用 `getHistorySessionsList` 并传入 `beforeSeq`；该场景只补历史，不触发 resume。
-5. `snapshot` 处理规则：
-   - 仅兼容 merge 当前会话内存消息基线；
-   - 保留 `messageId`、`parts`、`subagentSessionId` 等结构；
-   - 覆盖后继续允许后续 `streaming` / `text.delta` 在同一 `messageId` 上增量更新。
-6. `streaming` 处理规则：
+5. `streaming` 处理规则：
    - 若 `messageId + parts` 存在，则按当前 `StreamAssembler` 逻辑恢复进行中的 assistant 消息；
-   - 若 `sessionStatus=idle` 且 `parts` 为空，则清理当前 streaming 状态并关闭“输出中/停止生成”。
-7. `question` / `permission` / `tool` / `file` / `subagent` 继续复用现有 `mapRawParts`、`snapshotMessageToMessage`、`StreamAssembler`、`SubtaskBlock` 渲染链路。
-8. `agent.online/offline` 不进入历史等待队列，可直接处理；其他同会话实时消息在历史完成前先排队。
-9. `resume` 仅在首屏调用 `getHistorySessionsList` 且不传 `beforeSeq` 的场景下，由 SDK 在历史完成或历史失败结束后自动发送，避免服务端恢复态消息先于历史基线落地。
+   - 若 `sessionStatus=idle` 且 `parts` 为空，则清理当前 streaming 状态并关闭”输出中/停止生成”；
+   - **实际实现**：新增 `StreamAssembler.initializeFromSnapshot` 方法，streaming 消息到达时清空 Assembler 的 `parts` 和 `partOrder`，然后从 `msg.parts` 重新初始化，并将 `isHistory` 设置为 `false`。
+6. `question` / `permission` / `tool` / `file` / `subagent` 继续复用现有 `mapRawParts`、`snapshotMessageToMessage`、`StreamAssembler`、`SubtaskBlock` 渲染链路。
+7. `agent.online/offline` 不进入历史等待队列，可直接处理；其他同会话实时消息在历史完成前先排队。
+8. `resume` 仅在首屏调用 `getHistorySessionsList` 且不传 `beforeSeq` 的场景下，由 SDK 在历史完成或历史失败结束后自动发送，避免服务端恢复态消息先于历史基线落地。
+
+**实际实现细节**：
+
+**StreamAssembler.ts 新增方法**：
+```typescript
+initializeFromSnapshot(partSnapshots: MessagePartSnapshot[]): void {
+  if (this.completed) return;
+  this.parts.clear();
+  this.partOrder = [];
+  partSnapshots.forEach((partSnapshot) => {
+    const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);
+    const part = this.getOrCreatePart(partId, partSnapshot.type);
+    part.content = partSnapshot.content ?? '';
+    part.isStreaming = true;
+    part.subagentSessionId = partSnapshot.subagentSessionId ?? undefined;
+    part.subagentName = partSnapshot.subagentName ?? undefined;
+    if (partSnapshot.toolCallId) part.toolCallId = partSnapshot.toolCallId;
+    if (partSnapshot.toolName) part.toolName = partSnapshot.toolName;
+    if (partSnapshot.status) part.status = partSnapshot.status as unknown as PartStatus;
+    if (partSnapshot.input) part.input = partSnapshot.input;
+    if (partSnapshot.output != null) part.output = partSnapshot.output;
+    if (partSnapshot.fileName) part.fileName = partSnapshot.fileName;
+    if (partSnapshot.fileUrl) part.fileUrl = partSnapshot.fileUrl;
+    if (partSnapshot.fileMime) part.fileMime = partSnapshot.fileMime;
+  });
+}
+```
+
+**useChatSession.ts streaming 处理**：
+```typescript
+case 'streaming': {
+  const assembler = getOrCreateStreamingAssembler(messageId);
+  assembler.initializeFromSnapshot(msg.parts);
+  // ...
+  upsertAssistantMessage(messageId, (current) => ({
+    // ...
+    isHistory: false,  // streaming 消息不作为历史消息
+  }));
+  break;
+}
+```
 
 ### 4.3 兼容与边界
 

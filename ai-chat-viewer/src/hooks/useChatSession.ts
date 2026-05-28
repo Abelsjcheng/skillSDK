@@ -582,12 +582,12 @@ export function useChatSession({
           setMessages((msg.messages ?? []).map((item) => snapshotMessageToMessage(item)).reverse());
           break;
         case 'streaming': {
+          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           const messageId = msg.messageId;
           if (!messageId || !msg.parts || msg.parts.length === 0) {
             break;
           }
 
-          setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
           latestStreamingMsgIdRef.current = messageId;
 
           const assembler = getOrCreateStreamingAssembler(messageId);
