@@ -92,10 +92,6 @@ public class StreamMessage {
     private JsonArray messages;
     @Nullable
     private JsonArray parts;
-    @Nullable
-    private String deliveryMode;
-    @Nullable
-    private Boolean replayDone;
 
     @Nullable
     public String getType() {
@@ -437,23 +433,5 @@ public class StreamMessage {
 
     public void setParts(@Nullable JsonArray parts) {
         this.parts = parts;
-    }
-
-    @Nullable
-    public String getDeliveryMode() {
-        return deliveryMode;
-    }
-
-    public void setDeliveryMode(@Nullable String deliveryMode) {
-        this.deliveryMode = deliveryMode;
-    }
-
-    @Nullable
-    public Boolean getReplayDone() {
-        return replayDone;
-    }
-
-    public void setReplayDone(@Nullable Boolean replayDone) {
-        this.replayDone = replayDone;
     }
 }

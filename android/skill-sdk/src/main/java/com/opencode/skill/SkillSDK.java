@@ -57,6 +57,7 @@ import com.opencode.skill.model.SendMessageToIMParams;
 import com.opencode.skill.model.SendMessageToIMResult;
 import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SessionMessage;
+import com.opencode.skill.model.SessionMessagePart;
 import com.opencode.skill.model.SessionStatusResult;
 import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.Session;
@@ -285,7 +286,6 @@ public final class SkillSDK {
         Exception cleanupException = null;
         try {
             webSocketManager.clearAllListeners();
-            webSocketManager.clearAllRoundBuffers();
             listenerBindings.clear();
             sessionStatusCallbacks.clear();
             lastSessionStatusBySession.clear();
@@ -427,6 +427,12 @@ public final class SkillSDK {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
+        String directContent = params.getContent();
+        String normalizedChatId = normalizeOptionalString(params.getChatId());
+        if (directContent != null && directContent.trim().isEmpty()) {
+            callback.onError(error(1000, "content is invalid"));
+            return;
+        }
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean connected) {
@@ -437,7 +443,7 @@ public final class SkillSDK {
                             callback.onError(error(4005, "No completed message content found"));
                             return;
                         }
-                        apiClient.sendMessageToIM(params.getWelinkSessionId(), content, params.getChatId(),
+                        apiClient.sendMessageToIM(params.getWelinkSessionId(), content, normalizedChatId,
                                 new SkillCallback<SendMessageToIMResult>() {
                             @Override
                             public void onSuccess(@Nullable SendMessageToIMResult result) {
@@ -1967,22 +1973,19 @@ public final class SkillSDK {
 
     private void tryResolveSendToImContent(@NonNull SendMessageToIMParams params,
             @NonNull SkillCallback<String> callback) {
-        apiClient.getMessages(params.getWelinkSessionId(), 0, 100, new SkillCallback<PageResult<SessionMessage>>() {
+        String directContent = normalizeOptionalString(params.getContent());
+        if (directContent != null) {
+            callback.onSuccess(directContent);
+            return;
+        }
+        apiClient.getMessagesHistory(params.getWelinkSessionId(), null, 100, new SkillCallback<CursorResult<SessionMessage>>() {
             @Override
-            public void onSuccess(@Nullable PageResult<SessionMessage> result) {
-                PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
-                String content = resolveSendToImContent(page.getContent(), params.getMessageId());
+            public void onSuccess(@Nullable CursorResult<SessionMessage> result) {
+                CursorResult<SessionMessage> page = result == null ? new CursorResult<>() : result;
+                String content = resolveSendToImContent(page.getContent());
                 if (content != null && !content.trim().isEmpty()) {
                     callback.onSuccess(content);
                     return;
-                }
-
-                if (!isBlank(params.getMessageId())) {
-                    String messageId = params.getMessageId();
-                    if (!containsMessageId(page.getContent(), messageId)) {
-                        callback.onError(error(4003, "Message does not exist"));
-                        return;
-                    }
                 }
                 callback.onError(error(4005, "No completed message found"));
             }
@@ -2023,29 +2026,16 @@ public final class SkillSDK {
     }
 
     @Nullable
-    private static String resolveSendToImContent(@Nullable List<SessionMessage> messages, @Nullable String messageId) {
+    private static String resolveSendToImContent(@Nullable List<SessionMessage> messages) {
         if (messages == null) {
             return null;
         }
-        String normalizedMessageId = normalizeOptionalString(messageId);
-        if (normalizedMessageId != null) {
-            for (SessionMessage message : messages) {
-                if (message == null) {
-                    continue;
-                }
-                if (!normalizedMessageId.equals(normalizeOptionalString(message.getId()))) {
-                    continue;
-                }
-                return normalizeOptionalString(message.getContent());
-            }
-            return null;
-        }
-
-        for (SessionMessage message : messages) {
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            SessionMessage message = messages.get(index);
             if (message == null) {
                 continue;
             }
-            String content = normalizeOptionalString(message.getContent());
+            String content = resolveMessageDisplayContent(message);
             if (content != null) {
                 return content;
             }
@@ -2053,20 +2043,34 @@ public final class SkillSDK {
         return null;
     }
 
-    private static boolean containsMessageId(@Nullable List<SessionMessage> messages, @Nullable String messageId) {
-        String normalizedMessageId = normalizeOptionalString(messageId);
-        if (messages == null || normalizedMessageId == null) {
-            return false;
+    @Nullable
+    private static String resolveMessageDisplayContent(@NonNull SessionMessage message) {
+        String content = normalizeOptionalString(message.getContent());
+        if (content != null) {
+            return content;
         }
-        for (SessionMessage message : messages) {
-            if (message == null) {
+        List<SessionMessagePart> parts = message.getParts();
+        if (parts == null || parts.isEmpty()) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (SessionMessagePart part : parts) {
+            if (part == null) {
                 continue;
             }
-            if (normalizedMessageId.equals(normalizeOptionalString(message.getId()))) {
-                return true;
+            String partContent = normalizeOptionalString(part.getContent());
+            if (partContent == null) {
+                partContent = normalizeOptionalString(part.getOutput());
             }
+            if (partContent == null) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append('\n');
+            }
+            builder.append(partContent);
         }
-        return false;
+        return builder.length() == 0 ? null : builder.toString();
     }
 
     private void emitSessionStatusByEvent(@NonNull StreamMessage message) {

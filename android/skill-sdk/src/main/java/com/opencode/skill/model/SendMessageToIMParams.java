@@ -9,17 +9,17 @@ public class SendMessageToIMParams {
     @NonNull
     private final String welinkSessionId;
     @Nullable
-    private final String messageId;
+    private final String content;
     @Nullable
     private final String chatId;
 
-    public SendMessageToIMParams(@NonNull String welinkSessionId, @Nullable String messageId) {
-        this(welinkSessionId, messageId, null);
+    public SendMessageToIMParams(@NonNull String welinkSessionId, @Nullable String content) {
+        this(welinkSessionId, content, null);
     }
 
-    public SendMessageToIMParams(@NonNull String welinkSessionId, @Nullable String messageId, @Nullable String chatId) {
+    public SendMessageToIMParams(@NonNull String welinkSessionId, @Nullable String content, @Nullable String chatId) {
         this.welinkSessionId = welinkSessionId;
-        this.messageId = messageId;
+        this.content = content;
         this.chatId = chatId;
     }
 
@@ -29,8 +29,8 @@ public class SendMessageToIMParams {
     }
 
     @Nullable
-    public String getMessageId() {
-        return messageId;
+    public String getContent() {
+        return content;
     }
 
     @Nullable
