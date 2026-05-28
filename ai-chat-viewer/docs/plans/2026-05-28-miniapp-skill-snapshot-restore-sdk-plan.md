@@ -142,6 +142,63 @@ sequenceDiagram
 }
 ```
 
+4. `resume` 成功后，服务端返回的恢复态消息以 `type=streaming` 为主，建议三端 SDK 直接原样透传。例如：
+
+```json
+{
+  "type": "streaming",
+  "welinkSessionId": "session_123",
+  "messageId": "msg_assistant_1001",
+  "messageSeq": 101,
+  "role": "assistant",
+  "sessionStatus": "busy",
+  "emittedAt": "2026-05-28T10:00:00.000Z",
+  "parts": [
+    {
+      "type": "thinking",
+      "partId": "part_thinking_1",
+      "partSeq": 1,
+      "content": "正在分析问题"
+    },
+    {
+      "type": "text",
+      "partId": "part_text_1",
+      "partSeq": 2,
+      "content": "这是当前已生成的回答内容"
+    },
+    {
+      "type": "tool",
+      "partId": "part_tool_1",
+      "partSeq": 3,
+      "toolCallId": "tool_call_1",
+      "toolName": "search",
+      "status": "running",
+      "input": {
+        "query": "miniapp skill snapshot restore"
+      },
+      "output": ""
+    }
+  ]
+}
+```
+
+5. 若当前会话已恢复完成、服务端无活动中 parts，`resume` 后也可能直接返回空 parts 的 idle 态，例如：
+
+```json
+{
+  "type": "streaming",
+  "welinkSessionId": "session_123",
+  "messageId": "msg_assistant_1001",
+  "messageSeq": 101,
+  "role": "assistant",
+  "sessionStatus": "idle",
+  "emittedAt": "2026-05-28T10:00:05.000Z",
+  "parts": []
+}
+```
+
+6. 兼容场景下，服务端仍可能返回旧 `snapshot` 报文；页面只做 merge，不再用其覆盖历史接口结果。
+
 #### 4.2.2 Android 实现方案
 
 建议修改点：
@@ -211,6 +268,50 @@ sequenceDiagram
 7. `question` / `permission` / `tool` / `file` / `subagent` 继续复用现有 `mapRawParts`、`snapshotMessageToMessage`、`StreamAssembler`、`SubtaskBlock` 渲染链路。
 8. `agent.online/offline` 不进入历史等待队列，可直接处理；其他同会话实时消息在历史完成前先排队。
 9. `resume` 仅在首屏调用 `getHistorySessionsList` 且不传 `beforeSeq` 的场景下，由 SDK 在历史完成或历史失败结束后自动发送，避免服务端恢复态消息先于历史基线落地。
+
+#### 4.2.6 合并消息实现方案
+
+页面侧建议统一使用“历史基线 + pending 队列 + streaming overlay”的三段式合并策略：
+
+1. 历史基线阶段
+   - `getHistorySessionsList` 返回后，先将服务端历史消息标准化为 `Message[]`
+   - 历史消息按 `messageId` 去重，并保留服务端返回的 `messageSeq`、`parts`、`subagentSessionId`
+   - 历史中的 subagent parts 先按现有 `history.ts` 逻辑合并为虚拟 `subtask-${subagentSessionId}` 消息
+
+2. pending 队列回放阶段
+   - 历史未就绪前收到的同会话实时消息先放入 `pendingStreamMessages`
+   - 历史 ready 后，按到达顺序依次回放
+   - 回放时若命中同一个 `messageId`，则在历史消息基础上继续增量更新；若未命中，则创建新的进行中 assistant 消息
+
+3. resume 恢复阶段
+   - SDK 触发 `resume` 后，收到 `type=streaming` 报文
+   - 若 `streaming.messageId` 已存在于当前消息列表，则将 `parts` 逐个合并到该条消息
+   - 若 `streaming.messageId` 不存在，则新建一条 assistant 消息，并以 `parts` 初始化内容
+   - 若 `streaming.sessionStatus=idle` 且 `parts=[]`，则不新增消息，只清理当前会话 streaming 状态
+
+4. part 级合并规则
+   - 主键优先级：`partId` > `toolCallId` > `permissionId`
+   - 文本类 part：同 `partId` 下后到内容覆盖或追加到同一 part
+   - `tool` / `question` / `permission`：同 identity 命中时只更新状态、输入、输出、回复结果，不重复新增卡片
+   - `file`：同 `partId` 命中时更新文件元信息
+   - `subagent`：先按 `subagentSessionId` 分流，再在对应 `subtask` 消息内部继续按 `partId` 合并
+
+5. message 级合并规则
+   - 主键使用 `messageId`
+   - 同一 `messageId` 始终只保留一条主 assistant 消息
+   - 历史消息与恢复态消息合并时，优先保留更完整的 `parts` 结构和最新 `messageSeq`
+   - `content` 作为派生字段，可由 text parts 聚合得到；若已有 streaming content，则避免被较旧历史内容覆盖
+
+6. 推荐实现落点
+   - `history.ts`：负责历史消息标准化与 subagent 历史合并
+   - `useChatSession.ts`：负责历史 ready 状态、pending 队列、resume 后恢复流程
+   - `StreamAssembler`：负责将 `streaming.parts`、后续 `text.delta`、`tool.update`、`question`、`permission.reply` 等事件合并到同一 `messageId`
+
+7. 预期结果
+   - 历史接口先展示 durable baseline
+   - pending 队列补齐历史未完成前到达的实时消息
+   - `resume` 返回的 `streaming` 只恢复当前活动回复，不重复创建历史中已存在的消息块
+   - `tool`、`question`、`permission`、`file`、`subagent` 在恢复后仍保持单块展示、状态连续、不重复
 
 ### 4.3 兼容与边界
 
