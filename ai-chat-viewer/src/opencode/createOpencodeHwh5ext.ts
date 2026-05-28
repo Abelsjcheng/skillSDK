@@ -707,11 +707,9 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
     },
 
     async getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> {
-      const requestedAccounts = 'partnerAccounts' in params
-        ? params.partnerAccounts
-        : params.partnerAccount
-          ? [params.partnerAccount]
-          : [assistantDetail.partnerAccount];
+      const requestedAccounts = 'partnerAccount' in params
+        ? [params.partnerAccount]
+        : params.partnerAccounts;
       const details = requestedAccounts
         .filter((partnerAccount) => partnerAccount === config.assistantAccount)
         .map(() => assistantDetail);

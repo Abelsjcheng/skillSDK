@@ -187,16 +187,14 @@ function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetW
     if ('partnerAccounts' in params) {
       return { partnerAccounts: params.partnerAccounts };
     }
-    const partnerAccount = params.partnerAccount?.trim() ?? '';
-    return { partnerAccounts: partnerAccount ? [partnerAccount] : [] };
+    return { partnerAccounts: [params.partnerAccount] };
   }
 
   if ('partnerAccount' in params) {
-    const partnerAccount = params.partnerAccount?.trim() ?? '';
-    return partnerAccount ? { partnerAccount } : {};
+    return { partnerAccount: params.partnerAccount };
   }
 
-  return {};
+  return { partnerAccount: params.partnerAccounts[0] ?? '' };
 }
 
 function parseUrl(value: string, base = URL_PARSE_BASE): URL | null {

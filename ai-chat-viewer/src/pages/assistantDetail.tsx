@@ -77,15 +77,13 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const resolvedPartnerAccount = isPc
     ? (partnerAccount?.trim() ?? '')
     : useMemo(() => getQueryParam('partnerAccount') ?? '', []);
-  const assistantType = useMemo(() => getQueryParam('type') ?? '', []);
-  const isMyAgentDetail = !isPc && assistantType === EXCLUSIVE_ASSISTANT_BIZ_TAG;
 
   useEffect(() => {
     void ensureLanguageInitialized();
   }, []);
 
   useEffect(() => {
-    if (!resolvedPartnerAccount && !isMyAgentDetail) {
+    if (!resolvedPartnerAccount) {
       setDetail(null);
       return;
     }
@@ -94,18 +92,13 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getWeAgentDetails(
-          isMyAgentDetail ? {} : { partnerAccount: resolvedPartnerAccount },
-        );
+        const result = await getWeAgentDetails({ partnerAccount: resolvedPartnerAccount });
         const nextDetail = result?.weAgentDetailsArray?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);
         }
       } catch (error) {
-        WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({
-          resolvedPartnerAccount,
-          assistantType,
-        })} | error=${JSON.stringify(error)}`);
+        WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ resolvedPartnerAccount })} | error=${JSON.stringify(error)}`);
         showToast(t('assistantDetail.loadFailed'));
         if (!cancelled) {
           setDetail(null);
@@ -118,7 +111,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
     return () => {
       cancelled = true;
     };
-  }, [assistantType, isMyAgentDetail, resolvedPartnerAccount, t]);
+  }, [resolvedPartnerAccount, t]);
 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
