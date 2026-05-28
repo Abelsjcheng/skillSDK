@@ -18,6 +18,7 @@ import { reportViewHistoryClick } from '../../utils/uemUtil';
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
+const HISTORY_SESSIONS_PAGE_SIZE = 50;
 const HISTORY_SESSION_GROUP_ORDER: HistorySessionGroupKey[] = ['today', 'yesterday', 'threeDaysAgo'];
 
 function getStartOfDayTimestamp(value: Date): number {
@@ -84,14 +85,19 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRenderSidebar, setShouldRenderSidebar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchRequestIdRef = useRef(0);
+  const historySessionsRef = useRef<SkillSession[]>([]);
 
   const groupedHistorySessions = useMemo(
     () => groupHistorySessionsByUpdatedAt(historySessions),
     [historySessions],
   );
+  const hasMoreHistorySessions = !isLoading && currentPage + 1 < totalPages;
 
   const historyGroupLabels = useMemo<Record<HistorySessionGroupKey, string>>(() => ({
     today: t('weAgent.today'),
@@ -100,6 +106,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   }), [t]);
 
   useEffect(() => {
+    fetchRequestIdRef.current += 1;
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -107,20 +114,34 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     setIsVisible(false);
     setShouldRenderSidebar(false);
     setIsLoading(false);
+    setIsLoadingMore(false);
+    historySessionsRef.current = [];
     setHistorySessions([]);
+    setCurrentPage(0);
+    setTotalPages(0);
   }, [assistantAccount]);
 
   useEffect(() => {
     if (historyLoaded) {
-      setHistorySessions(cachedSessions);
+      if (!shouldRenderSidebar) {
+        setHistorySessions(cachedSessions);
+        setCurrentPage(Math.max(0, Math.ceil(cachedSessions.length / HISTORY_SESSIONS_PAGE_SIZE) - 1));
+        setTotalPages(0);
+      }
       return;
     }
     setHistorySessions([]);
-  }, [cachedSessions, historyLoaded]);
+    setCurrentPage(0);
+    setTotalPages(0);
+  }, [cachedSessions, historyLoaded, shouldRenderSidebar]);
 
   useEffect(() => {
     onVisibilityChange?.(isVisible);
   }, [isVisible, onVisibilityChange]);
+
+  useEffect(() => {
+    historySessionsRef.current = historySessions;
+  }, [historySessions]);
 
   useEffect(() => () => {
     if (closeTimerRef.current) {
@@ -140,19 +161,30 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     });
   }, []);
 
-  const refreshHistorySessions = useCallback(async (showLoading: boolean) => {
+  const loadHistorySessionsPage = useCallback(async (page: number, showLoading: boolean, append: boolean) => {
     const requestId = fetchRequestIdRef.current + 1;
     fetchRequestIdRef.current = requestId;
 
     if (showLoading) {
       setIsLoading(true);
+    } else if (append) {
+      setIsLoadingMore(true);
     }
 
     try {
       const currentAssistantAccount = assistantAccount.trim();
       const params = currentAssistantAccount
-        ? { assistantAccount: currentAssistantAccount, businessSessionDomain: 'miniapp' as const }
-        : { businessSessionDomain: 'miniapp' as const };
+        ? {
+          assistantAccount: currentAssistantAccount,
+          businessSessionDomain: 'miniapp' as const,
+          page,
+          size: HISTORY_SESSIONS_PAGE_SIZE,
+        }
+        : {
+          businessSessionDomain: 'miniapp' as const,
+          page,
+          size: HISTORY_SESSIONS_PAGE_SIZE,
+        };
       const result = await getHistorySessionsList(params);
 
       if (fetchRequestIdRef.current !== requestId) {
@@ -160,8 +192,15 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       }
 
       const sessions = Array.isArray(result.content) ? result.content : [];
-      setHistorySessions(sessions);
-      onHistoryLoaded?.(sessions);
+      const nextPage = typeof result.page === 'number' ? result.page : page;
+      const nextTotalPages = typeof result.totalPages === 'number' ? result.totalPages : 0;
+      const nextSessions = append ? [...historySessionsRef.current, ...sessions] : sessions;
+
+      setCurrentPage(nextPage);
+      setTotalPages(nextTotalPages);
+      historySessionsRef.current = nextSessions;
+      setHistorySessions(nextSessions);
+      onHistoryLoaded?.(nextSessions);
     } catch (error) {
       if (fetchRequestIdRef.current !== requestId) {
         return;
@@ -174,13 +213,24 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
 
       if (showLoading) {
         setHistorySessions([]);
+        setCurrentPage(0);
+        setTotalPages(0);
       }
     } finally {
-      if (fetchRequestIdRef.current === requestId && showLoading) {
-        setIsLoading(false);
+      if (fetchRequestIdRef.current === requestId) {
+        if (showLoading) {
+          setIsLoading(false);
+        }
+        if (append) {
+          setIsLoadingMore(false);
+        }
       }
     }
   }, [assistantAccount, onHistoryLoaded, t]);
+
+  const refreshHistorySessions = useCallback((showLoading: boolean) => (
+    loadHistorySessionsPage(0, showLoading, false)
+  ), [loadHistorySessionsPage]);
 
   const closeSidebar = useCallback(() => {
     if (!shouldRenderSidebar) {
@@ -207,13 +257,24 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     reportViewHistoryClick(assistantAccount);
     if (cachedSessions.length > 0) {
       setHistorySessions(cachedSessions);
+      setCurrentPage(Math.max(0, Math.ceil(cachedSessions.length / HISTORY_SESSIONS_PAGE_SIZE) - 1));
+      setTotalPages(0);
       setIsLoading(false);
+      setIsLoadingMore(false);
       void refreshHistorySessions(false);
       return;
     }
 
     void refreshHistorySessions(true);
-  }, [cachedSessions, closeSidebar, isVisible, openSidebar, refreshHistorySessions, shouldRenderSidebar]);
+  }, [
+    assistantAccount,
+    cachedSessions,
+    closeSidebar,
+    isVisible,
+    openSidebar,
+    refreshHistorySessions,
+    shouldRenderSidebar,
+  ]);
 
   const handleClose = useCallback(() => {
     closeSidebar();
@@ -223,6 +284,14 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     onSessionSelect?.(sessionId);
     closeSidebar();
   }, [closeSidebar, onSessionSelect]);
+
+  const handleLoadMore = useCallback(() => {
+    if (isLoading || isLoadingMore || !hasMoreHistorySessions) {
+      return;
+    }
+
+    void loadHistorySessionsPage(currentPage + 1, false, true);
+  }, [currentPage, hasMoreHistorySessions, isLoading, isLoadingMore, loadHistorySessionsPage]);
 
   const sidebarNode = shouldRenderSidebar ? (
     <div
@@ -294,6 +363,22 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
               </div>
             </section>
           ))}
+          {hasMoreHistorySessions && (
+            <button
+              type="button"
+              className="we-agent-history-sidebar__load-more"
+              disabled={isLoadingMore}
+              onClick={(event) => {
+                runButtonClickWithDebounce(event, () => {
+                  handleLoadMore();
+                });
+              }}
+            >
+              {isLoadingMore
+                ? t('weAgent.loadingMoreHistorySessions')
+                : t('weAgent.loadMoreHistorySessions')}
+            </button>
+          )}
         </div>
       </aside>
       {isPc && (

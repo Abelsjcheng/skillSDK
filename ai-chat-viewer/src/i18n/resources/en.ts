@@ -31,6 +31,8 @@ export const en = {
   'weAgent.stopGenerateFailed': 'Failed to stop generation',
   'weAgent.submitAnswerFailed': 'Failed to submit answer',
   'weAgent.loadHistoryFailed': 'Failed to load chat history',
+  'weAgent.loadMoreHistorySessions': 'Load more',
+  'weAgent.loadingMoreHistorySessions': 'Loading...',
   'weAgent.initSessionFailed': 'Failed to initialize session',
   'weAgent.missingAssistantDetail': 'Agent details were not found',
   'weAgent.aiReplyFailed': 'AI reply failed',
