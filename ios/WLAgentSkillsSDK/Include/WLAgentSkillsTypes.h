@@ -90,7 +90,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 
 @interface WLAgentSkillsSendMessageToIMParams : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
-@property (nonatomic, copy, nullable) NSString *messageId;
+@property (nonatomic, copy, nullable) NSString *content;
 @property (nonatomic, copy, nullable) NSString *chatId;
 @end
 
@@ -453,8 +453,6 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *subagentName;
 @property (nonatomic, strong, nullable) NSArray *messages;
 @property (nonatomic, strong, nullable) NSArray *parts;
-@property (nonatomic, copy, nullable) NSString *deliveryMode;
-@property (nonatomic, assign) BOOL replayDone;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;

@@ -838,10 +838,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _subagentName = WLAgentSkillsStringValue(dictionary[@"subagentName"], nil);
     _messages = [dictionary[@"messages"] isKindOfClass:[NSArray class]] ? dictionary[@"messages"] : nil;
     _parts = [dictionary[@"parts"] isKindOfClass:[NSArray class]] ? dictionary[@"parts"] : nil;
-    _deliveryMode = WLAgentSkillsStringValue(dictionary[@"deliveryMode"], nil);
-    _replayDone = [dictionary[@"replayDone"] respondsToSelector:@selector(boolValue)]
-        ? [dictionary[@"replayDone"] boolValue]
-        : NO;
     }
     return self;
 }
@@ -885,9 +881,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"subagentSessionId" : WLAgentSkillsNullObject(self.subagentSessionId),
         @"subagentName" : WLAgentSkillsNullObject(self.subagentName),
         @"messages" : WLAgentSkillsNullObject(self.messages),
-        @"parts" : WLAgentSkillsNullObject(self.parts),
-        @"deliveryMode" : WLAgentSkillsNullObject(self.deliveryMode),
-        @"replayDone" : @(self.replayDone)
+        @"parts" : WLAgentSkillsNullObject(self.parts)
     };
 }
 

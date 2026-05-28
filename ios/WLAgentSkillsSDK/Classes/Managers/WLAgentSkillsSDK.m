@@ -178,7 +178,6 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     }
 
     [manager disconnect];
-    [manager clearAllRoundBuffers];
     @synchronized(self) {
         [self.sendMessageTriggeredBySession removeAllObjects];
         [self.stopSkillHoldingBySession removeAllObjects];
@@ -292,7 +291,11 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
         return;
     }
-    NSString *normalizedMessageId = [self normalizedOptionalString:params.messageId];
+    NSString *normalizedContent = [self normalizedOptionalString:params.content];
+    if (params.content != nil && normalizedContent == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: content must be a non-empty string."];
+        return;
+    }
     NSString *normalizedChatId = [self normalizedOptionalString:params.chatId];
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
@@ -331,33 +334,27 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         }];
     };
 
-    [[WLAgentSkillsHTTPClient sharedClient] getMessagesWithSessionId:params.welinkSessionId
-                                                                                                                                page:@0
-                                                                                                                                size:@100
-                                                                                                                        success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        WLAgentSkillsPageResult *pageResult = [[WLAgentSkillsPageResult alloc] initWithDictionary:data];
+    if (normalizedContent != nil) {
+        sendWithContent(normalizedContent);
+        return;
+    }
 
-        NSString *latest = [weakSelf latestCompletedContentFromMessages:pageResult.content
-                                                              messageId:normalizedMessageId];
+    [[WLAgentSkillsHTTPClient sharedClient] getMessageHistoryWithSessionId:params.welinkSessionId
+                                                                 beforeSeq:nil
+                                                                      size:@100
+                                                                   success:^(id  _Nullable responseObject) {
+        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+        WLAgentSkillsCursorResult *pageResult = [[WLAgentSkillsCursorResult alloc] initWithDictionary:data];
+
+        NSString *latest = [weakSelf latestCompletedContentFromMessages:pageResult.content];
         if (latest == nil || latest.length == 0) {
-            NSInteger code = 4005;
-            NSString *message = @"No completed message available.";
-            if (normalizedMessageId != nil) {
-                BOOL exists = [weakSelf containsMessageWithId:normalizedMessageId
-                                                   inMessages:pageResult.content];
-                if (!exists) {
-                    code = 4003;
-                    message = @"Message not found in server messages.";
-                }
-            }
-            [weakSelf dispatchFailure:failure code:code message:message];
+            [weakSelf dispatchFailure:failure code:4005 message:@"No completed message available."];
             return;
         }
 
         sendWithContent(latest);
     }
-                                                                                                                        failure:^(NSError * _Nonnull error) {
+                                                                   failure:^(NSError * _Nonnull error) {
         [weakSelf dispatchFailureObject:failure error:error];
     }];
 }
@@ -1478,21 +1475,10 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     return nil;
 }
 
-- (nullable NSString *)latestCompletedContentFromMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages
-                                                messageId:(nullable NSString *)messageId {
-    NSString *normalizedMessageId = [self normalizedOptionalString:messageId];
-    if (normalizedMessageId != nil) {
-        for (WLAgentSkillsSessionMessage *message in messages) {
-            if (![[self normalizedOptionalString:message.id] isEqualToString:normalizedMessageId]) {
-                continue;
-            }
-            return [self normalizedOptionalString:message.content];
-        }
-        return nil;
-    }
-
-    for (WLAgentSkillsSessionMessage *message in messages) {
-        NSString *content = [self normalizedOptionalString:message.content];
+- (nullable NSString *)latestCompletedContentFromMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages {
+    for (NSInteger index = messages.count - 1; index >= 0; index--) {
+        WLAgentSkillsSessionMessage *message = messages[index];
+        NSString *content = [self resolvedMessageDisplayContent:message];
         if (content != nil) {
             return content;
         }
@@ -1500,18 +1486,25 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     return nil;
 }
 
-- (BOOL)containsMessageWithId:(NSString *)messageId
-                   inMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages {
-    NSString *normalizedMessageId = [self normalizedOptionalString:messageId];
-    if (normalizedMessageId == nil) {
-        return NO;
+- (nullable NSString *)resolvedMessageDisplayContent:(WLAgentSkillsSessionMessage *)message {
+    NSString *content = [self normalizedOptionalString:message.content];
+    if (content != nil) {
+        return content;
     }
-    for (WLAgentSkillsSessionMessage *message in messages) {
-        if ([[self normalizedOptionalString:message.id] isEqualToString:normalizedMessageId]) {
-            return YES;
+    NSMutableArray<NSString *> *segments = [NSMutableArray array];
+    for (WLAgentSkillsSessionMessagePart *part in message.parts) {
+        NSString *partContent = [self normalizedOptionalString:part.content];
+        if (partContent == nil) {
+            partContent = [self normalizedOptionalString:part.output];
+        }
+        if (partContent != nil) {
+            [segments addObject:partContent];
         }
     }
-    return NO;
+    if (segments.count == 0) {
+        return nil;
+    }
+    return [segments componentsJoinedByString:@"\n"];
 }
 
 - (nullable NSDictionary *)pickLatestReusableSessionFromArray:(NSArray *)sessions {
