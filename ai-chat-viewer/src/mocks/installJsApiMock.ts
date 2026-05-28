@@ -199,6 +199,7 @@ const BASE_PAGE_URI = `${HOST()}/index.html`;
 const DEFAULT_ASSISTANT_ACCOUNT = 'mock_assistant_001';
 const MOCK_UID = 'mock_uid_10001';
 const DEFAULT_PAGE_SIZE = 50;
+const MOCK_HISTORY_SESSION_TOTAL = 158;
 const SUBAGENT_BASIC_PREFIX = 'subagent_basic';
 const SUBAGENT_QUESTION_PREFIX = 'subagent_question';
 const SUBAGENT_PERMISSION_PREFIX = 'subagent_permission';
@@ -1912,6 +1913,39 @@ function createFixedSession(params: CreateNewSessionParams, welinkSessionId: str
     createdAt,
     updatedAt: createdAt,
   };
+}
+
+function seedAdditionalHistorySessions(
+  assistant: WeAgentDetails,
+  existingSessionCount: number,
+): void {
+  const additionalSessionCount = Math.max(0, MOCK_HISTORY_SESSION_TOTAL - existingSessionCount);
+  const baseTimestamp = Date.now() - 5 * 60 * 1000;
+
+  for (let index = 0; index < additionalSessionCount; index += 1) {
+    const sequence = index + 1;
+    const timestamp = new Date(baseTimestamp - sequence * 60 * 1000).toISOString();
+    const session = createFixedSession({
+      ak: assistant.appKey,
+      title: `分页验证会话 ${String(sequence).padStart(3, '0')}`,
+      businessSessionDomain: 'miniapp',
+      businessSessionType: 'direct',
+      assistantAccount: assistant.partnerAccount,
+      businessSessionId: MOCK_UID,
+    }, `mock_history_session_${String(sequence).padStart(3, '0')}`);
+
+    session.createdAt = timestamp;
+    session.updatedAt = timestamp;
+    sessionStore.set(session.welinkSessionId, {
+      session,
+      messages: [],
+      nextMessageSeq: 1,
+      nextStreamSeq: 0,
+      timerIds: [],
+      continuationScheduled: false,
+      activeReplayDraft: null,
+    });
+  }
 }
 
 function seedMockData(): void {

@@ -29,6 +29,8 @@ export const zh = {
   'weAgent.stopGenerateFailed': '停止生成失败',
   'weAgent.submitAnswerFailed': '提交回答失败',
   'weAgent.loadHistoryFailed': '获取历史消息失败',
+  'weAgent.loadMoreHistorySessions': '加载更多',
+  'weAgent.loadingMoreHistorySessions': '加载中...',
   'weAgent.initSessionFailed': '初始化会话失败',
   'weAgent.missingAssistantDetail': '未获取到助手详情',
   'weAgent.aiReplyFailed': 'AI 回复失败',
