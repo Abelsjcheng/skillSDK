@@ -13,7 +13,7 @@ function renderAssistantDetail(): void {
   );
 }
 
-function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'external'): void {
+function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'external' | 'externalEmpty'): void {
   Object.defineProperty(window, 'HWH5EXT', {
     value: {
       getWeAgentDetails: jest.fn(() => {
@@ -55,16 +55,16 @@ function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'exte
             {
               name: 'External Assistant',
               icon: '',
-              desc: 'External assistant description',
+              desc: kind === 'externalEmpty' ? '' : 'External assistant description',
               moduleId: 'M2000',
-              appKey: 'external-app-key',
-              appSecret: 'external-app-secret',
+              appKey: kind === 'externalEmpty' ? '' : 'external-app-key',
+              appSecret: kind === 'externalEmpty' ? '' : 'external-app-secret',
               partnerAccount: 'x00_1',
               createdBy: 'u1',
-              creatorName: 'external-creator-zh',
+              creatorName: kind === 'externalEmpty' ? '' : 'external-creator-zh',
               creatorWorkId: '',
               creatorW3Account: '',
-              creatorNameEn: 'external-creator-en',
+              creatorNameEn: kind === 'externalEmpty' ? '' : 'external-creator-en',
               ownerWelinkId: '',
               ownerW3Account: '',
               ownerName: '',
@@ -79,7 +79,7 @@ function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'exte
               weCodeUrl: 'h5://123456/html/index.html',
             },
           ],
-          };
+        };
       }),
     },
     configurable: true,
@@ -137,14 +137,15 @@ describe('AssistantDetail', () => {
     expect(await screen.findByText('creator-en creator_w3')).toBeInTheDocument();
   });
 
-  it('hides creator row and shows exclusive assistant tag for internal myAgent assistant', async () => {
+  it('hides creator row and capability provider for internal myAgent assistant', async () => {
     installAssistantDetailMock('internalMyAgent');
 
     renderAssistantDetail();
 
-    expect(await screen.findAllByText('专属助手')).toHaveLength(2);
+    expect(await screen.findAllByText('专属助手')).toHaveLength(1);
     expect(screen.queryByText(i18n.t('assistantDetail.creator'))).not.toBeInTheDocument();
     expect(screen.queryByText('creator-zh creator_w3')).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('assistantDetail.capabilityProvider'))).not.toBeInTheDocument();
   });
 
   it('renders appid and secret actions for external assistant', async () => {
@@ -156,5 +157,17 @@ describe('AssistantDetail', () => {
     expect(screen.getByText(i18n.t('assistantDetail.appId'))).toBeInTheDocument();
     expect(screen.getByText(i18n.t('assistantDetail.secret'))).toBeInTheDocument();
     expect(screen.getByText('external-app-key')).toBeInTheDocument();
+  });
+
+  it('renders info rows only when detail values exist', async () => {
+    installAssistantDetailMock('externalEmpty');
+
+    renderAssistantDetail();
+
+    expect(await screen.findByText('External Assistant')).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('assistantDetail.creator'))).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('assistantDetail.appId'))).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('assistantDetail.secret'))).not.toBeInTheDocument();
+    expect(screen.queryByText('External assistant description')).not.toBeInTheDocument();
   });
 });

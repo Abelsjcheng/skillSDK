@@ -17,7 +17,7 @@ import moreIcon from '../imgs/more_icon.png';
 import closeEyeIcon from '../imgs/close_eye_icon.svg';
 import openEyeIcon from '../imgs/open_eye_icon.svg';
 import serviceIcon from '../imgs/icon-service.svg';
-import type { WeAgentDetails } from '../types/bridge';
+import type { WeAgentDetails, WeAgentListItem } from '../types/bridge';
 import type { AssistantPageHeaderAction } from '../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
 import type {
@@ -40,9 +40,8 @@ import {
   openH5Webview,
 } from '../utils/hwext';
 import {
-  CUSTOM_ASSISTANT_TAG,
   EXCLUSIVE_ASSISTANT_BIZ_TAG,
-  EXCLUSIVE_ASSISTANT_TAG,
+  resolveAssistantTag,
 } from '../utils/assistantTag';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
@@ -116,11 +115,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
   const bizRobotTag = detail?.bizRobotTag?.trim() ?? '';
-  const displayTag = bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG
-    ? EXCLUSIVE_ASSISTANT_TAG
-    : detail?.bizRobotName?.trim()
-      || detail?.bizRobotNameEn?.trim()
-      || CUSTOM_ASSISTANT_TAG;
+  const displayTag = resolveAssistantTag(detail);
   const displayDescription = detail?.desc ?? '';
   const creatorDisplayName = (i18n.resolvedLanguage ?? i18n.language) === 'en'
     ? detail?.creatorNameEn
@@ -128,7 +123,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const displayCreator = joinDisplayValue(creatorDisplayName, detail?.creatorW3Account);
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
-  const shouldHideCreatorRow = isInternalAssistant && bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG;
+  const isExclusiveAssistant = isInternalAssistant && bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG;
   const secret = detail?.appSecret ?? '';
   const displaySecret = isSecretVisible ? secret : maskSecret(secret);
 
@@ -136,13 +131,22 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const orgValue = isInternalAssistant ? displayTag : (detail?.appKey ?? '');
   const ownerLabel = t('assistantDetail.secret');
   const ownerValue = displaySecret;
+  const hasDescription = Boolean(displayDescription.trim());
+  const hasCreator = Boolean(displayCreator.trim());
+  const hasOrgValue = Boolean(orgValue.trim());
+  const hasSecretValue = Boolean(secret.trim());
+  const showCreatorRow = !isExclusiveAssistant && hasCreator;
+  const showOrgRow = !isExclusiveAssistant && hasOrgValue;
+  const showSecretRow = !isInternalAssistant && hasSecretValue;
+  const showIntroCard = hasDescription || showCreatorRow;
+  const showOrgCard = showOrgRow || showSecretRow;
 
-  const toggleSecretVisible = () => {
+  const toggleSecretVisible = useCallback(() => {
     if (isInternalAssistant) return;
     setIsSecretVisible((previous) => !previous);
-  };
+  }, [isInternalAssistant]);
 
-  const handleCopy = async (content: string, successMessage: string) => {
+  const handleCopy = useCallback(async (content: string, successMessage: string) => {
     if (!content) {
       return;
     }
@@ -153,11 +157,15 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
       WeLog(`AssistantDetail copyTextToClipboard failed | error=${JSON.stringify(error)}`);
       showToast(t('assistantDetail.copyFailed'));
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     setIsSecretVisible(false);
   }, [isInternalAssistant, detail?.partnerAccount]);
+
+  const handleClosePage = useCallback(() => {
+    dispatchAssistantCloseEvent();
+  }, []);
 
   const handleServiceClick = useCallback(() => {
     if (isPc) {
@@ -182,7 +190,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
       return;
     }
 
-    dispatchAssistantCloseEvent();
+    handleClosePage();
   };
 
   const handleOpenActionSheet = useCallback(() => {
@@ -307,13 +315,75 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
       {
         label: t('common.close'),
         icon: closeIcon,
-        onClick: () => {
-          dispatchAssistantCloseEvent();
-        },
+        onClick: handleClosePage,
       },
     ],
-    [t],
+    [handleClosePage, t],
   );
+
+  const renderIconButton = useCallback((
+    icon: string,
+    ariaLabel: string,
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => void,
+  ) => (
+    <button
+      type="button"
+      className="assistant-detail__icon-btn"
+      onClick={onClick}
+      aria-label={ariaLabel}
+    >
+      <img src={icon} alt="" className="assistant-detail__icon" draggable="false" />
+    </button>
+  ), []);
+
+  const orgValueNode = showOrgRow ? (
+    isInternalAssistant || !isPc ? (
+      <span className="assistant-detail__org-value">{orgValue}</span>
+    ) : (
+      <div className="assistant-detail__value-with-actions">
+        <span className="assistant-detail__org-value">{orgValue}</span>
+        {renderIconButton(
+          iconCopy,
+          t('assistantDetail.copyAppId'),
+          (event) => {
+            runButtonClickWithDebounce(event, () => {
+              void handleCopy(orgValue, t('assistantDetail.appIdCopied'));
+            });
+          },
+        )}
+      </div>
+    )
+  ) : null;
+
+  const secretValueNode = showSecretRow ? (
+    !isPc ? (
+      <span className="assistant-detail__org-value">{ownerValue}</span>
+    ) : (
+      <div className="assistant-detail__value-with-actions">
+        <span className="assistant-detail__org-value">{ownerValue}</span>
+        <div className="assistant-detail__action-group">
+          {renderIconButton(
+            isSecretVisible ? openEyeIcon : closeEyeIcon,
+            isSecretVisible ? t('assistantDetail.hideSecret') : t('assistantDetail.showSecret'),
+            (event) => {
+              runButtonClickWithDebounce(event, () => {
+                toggleSecretVisible();
+              });
+            },
+          )}
+          {renderIconButton(
+            iconCopy,
+            t('assistantDetail.copySecret'),
+            (event) => {
+              runButtonClickWithDebounce(event, () => {
+                void handleCopy(secret, t('assistantDetail.secretCopied'));
+              });
+            },
+          )}
+        </div>
+      </div>
+    )
+  ) : null;
 
   if (isPc && pcView === 'edit') {
     return (
@@ -363,91 +433,35 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           </div>
         </section>
 
-        <section className="assistant-detail__card assistant-detail__card--intro">
-          <h3 className="assistant-detail__section-title">{t('assistantDetail.introTitle')}</h3>
-          <p className="assistant-detail__section-desc">{displayDescription}</p>
-          {shouldHideCreatorRow ? null : (
-            <DetailInfoRow
-              label={t('assistantDetail.creator')}
-              valueNode={<span className="assistant-detail__org-value">{displayCreator}</span>}
-            />
-          )}
-        </section>
+        {showIntroCard ? (
+          <section className="assistant-detail__card assistant-detail__card--intro">
+            <h3 className="assistant-detail__section-title">{t('assistantDetail.introTitle')}</h3>
+            {hasDescription ? <p className="assistant-detail__section-desc">{displayDescription}</p> : null}
+            {showCreatorRow ? (
+              <DetailInfoRow
+                label={t('assistantDetail.creator')}
+                valueNode={<span className="assistant-detail__org-value">{displayCreator}</span>}
+              />
+            ) : null}
+          </section>
+        ) : null}
 
-        <section className="assistant-detail__card assistant-detail__card--org">
-          <DetailInfoRow
-            label={orgLabel}
-            valueNode={
-              isInternalAssistant ? (
-                <span className="assistant-detail__org-value">{orgValue}</span>
-              ) : !isPc ? (
-                <span className="assistant-detail__org-value">{orgValue}</span>
-              ) : (
-                <div className="assistant-detail__value-with-actions">
-                  <span className="assistant-detail__org-value">{orgValue}</span>
-                  <button
-                    type="button"
-                    className="assistant-detail__icon-btn"
-                    onClick={(event) => {
-                      runButtonClickWithDebounce(event, () => {
-                        void handleCopy(orgValue, t('assistantDetail.appIdCopied'));
-                      });
-                    }}
-                    aria-label={t('assistantDetail.copyAppId')}
-                  >
-                    <img src={iconCopy} alt="" className="assistant-detail__icon" draggable="false" />
-                  </button>
-                </div>
-              )
-            }
-          />
-          {!isInternalAssistant && !isPc ? (
-            <DetailInfoRow
-              label={ownerLabel}
-              valueNode={<span className="assistant-detail__org-value">{ownerValue}</span>}
-            />
-          ) : !isInternalAssistant ? (
-            <DetailInfoRow
-              label={ownerLabel}
-              valueNode={
-                <div className="assistant-detail__value-with-actions">
-                  <span className="assistant-detail__org-value">{ownerValue}</span>
-                  <div className="assistant-detail__action-group">
-                    <button
-                      type="button"
-                      className="assistant-detail__icon-btn"
-                      onClick={(event) => {
-                        runButtonClickWithDebounce(event, () => {
-                          toggleSecretVisible();
-                        });
-                      }}
-                      aria-label={isSecretVisible ? t('assistantDetail.hideSecret') : t('assistantDetail.showSecret')}
-                    >
-                      <img
-                        src={isSecretVisible ? openEyeIcon : closeEyeIcon}
-                        alt=""
-                        className="assistant-detail__icon"
-                        draggable="false"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      className="assistant-detail__icon-btn"
-                      onClick={(event) => {
-                        runButtonClickWithDebounce(event, () => {
-                          void handleCopy(secret, t('assistantDetail.secretCopied'));
-                        });
-                      }}
-                      aria-label={t('assistantDetail.copySecret')}
-                    >
-                      <img src={iconCopy} alt="" className="assistant-detail__icon" draggable="false" />
-                    </button>
-                  </div>
-                </div>
-              }
-            />
-          ) : null}
-        </section>
+        {showOrgCard ? (
+          <section className="assistant-detail__card assistant-detail__card--org">
+            {showOrgRow ? (
+              <DetailInfoRow
+                label={orgLabel}
+                valueNode={orgValueNode}
+              />
+            ) : null}
+            {showSecretRow ? (
+              <DetailInfoRow
+                label={ownerLabel}
+                valueNode={secretValueNode}
+              />
+            ) : null}
+          </section>
+        ) : null}
       </main>
 
       {isPc ? (
