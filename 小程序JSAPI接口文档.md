@@ -119,8 +119,8 @@ window.HWH5EXT.regenerateAnswer({
 将会话中“已完成”的消息内容发送到 IM 聊天。
 
 说明：
-- 若传 `messageId`，SDK 按该消息 ID 从本地缓存取已完成内容。
-- 若不传 `messageId`，SDK 取当前会话最后一条已完成消息。
+- 若传 `content`，SDK 直接透传该内容给服务端。
+- 若不传 `content`，SDK 自动查询当前会话最后一条完成消息内容并发送到 IM。
 - `chatId` 为可选透传字段，SDK 不做会话 `imGroupId` 到 `chatId` 的自动映射。
 
 ### 调用方式
@@ -140,8 +140,12 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessag
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
-| messageId | string | 否 | 要发送到 IM 的消息 ID；不传则默认最后一条已完成消息 |
+| content | string | 否 | 要发送到 IM 的消息内容。若传入则直接透传给服务端；不传则由 SDK 查询当前会话最后一条完成的消息内容 |
 | chatId | string | 否 | 目标 IM 群组 ID，SDK 仅透传 |
+
+说明：
+- `content` 为可选入参；若传入则建议使用最终确认后的完整文本内容
+- `chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
 
 ### 返回值
 
@@ -155,20 +159,66 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendMessag
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
-| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
-| 4003 | 消息不存在 | 指定消息在缓存中不存在 |
-| 4004 | 消息未完成 | 指定消息尚未完成 |
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误，或 `content` 传入后为空字符串 |
 | 4005 | 无完成消息 | 会话中没有已完成消息 |
 | 6000 | 网络错误 | 网络请求失败 |
 | 7000 | 服务端错误 | 服务端处理失败 |
+
+### 实现方法
+
+1. 调用 `sendMessageToIM` 时：
+   - 若提供 `content`：SDK 直接使用该内容作为发送到 IM 的消息内容
+   - 若未提供 `content`：SDK 先请求 `GET /api/skill/sessions/{welinkSessionId}/messages/history` 获取当前会话历史消息，并从返回结果中取当前会话最后一条完成的消息内容
+   - 若未提供 `content` 且历史接口中不存在可用的完成消息内容，则返回错误
+2. 当 `content` 为空时，SDK 查询历史消息：
+   - **URL**: `GET /api/skill/sessions/{welinkSessionId}/messages/history`
+   - **查询参数**: 首次请求不传 `beforeSeq`，`size` 使用服务端 / SDK 默认值或按实现侧约定传入
+   - **消息选择规则**: 以历史接口返回的当前批次消息为准，取其中最后一条完成消息的内容；若该消息 `content` 为空，可按其 `parts` 聚合最终展示内容
+3. SDK 调用 Skill 服务端“发送到 IM”接口时，会传入：
+   - `content`：来自入参 `content`，或由历史接口解析出的最后一条完成消息内容
+   - `chatId`：若入参提供则原样透传；若未提供则不由 SDK 补齐，按服务端接口规则处理
+4. 调用服务端 REST API 发送消息到 IM：
+   - **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
+   - **请求体**:
+     ```json
+     {
+       "content": "代码重构已完成，请查看 PR #42",
+       "chatId": "group_abc123"
+     }
+     ```
+   - **响应**:
+     ```json
+     {
+       "success": true
+     }
+     ```
+
+### 组合调用场景
+
+1. 若页面已拿到最终确认的消息内容，建议直接传入 `content` 调用 `sendMessageToIM`，避免额外查询历史接口
+2. 若 `sendMessageToIM` 失败，可重试发送，但需注意避免重复发送
 
 ### 调用示例
 
 ```javascript
 window.HWH5EXT.sendMessageToIM({
   welinkSessionId: '42',
-  messageId: 'm_2',
+  content: '代码重构已完成，请查看 PR #42',
   chatId: 'group_abc123'
+}).then((result) => {
+  if (result.success) {
+    console.log('发送到 IM 成功');
+  }
+}).catch((error) => {
+  console.error('发送到 IM 失败:', error.errorCode, error.errorMessage);
+});
+```
+
+```javascript
+window.HWH5EXT.sendMessageToIM({
+  welinkSessionId: '42'
+  // 不提供 content，SDK 自动查询当前会话最后一条完成的消息内容
+  // 不提供 chatId，按服务端接口规则处理
 }).then((result) => {
   if (result.success) {
     console.log('发送到 IM 成功');
@@ -395,7 +445,6 @@ window.HWH5EXT.getSessionMessageHistory({
 - 同一 `welinkSessionId` 重复注册时，会覆盖旧监听器。
 - 可在任意时机注册，SDK 保证时序安全，不因注册时机导致漏消息。
 - WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外没有外层 envelope。
-- SDK 会按 `welinkSessionId` 本地缓存“当前未完成轮次”的全部原始 `onmessage` 事件；若页面晚于会话开始时机打开，注册监听后会先补发缓存，再继续接收实时事件。
 
 ### 调用方式
 
@@ -444,8 +493,6 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | seq | number \| null | 递增序列号；大部分事件都有，个别极简事件也可能省略 |
 | welinkSessionId | string | 所属会话 ID；`agent.online` / `agent.offline` 不携带 |
 | emittedAt | string \| null | 事件产生时间，ISO-8601；`permission.reply` / `agent.online` / `agent.offline` / `error` 通常不携带 |
-| deliveryMode | string \| null | SDK 本地补充的投递模式：`replay` 表示缓存补发事件，`live` 表示实时事件；未走补发链路时可省略 |
-| replayDone | boolean \| null | SDK 本地补充的补发完成标记；仅出现在“最后一条补发事件”上，值为 `true` |
 
 #### 消息级字段（按事件返回）
 
@@ -518,33 +565,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 
 1. SDK 内部维护每个会话唯一监听器（`onMessage` / `onError` / `onClose`）。
 2. 同一 `welinkSessionId` 重复注册时，会覆盖旧监听器。
-3. SDK 在本地按 `welinkSessionId` 缓存“当前未完成轮次”的全部原始 `StreamMessage` 事件：
-   - 缓存内容为当前轮次收到的全部原始 `onmessage` 事件
-   - 不区分事件类型，不做消息聚合，不改写字段结构
-   - 写入缓存时必须保持原始到达顺序
-4. 以下事件视为当前轮次结束，且终止事件本身也需要写入当前轮次缓存：
-   - `session.status` 且 `sessionStatus = idle`
-   - `session.error`
-   - `error`
-   - `agent.offline`
-5. 调用 `registerSessionListener` 时：
-   - 若该 `welinkSessionId` 存在当前未完成轮次缓存，SDK 必须先按原始到达顺序，通过 `onMessage` 逐条补发缓存中的全部事件
-   - 补发阶段的每条事件都必须补充 `deliveryMode = replay`
-   - 最后一条补发事件必须额外补充 `replayDone = true`，用于通知前端“补发阶段已完成”
-   - SDK 不再额外插入一条虚拟的补发完成消息
-   - 若该轮次缓存已结束，则不应再通过 `registerSessionListener` 回放该轮次缓存；页面应以 `getSessionMessageHistory` 返回的服务端历史为准恢复最终消息内容
-   - 当前轮次缓存补发完成后，再开始回调后续实时事件；实时事件必须补充 `deliveryMode = live`
-6. 若缓存补发期间又收到新的实时事件，SDK 需先将这些事件暂存到内部待发队列，待缓存补发完成后，再按顺序继续回调，保证前端接收到的始终是一条严格有序的事件流。
-7. `unregisterSessionListener` 仅移除当前监听器，不主动清空该会话的当前未完成轮次缓存。
-8. 若同一 `welinkSessionId` 在上一轮缓存已结束后再次收到新事件，SDK 应先清理上一轮已结束缓存，再开启下一轮新的未完成轮次缓存。
-9. 调用 `closeSkill`、`shutdown`、`destroyInstance` 或 SDK 实例销毁时，应立即清理对应缓存，避免无效残留。
-
-### 前端使用建议
-
-- 建议前端在 `deliveryMode = replay` 阶段只做内存聚合，不做逐条流式渲染。
-- 待收到“最后一条补发事件上的 `replayDone = true`”后，再将补发阶段聚合出的当前未完成消息一次性展示。
-- 对 `deliveryMode = live` 的事件再继续执行逐条流式渲染。
-- 页面关闭时应调用 `unregisterSessionListener` 释放监听，但不需要担心因此丢失当前未完成轮次缓存。
+3. `unregisterSessionListener` 仅移除当前监听器，不主动关闭其他会话监听。
+4. 页面关闭或切换会话时应及时调用 `unregisterSessionListener` 释放监听。
 
 ### 错误处理
 
@@ -556,10 +578,6 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 
 ```javascript
 const onMessage = (message) => {
-  if (message.deliveryMode === 'replay') {
-    console.log('收到补发事件:', message.type, message.replayDone === true ? '补发结束' : '补发中');
-  }
-
   switch (message.type) {
     case 'text.delta':
       console.log('AI 响应片段:', message.content);
@@ -584,7 +602,7 @@ const onMessage = (message) => {
       console.log('权限请求已应答:', message.permissionId, message.response);
       break;
     case 'message.user':
-      console.log('收到用户消息回放:', message.content);
+      console.log('收到用户消息:', message.content);
       break;
     case 'snapshot':
       console.log('断线恢复快照消息数:', message.messages?.length || 0);

@@ -1005,13 +1005,6 @@ we码调用
 
 同一个 `welinkSessionId` 只允许注册一次监听；若已注册，再次注册不做任何处理，仍返回 `status: success`。
 
-为支持“页面未打开时，客户端已提前发起对话，服务端正在持续流式返回”的场景，SDK 在本地按 `welinkSessionId` 缓存当前未完成轮次的全部原始 `onmessage` 事件。当调用 `registerSessionListener` 时，若该会话存在未完成轮次缓存，则 SDK 会先按原始到达顺序通过 `onMessage` 逐条补发缓存事件，再继续回调后续实时事件。
-
-为支持前端将“缓存补发内容”与“页面打开后才收到的实时内容”采用不同渲染策略，SDK 在 `StreamMessage` 上新增两个本地扩展字段：
-
-- `deliveryMode`：标识当前事件是缓存补发事件还是实时事件
-- `replayDone`：标识当前轮次缓存补发已结束，前端可据此将补发阶段聚合出的内容一次性落盘展示
-
 SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，覆盖以下事件：
 
 - 文本流：`text.delta` / `text.done`
@@ -1041,7 +1034,6 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
 - `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
 - `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
-- `deliveryMode` 与 `replayDone` 为 SDK 本地补充字段，不要求服务端返回；SDK 在监听器分发阶段负责补齐
 
 ### 接口名
 
@@ -1088,74 +1080,9 @@ interface SessionError {
 
 1. SDK 内部维护每个会话唯一监听器（`onMessage`/`onError`/`onClose`）记录
 2. 同一 `welinkSessionId` 仅允许注册一次；重复注册不做任何处理并返回 `status: success`
-3. SDK 在本地按 `welinkSessionId` 维护“当前未完成轮次”的原始 `StreamMessage` 缓存：
-   - 缓存内容为当前轮次收到的全部原始 `onmessage` 事件
-   - 不区分事件类型，不做消息聚合，不改写字段结构
-   - 事件写入缓存时必须保持原始到达顺序
-4. 当某会话当前不存在未完成轮次缓存时，收到新的 `onmessage` 事件后，SDK 应创建新的当前轮次缓存；后续事件持续追加到该缓存中
-5. 以下事件视为当前轮次结束；终止事件本身也需要写入当前轮次缓存，确保前端在补发场景中也能收到完整结束信号：
-   - `session.status` 且 `sessionStatus = idle`
-   - `session.error`
-   - `error`
-   - `agent.offline`
-6. 调用 `registerSessionListener` 时：
-   - 若该 `welinkSessionId` 存在当前未完成轮次缓存，则 SDK 必须先按原始到达顺序，通过 `onMessage` 逐条补发缓存中的全部事件
-   - 该阶段补发的每条事件，SDK 都必须补充 `deliveryMode = replay`
-   - 若该轮次缓存已结束，则不应再通过 `registerSessionListener` 回放该轮次缓存；此时页面应以 `getSessionMessageHistory` 返回的服务端历史为准恢复最终消息内容
-   - 当前轮次缓存补发完成标记不再通过额外新增一条虚拟消息回调，而是挂在“最后一条补发事件”上返回：该条事件需要同时携带 `deliveryMode = replay` 和 `replayDone = true`
-   - 除最后一条补发事件外，其余补发事件不返回 `replayDone`
-   - 当前轮次缓存补发完成后，再开始回调后续实时事件；实时事件必须补充 `deliveryMode = live`
-7. 若缓存补发期间又收到新的实时事件，SDK 需先将这些事件暂存到内部待发队列，待缓存补发完成后，再按顺序继续回调，保证前端接收到的始终是一条严格有序的事件流
-8. 若 WebSocket 已建立，则监听器立即生效；若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
-9. 连接错误时触发 `onError`
-10. 连接关闭时触发 `onClose`
-
-#### 当前未完成轮次缓存说明
-
-1. 缓存粒度为 `welinkSessionId`
-2. 缓存内容为当前轮次的全部原始 `StreamMessage` 事件，不新增包装结构，不生成聚合消息
-3. `unregisterSessionListener` 仅移除当前监听器，不应主动清空该会话的当前未完成轮次缓存
-4. 若同一 `welinkSessionId` 在上一轮缓存已结束后再次收到新事件，SDK 应先清理上一轮已结束缓存，再开启下一轮新的未完成轮次缓存
-5. 调用 `closeSkill`、`shutdown`、`destroyInstance` 或 SDK 实例销毁时，应立即清理该会话对应缓存，避免无效残留
-6. 仅处于未完成状态的当前轮次缓存参与 `registerSessionListener` 回放；已结束轮次缓存不再作为回放源
-7. 该机制的目标是保证页面在未注册监听期间错过的流式事件，能够在后续注册监听时通过同一套 `onMessage` 回调链路补回给前端
-8. 缓存内容仍然是“当前未完成轮次的全量原始事件”；`deliveryMode` / `replayDone` 仅在 SDK 分发给监听器时补充，不写回底层缓存
-
-#### 场景化实现说明
-
-##### 场景 1：页面已打开后，在页面内继续发送消息
-
-1. 页面首次调用 `registerSessionListener` 时，SDK 若发现该 `welinkSessionId` 存在当前未完成轮次缓存，应先回放这轮缓存中的全部原始事件
-2. 缓存回放阶段，SDK 应为每条补发事件补充 `deliveryMode = replay`
-3. 最后一条补发事件需额外补充 `replayDone = true`，用于通知前端“补发阶段已完成”；SDK 不再单独新增一条补发完成信号消息
-4. 后续实时事件统一补充 `deliveryMode = live`
-5. 页面在已注册监听的状态下继续调用 `sendMessage` 发起新消息时：
-   - 后续服务端返回的实时事件继续写入当前未完成轮次缓存
-   - 同时继续实时回调给当前监听器
-6. 同一个活跃监听器注册周期内，SDK 不应重复回放同一轮缓存，避免前端对同一批事件重复渲染
-
-##### 场景 2：流式返回过程中，页面打开后又关闭，再再次打开
-
-1. 第一次打开页面时，SDK 先回放当前未完成轮次缓存，再继续回调后续实时事件
-2. 页面关闭时调用 `unregisterSessionListener`，SDK 仅移除监听器，不清理当前未完成轮次缓存
-3. 页面关闭后，若服务端仍持续返回当前轮次事件，SDK 仍需继续将这些实时事件追加写入当前未完成轮次缓存
-4. 页面再次打开并重新调用 `registerSessionListener` 时，SDK 应再次回放该 `welinkSessionId` 当前未完成轮次缓存中的全量原始事件，并为这些补发事件补充 `deliveryMode = replay`
-5. 该次回放中的最后一条补发事件需再次补充 `replayDone = true`，再继续回调后续实时事件；实时事件统一补充 `deliveryMode = live`
-6. 为保证第二次打开页面时能完整恢复当前流式状态，SDK 缓存的必须是“当前未完成轮次的全量原始事件”，而不能仅缓存页面未打开期间漏掉的那一部分事件
-
-##### 场景 3：当前轮流式已结束，页面打开时历史接口已能拿到最终消息
-
-1. 若当前轮次已收到结束事件，并且页面打开时可通过 `getSessionMessageHistory` 获取该轮最终消息，则页面应以服务端历史消息为准恢复最终内容
-2. 此时 SDK 不应再通过 `registerSessionListener` 回放该已结束轮次缓存，避免前端对同一轮已完成消息重复执行 `text.delta` / `text.done` / `step.done` 等渲染链路
-3. 已结束轮次缓存可保留到下一轮开始、会话关闭或实例销毁时再清理，但不再作为监听注册时的回放来源
-
-##### 回放与实时衔接要求
-
-1. 缓存回放期间，若 SDK 又收到新的实时事件，不应直接插入回调给前端
-2. 这些实时事件应先进入内部待发队列
-3. 当前轮次缓存回放完成标记通过“最后一条补发事件上的 `replayDone = true`”返回，而不是新增一条虚拟消息
-4. 随后再按顺序继续回调待发队列中的实时事件，并为这些事件补充 `deliveryMode = live`
-5. 通过上述串行策略，保证前端始终接收到一条严格有序的事件流，避免 `text.delta`、`text.done`、`question`、`permission.reply` 等事件顺序错乱
+3. 若 WebSocket 已建立，则监听器立即生效；若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
+4. 连接错误时触发 `onError`
+5. 连接关闭时触发 `onClose`
 
 ### 错误处理
 
@@ -1166,7 +1093,7 @@ interface SessionError {
 ### 组合调用场景
 
 在与其他接口组合调用时：
-1. 若页面可能晚于会话开始时机打开，建议在页面初始化阶段尽早调用 `registerSessionListener`，由 SDK 先补发当前未完成轮次缓存，再接收后续实时事件
+1. 若页面可能晚于会话开始时机打开，建议在页面初始化阶段尽早调用 `registerSessionListener`
 2. 若 `registerSessionListener` 失败，不影响其他接口的调用
 
 ### 注意事项
@@ -1174,10 +1101,6 @@ interface SessionError {
 - 回调注册是异步安全的，可在任何时机调用
 - 同一个 `welinkSessionId` 重复注册时，SDK 不做任何处理并返回 `status: success`
 - 如需替换监听器，需先调用 `unregisterSessionListener({ welinkSessionId })` 清理后再注册
-- `registerSessionListener` 补发的缓存事件与实时事件共用同一个 `onMessage` 回调，但前端可通过 `deliveryMode` 区分“补发事件”与“实时事件”
-- 建议前端在 `deliveryMode = replay` 阶段只做内存聚合，不做逐条流式渲染；待收到“最后一条补发事件上的 `replayDone = true`”后，再将补发阶段聚合出的当前未完成消息一次性展示
-- 建议前端仅对 `deliveryMode = live` 的事件继续执行逐条流式渲染
-- `getSessionMessageHistory` 仅返回服务端已落库历史消息；页面晚打开场景中未监听期间丢失的流式内容，应依赖 `registerSessionListener` 的缓存补发能力恢复
 
 ### 调用示例
 
@@ -2142,8 +2065,6 @@ try {
 | seq | number \| null | 递增序列号；大部分事件都有，个别极简事件也可能省略 |
 | welinkSessionId | string | 所属会话 ID；`agent.online` / `agent.offline` 不携带 |
 | emittedAt | string \| null | 事件产生时间，ISO-8601；`permission.reply` / `agent.online` / `agent.offline` / `error` 通常不携带 |
-| deliveryMode | string \| null | SDK 本地补充的投递模式：`replay` 表示缓存补发，`live` 表示实时事件；若未走 `registerSessionListener` 补发链路可省略 |
-| replayDone | boolean \| null | SDK 本地补充的补发完成标记；仅在“最后一条补发事件”上返回 `true`，其余事件通常省略 |
 
 #### 消息级字段
 
@@ -2166,8 +2087,6 @@ try {
 > 说明：
 > - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam` / `questionId`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId`。
 > - `permission.reply` 为极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
-> - `deliveryMode` 与 `replayDone` 为 SDK 本地扩展字段，不要求服务端透传；SDK 应在回调给 `SessionListener.onMessage` 前补齐。
-> - SDK 不再额外插入一条虚拟的补发完成消息；补发完成标记直接挂在当前轮次“最后一条补发事件”上返回，即该条事件同时带有 `deliveryMode = replay` 与 `replayDone = true`。
 
 #### StreamMessage 的 Subagent 扩展字段
 

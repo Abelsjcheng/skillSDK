@@ -1239,27 +1239,27 @@ getWeAgentUri(): WeAgentUriResult
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `weAgentUri` | `string` | 当前助理 CUI 地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，使用持久化详情中的 `weCodeUrl` 并追加 query 参数 `wecodePlace=weAgent&from=weAgent`；当读取不到持久化助理详情时，固定返回 `MyAgentUri + /index.html?wecodePlace=weAgent&from=weAgent`；其余场景沿用历史组装逻辑 |
-| `assistantDetailUri` | `string` | 助理详情地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；当读取不到持久化助理详情时，固定返回 `h5://S008623/index.html?type=myAgent#assistantDetail`；其余场景沿用历史组装逻辑 |
-| `switchAssistantUri` | `string` | 切换助理地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`；当读取不到持久化助理详情时，固定返回 `h5://S008623/index.html?type=myAgent#switchAssistant`；其余场景沿用历史组装逻辑 |
+| `weAgentUri` | `string` | 当前助理 CUI 地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，使用持久化详情中的 `weCodeUrl` 并追加 query 参数 `wecodePlace=weAgent` 和 `from=weAgent`；当读取不到持久化助理详情时，SDK 请求 `/v4-1/we-crew/my-agent` 获取主助理详情并按同样规则组装；若请求失败或 `weCodeUrl` 为空，则返回激活页地址；其余场景沿用历史组装逻辑 |
+| `assistantDetailUri` | `string` | 助理详情地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；当读取不到持久化助理详情时，SDK 请求 `/v4-1/we-crew/my-agent` 获取主助理详情并按同样规则组装；若请求失败或 `weCodeUrl` 为空，则返回空字符串；其余场景沿用历史组装逻辑 |
+| `switchAssistantUri` | `string` | 切换助理地址；当持久化助理详情的 `bizRobotTag = myAgent` 时，组装为 `h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`；当读取不到持久化助理详情时，SDK 请求 `/v4-1/we-crew/my-agent` 获取主助理详情并按同样规则组装；若请求失败或 `weCodeUrl` 为空，则返回空字符串；其余场景沿用历史组装逻辑 |
 
 ### 出参示例（持久化助理详情 `bizRobotTag = myAgent` 场景）
 
 ```json
 {
-  "weAgentUri": "h5://S008623/index.html?wecodePlace=weAgent&from=weAgent",
+  "weAgentUri": "https://xxx?wecodePlace=weAgent&from=weAgent",
   "assistantDetailUri": "h5://S008623/index.html?partnerAccount=x00_1#assistantDetail",
   "switchAssistantUri": "h5://S008623/index.html?partnerAccount=x00_1#switchAssistant"
 }
 ```
 
-### 出参示例（无持久化助理详情场景）
+### 出参示例（无持久化助理详情，成功请求到主助理详情场景）
 
 ```json
 {
-  "weAgentUri": "h5://2317/index.html?wecodePlace=weAgent&from=weAgent",
-  "assistantDetailUri": "h5://S008623/index.html?type=myAgent#assistantDetail",
-  "switchAssistantUri": "h5://S008623/index.html?type=myAgent#switchAssistant"
+  "weAgentUri": "https://xxx?wecodePlace=weAgent&from=weAgent",
+  "assistantDetailUri": "h5://S008623/index.html?partnerAccount=x00_1#assistantDetail",
+  "switchAssistantUri": "h5://S008623/index.html?partnerAccount=x00_1#switchAssistant"
 }
 ```
 
@@ -1281,7 +1281,7 @@ getWeAgentUri(): WeAgentUriResult
    - `assistantDetailUri` 返回空字符串
    - `switchAssistantUri` 返回空字符串
 3. 当读取到的持久化助理详情满足 `bizRobotTag = myAgent` 时，使用新的组装规则：
-   - `weAgentUri` 组装为：持久化助理详情中的 `weCodeUrl` + query 参数 `wecodePlace=weAgent&from=weAgent`；
+   - `weAgentUri` 组装为：持久化助理详情中的 `weCodeUrl` + query 参数 `wecodePlace=weAgent` 和 `from=weAgent`；
    - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={持久化助理详情.partnerAccount}` + hash `assistantDetail`；
    - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={持久化助理详情.partnerAccount}` + hash `switchAssistant`。
 4. 当读取到的持久化助理详情不满足 `bizRobotTag = myAgent` 时，沿用历史组装逻辑返回：
@@ -1289,12 +1289,16 @@ getWeAgentUri(): WeAgentUriResult
    - 若 `weCodeUrl` 的 host 值与常量 `WE_AGENT_CUI_APPID: S008623` 一致：以 `weCodeUrl` 为基础地址，追加 query 参数 `wecodePlace=weAgent` 与 `assistantAccount={partnerAccount}`；
    - `assistantDetailUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `assistantDetail`；
    - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
-5. SDK 定义常量 `MyAgentUri = h5://2317`。
-6. 若读取不到持久化助理详情，则 SDK 直接返回主助理固定页面地址：
-   - `weAgentUri` 固定返回 `MyAgentUri + /index.html?wecodePlace=weAgent&from=weAgent`，即 `h5://2317/index.html?wecodePlace=weAgent&from=weAgent`
-   - `assistantDetailUri` 固定返回 `h5://S008623/index.html?type=myAgent#assistantDetail`
-   - `switchAssistantUri` 固定返回 `h5://S008623/index.html?type=myAgent#switchAssistant`
-7. 返回 `WeAgentUriResult`。
+5. 若读取不到持久化助理详情，则 SDK 调用服务端 REST API：`GET /v4-1/we-crew/my-agent`。
+6. 当 `/v4-1/we-crew/my-agent` 返回成功时：
+   - SDK 将服务端返回对象适配为主助理详情，其中 `robotId` 映射到 `id`；
+   - 若当前本地没有详情，或当前本地详情本身就是主助理，则将该主助理详情写入 `current_we_agent_detail`；
+   - 若返回详情中的 `weCodeUrl` 非空，则按第 3 步的主助理规则组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`。
+7. 若 `/v4-1/we-crew/my-agent` 请求失败、返回结构异常，或返回详情中的 `weCodeUrl` 为空，则 SDK 直接走兜底逻辑：
+   - `weAgentUri` 固定返回 `h5://S008623/index.html?wecodePlace=weAgent#activateAssistant`
+   - `assistantDetailUri` 返回空字符串
+   - `switchAssistantUri` 返回空字符串
+8. 返回 `WeAgentUriResult`。
 
 ---
 
