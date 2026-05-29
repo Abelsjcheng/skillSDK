@@ -453,6 +453,10 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         if (success) {
             success(result);
         }
+        if (beforeSeq == nil) {
+            // beforeSeq 为空视为首屏历史请求；历史成功返回后尽力补发一次 resume。
+            [[WLAgentSkillsWebSocketManager sharedManager] sendResumeMessageForSessionId:welinkSessionId];
+        }
     }
                                                                     failure:^(NSError * _Nonnull error) {
         [weakSelf dispatchFailureObject:failure error:error];

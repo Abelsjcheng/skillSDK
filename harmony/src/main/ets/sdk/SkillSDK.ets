@@ -412,7 +412,12 @@ export class SkillSDK {
       const size = TypeConverter.toPositiveInt(params.size, 50, 'size');
       await this.ensureWebSocketConnected();
 
-      return await this.fetchServerMessageHistory(welinkSessionId, beforeSeq, size);
+      const history = await this.fetchServerMessageHistory(welinkSessionId, beforeSeq, size);
+      if (beforeSeq === undefined) {
+        // beforeSeq 为空视为首屏历史请求；历史成功返回后尽力补发一次 resume。
+        void this.wsManager.sendResumeForSession(welinkSessionId);
+      }
+      return history;
     } catch (error) {
       throw this.normalizeError('getSessionMessageHistory', error);
     }

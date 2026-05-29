@@ -123,6 +123,39 @@ export class WebSocketManager {
     this.listenersBySession.clear();
   }
 
+  async sendResumeForSession(sessionId: string): Promise<void> {
+    if (sessionId.trim() === '') {
+      return;
+    }
+    if (!this.connected || this.socket === null) {
+      return;
+    }
+
+    const payload = JSON.stringify({
+      action: 'resume',
+      sessionId
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        if (this.socket === null) {
+          resolve();
+          return;
+        }
+        this.socket.send(payload, (error: BusinessError) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    } catch (error) {
+      // 恢复订阅属于尽力而为能力，不向上抛错打断历史消息正常返回。
+      this.logger.warn('send resume failed', error);
+    }
+  }
+
   private setupSocketEventHandlers(socket: webSocket.WebSocket): void {
     socket.on('open', (error: BusinessError) => {
       if (error) {

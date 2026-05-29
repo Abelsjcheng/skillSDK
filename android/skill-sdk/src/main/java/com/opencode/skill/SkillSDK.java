@@ -546,6 +546,10 @@ public final class SkillSDK {
                             public void onSuccess(@Nullable CursorResult<SessionMessage> result) {
                                 CursorResult<SessionMessage> cursorResult = normalizeSessionMessageCursor(result, size);
                                 callback.onSuccess(cursorResult);
+                                if (beforeSeq == null) {
+                                    // beforeSeq 为空视为首屏历史请求；历史成功返回后自动补发一次 resume。
+                                    webSocketManager.sendResume(welinkSessionId);
+                                }
                             }
 
                             @Override

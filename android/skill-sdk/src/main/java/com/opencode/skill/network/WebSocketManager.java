@@ -181,6 +181,24 @@ public final class WebSocketManager {
         return !sessionListeners.isEmpty();
     }
 
+    /**
+     * 发送会话恢复指令。
+     * 仅在首屏历史消息返回后由 SDK best-effort 调用一次；发送失败不影响历史接口成功回调。
+     */
+    public void sendResume(@NonNull String sessionId) {
+        if (!connected || webSocket == null || sessionId.trim().isEmpty()) {
+            return;
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("action", "resume");
+        payload.addProperty("sessionId", sessionId);
+        try {
+            webSocket.send(payload.toString());
+        } catch (Exception ignored) {
+            // 恢复订阅属于尽力而为能力，不向上抛错打断历史消息正常返回。
+        }
+    }
+
     public synchronized void shutdown() {
         disconnect();
         clearAllListeners();
