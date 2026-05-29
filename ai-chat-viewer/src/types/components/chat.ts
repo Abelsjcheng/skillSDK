@@ -34,6 +34,7 @@ export interface CodeBlockProps {
 export interface PermissionCardProps {
   part: MessagePart;
   welinkSessionId: string;
+  page?: 'weAgentCUI' | 'skillCUI';
   onResolved?: () => void;
   readonly?: boolean;
 }
@@ -41,6 +42,8 @@ export interface PermissionCardProps {
 export interface QuestionCardProps {
   part: MessagePart;
   messageId?: string;
+  welinkSessionId?: string;
+  page?: 'weAgentCUI' | 'skillCUI';
   onAnswered?: (submission: QuestionAnswerSubmission) => Promise<void> | void;
   readonly?: boolean;
 }

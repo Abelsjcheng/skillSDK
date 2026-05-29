@@ -34,6 +34,7 @@ export interface SendMessageParams {
   welinkSessionId: string;
   content: string;
   toolCallId?: string;
+  questionId?: string;
   subagentSessionId?: string;
 }
 
@@ -400,6 +401,7 @@ export interface HWH5DeviceInfo {
 export interface HWH5AppInfo {
   language: string;
   versionName?: string;
+  environment?: string;
   [key: string]: unknown;
 }
 

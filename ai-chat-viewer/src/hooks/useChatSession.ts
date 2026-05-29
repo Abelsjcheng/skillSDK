@@ -31,10 +31,16 @@ import {
 import { copyTextToClipboard } from '../utils/clipboard';
 import { WeLog } from '../utils/logger';
 import { hasMoreHistoryByCursor } from '../utils/session';
+import { reportFlowTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
+import { reportSendMessageClick } from '../utils/uemUtil';
 
 const HISTORY_PAGE_SIZE = 20;
+
+function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
+  return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
+}
 
 function buildUserMessage(msg: StreamMessage): Message | null {
   const messageId = msg.messageId;
@@ -381,6 +387,7 @@ export function useChatSession({
       if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
         return;
       }
+      const telemetryPage = resolveTelemetryPage(mode);
 
       if (
         msg.type === 'question'
@@ -573,6 +580,15 @@ export function useChatSession({
         case 'session.error':
         case 'error':
           setSessionStatus('error');
+          void reportFlowTelemetry('flow_onmessage_error', 'onMessage 错误', {
+            type: 'error',
+            page: telemetryPage,
+            welinkSessionId: activeWelinkSessionId,
+            messageId: msg.messageId ?? undefined,
+            subagentSessionId: msg.subagentSessionId ?? undefined,
+            messageType: msg.type,
+            errorMessage: msg.error ?? undefined,
+          });
           appendAssistantErrorBlock(msg.error ?? '', aiReplyFailedTextRef.current);
           break;
         case 'snapshot':
@@ -617,6 +633,13 @@ export function useChatSession({
     };
 
     const onError = (err: { code?: string; message?: string; errorCode?: number; errorMessage?: string }) => {
+      void reportFlowTelemetry('flow_onmessage_error', 'onMessage 错误', {
+        type: 'error',
+        page: resolveTelemetryPage(mode),
+        welinkSessionId,
+        errorCode: String(err.code ?? err.errorCode ?? ''),
+        errorMessage: err.message ?? err.errorMessage ?? '',
+      });
       WeLog(`useChatSession session listener error | extra=${JSON.stringify({ mode, welinkSessionId, errorCode: err.code ?? err.errorCode, errorMessage: err.message ?? err.errorMessage })}`);
     };
 
@@ -713,6 +736,7 @@ export function useChatSession({
     if (!welinkSessionId || !content) return;
 
     setSessionStatus('busy');
+    reportSendMessageClick(resolveTelemetryPage(mode), welinkSessionId, content);
     try {
       await sendUserMessage(content);
     } catch (err) {

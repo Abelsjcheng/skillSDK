@@ -6,6 +6,7 @@ import { isPcMiniApp } from '../constants';
 import { useChatSession } from '../hooks/useChatSession';
 import type { SkillCUIProps } from '../types/pages';
 import { getQueryParam } from '../utils/hwext';
+import { installBrowserJsErrorTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import '../styles/App.less';
 import '../styles/SkillCUI.less';
@@ -29,6 +30,11 @@ import '../styles/SkillCUI.less';
       emptySessionToastShownRef.current = true;
     }
   }, [welinkSessionId]);
+
+  useEffect(() => installBrowserJsErrorTelemetry(() => ({
+    page: 'skillCUI',
+    welinkSessionId: welinkSessionId || undefined,
+  })), [welinkSessionId]);
 
   return (
     <div className="app-container skill-cui">

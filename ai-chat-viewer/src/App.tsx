@@ -23,6 +23,7 @@ import {
 } from './utils/hwext';
 import { WeLog } from './utils/logger';
 import { ensureSessionTimestamps, getLatestAvailableSessionByUpdatedAt } from './utils/session';
+import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
 
@@ -116,6 +117,12 @@ function App({ assistantAccount = '' }: AppProps) {
       setKeyboardHeight(0);
     };
   }, [isIosKeyboardLiftEnabled]);
+
+  useEffect(() => installBrowserJsErrorTelemetry(() => ({
+    page: 'weAgentCUI',
+    assistantAccount: assistantAccountRef.current,
+    welinkSessionId: welinkSessionId ?? undefined,
+  })), [welinkSessionId]);
 
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);

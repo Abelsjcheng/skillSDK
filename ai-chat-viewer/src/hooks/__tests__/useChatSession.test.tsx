@@ -5,6 +5,7 @@ import type { StreamMessage } from '../../types';
 import {
   getSessionMessageHistory,
   registerSessionListener,
+  reportUemEvent,
   sendMessage,
   sendMessageToIM,
   stopSkill,
@@ -15,6 +16,7 @@ jest.mock('../../utils/hwext', () => ({
   getSessionMessageHistory: jest.fn(),
   registerSessionListener: jest.fn(),
   unregisterSessionListener: jest.fn(),
+  reportUemEvent: jest.fn(),
   sendMessage: jest.fn(),
   sendMessageToIM: jest.fn(),
   stopSkill: jest.fn(),
@@ -38,6 +40,7 @@ type ListenerParams = {
 const mockGetSessionMessageHistory = getSessionMessageHistory as jest.MockedFunction<typeof getSessionMessageHistory>;
 const mockRegisterSessionListener = registerSessionListener as jest.MockedFunction<typeof registerSessionListener>;
 const mockUnregisterSessionListener = unregisterSessionListener as jest.MockedFunction<typeof unregisterSessionListener>;
+const mockReportUemEvent = reportUemEvent as jest.MockedFunction<typeof reportUemEvent>;
 const mockSendMessage = sendMessage as jest.MockedFunction<typeof sendMessage>;
 const mockSendMessageToIM = sendMessageToIM as jest.MockedFunction<typeof sendMessageToIM>;
 const mockStopSkill = stopSkill as jest.MockedFunction<typeof stopSkill>;
@@ -68,6 +71,7 @@ describe('useChatSession', () => {
       hasMore: false,
       nextBeforeSeq: null,
     });
+    mockReportUemEvent.mockResolvedValue(undefined);
     mockSendMessage.mockResolvedValue({
       id: 'user_msg_1',
       welinkSessionId: 'session_1',

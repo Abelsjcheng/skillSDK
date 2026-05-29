@@ -59,6 +59,22 @@ import type {
 import { APP_ID, isPcMiniApp } from '../constants';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
+import {
+  trackApiCreateDigitalTwin,
+  trackApiCreateNewSession,
+  trackApiDeleteWeAgent,
+  trackApiGetHistorySessions,
+  trackApiGetSessionMessageHistory,
+  trackApiGetWeAgentDetails,
+  trackApiGetWeAgentList,
+  trackApiQueryQrcodeInfo,
+  trackApiReplyPermission,
+  trackApiSendMessage,
+  trackApiSendMessageToIM,
+  trackApiStopSkill,
+  trackApiUpdateWeAgent,
+  trackApiUpdateQrcodeInfo,
+} from './uemUtil';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
@@ -392,11 +408,13 @@ export async function getAppInfo(): Promise<HWH5AppInfo> {
         return {
           language: toAppLanguage(appInfo.language),
           versionName: toTrimmedString(appInfo.versionName),
+          environment: toTrimmedString(appInfo.environment),
         };
       } catch (error) {
         return {
           language: 'zh',
           versionName: '',
+          environment: '',
         };
       }
     })();
@@ -499,7 +517,7 @@ export async function regenerateAnswer(params: RegenerateAnswerParams): Promise<
 }
 
 export async function sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResponse> {
-  return getJsApiOrThrow().sendMessageToIM(params);
+  return trackApiSendMessageToIM(params, Promise.resolve(getJsApiOrThrow().sendMessageToIM(params)));
 }
 
 export async function getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse> {
@@ -509,7 +527,7 @@ export async function getSessionMessage(params: GetSessionMessageParams): Promis
 export async function getSessionMessageHistory(
   params: GetSessionMessageHistoryParams,
 ): Promise<GetSessionMessageHistoryResponse> {
-  return getJsApiOrThrow().getSessionMessageHistory(params);
+  return trackApiGetSessionMessageHistory(params, getJsApiOrThrow().getSessionMessageHistory(params));
 }
 
 export function registerSessionListener(params: RegisterSessionListenerParams): void {
@@ -521,15 +539,15 @@ export function unregisterSessionListener(params: UnregisterSessionListenerParam
 }
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
-  return getJsApiOrThrow().sendMessage(params);
+  return trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
 }
 
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
-  return getJsApiOrThrow().stopSkill(params);
+  return trackApiStopSkill(params, getJsApiOrThrow().stopSkill(params));
 }
 
 export async function replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse> {
-  return getJsApiOrThrow().replyPermission(params);
+  return trackApiReplyPermission(params, getJsApiOrThrow().replyPermission(params));
 }
 
 export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse> {
@@ -537,7 +555,7 @@ export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Prom
 }
 
 export async function createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
-  return getJsApiOrThrow().createNewSession(params);
+  return trackApiCreateNewSession(params, Promise.resolve(getJsApiOrThrow().createNewSession(params)));
 }
 
 export async function getAccountInfoUid(): Promise<string> {
@@ -549,27 +567,31 @@ export async function getAgentType(): Promise<AgentTypeListResult> {
 }
 
 export async function createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> {
-  return getJsApiOrThrow().createDigitalTwin(params);
+  return trackApiCreateDigitalTwin(params, Promise.resolve(getJsApiOrThrow().createDigitalTwin(params)));
 }
 
 export async function getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> {
-  return getJsApiOrThrow().getWeAgentList(params);
+  return trackApiGetWeAgentList(params, Promise.resolve(getJsApiOrThrow().getWeAgentList(params)));
 }
 
 export async function getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> {
-  return getJsApiOrThrow().getWeAgentDetails(normalizeGetWeAgentDetailsParams(params));
+  const normalizedParams = normalizeGetWeAgentDetailsParams(params);
+  return trackApiGetWeAgentDetails(
+    normalizedParams,
+    Promise.resolve(getJsApiOrThrow().getWeAgentDetails(normalizedParams)),
+  );
 }
 
 export async function updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {
-  return getJsApiOrThrow().updateWeAgent(params);
+  return trackApiUpdateWeAgent(params, Promise.resolve(getJsApiOrThrow().updateWeAgent(params)));
 }
 
 export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
-  return getJsApiOrThrow().deleteWeAgent(params);
+  return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
-  return getJsApiOrThrow().queryQrcodeInfo(params);
+  return trackApiQueryQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().queryQrcodeInfo(params)));
 }
 
 export async function checkCreateAssistantWhitelist(): Promise<boolean> {
@@ -593,7 +615,7 @@ export async function checkCreateAssistantWhitelist(): Promise<boolean> {
 }
 
 export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
-  return getJsApiOrThrow().updateQrcodeInfo(params);
+  return trackApiUpdateQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().updateQrcodeInfo(params)));
 }
 
 export async function notifyAssistantDetailUpdated(
@@ -605,7 +627,7 @@ export async function notifyAssistantDetailUpdated(
 export async function getHistorySessionsList(
   params: GetHistorySessionsListParams,
 ): Promise<HistorySessionsListResult> {
-  return getJsApiOrThrow().getHistorySessionsList(params);
+  return trackApiGetHistorySessions(params, Promise.resolve(getJsApiOrThrow().getHistorySessionsList(params)));
 }
 
 export async function getWeAgentUri(): Promise<WeAgentUriResult> {
