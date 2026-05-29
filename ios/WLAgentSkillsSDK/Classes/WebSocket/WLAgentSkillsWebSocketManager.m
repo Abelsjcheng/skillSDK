@@ -133,6 +133,39 @@
     }
 }
 
+- (void)sendResumeMessageForSessionId:(NSString *)sessionId {
+    if (sessionId == nil || sessionId.length == 0) {
+    return;
+    }
+
+    SRWebSocket *socket = nil;
+    @synchronized(self) {
+    if (!self.isConnected || self.webSocket == nil) {
+        return;
+    }
+    socket = self.webSocket;
+    }
+
+    NSDictionary *payload = @{
+        @"action": @"resume",
+        @"sessionId": sessionId
+    };
+    NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+    if (data == nil) {
+    return;
+    }
+    NSString *jsonString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    if (jsonString == nil || jsonString.length == 0) {
+    return;
+    }
+
+    @try {
+    [socket send:jsonString];
+    } @catch (__unused NSException *exception) {
+    // 恢复订阅属于尽力而为能力，不向上抛错打断历史消息正常返回。
+    }
+}
+
 #pragma mark - SRWebSocketDelegate
 
 - (void)webSocketDidOpen:(SRWebSocket *)webSocket {
