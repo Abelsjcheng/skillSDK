@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { MessageBubble } from '../MessageBubble';
-import type { Message } from '../../types';
+import type { Message, MessagePart } from '../../types';
 
 function createAssistantMessage(content: string): Message {
   return {
@@ -9,6 +9,18 @@ function createAssistantMessage(content: string): Message {
     content,
     timestamp: Date.now(),
     isStreaming: true,
+  };
+}
+
+function createHistoryAssistantMessage(parts: MessagePart[]): Message {
+  return {
+    id: 'history-message-1',
+    role: 'assistant',
+    content: '',
+    timestamp: Date.now(),
+    isStreaming: false,
+    isHistory: true,
+    parts,
   };
 }
 
@@ -35,5 +47,74 @@ describe('MessageBubble', () => {
 
     expect(listItems).toHaveLength(2);
     expect(cursor).not.toBeInTheDocument();
+  });
+
+  it('keeps unresolved history question interactive after reload', () => {
+    const questionPart: MessagePart = {
+      partId: 'question-part-1',
+      type: 'question',
+      content: '请选择处理方式',
+      isStreaming: false,
+      question: '请选择处理方式',
+      options: [{ label: '继续执行' }],
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createHistoryAssistantMessage([questionPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    const button = container.querySelector('.question-card__option') as HTMLButtonElement | null;
+    expect(button).toBeInTheDocument();
+    expect(button).not.toBeDisabled();
+  });
+
+  it('keeps unresolved history permission interactive after reload', () => {
+    const permissionPart: MessagePart = {
+      partId: 'permission-part-1',
+      type: 'permission',
+      content: 'Need permission to write a markdown file',
+      isStreaming: false,
+      permissionId: 'perm-1',
+      permType: 'file_write',
+      toolName: 'write_file',
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createHistoryAssistantMessage([permissionPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    const allowButton = container.querySelector('.permission-card__btn--allow') as HTMLButtonElement | null;
+    expect(allowButton).toBeInTheDocument();
+    expect(allowButton).not.toBeDisabled();
+  });
+
+  it('keeps resolved history permission readonly after reload', () => {
+    const permissionPart: MessagePart = {
+      partId: 'permission-part-2',
+      type: 'permission',
+      content: 'Need permission to write a markdown file',
+      isStreaming: false,
+      permissionId: 'perm-2',
+      permType: 'file_write',
+      toolName: 'write_file',
+      permResolved: true,
+      response: 'once',
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createHistoryAssistantMessage([permissionPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    expect(container.querySelector('.permission-card')).toBeInTheDocument();
+    expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
   });
 });

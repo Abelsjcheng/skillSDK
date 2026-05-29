@@ -54,6 +54,26 @@ function messageContainsCodeBlock(message: Message): boolean {
   return hasMarkdownCodeBlock(message.content);
 }
 
+function isQuestionPartReadonly(part: MessagePart, readonly: boolean): boolean {
+  if (part.type !== 'question') {
+    return readonly;
+  }
+  if (part.answered) {
+    return readonly;
+  }
+  return false;
+}
+
+function isPermissionPartReadonly(part: MessagePart, readonly: boolean): boolean {
+  if (part.type !== 'permission') {
+    return readonly;
+  }
+  if (part.permResolved) {
+    return readonly;
+  }
+  return false;
+}
+
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
 const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
 
@@ -107,7 +127,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             part={part}
             messageId={message.id}
             onAnswered={onQuestionAnswered}
-            readonly={isHistoryAssistantReadonly}
+            readonly={isQuestionPartReadonly(part, isHistoryAssistantReadonly)}
           />
         );
 
@@ -117,7 +137,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
-            readonly={isHistoryAssistantReadonly}
+            readonly={isPermissionPartReadonly(part, isHistoryAssistantReadonly)}
           />
         );
 
