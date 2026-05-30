@@ -568,7 +568,7 @@ export function useChatSession({
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
             setSessionStatus('idle');
-            finalizeStreamingMessageById(msg.messageId);
+            finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
