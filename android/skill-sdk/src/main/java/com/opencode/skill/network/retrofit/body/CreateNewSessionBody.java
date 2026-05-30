@@ -8,9 +8,9 @@ import androidx.annotation.Nullable;
 public final class CreateNewSessionBody {
     @Nullable
     private final String ak;
-    @Nullable
+    @NonNull
     private final String businessSessionDomain;
-    @Nullable
+    @NonNull
     private final String businessSessionType;
     @NonNull
     private final String businessSessionId;
@@ -21,8 +21,8 @@ public final class CreateNewSessionBody {
 
     public CreateNewSessionBody(
             @Nullable String ak,
-            @Nullable String businessSessionDomain,
-            @Nullable String businessSessionType,
+            @NonNull String businessSessionDomain,
+            @NonNull String businessSessionType,
             @NonNull String businessSessionId,
             @Nullable String assistantAccount,
             @Nullable String title
@@ -40,12 +40,12 @@ public final class CreateNewSessionBody {
         return ak;
     }
 
-    @Nullable
+    @NonNull
     public String getBusinessSessionDomain() {
         return businessSessionDomain;
     }
 
-    @Nullable
+    @NonNull
     public String getBusinessSessionType() {
         return businessSessionType;
     }

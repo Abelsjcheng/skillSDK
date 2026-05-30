@@ -18,8 +18,8 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 
 - (void)createSessionWithAK:(nullable NSString *)ak
                                             title:(nullable NSString *)title
-                        businessSessionDomain:(nullable NSString *)businessSessionDomain
-                          businessSessionType:(nullable NSString *)businessSessionType
+                        businessSessionDomain:(NSString *)businessSessionDomain
+                          businessSessionType:(NSString *)businessSessionType
                             businessSessionId:(NSString *)businessSessionId
                             assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
@@ -27,8 +27,8 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 
 - (void)createNewSessionWithAK:(nullable NSString *)ak
                                         title:(nullable NSString *)title
-                        businessSessionDomain:(nullable NSString *)businessSessionDomain
-                          businessSessionType:(nullable NSString *)businessSessionType
+                        businessSessionDomain:(NSString *)businessSessionDomain
+                          businessSessionType:(NSString *)businessSessionType
                             businessSessionId:(NSString *)businessSessionId
                             assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success

@@ -183,11 +183,17 @@ public final class SkillSDK {
         }
         final CreateSessionParams normalizedParams;
         try {
+            String businessSessionDomain = TypeConvertUtils.requireString(
+                    params.getBusinessSessionDomain(),
+                    "businessSessionDomain"
+            );
             String businessSessionId = TypeConvertUtils.requireString(params.getBusinessSessionId(), "businessSessionId");
+            String businessSessionType = TypeConvertUtils.requireString(
+                    params.getBusinessSessionType(),
+                    "businessSessionType"
+            );
             String ak = TypeConvertUtils.optionalString(params.getAk());
             String title = TypeConvertUtils.optionalString(params.getTitle());
-            String businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
-            String businessSessionType = TypeConvertUtils.optionalString(params.getBusinessSessionType());
             String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
             normalizedParams = new CreateSessionParams(
                     ak,
@@ -760,11 +766,16 @@ public final class SkillSDK {
 
         final CreateNewSessionParams normalizedParams;
         try {
-            // createNewSession 按最新文档要求 businessSessionId 必传。
+            String businessSessionDomain = TypeConvertUtils.requireString(
+                    params.getBusinessSessionDomain(),
+                    "businessSessionDomain"
+            );
+            String businessSessionType = TypeConvertUtils.requireString(
+                    params.getBusinessSessionType(),
+                    "businessSessionType"
+            );
             String businessSessionId = TypeConvertUtils.requireString(params.getBusinessSessionId(), "businessSessionId");
             String ak = TypeConvertUtils.optionalString(params.getAk());
-            String businessSessionDomain = TypeConvertUtils.optionalString(params.getBusinessSessionDomain());
-            String businessSessionType = TypeConvertUtils.optionalString(params.getBusinessSessionType());
             String assistantAccount = TypeConvertUtils.optionalString(params.getAssistantAccount());
             String title = TypeConvertUtils.optionalString(params.getTitle());
             normalizedParams = new CreateNewSessionParams(

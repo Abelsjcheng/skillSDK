@@ -116,10 +116,22 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
+    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter requiredStringFromValue:params.businessSessionDomain
+                                                                                 fieldName:@"businessSessionDomain"
+                                                                              errorMessage:&errorMessage];
+    if (businessSessionDomain == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *businessSessionType = [WLAgentSkillsTypeConverter requiredStringFromValue:params.businessSessionType
+                                                                               fieldName:@"businessSessionType"
+                                                                            errorMessage:&errorMessage];
+    if (businessSessionType == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
     NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
     NSString *title = [WLAgentSkillsTypeConverter optionalStringFromValue:params.title];
-    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
-    NSString *businessSessionType = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionType];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
@@ -608,9 +620,21 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
         [self dispatchFailure:failure code:1000 message:errorMessage];
         return;
     }
+    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter requiredStringFromValue:params.businessSessionDomain
+                                                                                 fieldName:@"businessSessionDomain"
+                                                                              errorMessage:&errorMessage];
+    if (businessSessionDomain == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    NSString *businessSessionType = [WLAgentSkillsTypeConverter requiredStringFromValue:params.businessSessionType
+                                                                               fieldName:@"businessSessionType"
+                                                                            errorMessage:&errorMessage];
+    if (businessSessionType == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
     NSString *ak = [WLAgentSkillsTypeConverter optionalStringFromValue:params.ak];
-    NSString *businessSessionDomain = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionDomain];
-    NSString *businessSessionType = [WLAgentSkillsTypeConverter optionalStringFromValue:params.businessSessionType];
     NSString *assistantAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:params.assistantAccount];
     NSString *title = [WLAgentSkillsTypeConverter optionalStringFromValue:params.title];
 

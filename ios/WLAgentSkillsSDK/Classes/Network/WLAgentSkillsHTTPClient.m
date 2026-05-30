@@ -44,24 +44,22 @@
 
 - (void)createSessionWithAK:(nullable NSString *)ak
                                             title:(nullable NSString *)title
-                        businessSessionDomain:(nullable NSString *)businessSessionDomain
-                          businessSessionType:(nullable NSString *)businessSessionType
+                        businessSessionDomain:(NSString *)businessSessionDomain
+                          businessSessionType:(NSString *)businessSessionType
                             businessSessionId:(NSString *)businessSessionId
                             assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [@{ @"businessSessionId" : businessSessionId } mutableCopy];
+    NSMutableDictionary *parameters = [@{
+        @"businessSessionDomain" : businessSessionDomain,
+        @"businessSessionType" : businessSessionType,
+        @"businessSessionId" : businessSessionId
+    } mutableCopy];
     if (ak != nil && ak.length > 0) {
         parameters[@"ak"] = ak;
     }
     if (title != nil && title.length > 0) {
         parameters[@"title"] = title;
-    }
-    if (businessSessionDomain != nil && businessSessionDomain.length > 0) {
-        parameters[@"businessSessionDomain"] = businessSessionDomain;
-    }
-    if (businessSessionType != nil && businessSessionType.length > 0) {
-        parameters[@"businessSessionType"] = businessSessionType;
     }
     if (assistantAccount != nil && assistantAccount.length > 0) {
         parameters[@"assistantAccount"] = assistantAccount;
@@ -72,21 +70,19 @@
 
 - (void)createNewSessionWithAK:(nullable NSString *)ak
                                         title:(nullable NSString *)title
-                        businessSessionDomain:(nullable NSString *)businessSessionDomain
-                          businessSessionType:(nullable NSString *)businessSessionType
+                        businessSessionDomain:(NSString *)businessSessionDomain
+                          businessSessionType:(NSString *)businessSessionType
                             businessSessionId:(NSString *)businessSessionId
                             assistantAccount:(nullable NSString *)assistantAccount
                                         success:(WLAgentSkillsHTTPSuccessBlock)success
                                         failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [@{ @"businessSessionId" : businessSessionId } mutableCopy];
+    NSMutableDictionary *parameters = [@{
+        @"businessSessionDomain" : businessSessionDomain,
+        @"businessSessionType" : businessSessionType,
+        @"businessSessionId" : businessSessionId
+    } mutableCopy];
     if (ak != nil && ak.length > 0) {
         parameters[@"ak"] = ak;
-    }
-    if (businessSessionDomain != nil && businessSessionDomain.length > 0) {
-        parameters[@"businessSessionDomain"] = businessSessionDomain;
-    }
-    if (businessSessionType != nil && businessSessionType.length > 0) {
-        parameters[@"businessSessionType"] = businessSessionType;
     }
     if (assistantAccount != nil && assistantAccount.length > 0) {
         parameters[@"assistantAccount"] = assistantAccount;
