@@ -454,9 +454,6 @@ export function useChatSession({
             meta: current?.meta,
             isHistory: current?.isHistory,
           }));
-          if (!isMessageStreaming) {
-            finalizeStreamingMessageById(messageId);
-          }
           window.requestAnimationFrame(() => {
             hidePendingAssistantPreview();
           });
