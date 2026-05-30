@@ -75,6 +75,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const session = useChatSession({
     mode: 'weAgentCUI',
     welinkSessionId: welinkSessionId ?? '',
+    assistantDetail: assistantDetailRef.current,
     onSessionTitleChange: (sessionId, title) => {
       setHistorySessionsCache((prev) => updateSessionTitleInCache(prev, sessionId, title));
     },

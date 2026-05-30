@@ -1,10 +1,12 @@
 import type { Message, PendingAssistantPreview, QuestionAnswerSubmission, SessionStatus } from '../index';
+import type { WeAgentDetails } from '../bridge';
 
 export type ChatSessionMode = 'weAgentCUI' | 'skillCUI';
 
 export interface UseChatSessionOptions {
   mode: ChatSessionMode;
   welinkSessionId: string;
+  assistantDetail?: WeAgentDetails | null;
   onSessionTitleChange?: (sessionId: string, title: string) => void;
 }
 

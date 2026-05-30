@@ -1925,14 +1925,14 @@ function seedAdditionalHistorySessions(
   for (let index = 0; index < additionalSessionCount; index += 1) {
     const sequence = index + 1;
     const timestamp = new Date(baseTimestamp - sequence * 60 * 1000).toISOString();
-    const session = createFixedSession({
-      ak: assistant.appKey,
-      title: `分页验证会话 ${String(sequence).padStart(3, '0')}`,
-      businessSessionDomain: 'miniapp',
-      businessSessionType: 'direct',
-      assistantAccount: assistant.partnerAccount,
-      businessSessionId: MOCK_UID,
-    }, `mock_history_session_${String(sequence).padStart(3, '0')}`);
+      const session = createFixedSession({
+        ak: assistant.appKey,
+        title: `分页验证会话 ${String(sequence).padStart(3, '0')}`,
+        businessSessionDomain: 'skill',
+        businessSessionType: 'skill',
+        assistantAccount: assistant.partnerAccount,
+        businessSessionId: MOCK_UID,
+      }, `mock_history_session_${String(sequence).padStart(3, '0')}`);
 
     session.createdAt = timestamp;
     session.updatedAt = timestamp;
@@ -2341,7 +2341,7 @@ function buildMockApi(): HWH5EXT {
         timerIds: [],
       };
       sessionStore.set(nextSession.welinkSessionId, record);
-      currentAssistantAccount = params.assistantAccount;
+      currentAssistantAccount = params.assistantAccount || currentAssistantAccount;
       return cloneSession(nextSession);
     },
 

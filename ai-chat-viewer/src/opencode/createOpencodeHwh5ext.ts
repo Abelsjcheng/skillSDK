@@ -664,6 +664,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
             businessSessionType: params.businessSessionType,
             businessSessionId: params.businessSessionId,
             assistantAccount: params.assistantAccount,
+            businessExtParam: params.businessExtParam,
           }),
         },
       );

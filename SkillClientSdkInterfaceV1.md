@@ -36,6 +36,25 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
 
 ---
+### 接口总览
+
+| 序号 | 接口名 | 作用 |
+|---|---|---|
+| 1 | `createSession` | 创建会话 |
+| 2 | `closeSkill` | 关闭技能 |
+| 3 | `stopSkill` | 停止当前轮回答 |
+| 4 | `onSessionStatusChange` | 会话状态变更回调 |
+| 5 | `onSkillWecodeStatusChange` | 小程序状态变更回调 |
+| 6 | `regenerateAnswer` | 重新生成问答 |
+| 7 | `sendMessageToIM` | 将 AI 结果发送到 IM |
+| 8 | `getSessionMessage` | 获取当前会话消息列表 |
+| 8.1 | `getSessionMessageHistory` | 获取当前会话历史消息 |
+| 9 | `registerSessionListener` / `unregisterSessionListener` | 监听服务端流式消息 |
+| 10 | `sendMessage` | 发送消息内容 |
+| 11 | `replyPermission` | 权限确认 |
+| 12 | `controlSkillWeCode` | 小程序控制 |
+| 13 | `createNewSession` | 创建新会话 |
+| 14 | `getHistorySessionsList` | 获取历史会话列表 |
 
 ## 1. 创建会话接口
 
@@ -59,9 +78,9 @@ createSession(params: CreateNewSessionParams): Promise<Session>
 |--------|------|------|------|
 | ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| businessSessionDomain | String | 否 | 会话关联场域。`createSession` 调用时传入值 `skill` |
+| businessSessionDomain | String | 是 | 会话关联场域。`createSession` 调用时传入值 `skill` |
 | businessSessionId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| businessSessionType | String | 否 | 会话类型。`createSession` 调用时传入值 `skill` |
+| businessSessionType | String | 是 | 会话类型。`createSession` 调用时传入值 `skill` |
 | assistantAccount | String | 否 | 助理ID |
 
 ### 入参示例
@@ -1578,8 +1597,8 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
 | ak | String | 否 | 应用 AK；无 AK 的纯本地会话也合法 |
 | title | String | 否 | 会话标题；缺省时由服务端后续推送 `session.title` 填充 |
 | assistantAccount | String | 否 | 助理账号；为空时是否允许创建由服务端开关控制 |
-| businessSessionDomain | String | 否 | 业务侧外部 ID 三元组中的 domain；miniapp 场景通常传 `null` |
-| businessSessionType | String | 否 | 业务侧外部 ID 三元组中的 type；miniapp 场景通常传 `null` |
+| businessSessionDomain | String | 是 | 业务侧外部 ID 三元组中的 domain；miniapp 场景通常传 `skill` |
+| businessSessionType | String | 是 | 业务侧外部 ID 三元组中的 type；miniapp 场景通常传 `skill` |
 | businessSessionId | String | 是 | 业务侧外部 ID 三元组中的 id；单聊传用户 ID，群聊传群 ID |
 
 ### 入参示例
@@ -1589,8 +1608,8 @@ createNewSession(params: CreateNewSessionParams): Promise<Session>
   "ak": "ak_xxxxxxxx",
   "title": "帮我创建一个React项目",
   "assistantAccount": "x00_1",
-  "businessSessionDomain": null,
-  "businessSessionType": null,
+  "businessSessionDomain": "skill",
+  "businessSessionType": "skill",
   "businessSessionId": "x00123456"
 }
 ```
