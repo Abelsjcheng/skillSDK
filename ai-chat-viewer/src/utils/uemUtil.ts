@@ -82,11 +82,18 @@ export function reportCreateSessionClick(detail: WeAgentDetails | null, error?: 
   });
 }
 
-export function reportSendMessageClick(page: 'weAgentCUI' | 'skillCUI', welinkSessionId: string, content: string): void {
+export function reportSendMessageClick(
+  page: 'weAgentCUI' | 'skillCUI',
+  welinkSessionId: string,
+  content: string,
+  assistantDetail?: WeAgentDetails | null,
+): void {
   reportClickEvent('weagent_send_message_click', '发送消息', {
     page,
     welinkSessionId,
     contentLength: content.length,
+    robot_Id: assistantDetail?.id,
+    bizRobotId: assistantDetail?.bizRobotId,
   });
 }
 
@@ -103,6 +110,7 @@ export async function trackApiCreateNewSession(
         businessSessionType: params.businessSessionType,
         businessSessionId: params.businessSessionId,
         ak: params.ak,
+        businessExtParam: params.businessExtParam,
       },
       response: {
         welinkSessionId: result.welinkSessionId,
@@ -118,6 +126,7 @@ export async function trackApiCreateNewSession(
         businessSessionType: params.businessSessionType,
         businessSessionId: params.businessSessionId,
         ak: params.ak,
+        businessExtParam: params.businessExtParam,
       },
     });
     throw error;

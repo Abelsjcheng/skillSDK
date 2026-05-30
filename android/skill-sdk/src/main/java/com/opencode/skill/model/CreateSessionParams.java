@@ -10,11 +10,11 @@ public class CreateSessionParams {
     private final String ak;
     @Nullable
     private final String title;
-    @Nullable
+    @NonNull
     private final String businessSessionDomain;
     @NonNull
     private final String businessSessionId;
-    @Nullable
+    @NonNull
     private final String businessSessionType;
     @Nullable
     private final String assistantAccount;
@@ -22,9 +22,9 @@ public class CreateSessionParams {
     public CreateSessionParams(
             @Nullable String ak,
             @Nullable String title,
-            @Nullable String businessSessionDomain,
+            @NonNull String businessSessionDomain,
             @NonNull String businessSessionId,
-            @Nullable String businessSessionType,
+            @NonNull String businessSessionType,
             @Nullable String assistantAccount
     ) {
         this.ak = ak;
@@ -45,7 +45,7 @@ public class CreateSessionParams {
         return title;
     }
 
-    @Nullable
+    @NonNull
     public String getBusinessSessionDomain() {
         return businessSessionDomain;
     }
@@ -55,7 +55,7 @@ public class CreateSessionParams {
         return businessSessionId;
     }
 
-    @Nullable
+    @NonNull
     public String getBusinessSessionType() {
         return businessSessionType;
     }

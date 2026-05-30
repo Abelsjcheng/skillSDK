@@ -61,6 +61,7 @@ function buildUserMessage(msg: StreamMessage): Message | null {
 export function useChatSession({
   mode,
   welinkSessionId,
+  assistantDetail,
   onSessionTitleChange,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
@@ -733,7 +734,7 @@ export function useChatSession({
     if (!welinkSessionId || !content) return;
 
     setSessionStatus('busy');
-    reportSendMessageClick(resolveTelemetryPage(mode), welinkSessionId, content);
+    reportSendMessageClick(resolveTelemetryPage(mode), welinkSessionId, content, assistantDetail);
     try {
       await sendUserMessage(content);
     } catch (err) {
@@ -741,7 +742,7 @@ export function useChatSession({
       showToast(tRef.current('weAgent.sendMessageFailed'));
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
-  }, [mode, sendUserMessage, welinkSessionId]);
+  }, [assistantDetail, mode, sendUserMessage, welinkSessionId]);
 
   const onStop = useCallback(async () => {
     if (!welinkSessionId) return;

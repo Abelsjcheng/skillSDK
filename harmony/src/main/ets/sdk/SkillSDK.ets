@@ -176,21 +176,21 @@ export class SkillSDK {
     try {
       Validator.requireObject(params, 'params');
       const ak = this.normalizeOptionalString(params.ak);
+      const businessSessionDomain = TypeConverter.toRequiredString(
+        params.businessSessionDomain,
+        'businessSessionDomain'
+      );
       const businessSessionId = TypeConverter.toRequiredString(
         params.businessSessionId,
         'businessSessionId'
       );
+      const businessSessionType = TypeConverter.toRequiredString(
+        params.businessSessionType,
+        'businessSessionType'
+      );
       const assistantAccount = TypeConverter.toOptionalString(
         params.assistantAccount,
         'assistantAccount'
-      );
-      const businessSessionDomain = TypeConverter.toOptionalString(
-        params.businessSessionDomain,
-        'businessSessionDomain'
-      );
-      const businessSessionType = TypeConverter.toOptionalString(
-        params.businessSessionType,
-        'businessSessionType'
       );
       if (params.ak !== undefined && ak === undefined) {
         throw new SkillSdkException(1000, 'ak must be a non-empty string');
@@ -204,14 +204,10 @@ export class SkillSDK {
       const query: Record<string, string | number> = {
         page: 0,
         size: 50,
+        businessSessionDomain,
+        businessSessionType,
         businessSessionId
       };
-      if (businessSessionDomain !== undefined) {
-        query.businessSessionDomain = businessSessionDomain;
-      }
-      if (businessSessionType !== undefined) {
-        query.businessSessionType = businessSessionType;
-      }
       if (ak !== undefined) {
         query.ak = ak;
       }
@@ -225,14 +221,10 @@ export class SkillSDK {
       }
 
       const payload: Record<string, Object> = {
+        businessSessionDomain,
+        businessSessionType,
         businessSessionId
       };
-      if (businessSessionDomain !== undefined) {
-        payload.businessSessionDomain = businessSessionDomain;
-      }
-      if (businessSessionType !== undefined) {
-        payload.businessSessionType = businessSessionType;
-      }
       if (ak !== undefined) {
         payload.ak = ak;
       }
@@ -555,36 +547,31 @@ export class SkillSDK {
   async createNewSession(params: CreateNewSessionParams): Promise<Session> {
     try {
       Validator.requireObject(params, 'params');
-      // createNewSession 按最新文档要求 businessSessionId 必传。
+      const businessSessionDomain = TypeConverter.toRequiredString(
+        params.businessSessionDomain,
+        'businessSessionDomain'
+      );
+      const businessSessionType = TypeConverter.toRequiredString(
+        params.businessSessionType,
+        'businessSessionType'
+      );
       const businessSessionId = TypeConverter.toRequiredString(
         params.businessSessionId,
         'businessSessionId'
       );
       const ak = TypeConverter.toOptionalString(params.ak, 'ak');
-      const businessSessionDomain = TypeConverter.toOptionalString(
-        params.businessSessionDomain,
-        'businessSessionDomain'
-      );
-      const businessSessionType = TypeConverter.toOptionalString(
-        params.businessSessionType,
-        'businessSessionType'
-      );
       const assistantAccount = TypeConverter.toOptionalString(params.assistantAccount, 'assistantAccount');
       const title = TypeConverter.toOptionalString(params.title, 'title');
 
       await this.ensureWebSocketConnected();
 
       const payload: Record<string, Object> = {
+        businessSessionDomain,
+        businessSessionType,
         businessSessionId
       };
       if (ak !== undefined) {
         payload.ak = ak;
-      }
-      if (businessSessionDomain !== undefined) {
-        payload.businessSessionDomain = businessSessionDomain;
-      }
-      if (businessSessionType !== undefined) {
-        payload.businessSessionType = businessSessionType;
       }
       if (assistantAccount !== undefined) {
         payload.assistantAccount = assistantAccount;

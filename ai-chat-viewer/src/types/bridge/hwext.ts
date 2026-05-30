@@ -78,12 +78,13 @@ export interface ControlSkillWeCodeParams {
 }
 
 export interface CreateNewSessionParams {
-  ak: string;
+  ak?: string;
   title?: string;
   businessSessionDomain: string;
   businessSessionId: string;
   businessSessionType: string;
-  assistantAccount: string;
+  assistantAccount?: string;
+  businessExtParam?: Record<string, unknown>;
 }
 
 export interface GetWeAgentListParams {

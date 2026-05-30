@@ -1657,9 +1657,9 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createNewS
 |--------|------|------|------|
 | ak | string | 否 | Agent Plugin 对应的 Access Key |
 | title | string | 否 | 会话标题，不传则由 AI 自动生成 |
-| businessSessionDomain | string | 否 | 业务侧外部 ID 三元组中的 domain |
+| businessSessionDomain | string | 是 | 业务侧外部 ID 三元组中的 domain；miniapp 场景通常传 `skill` |
 | businessSessionId | string | 是 | 业务侧外部 ID 三元组中的 id；单聊可传用户 ID，群聊可传群 ID |
-| businessSessionType | string | 否 | 业务侧外部 ID 三元组中的 type |
+| businessSessionType | string | 是 | 业务侧外部 ID 三元组中的 type；miniapp 场景通常传 `skill` |
 | assistantAccount | string | 否 | 助理账号 ID；为空时是否允许创建由服务端开关控制 |
 | businessExtParam | object | 否 | 业务扩展参数，SDK 原样透传给服务端 |
 
@@ -1696,8 +1696,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'createNewS
 window.HWH5EXT.createNewSession({
   ak: 'ak_xxxxxxxx',
   title: '帮我创建一个 React 项目',
-  businessSessionDomain: null,
-  businessSessionType: null,
+  businessSessionDomain: 'skill',
+  businessSessionType: 'skill',
   assistantAccount: 'x00_1',
   businessSessionId: 'x00123456',
   businessExtParam: { traceId: 'trace_001' }

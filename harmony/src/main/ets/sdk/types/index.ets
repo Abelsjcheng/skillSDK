@@ -284,17 +284,17 @@ export interface SessionListener {
 export interface CreateSessionParams {
   ak?: string;
   title?: string;
-  businessSessionDomain?: string;
+  businessSessionDomain: string;
   businessSessionId: string;
-  businessSessionType?: string;
+  businessSessionType: string;
   assistantAccount?: string;
 }
 
 export interface CreateNewSessionParams {
   ak?: string;
   title?: string;
-  businessSessionDomain?: string;
-  businessSessionType?: string;
+  businessSessionDomain: string;
+  businessSessionType: string;
   businessSessionId: string;
   assistantAccount?: string;
 }
