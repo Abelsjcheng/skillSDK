@@ -322,11 +322,6 @@ function App({ assistantAccount = '' }: AppProps) {
                   draggable="false"
                 />
               </button>
-              {session.isGenerating ? (
-                <div className="we-agent-cui-actions__status" aria-live="polite">
-                  {t('weAgent.outputting')}
-                </div>
-              ) : null}
               <WeAgentHistorySidebar
                 assistantAccount={assistantAccount}
                 currentWelinkSessionId={welinkSessionId ?? ''}

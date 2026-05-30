@@ -79,18 +79,20 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
         />
       </main>
 
-      <footer className="switch-assistant__actions">
-        <button
-          type="button"
-          className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
-          onClick={(event) => {
-            runButtonClickWithDebounce(event, () => {
-              onLeftButtonClick();
-            });
-          }}
-        >
-          {leftButtonText}
-        </button>
+      <footer className={`switch-assistant__actions${leftButtonText ? '' : ' switch-assistant__actions--single'}`}>
+        {leftButtonText ? (
+          <button
+            type="button"
+            className="switch-assistant__action-btn switch-assistant__action-btn--cancel"
+            onClick={(event) => {
+              runButtonClickWithDebounce(event, () => {
+                onLeftButtonClick();
+              });
+            }}
+          >
+            {leftButtonText}
+          </button>
+        ) : null}
         <button
           type="button"
           className="switch-assistant__action-btn switch-assistant__action-btn--confirm"

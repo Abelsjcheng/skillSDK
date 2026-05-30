@@ -68,7 +68,7 @@ export interface AssistantPageHeaderProps {
 export interface AssistantSelectionPageProps {
   title: string;
   isPcMiniApp?: boolean;
-  leftButtonText: string;
+  leftButtonText?: string;
   rightButtonText: string;
   defaultSelectedAssistantId?: string;
   onLeftButtonClick?: () => void;
