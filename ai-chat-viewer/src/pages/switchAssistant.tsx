@@ -5,7 +5,7 @@ import { isPcMiniApp } from '../constants';
 import { ensureLanguageInitialized } from '../i18n/config';
 import type { WeAgentListItem } from '../types/bridge';
 import type { SwitchAssistantProps } from '../types/pages';
-import { dispatchSwitchAssistantCancelEvent, dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
+import { dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
 import {
   DEFAULT_ASSISTANT_LIST_QUERY,
   mapWeAgentListToAssistantItems,
@@ -82,15 +82,6 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     }
   }, [assistantList, selectedPartnerAccount, t]);
 
-  const handleLeftButtonClick = useCallback(() => {
-    if (isPc) {
-      dispatchSwitchAssistantCancelEvent(selectedPartnerAccount);
-      setSelectedPartnerAccount('');
-      return;
-    }
-    window.HWH5.close();
-  }, [isPc, selectedPartnerAccount]);
-
   const handleRightButtonClick = useCallback(async () => {
     reportSwitchAssistantClick();
 
@@ -98,8 +89,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
 
     if (isPc) {
       try {
-        const detailResult = await getWeAgentDetails({ partnerAccounts: [selectedPartnerAccount] });
-        const detail = detailResult?.weAgentDetailsArray?.[0];
+        await getWeAgentDetails({ partnerAccounts: [selectedPartnerAccount] });
         dispatchSwitchAssistantConfirmEvent(selectedPartnerAccount);
       } catch (error) {
         dispatchSwitchAssistantConfirmEvent({});
@@ -108,7 +98,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     }
 
     void handleConfirmSwitch();
-  }, [assistantList.length, handleConfirmSwitch, isPc, partnerAccount, selectedPartnerAccount]);
+  }, [handleConfirmSwitch, isPc, selectedPartnerAccount]);
 
   const handleServiceClick = useCallback(() => {
     if (isPc) {
@@ -124,10 +114,8 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     <AssistantSelectionPage
       title={t('switchAssistant.title')}
       isPcMiniApp={isPc}
-      leftButtonText={t('switchAssistant.cancelSelect')}
       rightButtonText={t('switchAssistant.confirmSwitch')}
       defaultSelectedAssistantId={preferredDefaultPartnerAccount}
-      onLeftButtonClick={handleLeftButtonClick}
       onRightButtonClick={handleRightButtonClick}
       onService={handleServiceClick}
       assistants={assistantItems}

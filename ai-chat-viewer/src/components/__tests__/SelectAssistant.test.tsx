@@ -6,7 +6,6 @@ import * as constants from '../../constants';
 const TEXT_SELECT_ASSISTANT = '\u9009\u62e9\u52a9\u624b';
 const TEXT_BACK = '\u8fd4\u56de';
 const TEXT_SERVICE = '\u5ba2\u670d';
-const TEXT_CREATE_ASSISTANT = '\u521b\u5efa\u52a9\u624b';
 const TEXT_START_USING = '\u5f00\u59cb\u4f7f\u7528';
 
 describe('SelectAssistant', () => {
@@ -41,8 +40,8 @@ describe('SelectAssistant', () => {
     expect(container.querySelector('.assistant-page-header__title')?.textContent).toBe(TEXT_SELECT_ASSISTANT);
     expect(screen.getByRole('button', { name: TEXT_BACK })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: TEXT_SERVICE })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: TEXT_CREATE_ASSISTANT })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: TEXT_START_USING })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '\u521b\u5efa\u52a9\u624b' })).not.toBeInTheDocument();
   });
 
   it('renders pc layout when in pc miniapp', async () => {
@@ -82,7 +81,7 @@ describe('SelectAssistant', () => {
     expect(container.querySelector('.start-assistant__title')?.textContent).toBe(TEXT_SELECT_ASSISTANT);
     expect(screen.queryByRole('button', { name: TEXT_BACK })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: TEXT_SERVICE })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: TEXT_CREATE_ASSISTANT })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: TEXT_START_USING })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '\u521b\u5efa\u52a9\u624b' })).not.toBeInTheDocument();
   });
 });

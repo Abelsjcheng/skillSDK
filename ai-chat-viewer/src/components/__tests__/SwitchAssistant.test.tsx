@@ -134,8 +134,8 @@ describe('SwitchAssistant', () => {
     expect(screen.getByText('切换助手')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '返回' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '客服' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '取消选择' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '确认切换' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '取消选择' })).not.toBeInTheDocument();
 
     expect(await screen.findByText('编程助手')).toBeInTheDocument();
     expect(await screen.findByText('专属助手')).toBeInTheDocument();

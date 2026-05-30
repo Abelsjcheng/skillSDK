@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ActivateAssistant from '../../pages/activateAssistant';
 
@@ -9,18 +9,28 @@ describe('ActivateAssistant', () => {
     delete (window as any).HWH5;
   });
 
-  it('renders guide image and select button', () => {
+  it('renders guide image and select button', async () => {
+    Object.defineProperty(window, 'HWH5EXT', {
+      value: {
+        getWeAgentList: jest.fn(async () => ({
+          content: [{ name: '助手', icon: '', description: '', partnerAccount: 'x1', bizRobotName: '', bizRobotNameEn: '', bizRobotTag: '', robotId: '' }],
+        })),
+      },
+      configurable: true,
+      writable: true,
+    });
+
     render(
       <MemoryRouter>
         <ActivateAssistant />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('button', { name: '选择助手' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '选择助手' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '激活助手引导图' })).toBeInTheDocument();
   });
 
-  it('opens select assistant page instead of create assistant page when list is empty', async () => {
+  it('shows service unavailable text and hides select button when list is empty', async () => {
     const openWebview = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
@@ -45,15 +55,10 @@ describe('ActivateAssistant', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '选择助手' }));
-
     await waitFor(() => {
-      expect(openWebview).toHaveBeenCalledWith({
-        uri: expect.stringContaining('#selectAssistant'),
-      });
+      expect(screen.getByText('暂未开通助手服务')).toBeInTheDocument();
     });
-    expect(openWebview).not.toHaveBeenCalledWith({
-      uri: expect.stringContaining('#createAssistant'),
-    });
+    expect(screen.queryByRole('button', { name: '选择助手' })).not.toBeInTheDocument();
+    expect(openWebview).not.toHaveBeenCalled();
   });
 });

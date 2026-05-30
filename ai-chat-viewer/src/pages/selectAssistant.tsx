@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import AssistantCardList from '../components/assistant/AssistantCardList';
 import { isPcMiniApp } from '../constants';
@@ -22,21 +21,11 @@ import {
   openH5Webview,
 } from '../utils/hwext';
 import { showToast } from '../utils/toast';
-import { handleServiceClickPc, openWeAgentDialogPc } from '../utils/assistantPcHandle';
-import { reportCreateAssistantClick, reportEnableNowClick } from '../utils/uemUtil';
-
-const CREATE_ASSISTANT_ROUTE = '/createAssistant';
-
-function buildCreateAssistantSearch(): string {
-  const params = new URLSearchParams();
-  params.set('from', 'weAgent');
-  params.set('_ts', String(Date.now()));
-  return `?${params.toString()}`;
-}
+import { handleServiceClickPc } from '../utils/assistantPcHandle';
+import { reportEnableNowClick } from '../utils/uemUtil';
 
 const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
@@ -64,29 +53,6 @@ const SelectAssistant: React.FC = () => {
     void loadAssistantList();
   }, [loadAssistantList]);
 
-  const handleCreateAssistant = useCallback(() => {
-    reportCreateAssistantClick();
-
-    if (isPc) {
-      openWeAgentDialogPc("weAgentPc");
-      return
-    }
-    const search = buildCreateAssistantSearch();
-    const targetHash = `#${CREATE_ASSISTANT_ROUTE}${search}`;
-
-    navigate({
-      pathname: CREATE_ASSISTANT_ROUTE,
-      search,
-    });
-
-    window.setTimeout(() => {
-      if (window.location.hash !== targetHash) {
-        window.location.hash = targetHash;
-      }
-      window.location.reload();
-    }, 0);
-  }, [isPc, navigate]);
-
   const handleEnableNow = useCallback(async () => {
     reportEnableNowClick();
 
@@ -102,7 +68,7 @@ const SelectAssistant: React.FC = () => {
       WeLog(`SelectAssistant openWeAgentCUI failed | extra=${JSON.stringify({ selectedAssistantId })} | error=${JSON.stringify(error)}`);
       showToast(t('selectAssistant.openFailed'));
     }
-  }, [assistantList, isPc, selectedAssistantId, t]);
+  }, [assistantList, selectedAssistantId, t]);
 
   const handleServiceClick = useCallback(() => {
     if (isPc) {
@@ -119,9 +85,7 @@ const SelectAssistant: React.FC = () => {
       <AssistantSelectionPage
         title={t('selectAssistant.title')}
         isPcMiniApp={isPc}
-        leftButtonText={t('selectAssistant.createAssistant')}
         rightButtonText={t('selectAssistant.startUsing')}
-        onLeftButtonClick={handleCreateAssistant}
         onRightButtonClick={handleEnableNow}
         onService={handleServiceClick}
         assistants={assistantItems}
@@ -148,17 +112,6 @@ const SelectAssistant: React.FC = () => {
         </main>
 
         <footer className="start-assistant__actions">
-          <button
-            type="button"
-            className="start-assistant__action-btn start-assistant__action-btn--create"
-            onClick={(event) => {
-              runButtonClickWithDebounce(event, () => {
-                handleCreateAssistant();
-              });
-            }}
-          >
-            {t('selectAssistant.createAssistant')}
-          </button>
           <button
             type="button"
             className="start-assistant__action-btn start-assistant__action-btn--enable"
