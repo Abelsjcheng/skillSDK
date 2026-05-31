@@ -613,6 +613,7 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
           body: JSON.stringify({
             content: params.content,
             ...(params.toolCallId ? { toolCallId: params.toolCallId } : {}),
+            ...(params.questionId ? { questionId: params.questionId } : {}),
             ...(params.subagentSessionId ? { subagentSessionId: params.subagentSessionId } : {}),
           }),
         },

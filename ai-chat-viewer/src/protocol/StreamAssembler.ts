@@ -118,6 +118,7 @@ export class StreamAssembler {
         this.syncSubagentFields(part, msg);
         part.toolName = msg.toolName ?? questionPart?.toolName ?? part.toolName;
         part.toolCallId = msg.toolCallId ?? questionPart?.toolCallId ?? part.toolCallId;
+        part.questionId = msg.questionId ?? questionPart?.questionId ?? part.questionId;
 
         const status = msg.status ?? questionPart?.status;
         if (status === 'pending' || status === 'running' || status === 'completed' || status === 'error') {
@@ -259,6 +260,7 @@ export class StreamAssembler {
     this.parts.clear();
     this.partOrder = [];
     partSnapshots.forEach((partSnapshot) => {
+      const questionFields = extractQuestionFields(partSnapshot.input);
       const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);
       const part = this.getOrCreatePart(partId, partSnapshot.type);
       part.content = partSnapshot.content ?? '';
@@ -270,6 +272,19 @@ export class StreamAssembler {
       if (partSnapshot.status) part.status = partSnapshot.status as unknown as PartStatus;
       if (partSnapshot.input) part.input = partSnapshot.input;
       if (partSnapshot.output != null) part.output = partSnapshot.output;
+      if (partSnapshot.header ?? questionFields.header) {
+        part.header = partSnapshot.header ?? questionFields.header ?? undefined;
+      }
+      if (partSnapshot.question ?? questionFields.question) {
+        part.question = partSnapshot.question ?? questionFields.question ?? undefined;
+      }
+      if (partSnapshot.questionId) part.questionId = partSnapshot.questionId;
+      if (partSnapshot.options ?? questionFields.options) {
+        part.options = normalizeQuestionOptions(partSnapshot.options) ?? questionFields.options ?? undefined;
+      }
+      if (partSnapshot.multiSelect != null) part.multiSelect = partSnapshot.multiSelect;
+      if (partSnapshot.questions) part.questions = partSnapshot.questions;
+      if (partSnapshot.extParam) part.extParam = partSnapshot.extParam;
       if (partSnapshot.fileName) part.fileName = partSnapshot.fileName;
       if (partSnapshot.fileUrl) part.fileUrl = partSnapshot.fileUrl;
       if (partSnapshot.fileMime) part.fileMime = partSnapshot.fileMime;

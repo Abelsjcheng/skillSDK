@@ -107,6 +107,7 @@ type MockReplyScenario =
   | {
     type: 'question';
     toolCallId: string;
+    questionId: string;
     header: string;
     question: string;
     options: Array<{ label: string; description?: string }>;
@@ -173,6 +174,7 @@ type MockReplyScenario =
     introContent: string;
     subagent: SubagentMockContext;
     toolCallId: string;
+    questionId: string;
     header: string;
     question: string;
     options: Array<{ label: string; description?: string }>;
@@ -368,6 +370,7 @@ function buildToolPart(
 function buildQuestionPart(
   partId: string,
   toolCallId: string,
+  questionId: string,
   header: string,
   question: string,
   options: Array<{ label: string; description?: string }>,
@@ -381,6 +384,7 @@ function buildQuestionPart(
     content: question,
     status: 'running',
     toolCallId,
+    questionId,
     header,
     question,
     options,
@@ -663,6 +667,7 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
       introContent: 'I am delegating platform confirmation to a subagent before continuing the main task.',
       subagent: createSubagentContext(SUBAGENT_QUESTION_PREFIX, 'Platform Planner'),
       toolCallId: nextId('tool_call_subagent_question'),
+      questionId: nextId('question_subagent'),
       header: 'Subagent needs your input',
       question: 'Which platform should the follow-up implementation plan prioritize?',
       options: [
@@ -711,6 +716,7 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
     return {
       type: 'question',
       toolCallId: nextId('tool_call_question'),
+      questionId: nextId('question'),
       header: 'Need your confirmation',
       question: 'Which platform should this requirement prioritize first?',
       options: [
@@ -1458,6 +1464,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         role: 'assistant',
         partId: questionPartId,
         toolCallId: scenario.toolCallId,
+        questionId: scenario.questionId,
         header: scenario.header,
         question: scenario.question,
         options: scenario.options,
@@ -1475,6 +1482,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         buildQuestionPart(
           questionPartId,
           scenario.toolCallId,
+          scenario.questionId,
           scenario.header,
           scenario.question,
           scenario.options,
@@ -1557,6 +1565,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         role: 'assistant',
         partId: questionPartId,
         toolCallId: scenario.toolCallId,
+        questionId: scenario.questionId,
         header: scenario.header,
         question: scenario.question,
         options: scenario.options,
@@ -1566,7 +1575,15 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
 
     scheduleRecordTimer(record, 220, () => {
       finalizeAssistantMessage(record, scenario.question, [
-        buildQuestionPart(questionPartId, scenario.toolCallId, scenario.header, scenario.question, scenario.options, 1),
+        buildQuestionPart(
+          questionPartId,
+          scenario.toolCallId,
+          scenario.questionId,
+          scenario.header,
+          scenario.question,
+          scenario.options,
+          1,
+        ),
       ]);
       emit(sessionId, {
         type: 'session.status',

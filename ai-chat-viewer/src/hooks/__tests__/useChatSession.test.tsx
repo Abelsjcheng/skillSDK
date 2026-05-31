@@ -259,4 +259,62 @@ describe('useChatSession', () => {
       content: 'final answer content',
     });
   });
+
+  it('preserves questionId from question events when answering question cards', async () => {
+    const { result } = renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+
+    act(() => {
+      listener.onMessage({
+        type: 'question',
+        messageId: 'assistant_question_1',
+        welinkSessionId: 'session_1',
+        seq: 1,
+        role: 'assistant',
+        emittedAt: '2026-05-25T10:00:00.000Z',
+        partId: 'question_part_1',
+        toolCallId: 'tool_call_1',
+        questionId: 'question_1',
+        header: 'Clarification',
+        question: 'Which platform should we prioritize?',
+        options: ['Android', 'iOS'],
+        status: 'running',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(1);
+    });
+
+    const questionPart = result.current.messages[0].parts?.[0];
+    expect(questionPart).toEqual(expect.objectContaining({
+      type: 'question',
+      toolCallId: 'tool_call_1',
+      questionId: 'question_1',
+    }));
+
+    await act(async () => {
+      await result.current.onQuestionAnswered({
+        answer: 'Android',
+        messageId: result.current.messages[0].id,
+        toolCallId: questionPart?.toolCallId,
+        questionId: questionPart?.questionId,
+      });
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      welinkSessionId: 'session_1',
+      content: 'Android',
+      toolCallId: 'tool_call_1',
+      questionId: 'question_1',
+    }));
+  });
 });
