@@ -4,6 +4,7 @@ import { SkillCUIFooter } from '../components/skillCUI/SkillCUIFooter';
 import { SkillCUIHeader } from '../components/skillCUI/SkillCUIHeader';
 import { isPcMiniApp } from '../constants';
 import { useChatSession } from '../hooks/useChatSession';
+import { useIosKeyboardLift } from '../hooks/useIosKeyboardLift';
 import type { SkillCUIProps } from '../types/pages';
 import { getQueryParam } from '../utils/hwext';
 import { installBrowserJsErrorTelemetry } from '../utils/telemetry';
@@ -11,9 +12,10 @@ import { showToast } from '../utils/toast';
 import '../styles/App.less';
 import '../styles/SkillCUI.less';
 
-  const SkillCUI: React.FC<SkillCUIProps> = ({ welinkSessionId: welinkSessionIdProp }) => {
+const SkillCUI: React.FC<SkillCUIProps> = ({ welinkSessionId: welinkSessionIdProp }) => {
   const emptySessionToastShownRef = useRef(false);
   const isPc = isPcMiniApp();
+  const { keyboardContainerStyle } = useIosKeyboardLift();
   const welinkSessionId = isPc
     ? (welinkSessionIdProp?.trim() || '')
     : (getQueryParam('welinkSessionId')?.trim() || '');
@@ -37,7 +39,7 @@ import '../styles/SkillCUI.less';
   })), [welinkSessionId]);
 
   return (
-    <div className="app-container skill-cui">
+    <div className="app-container skill-cui" style={keyboardContainerStyle}>
       <div className="header-wrapper">
         <SkillCUIHeader />
       </div>

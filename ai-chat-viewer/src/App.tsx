@@ -1,11 +1,12 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isIosMobileDevice, isPcMiniApp } from './constants';
+import { isPcMiniApp } from './constants';
 import { Content } from './components/Content';
 import WeAgentCUIFooter from './components/assistant/WeAgentCUIFooter';
 import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar';
 import { resolveAssistantIconUrl } from './components/createAssistant/constants';
 import { useChatSession } from './hooks/useChatSession';
+import { useIosKeyboardLift } from './hooks/useIosKeyboardLift';
 import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
@@ -16,7 +17,6 @@ import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import {
   createNewSession,
-  getDeviceInfo,
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
@@ -50,7 +50,7 @@ function updateSessionTitleInCache(
 
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
-  const isIosKeyboardLiftEnabled = isIosMobileDevice();
+  const { keyboardContainerStyle } = useIosKeyboardLift();
   const { t, i18n } = useTranslation();
   const shouldUseEnglishUserName = (i18n.resolvedLanguage ?? i18n.language) === 'en';
 
@@ -58,7 +58,6 @@ function App({ assistantAccount = '' }: AppProps) {
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
   const [historySessionsCache, setHistorySessionsCache] = useState<SkillSession[] | null>(null);
   const [historySessionsLoaded, setHistorySessionsLoaded] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [weAgentUserName, setWeAgentUserName] = useState('');
   const [weAgentUserAvatar, setWeAgentUserAvatar] = useState('');
   const [weAgentAssistantName, setWeAgentAssistantName] = useState('');
@@ -80,44 +79,6 @@ function App({ assistantAccount = '' }: AppProps) {
       setHistorySessionsCache((prev) => updateSessionTitleInCache(prev, sessionId, title));
     },
   });
-
-  useEffect(() => {
-    if (!isIosKeyboardLiftEnabled) {
-      setKeyboardHeight(0);
-      window.HWH5?.offKeyboardHeightChange?.();
-      return;
-    }
-
-    if (typeof window === 'undefined' || typeof window.HWH5?.onKeyboardHeightChange !== 'function') {
-      return;
-    }
-
-    let safeAreaInsetBottom = 0;
-    const handleKeyboardHeightChange = (res: { height: number }) => {
-      let nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
-      nextHeight = nextHeight - 49 - safeAreaInsetBottom / window.devicePixelRatio;
-      setKeyboardHeight(nextHeight > 0 ? nextHeight : 0);
-    };
-
-    const setupKeyboardHeightListener = async () => {
-      try {
-        await window.HWH5?.disableAutoPushUpPage?.({ status: true });
-        const deviceInfo = await getDeviceInfo();
-        safeAreaInsetBottom = deviceInfo.safeAreaInsetBottom;
-      } catch (error) {
-        WeLog(`App setupKeyboardHeightListener failed | error=${JSON.stringify(error)}`);
-      }
-
-      window.HWH5.onKeyboardHeightChange?.(handleKeyboardHeightChange);
-    };
-
-    void setupKeyboardHeightListener();
-
-    return () => {
-      window.HWH5?.offKeyboardHeightChange?.();
-      setKeyboardHeight(0);
-    };
-  }, [isIosKeyboardLiftEnabled]);
 
   useEffect(() => installBrowserJsErrorTelemetry(() => ({
     page: 'weAgentCUI',
@@ -278,9 +239,7 @@ function App({ assistantAccount = '' }: AppProps) {
         'app-container--we-agent-cui',
         isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
       ].filter(Boolean).join(' ')}
-      style={isIosKeyboardLiftEnabled && keyboardHeight > 0
-        ? { height: `calc(100vh - ${keyboardHeight}px)` }
-        : undefined}
+      style={keyboardContainerStyle}
     >
       <div className="we-agent-cui-main">
         <div className="we-agent-cui-chat-panel">
