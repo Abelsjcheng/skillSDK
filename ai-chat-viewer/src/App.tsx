@@ -50,7 +50,7 @@ function updateSessionTitleInCache(
 
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
-  const { keyboardContainerStyle } = useIosKeyboardLift();
+  const { keyboardContainerStyle } = useIosKeyboardLift({ viewportOffset: 49 });
   const { t, i18n } = useTranslation();
   const shouldUseEnglishUserName = (i18n.resolvedLanguage ?? i18n.language) === 'en';
 
