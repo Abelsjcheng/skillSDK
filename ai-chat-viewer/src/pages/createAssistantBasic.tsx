@@ -7,7 +7,6 @@ import { isPcMiniApp } from '../constants';
 import qrcodeExpiredNotice from '../imgs/qrcode_expired_notice.png';
 import type { CreateAssistantRouteState, CreateDigitalTwinParams, DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
 import {
-  checkCreateAssistantWhitelist,
   createDigitalTwin,
   getQueryParam,
   queryQrcodeInfo,
@@ -79,16 +78,6 @@ const CreateAssistantBasicPage: React.FC = () => {
         if (!versionSupported) {
           shouldUpdateQrcodeStatusRef.current = false;
           showQrcodeExpired(t('versionNotSupported'));
-          return;
-        }
-
-        const hasPermission = await checkCreateAssistantWhitelist();
-        if (cancelled) {
-          return;
-        }
-
-        if (!hasPermission) {
-          showQrcodeExpired(t('createAssistant.noPermission'));
           return;
         }
 

@@ -13,13 +13,11 @@ import type {
   AgentTypeListResult,
   BuildOpenWeAgentCUIOptions,
   ChooseImageParams,
-  CreateAssistantWhitelistResponse,
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
-  FetchFullOptions,
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
@@ -81,7 +79,6 @@ export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
 export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
-const CREATE_ASSISTANT_WHITELIST_URL = 'https://mock.example.com/create-assistant-whitelist';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 function tryGetPedestal(): Pedestal | null {
@@ -592,26 +589,6 @@ export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<Delete
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
   return trackApiQueryQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().queryQrcodeInfo(params)));
-}
-
-export async function checkCreateAssistantWhitelist(): Promise<boolean> {
-  if (isPcMiniApp()) {
-    // TODO: implement PC-side whitelist request when the PC bridge is ready.
-    return true;
-  }
-
-  const fetchFull = window.HWH5?.fetchFull;
-  if (typeof fetchFull !== 'function') {
-    throw new Error('HWH5.fetchFull is not available.');
-  }
-
-  const options: FetchFullOptions = {
-    method: 'GET',
-    headers: {},
-  };
-  const response = await fetchFull<CreateAssistantWhitelistResponse>(CREATE_ASSISTANT_WHITELIST_URL, options);
-  const result = await response.json();
-  return result.data?.IMPersonalAssistant?.enable === 1;
 }
 
 export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {

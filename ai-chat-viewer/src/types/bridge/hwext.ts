@@ -306,16 +306,6 @@ export interface FetchFullResponse<T = unknown> {
   json: () => Promise<T>;
 }
 
-export interface CreateAssistantWhitelistResponse {
-  code: number;
-  data?: {
-    IMPersonalAssistant?: {
-      enable?: number;
-    };
-    [key: string]: unknown;
-  };
-}
-
 export interface WeAgentUriResult {
   weAgentUri: string;
   assistantDetailUri: string;

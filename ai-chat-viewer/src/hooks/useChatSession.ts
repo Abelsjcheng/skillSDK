@@ -348,7 +348,6 @@ export function useChatSession({
     questionId,
     subagentSessionId,
   }: QuestionAnswerSubmission) => {
-    finalizeStreamingMessageById(messageId ?? getLatestStreamingMessageId());
     setSessionStatus('busy');
 
     try {
@@ -359,7 +358,7 @@ export function useChatSession({
       showToast(tRef.current('weAgent.submitAnswerFailed'));
       throw err;
     }
-  }, [finalizeStreamingMessageById, getLatestStreamingMessageId, mode, sendUserMessage, welinkSessionId]);
+  }, [mode, sendUserMessage, welinkSessionId]);
 
   useEffect(() => {
     activeWelinkSessionIdRef.current = welinkSessionId || null;
@@ -393,14 +392,14 @@ export function useChatSession({
       if (
         msg.type === 'question'
         && (msg.status === 'completed' || msg.status === 'error')
-        && !latestStreamingMsgIdRef.current
-        && streamingAssemblersRef.current.size === 0
       ) {
         const hasMatchingQuestion = messagesRef.current.some((message) =>
           message.parts?.some((part) => (
             part.type === 'question'
-            && (!msg.partId || part.partId === msg.partId)
-            && (!msg.toolCallId || part.toolCallId === msg.toolCallId)
+            && (
+              (msg.partId !=null && part.partId === msg.partId)
+              || (msg.toolCallId !=null && part.toolCallId === msg.toolCallId)
+            )
           )),
         );
 
@@ -408,8 +407,11 @@ export function useChatSession({
           setMessages((prev) => updateLatestQuestionPart(
             prev,
             (part) => (
-              (!msg.partId || part.partId === msg.partId)
-              && (!msg.toolCallId || part.toolCallId === msg.toolCallId)
+              part.type === 'question'
+              && (
+                (msg.partId !=null && part.partId === msg.partId)
+                || (msg.toolCallId !=null && part.toolCallId === msg.toolCallId)
+              )
             ),
             (part) => ({
               ...part,
@@ -473,7 +475,6 @@ export function useChatSession({
             break;
           }
 
-          finalizeStreamingMessage();
           setSessionStatus('busy');
           setMessages((prev) => {
             if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
@@ -575,7 +576,7 @@ export function useChatSession({
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
             setSessionStatus('idle');
-            finalizeStreamingMessage();
+            hidePendingAssistantPreview();
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
@@ -726,9 +727,6 @@ export function useChatSession({
     };
   }, [
     appendAssistantErrorBlock,
-    finalizeStreamingMessage,
-    finalizeStreamingMessageById,
-    getLatestStreamingMessageId,
     getOrCreateStreamingAssembler,
     hidePendingAssistantPreview,
     mode,
