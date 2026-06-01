@@ -5,7 +5,7 @@ export function isPcMiniApp(): boolean {
     return false;
   }
 
-  return false;
+  return true;
 }
 
 function resolveIsProEnv(): boolean {

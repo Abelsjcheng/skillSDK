@@ -63,6 +63,7 @@ export function useChatSession({
   welinkSessionId,
   assistantDetail,
   onSessionTitleChange,
+  onSessionActivity,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -91,10 +92,12 @@ export function useChatSession({
   const historyEpochRef = useRef(0);
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
+  const onSessionActivityRef = useRef(onSessionActivity);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
   const agentOfflineTextRef = useRef('agent已离线');
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
+  onSessionActivityRef.current = onSessionActivity;
   aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
@@ -327,6 +330,8 @@ export function useChatSession({
       ...(subagentSessionId ? { subagentSessionId } : {}),
       ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
     });
+    // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
+    onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
 
     const userMessage = messageOperationToMessage(result);
     setMessages((prev) => {

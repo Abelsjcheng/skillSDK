@@ -8,17 +8,18 @@ import type { SkillSession } from '../../types/bridge';
 import type {
   HistorySessionGroup,
   HistorySessionGroupKey,
+  HistorySessionsCache,
   WeAgentHistorySidebarProps,
 } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { getHistorySessionsList } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
+import { HISTORY_SESSIONS_PAGE_SIZE } from '../../utils/session';
 import { showToast } from '../../utils/toast';
 import { reportViewHistoryClick } from '../../utils/uemUtil';
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
-const HISTORY_SESSIONS_PAGE_SIZE = 50;
 const HISTORY_SESSION_GROUP_ORDER: HistorySessionGroupKey[] = ['today', 'yesterday', 'threeDaysAgo'];
 
 function getStartOfDayTimestamp(value: Date): number {
@@ -71,10 +72,27 @@ function groupHistorySessionsByUpdatedAt(sessions: SkillSession[]): HistorySessi
     .filter((group) => group.sessions.length > 0);
 }
 
+function mergeHistorySessions(currentSessions: SkillSession[], nextSessions: SkillSession[]): SkillSession[] {
+  const seenSessionIds = new Set<string>();
+  const mergedSessions: SkillSession[] = [];
+
+  // 加载更多时把新页追加到本地缓存，并按 welinkSessionId 去重。
+  [...currentSessions, ...nextSessions].forEach((session) => {
+    if (seenSessionIds.has(session.welinkSessionId)) {
+      return;
+    }
+    seenSessionIds.add(session.welinkSessionId);
+    mergedSessions.push(session);
+  });
+
+  return mergedSessions;
+}
+
 const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   assistantAccount = '',
   currentWelinkSessionId = '',
-  cachedSessions = [],
+  cachedCache = null,
+  defaultOpen = false,
   historyLoaded = false,
   onHistoryLoaded,
   onSessionSelect,
@@ -82,8 +100,8 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
 }) => {
   const isPc = isPcMiniApp();
   const { t } = useTranslation();
-  const [isVisible, setIsVisible] = useState(false);
-  const [shouldRenderSidebar, setShouldRenderSidebar] = useState(false);
+  const [isVisible, setIsVisible] = useState(defaultOpen);
+  const [shouldRenderSidebar, setShouldRenderSidebar] = useState(defaultOpen);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
@@ -111,29 +129,30 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-    setIsVisible(false);
-    setShouldRenderSidebar(false);
+    setIsVisible(defaultOpen);
+    setShouldRenderSidebar(defaultOpen);
     setIsLoading(false);
     setIsLoadingMore(false);
     historySessionsRef.current = [];
     setHistorySessions([]);
     setCurrentPage(0);
     setTotalPages(0);
-  }, [assistantAccount]);
+  }, [assistantAccount, defaultOpen]);
 
   useEffect(() => {
     if (historyLoaded) {
-      if (!shouldRenderSidebar) {
-        setHistorySessions(cachedSessions);
-        setCurrentPage(Math.max(0, Math.ceil(cachedSessions.length / HISTORY_SESSIONS_PAGE_SIZE) - 1));
-        setTotalPages(0);
-      }
+      // 侧边栏以 App 维护的 HistorySessionsCache 为准，保证默认展开和手动打开看到同一份数据。
+      const nextSessions = cachedCache?.content ?? [];
+      historySessionsRef.current = nextSessions;
+      setHistorySessions(nextSessions);
+      setCurrentPage(cachedCache?.page ?? 0);
+      setTotalPages(cachedCache?.totalPages ?? 0);
       return;
     }
     setHistorySessions([]);
     setCurrentPage(0);
     setTotalPages(0);
-  }, [cachedSessions, historyLoaded, shouldRenderSidebar]);
+  }, [cachedCache, historyLoaded]);
 
   useEffect(() => {
     onVisibilityChange?.(isVisible);
@@ -194,13 +213,21 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       const sessions = Array.isArray(result.content) ? result.content : [];
       const nextPage = typeof result.page === 'number' ? result.page : page;
       const nextTotalPages = typeof result.totalPages === 'number' ? result.totalPages : 0;
-      const nextSessions = append ? [...historySessionsRef.current, ...sessions] : sessions;
+      const nextSessions = append ? mergeHistorySessions(historySessionsRef.current, sessions) : sessions;
+      // 回传合并后的缓存快照，让 App 继续作为历史列表的数据源。
+      const nextCache: HistorySessionsCache = {
+        content: nextSessions,
+        page: nextPage,
+        size: typeof result.size === 'number' ? result.size : HISTORY_SESSIONS_PAGE_SIZE,
+        total: Math.max(typeof result.total === 'number' ? result.total : 0, nextSessions.length),
+        totalPages: nextTotalPages,
+      };
 
       setCurrentPage(nextPage);
       setTotalPages(nextTotalPages);
       historySessionsRef.current = nextSessions;
       setHistorySessions(nextSessions);
-      onHistoryLoaded?.(nextSessions);
+      onHistoryLoaded?.(nextCache);
     } catch (error) {
       if (fetchRequestIdRef.current !== requestId) {
         return;
@@ -255,10 +282,13 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
 
     openSidebar();
     reportViewHistoryClick(assistantAccount);
-    if (cachedSessions.length > 0) {
-      setHistorySessions(cachedSessions);
-      setCurrentPage(Math.max(0, Math.ceil(cachedSessions.length / HISTORY_SESSIONS_PAGE_SIZE) - 1));
-      setTotalPages(0);
+    if (cachedCache) {
+      // 用户手动打开时先展示缓存，再静默刷新第一页，减少等待和闪烁。
+      const nextSessions = cachedCache.content;
+      historySessionsRef.current = nextSessions;
+      setHistorySessions(nextSessions);
+      setCurrentPage(cachedCache.page);
+      setTotalPages(cachedCache.totalPages);
       setIsLoading(false);
       setIsLoadingMore(false);
       void refreshHistorySessions(false);
@@ -268,7 +298,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     void refreshHistorySessions(true);
   }, [
     assistantAccount,
-    cachedSessions,
+    cachedCache,
     closeSidebar,
     isVisible,
     openSidebar,
@@ -282,8 +312,11 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
 
   const handleSessionClick = useCallback((sessionId: string) => {
     onSessionSelect?.(sessionId);
-    closeSidebar();
-  }, [closeSidebar, onSessionSelect]);
+    // PC 端侧边栏常驻展示；移动端仍沿用抽屉选择后关闭的交互。
+    if (!isPc) {
+      closeSidebar();
+    }
+  }, [closeSidebar, isPc, onSessionSelect]);
 
   const handleLoadMore = useCallback(() => {
     if (isLoading || isLoadingMore || !hasMoreHistorySessions) {
@@ -322,7 +355,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
           <h3 className="we-agent-history-sidebar__header-title">{t('weAgent.history')}</h3>
         </header>
         <div className="we-agent-history-sidebar__body">
-          {!isLoading && groupedHistorySessions.length === 0 && (
+          {historyLoaded && !isLoading && groupedHistorySessions.length === 0 && (
             <div className="we-agent-history-sidebar__empty">
               <img
                 className="we-agent-history-sidebar__empty-image"
