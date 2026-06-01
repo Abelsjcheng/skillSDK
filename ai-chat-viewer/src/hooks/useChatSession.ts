@@ -458,6 +458,13 @@ export function useChatSession({
           window.requestAnimationFrame(() => {
             hidePendingAssistantPreview();
           });
+          if (msg.type === 'text.done') {
+            WeLog(`useChatSession onMessage text.done | extra=${JSON.stringify({
+              welinkSessionId: activeWelinkSessionId,
+              messageId,
+              content: (currentText || msg.content || '')?.slice(-50),
+            })}`);
+          }
           break;
         }
         case 'message.user': {
