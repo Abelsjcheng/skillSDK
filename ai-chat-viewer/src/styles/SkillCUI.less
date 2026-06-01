@@ -115,6 +115,8 @@
     color: #ffffff;
     cursor: pointer;
     box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
   }
 
   .skill-cui-footer__input+.skill-cui-footer__btn {
@@ -130,6 +132,10 @@
 
   .skill-cui-footer__btn.is-generating {
     background: rgba(13, 148, 255, 1);
+  }
+
+  .skill-cui-footer__btn:disabled {
+    opacity: 1;
   }
 
   .skill-cui-footer__btn>*+* {
@@ -282,5 +288,69 @@
     font-size: 14px;
     font-weight: 400;
     line-height: 22px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-container.skill-cui {
+    background: rgba(31, 33, 34, 1);
+  }
+
+  .skill-cui,
+  .skill-cui .content-wrapper,
+  .skill-cui .content,
+  .skill-cui__empty-content,
+  .skill-cui-footer {
+    background: rgba(31, 33, 34, 1);
+  }
+
+  .skill-cui-header__title-text {
+    color: rgba(220, 221, 221, 1);
+  }
+
+  .skill-cui-header__icon {
+    filter: brightness(0) saturate(100%) invert(79%) sepia(4%) saturate(69%) hue-rotate(167deg) brightness(88%) contrast(88%);
+  }
+
+  .skill-cui-footer .skill-cui-footer__input {
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(80, 84, 86, 1);
+    background: rgba(31, 33, 34, 1);
+  }
+
+  .skill-cui-footer .skill-cui-footer__input::placeholder {
+    color: rgba(80, 84, 86, 1);
+  }
+
+  .skill-cui-footer .skill-cui-footer__btn {
+    background: linear-gradient(135deg, rgba(31, 20, 51, 1) 0%, rgba(5, 29, 51, 1) 100%);
+  }
+
+  .skill-cui-footer .skill-cui-footer__btn.is-disabled {
+    background: linear-gradient(135deg, rgba(31, 20, 51, 0.45) 0%, rgba(5, 29, 51, 0.45) 100%);
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .skill-cui .message-user {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: transparent;
+
+    .message-content {
+      color: rgba(220, 221, 221, 1);
+    }
+  }
+
+  .skill-cui .message-assistant {
+    background: rgba(24, 24, 24, 1);
+    border-color: transparent;
+
+    .message-content {
+      color: rgba(127, 130, 131, 1);
+    }
+  }
+
+  .skill-cui .we-agent-message__meta-text,
+  .skill-cui .we-agent-message__pending-text {
+    color: rgba(174, 175, 176, 1);
   }
 }
