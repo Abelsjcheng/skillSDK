@@ -58,8 +58,12 @@ export function contentTypeForRole(role: Message['role']): NonNullable<Message['
   }
 }
 
-export function updateLatestQuestionPart(
+// `updateLatestQuestionPart` 已被合并为通用的 `updateLatestPart`，
+// 原先的导出已移除以简化公共 API。保留 `updateLatestPart` 供内部使用。
+
+export function updateLatestPart(
   messages: Message[],
+  partType: MessagePart['type'],
   matcher: (part: MessagePart) => boolean,
   updater: (part: MessagePart) => MessagePart,
 ): Message[] {
@@ -71,7 +75,7 @@ export function updateLatestQuestionPart(
 
     for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
       const part = message.parts[partIndex];
-      if (part.type !== 'question' || !matcher(part)) {
+      if (part.type !== partType || !matcher(part)) {
         continue;
       }
 

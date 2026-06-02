@@ -18,7 +18,7 @@ import {
   normalizeRole,
   sessionMessageToMessage,
   snapshotMessageToMessage,
-  updateLatestQuestionPart,
+  updateLatestPart,
 } from '../utils/message';
 import {
   getSessionMessageHistory,
@@ -389,33 +389,34 @@ export function useChatSession({
       }
       const telemetryPage = resolveTelemetryPage(mode);
 
+      // question / tool.update 完成或错误，可能是对历史消息的 part 的更新
       if (
-        msg.type === 'question'
+        (msg.type === 'question' || msg.type === 'tool.update')
         && (msg.status === 'completed' || msg.status === 'error')
       ) {
-        const hasMatchingQuestion = messagesRef.current.some((message) =>
+        const partType = msg.type === 'question' ? 'question' : 'tool';
+        const hasMatchingPart = messagesRef.current.some((message) =>
           message.parts?.some((part) => (
-            part.type === 'question'
+            part.type === partType
             && (
-              (msg.partId !=null && part.partId === msg.partId)
-              || (msg.toolCallId !=null && part.toolCallId === msg.toolCallId)
+              (msg.partId != null && part.partId === msg.partId)
+              || (msg.toolCallId != null && part.toolCallId === msg.toolCallId)
             )
           )),
         );
 
-        if (hasMatchingQuestion) {
-          setMessages((prev) => updateLatestQuestionPart(
+        if (hasMatchingPart) {
+          setMessages((prev) => updateLatestPart(
             prev,
+            partType,
             (part) => (
-              part.type === 'question'
-              && (
-                (msg.partId !=null && part.partId === msg.partId)
-                || (msg.toolCallId !=null && part.toolCallId === msg.toolCallId)
-              )
+              (msg.partId != null && part.partId === msg.partId)
+              || (msg.toolCallId != null && part.toolCallId === msg.toolCallId)
             ),
             (part) => ({
               ...part,
-              answered: true,
+              // 对 question 标记为已回答
+              ...(partType === 'question' ? { answered: true } : {}),
               output: msg.output ?? part.output,
               status: msg.status === 'completed' || msg.status === 'error' ? msg.status : part.status,
               isStreaming: false,
