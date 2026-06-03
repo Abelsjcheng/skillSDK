@@ -210,6 +210,32 @@ function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetW
   return { partnerAccount: params.partnerAccounts[0] ?? '' };
 }
 
+function normalizeCreateNewSessionParams(params: CreateNewSessionParams): CreateNewSessionParams {
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType;
+
+  return {
+    ...params,
+    businessSessionDomain, // 6月版本修改入参
+    businessSessionId,  // 6月版本修改入参
+    businessSessionType,  // 6月版本修改入参
+    bussinessDomain: businessSessionDomain,
+    bussinessId: businessSessionId,
+    bussinessType: businessSessionType,
+  };
+}
+
+function normalizeGetHistorySessionsListParams(params: GetHistorySessionsListParams): GetHistorySessionsListParams {
+  const businessSessionId = params.businessSessionId ?? params.bussinessId;
+
+  return {
+    ...params,
+    businessSessionId, // 6月版本修改入参
+    bussinessId: businessSessionId,
+  };
+}
+
 function parseUrl(value: string, base = URL_PARSE_BASE): URL | null {
   try {
     return new URL(value, base);
@@ -552,7 +578,11 @@ export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Prom
 }
 
 export async function createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
-  return trackApiCreateNewSession(params, Promise.resolve(getJsApiOrThrow().createNewSession(params)));
+  const normalizedParams = normalizeCreateNewSessionParams(params);
+  return trackApiCreateNewSession(
+    normalizedParams,
+    Promise.resolve(getJsApiOrThrow().createNewSession(normalizedParams)),
+  );
 }
 
 export async function getAccountInfoUid(): Promise<string> {
@@ -604,7 +634,11 @@ export async function notifyAssistantDetailUpdated(
 export async function getHistorySessionsList(
   params: GetHistorySessionsListParams,
 ): Promise<HistorySessionsListResult> {
-  return trackApiGetHistorySessions(params, Promise.resolve(getJsApiOrThrow().getHistorySessionsList(params)));
+  const normalizedParams = normalizeGetHistorySessionsListParams(params);
+  return trackApiGetHistorySessions(
+    normalizedParams,
+    Promise.resolve(getJsApiOrThrow().getHistorySessionsList(normalizedParams)),
+  );
 }
 
 export async function getWeAgentUri(): Promise<WeAgentUriResult> {

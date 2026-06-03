@@ -80,9 +80,12 @@ export interface ControlSkillWeCodeParams {
 export interface CreateNewSessionParams {
   ak?: string;
   title?: string;
-  businessSessionDomain: string;
-  businessSessionId: string;
-  businessSessionType: string;
+  businessSessionDomain?: string;
+  businessSessionId?: string;
+  businessSessionType?: string;
+  bussinessDomain?: string;
+  bussinessId?: string;
+  bussinessType?: string;
   assistantAccount?: string;
   businessExtParam?: Record<string, unknown>;
 }
@@ -98,8 +101,10 @@ export interface GetHistorySessionsListParams {
   status?: string;
   ak?: string;
   businessSessionId?: string;
+  bussinessId?: string;
   assistantAccount?: string;
   businessSessionDomain?: 'miniapp' | 'im' | string;
+  businessExtParam?: Record<string, unknown>;
 }
 
 export interface SkillSession {
@@ -110,6 +115,9 @@ export interface SkillSession {
   bussinessDomain: string | null;
   bussinessType: string | null;
   bussinessId: string | null;
+  businessSessionDomain?: string | null;
+  businessSessionType?: string | null;
+  businessSessionId?: string | null;
   assistantAccount: string | null;
   status: string;
   toolSessionId: string | null;

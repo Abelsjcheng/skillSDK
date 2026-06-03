@@ -1898,15 +1898,22 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
 
 function createSession(params: CreateNewSessionParams): SkillSession {
   const createdAt = nowIso();
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain ?? null;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType ?? null;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId ?? null;
+
   return {
     welinkSessionId: nextId('session'),
     userId: 'mock_user_id',
-    ak: params.ak,
+    ak: params.ak ?? null,
     title: params.title ?? `session-${idCounter}`,
-    bussinessDomain: params.businessSessionDomain,
-    bussinessType: params.businessSessionType,
-    bussinessId: params.businessSessionId,
-    assistantAccount: params.assistantAccount,
+    bussinessDomain: businessSessionDomain,
+    bussinessType: businessSessionType,
+    bussinessId: businessSessionId,
+    businessSessionDomain,
+    businessSessionType,
+    businessSessionId,
+    assistantAccount: params.assistantAccount ?? null,
     status: 'ACTIVE',
     toolSessionId: null,
     createdAt,
@@ -1916,15 +1923,22 @@ function createSession(params: CreateNewSessionParams): SkillSession {
 
 function createFixedSession(params: CreateNewSessionParams, welinkSessionId: string): SkillSession {
   const createdAt = nowIso();
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain ?? null;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType ?? null;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId ?? null;
+
   return {
     welinkSessionId,
     userId: 'mock_user_id',
-    ak: params.ak,
+    ak: params.ak ?? null,
     title: params.title ?? welinkSessionId,
-    bussinessDomain: params.businessSessionDomain,
-    bussinessType: params.businessSessionType,
-    bussinessId: params.businessSessionId,
-    assistantAccount: params.assistantAccount,
+    bussinessDomain: businessSessionDomain,
+    bussinessType: businessSessionType,
+    bussinessId: businessSessionId,
+    businessSessionDomain,
+    businessSessionType,
+    businessSessionId,
+    assistantAccount: params.assistantAccount ?? null,
     status: 'ACTIVE',
     toolSessionId: null,
     createdAt,
