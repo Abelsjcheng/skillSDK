@@ -50,7 +50,7 @@ flowchart TD
 
 ### 2.2 方案核心
 
-基于现有埋码链路新增流程异常事件，页面和 Hook 只在关键失败分支调用 `reportFlowTelemetry`，接口成功 / 失败继续由 `uemUtil.ts` 和 `hwext.ts` 的 API wrapper 负责。
+基于现有埋码链路新增流程异常事件和流式性能事件，页面和 Hook 只在关键失败分支、流式关键节点调用 `reportFlowTelemetry`，接口成功 / 失败继续由 `uemUtil.ts` 和 `hwext.ts` 的 API wrapper 负责。
 
 ## 3. 时序图
 
@@ -107,7 +107,8 @@ sequenceDiagram
 5. 在 `src/components/assistant/EditAssistantContent.tsx` 补充 `flow_edit_assistant_error`，覆盖详情加载失败、更新失败、`notifyAssistantDetailUpdated` 失败和缺少目标标识。
 6. 在 `src/pages/assistantDetail.tsx` 补充 `flow_delete_assistant_error`，覆盖删除失败和缺少 `partnerAccount` / `robotId`。
 7. 在 `src/pages/skillCUI.tsx` 缺少 `welinkSessionId` 分支补充 `flow_skillcui_missing_param_error`，用于识别入口参数异常。
-8. 保留现有 `flow_onmessage_error`、`browser_js_error`，并在总表文档同步新增事件。
+8. 在 `src/hooks/useChatSession.ts` 补充流式性能埋码，记录发送开始、首个服务端用户消息、首个 assistant token、流式完成、流式错误等关键时间点。
+9. 保留现有 `flow_onmessage_error`、`browser_js_error`，并在总表文档同步新增事件。
 
 ### 4.2 核心实现方式
 
@@ -141,6 +142,23 @@ export function reportCoreFlowError(
 6. `isPc`：是否 PC 小程序环境。
 7. `errorCode` / `errorMessage`：错误码和截断后的错误信息。
 
+流式性能事件建议在 `useChatSession.ts` 维护 `streamTelemetryRef`，以 `welinkSessionId + messageId` 或最近一次发送上下文为 key 记录：
+
+1. `sendStartedAt`：用户触发 `onSend` 或问题卡片提交后、本地调用 `sendMessage` 前的时间。
+2. `apiReturnedAt`：`sendMessage` 接口返回用户消息后的时间，用于区分接口耗时和后续流式耗时。
+3. `serverUserMessageAt`：收到 `message.user` 事件时的时间，作为服务端确认用户消息进入流式链路的参考。
+4. `firstTokenAt`：首次收到 `text.delta`、`text.done`、`thinking.delta`、`thinking.done`、`tool.update`、`question`、`permission.ask`、`file` 且能够定位到 assistant `messageId` 时记录。
+5. `completedAt`：收到 `text.done` 或 `session.status=idle` 且当前流式消息已结束时记录。
+6. `errorAt`：收到 `session.error`、`error` 或 listener `onError` 时记录。
+
+计算口径建议：
+
+1. 首 token 延迟：`firstTokenAt - sendStartedAt`，如果没有本地发送起点，则降级为 `firstTokenAt - serverUserMessageAt`。
+2. 流式生成完成耗时：`completedAt - firstTokenAt`。
+3. 端到端完成耗时：`completedAt - sendStartedAt`。
+4. 错误前耗时：`errorAt - sendStartedAt`。
+5. 所有 duration 字段单位统一为毫秒，且不上报用户输入原文和回复内容。
+
 ### 4.3 兼容与边界
 
 1. 移动端继续通过 `HWH5.uem` 上报；`HWH5.uem` 不存在时由 `telemetry.ts` 捕获并写入 `WeLog`，不影响业务。
@@ -164,7 +182,19 @@ export function reportCoreFlowError(
 
 ## 5. 性能
 
-新增的是异常路径 fire-and-forget 上报，不增加正常路径的同步等待。`telemetry.ts` 已缓存 `getTelemetryBase()`，公共字段不会在每次上报都重复请求设备和应用信息。异常高频场景主要是 JS 运行时错误，现有 `installBrowserJsErrorTelemetry` 已做 3 秒同指纹节流；新增流程异常一般由用户动作或页面初始化触发，频率可控。
+新增异常埋码为异常路径 fire-and-forget 上报，不增加正常路径的同步等待。新增流式性能埋码会进入正常对话路径，但只在关键节点上报，不在每个 `text.delta` 分片上报，避免高频埋码影响流式渲染。
+
+性能埋码采集本身只记录时间戳和少量状态字段，计算成本为常数级。`telemetry.ts` 已缓存 `getTelemetryBase()`，公共字段不会在每次上报都重复请求设备和应用信息。异常高频场景主要是 JS 运行时错误，现有 `installBrowserJsErrorTelemetry` 已做 3 秒同指纹节流；新增流程异常一般由用户动作或页面初始化触发，频率可控。
+
+建议新增以下性能观测目标：
+
+| 指标 | 事件 | 计算口径 | 价值 |
+|---|---|---|---|
+| 首 token 延迟 | `perf_stream_first_token` | `firstTokenAt - sendStartedAt`，无本地起点时用 `firstTokenAt - serverUserMessageAt` | 衡量用户点击发送后多久看到首个 AI 输出 |
+| 流式生成完成耗时 | `perf_stream_complete` | `completedAt - firstTokenAt` | 衡量首 token 后完整生成耗时 |
+| 端到端完成耗时 | `perf_stream_complete` | `completedAt - sendStartedAt` | 衡量一次提问从发送到完成的总体耗时 |
+| 错误前耗时 | `perf_stream_error` | `errorAt - sendStartedAt` | 分析长时间等待后失败和即时失败的差异 |
+| 历史加载耗时 | 可选 `perf_history_load` | `historyLoadedAt - historyLoadStartedAt` | 衡量进入会话或上拉加载历史的体验 |
 
 ## 6. 功耗
 
@@ -172,44 +202,93 @@ export function reportCoreFlowError(
 
 ## 7. 埋码
 
-1. `flow_weagent_init_error`
-   - 说明：`App.tsx` 初始化 WeAgentCUI 失败，覆盖用户信息、助手详情、历史会话、兜底创建会话等任一阶段失败。建议字段：`page`、`stage`、`assistantAccount`、`isPc`、`errorCode`、`errorMessage`。
-2. `flow_open_weagent_error`
-   - 说明：选择助理 / 切换助理后打开 WeAgentCUI 失败或 `openAssistantByPartnerAccount` 未成功打开。建议字段：`page`、`stage`、`selectedAssistantId` / `selectedPartnerAccount`、`isPc`、`errorCode`、`errorMessage`。
-3. `flow_create_assistant_error`
-   - 说明：创建助理流程失败，包括二维码校验、创建结果缺少 `partnerAccount`、创建后打开 IM / WeAgentCUI 失败。建议字段：`page`、`stage`、`from`、`qrcode`、`weCrewType`、`bizRobotId`、`isPc`、`errorCode`、`errorMessage`。
-4. `flow_edit_assistant_error`
-   - 说明：编辑助理流程失败，包括详情加载、目标标识缺失、更新接口失败、通知宿主失败。建议字段：`page`、`stage`、`source`、`partnerAccount`、`robotId`、`isPc`、`errorCode`、`errorMessage`。
-5. `flow_delete_assistant_error`
-   - 说明：删除助理流程失败，包括目标标识缺失、删除接口异常。建议字段：`page`、`stage`、`partnerAccount`、`robotId`、`isPc`、`errorCode`、`errorMessage`。
-6. `flow_skillcui_missing_param_error`
-   - 说明：`skillCUI` 页面缺少 `welinkSessionId`，当前仅 toast，建议补齐入口参数异常上报。建议字段：`page`、`stage: 'missingWelinkSessionId'`、`isPc`。
-7. `flow_host_bridge_error`
-   - 说明：宿主桥接能力调用失败的通用异常，如 `notifyAssistantDetailUpdated`、`openIMChat`、`close`、`navigateBack` 等非接口 wrapper 能力。可作为独立事件，也可合并进具体业务 `flow_*_error` 的 `stage`。推荐优先合并进具体业务事件，只有无法归属业务流程时使用该通用事件。
+### 7.1 已实现埋码现状
+
+| 分类 | 事件 | 当前接入模块 | 覆盖场景 | 备注 |
+|---|---|---|---|---|
+| 点击 | `activate_select_assistant_click` | `activateAssistant.tsx`、`uemUtil.ts` | 激活页点击“选择助理” | 已实现 |
+| 点击 | `select_assistant_create_click` | `selectAssistant.tsx`、`uemUtil.ts` | 选择助理页点击“创建助理” | 已实现 |
+| 点击 | `select_assistant_start_click` | `selectAssistant.tsx`、`uemUtil.ts` | 选择助理页点击“开始使用” | 已实现 |
+| 点击 | `switch_assistant_confirm_click` | `switchAssistant.tsx`、`uemUtil.ts` | 切换助理页点击“确认切换” | 已实现 |
+| 点击 | `weagent_history_click` | `WeAgentHistorySidebar.tsx`、`uemUtil.ts` | WeAgentCUI 点击历史会话 | 已实现 |
+| 点击 | `weagent_create_session_click` | `App.tsx`、`uemUtil.ts` | WeAgentCUI 点击创建会话 | 已实现 |
+| 点击 | `weagent_send_message_click` | `useChatSession.ts`、`uemUtil.ts` | WeAgentCUI / skillCUI 点击发送消息 | 已实现，只记录点击与内容长度，不记录流式耗时 |
+| 接口 | `api_create_new_session` | `hwext.ts`、`uemUtil.ts` | 创建会话成功 / 失败 | 已实现 |
+| 接口 | `api_get_history_sessions` | `hwext.ts`、`uemUtil.ts` | 获取历史会话成功 / 失败 | 已实现 |
+| 接口 | `api_get_session_message_history` | `hwext.ts`、`uemUtil.ts` | 获取历史消息成功 / 失败 | 已实现 |
+| 接口 | `api_send_message` | `hwext.ts`、`uemUtil.ts` | 发送消息接口成功 / 失败 | 已实现，只覆盖接口返回，不覆盖首 token 和完成耗时 |
+| 接口 | `api_reply_permission` | `hwext.ts`、`uemUtil.ts` | 权限回复成功 / 失败 | 已实现 |
+| 接口 | `api_create_digital_twin` | `hwext.ts`、`uemUtil.ts` | 创建助理成功 / 失败 | 已实现 |
+| 接口 | `api_query_qrcode_info` | `hwext.ts`、`uemUtil.ts` | 查询二维码信息成功 / 失败 | 已实现 |
+| 接口 | `api_update_qrcode_info` | `hwext.ts`、`uemUtil.ts` | 更新二维码状态成功 / 失败 | 已实现 |
+| 接口 | `api_get_weagent_details` | `hwext.ts`、`uemUtil.ts` | 获取助理详情成功 / 失败 | 已实现 |
+| 接口 | `api_get_weagent_list` | `hwext.ts`、`uemUtil.ts` | 获取助理列表成功 / 失败 | 已实现 |
+| 接口 | `api_stop_skill` | `hwext.ts`、`uemUtil.ts` | 停止生成成功 / 失败 | 已实现 |
+| 接口 | `api_send_message_to_im` | `hwext.ts`、`uemUtil.ts` | 发送到 IM 成功 / 失败 | 已实现 |
+| 接口 | `api_update_weagent` | `hwext.ts`、`uemUtil.ts` | 更新助理成功 / 失败 | 已实现 |
+| 接口 | `api_delete_weagent` | `hwext.ts`、`uemUtil.ts` | 删除助理成功 / 失败 | 已实现 |
+| 流程异常 | `flow_onmessage_error` | `useChatSession.ts`、`telemetry.ts` | `onMessage` 收到错误消息或 listener error | 已实现 |
+| 浏览器异常 | `browser_js_error` | `App.tsx`、`skillCUI.tsx`、`telemetry.ts` | 浏览器运行时脚本异常 | 已实现，3 秒同指纹节流 |
+
+### 7.2 拟新增异常埋码
+
+| 分类 | 事件 | 接入模块 | 触发时机 | 建议字段 |
+|---|---|---|---|---|
+| 流程异常 | `flow_weagent_init_error` | `App.tsx` | 初始化 WeAgentCUI 失败，覆盖用户信息、助手详情、历史会话、兜底创建会话等任一阶段失败 | `page`、`stage`、`assistantAccount`、`isPc`、`errorCode`、`errorMessage` |
+| 流程异常 | `flow_weagent_missing_param_error` | `App.tsx` | 进入 WeAgentCUI 但缺少 `assistantAccount` | `page`、`stage: 'missingAssistantAccount'`、`isPc` |
+| 流程异常 | `flow_open_weagent_error` | `selectAssistant.tsx`、`switchAssistant.tsx` | 选择助理 / 切换助理后打开 WeAgentCUI 失败或 `openAssistantByPartnerAccount` 未成功打开 | `page`、`stage`、`selectedAssistantId` / `selectedPartnerAccount`、`isPc`、`errorCode`、`errorMessage` |
+| 流程异常 | `flow_create_assistant_error` | `createAssistantBasic.tsx`、`selectBrainAssistant.tsx` | 创建助理流程失败，包括二维码校验、创建结果缺少 `partnerAccount`、创建后打开 IM / WeAgentCUI 失败 | `page`、`stage`、`from`、`qrcode`、`weCrewType`、`bizRobotId`、`isPc`、`errorCode`、`errorMessage` |
+| 流程异常 | `flow_edit_assistant_error` | `EditAssistantContent.tsx` | 编辑助理流程失败，包括详情加载、目标标识缺失、更新接口失败、通知宿主失败 | `page`、`stage`、`source`、`partnerAccount`、`robotId`、`isPc`、`errorCode`、`errorMessage` |
+| 流程异常 | `flow_delete_assistant_error` | `assistantDetail.tsx` | 删除助理流程失败，包括目标标识缺失、删除接口异常 | `page`、`stage`、`partnerAccount`、`robotId`、`isPc`、`errorCode`、`errorMessage` |
+| 流程异常 | `flow_skillcui_missing_param_error` | `skillCUI.tsx` | `skillCUI` 页面缺少 `welinkSessionId` | `page`、`stage: 'missingWelinkSessionId'`、`isPc` |
+| 流程异常 | `flow_host_bridge_error` | `createAssistantFlow.ts` 或具体页面 | 宿主桥接能力调用失败，如 `notifyAssistantDetailUpdated`、`openIMChat`、`close`、`navigateBack` 等非接口 wrapper 能力 | `page`、`stage`、`bridgeMethod`、`isPc`、`errorCode`、`errorMessage` |
+
+### 7.3 拟新增性能埋码
+
+| 分类 | 事件 | 接入模块 | 触发时机 | 建议字段 | 安全边界 |
+|---|---|---|---|---|---|
+| 流式性能 | `perf_stream_first_token` | `useChatSession.ts` | 当前轮发送后首次收到 assistant 可展示内容事件时上报 | `page`、`welinkSessionId`、`messageId`、`assistantAccount`、`firstTokenDuration`、`sendToApiDuration`、`source: 'text' \| 'thinking' \| 'tool' \| 'question' \| 'permission' \| 'file'` | 不上报输入原文、首 token 文本、回复内容 |
+| 流式性能 | `perf_stream_complete` | `useChatSession.ts` | 当前轮流式消息完成时上报，优先在 `text.done` 或 `session.status=idle` 触发 | `page`、`welinkSessionId`、`messageId`、`assistantAccount`、`firstTokenDuration`、`streamDuration`、`totalDuration`、`tokenInput`、`tokenOutput`、`cost`、`finishReason` | 不上报回复内容；token/cost 使用服务端已返回聚合值 |
+| 流式性能 | `perf_stream_error` | `useChatSession.ts` | 当前轮流式过程中收到 `session.error`、`error` 或 listener `onError` 时上报 | `page`、`welinkSessionId`、`messageId`、`assistantAccount`、`durationBeforeError`、`hasFirstToken`、`errorCode`、`errorMessage` | 错误信息截断，不拼接用户输入 |
+| 历史加载性能 | 可选 `perf_history_load` | `useChatSession.ts`、`WeAgentHistorySidebar.tsx` | 首屏历史消息或历史会话列表加载完成时上报 | `page`、`welinkSessionId`、`assistantAccount`、`duration`、`size`、`resultCount`、`hasMore` | 不上报历史消息内容 |
+| 初始化性能 | 可选 `perf_weagent_init` | `App.tsx` | WeAgentCUI 初始化成功后上报 | `page`、`assistantAccount`、`duration`、`hasHistorySession`、`createdFallbackSession`、`isPc` | 不上报用户信息和消息内容 |
+
+### 7.4 埋码安全与字段约束
+
+| 约束项 | 规则 |
+|---|---|
+| 用户输入 | 不上报用户输入原文、问题答案原文、消息正文、AI 回复正文 |
+| 标识字段 | `assistantAccount`、`welinkSessionId`、`messageId` 沿用当前工程既有口径；如数据安全要求升级，应支持改为哈希或只上报是否存在 |
+| 错误信息 | `errorMessage` 沿用 `telemetry.ts` 截断策略，且不得拼接输入原文 |
+| 性能字段 | 只上报 duration、状态、数量、是否命中、token 聚合值，不上报文本内容 |
+| 高频控制 | 不对每个 `text.delta` 分片上报，只在首 token、完成、错误等关键节点上报 |
+| 字段构造 | 使用白名单字段构造 payload，不直接透传完整事件对象、消息对象或命令对象 |
 
 ## 8. 影响范围
 
 ### 8.1 直接影响
 
 1. `src/utils/telemetry.ts`：新增或复用流程异常上报 helper。
-2. `src/App.tsx`：WeAgentCUI 初始化和创建新会话流程异常。
+2. `src/App.tsx`：WeAgentCUI 初始化和创建新会话流程异常；可选补充 `perf_weagent_init`。
 3. `src/pages/skillCUI.tsx`：缺少 `welinkSessionId` 的入口异常。
 4. `src/pages/selectAssistant.tsx`、`src/pages/switchAssistant.tsx`：打开 / 切换助手异常。
 5. `src/pages/createAssistantBasic.tsx`、`src/pages/selectBrainAssistant.tsx`：创建助手异常。
 6. `src/components/assistant/EditAssistantContent.tsx`：编辑助手异常。
 7. `src/pages/assistantDetail.tsx`：删除助手异常。
+8. `src/hooks/useChatSession.ts`：新增流式首 token、完成、错误前耗时、历史加载耗时等性能埋码状态记录。
 
 ### 8.2 间接影响
 
-1. UEM 数据平台会新增 `flow_*` 事件，需要数据侧同步事件白名单、看板或告警规则。
+1. UEM 数据平台会新增 `flow_*` 和 `perf_*` 事件，需要数据侧同步事件白名单、看板或告警规则。
 2. 测试用例需要 mock `reportFlowTelemetry` 或 `reportUemEvent`，避免异步上报影响断言。
 3. 文档总表需同步，避免后续维护者误删或重复新增事件。
+4. 流式性能指标需要数据侧统一 P50 / P90 / P99 统计口径，避免只看平均值掩盖长尾问题。
 
 ### 8.3 不影响
 
 1. 不影响现有页面 UI 和交互文案。
 2. 不影响现有 `api_*` 埋码事件名、字段和调用时机。
-3. 不影响消息渲染、流式协议解析、历史会话分页逻辑。
+3. 不影响消息渲染、流式协议解析、历史会话分页逻辑；性能埋码只读流式事件，不改变事件处理结果。
 4. 不影响构建产物入口和外部 SDK API 签名。
 
 ## 9. 测试范围
@@ -222,6 +301,10 @@ export function reportCoreFlowError(
 4. Mock `notifyAssistantDetailUpdated` 失败，验证 `flow_edit_assistant_error` 被触发且不关闭页面。
 5. Mock `deleteWeAgent` 失败或目标标识缺失，验证 `flow_delete_assistant_error` 被触发。
 6. `skillCUI` 不传 `welinkSessionId`，验证 `flow_skillcui_missing_param_error` 触发一次，不随渲染重复上报。
+7. Mock 一轮正常流式回复：`sendMessage` 返回后依次触发 `message.user`、`text.delta`、`text.done`、`session.status=idle`，验证 `perf_stream_first_token` 与 `perf_stream_complete` 各触发一次。
+8. Mock 流式首 token 前直接 `session.error`，验证只触发 `perf_stream_error`，且 `hasFirstToken=false`。
+9. Mock 多个 `text.delta` 分片，验证不会按分片重复上报 `perf_stream_first_token`。
+10. Mock 历史消息加载成功与失败，若实现 `perf_history_load`，验证只记录耗时和数量，不记录消息内容。
 
 ### 9.2 兼容测试
 
@@ -229,13 +312,16 @@ export function reportCoreFlowError(
 2. 移动端 `window.HWH5.uem` 不可用时，验证业务不崩溃，`telemetry.ts` 捕获异常并写 `WeLog`。
 3. PC 小程序环境下，验证新增埋码调用不影响既有流程，`reportUemEvent` 仍按当前逻辑 return。
 4. 中英文环境下，验证埋码不依赖页面文案，事件名和字段稳定。
+5. 快速连续发送两轮消息时，验证流式性能上下文按 `welinkSessionId + messageId` 或发送轮次隔离，不串用上一轮时间戳。
+6. 页面切换会话或组件卸载时，验证未完成的性能上下文被清理，不在新会话产生错误耗时。
 
 ### 9.3 文档一致性检查
 
 1. 新增事件需同步到 `docs/plans/2026-05-20-ai-chat-viewer-telemetry-plan.md`。
 2. `docs/requirements.md` 中埋码章节需与代码事件名、字段保持一致。
-3. 若新增 helper，需在代码注释或文档中说明流程埋码与接口埋码的边界，避免重复维护。
+3. 若新增 helper，需在代码注释或文档中说明流程埋码、接口埋码、性能埋码的边界，避免重复维护。
+4. 数据看板口径需同步区分 `api_send_message` 接口耗时、`perf_stream_first_token` 首 token 延迟和 `perf_stream_complete` 完成耗时。
 
 ## 10. 最终建议
 
-最终结论：推荐复用现有 `telemetry.ts` + `hwext.reportUemEvent` 链路，补齐 `flow_weagent_init_error`、`flow_open_weagent_error`、`flow_create_assistant_error`、`flow_edit_assistant_error`、`flow_delete_assistant_error`、`flow_skillcui_missing_param_error` 等核心流程异常埋码。该方案改动小、与当前埋码架构一致、不会阻塞业务流程；代价是同一次异常可能同时出现接口级 `api_*` 和流程级 `flow_*` 两条数据，需要数据分析侧按事件维度区分“接口稳定性”和“用户流程损失”。后续动作建议先实现 `reportCoreFlowError` helper，再按页面逐个补点，并同步更新埋码总表与单元测试。
+最终结论：推荐复用现有 `telemetry.ts` + `hwext.reportUemEvent` 链路，先补齐 `flow_weagent_init_error`、`flow_open_weagent_error`、`flow_create_assistant_error`、`flow_edit_assistant_error`、`flow_delete_assistant_error`、`flow_skillcui_missing_param_error` 等核心流程异常埋码，再补齐 `perf_stream_first_token`、`perf_stream_complete`、`perf_stream_error` 三个流式性能埋码。该方案改动小、与当前埋码架构一致、不会阻塞业务流程；代价是同一次对话可能同时出现接口级 `api_*`、流程级 `flow_*` 和性能级 `perf_*` 数据，需要数据分析侧按事件维度区分“接口稳定性”“用户流程损失”和“流式体验耗时”。后续动作建议先实现 `reportCoreFlowError` 与流式性能上下文 helper，再按页面和 Hook 逐个补点，并同步更新埋码总表、数据看板口径与单元测试。
