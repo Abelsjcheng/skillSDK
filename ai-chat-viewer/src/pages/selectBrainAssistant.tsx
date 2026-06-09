@@ -33,23 +33,6 @@ const SelectBrainAssistantPage: React.FC = () => {
   const draftExists = Boolean(draft);
   const from = useMemo(() => getQueryParam('from', location.search) ?? '', [location.search]);
 
-  useEffect(() => {
-    if (draftExists) {
-      return;
-    }
-
-    navigate(
-      {
-        pathname: '/createAssistant',
-        search: location.search,
-      },
-      { replace: true },
-    );
-  }, [draftExists, location.search, navigate]);
-
-  if (!draftExists) {
-    return null;
-  }
 
   const handleClose = useCallback(() => {
     closeCreateAssistantWindow();
@@ -140,6 +123,24 @@ const SelectBrainAssistantPage: React.FC = () => {
     },
     [draft, from, isPc, location.search, navigate, t],
   );
+  
+  useEffect(() => {
+    if (draftExists) {
+      return;
+    }
+
+    navigate(
+      {
+        pathname: "/createAssistant",
+        search: location.search,
+      },
+      { replace: true },
+    );
+  }, [draftExists, location.search, navigate]);
+
+  if (!draftExists) {
+    return null;
+  }
 
   return (
     <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>
