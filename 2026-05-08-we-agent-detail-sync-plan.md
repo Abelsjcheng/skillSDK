@@ -90,8 +90,8 @@ sequenceDiagram
     SDK->>SDK: 解析 action / weCrew / notifyWecodeId
     SDK->>Cache: 命中已有详情时覆盖 we_agent_details
     SDK->>Cache: 命中当前助理时覆盖 current_we_agent_detail
-    SDK->>Broadcast: updateWeAgentDetailEvent
-    Broadcast-->>Page: 推送最新 weCrew
+    SDK->>Broadcast: welink.agentskills.agentUpdated
+    Broadcast-->>Page: 推送 { type: update, data: weCrew }
     Page->>Page: 当前助理一致时刷新名称/简介/头像
 ```
 
@@ -125,7 +125,7 @@ sequenceDiagram
     SDK->>SDK: 解析 action / weCrew / notifyWecodeId
     SDK->>Cache: 从 we_agent_list_cache 移除目标助理
     SDK->>Cache: 从 we_agent_details 移除目标助理
-    SDK->>Broadcast: deleteWeAgentEvent
+    SDK->>Broadcast: welink.agentskills.agentUpdated
     Broadcast-->>Page: 推送删除标识
     Page->>Page: 当前助理一致时弹出“助理已删除”
 ```
@@ -175,7 +175,7 @@ sequenceDiagram
     SDK->>Server: 调用对应服务端接口
     Server-->>SDK: code = 200
     SDK->>Cache: 按既有规则更新本地缓存
-    SDK->>Broadcast: 广播 updateWeAgentDetailEvent 或 deleteWeAgentEvent
+    SDK->>Broadcast: 广播 welink.agentskills.agentUpdated
     SDK-->>Host: 返回原接口结果
 ```
 
@@ -201,7 +201,7 @@ flowchart TD
     H --> I{"是否命中 current_we_agent_detail"}
     I -- "是" --> J["同步更新 current_we_agent_detail"]
     I -- "否" --> K["跳过当前助理缓存更新"]
-    G --> L["调用 broadcastWeAgentEvent(updateWeAgentDetailEvent, weCrew)"]
+    G --> L["调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, updatePayload)"]
     J --> L
     K --> L
     L --> M
@@ -221,7 +221,7 @@ flowchart TD
     Y --> Z{"we_agent_list_cache 中是否存在该助理"}
     Z -- "是" --> AA["同步删除 we_agent_list_cache 对应条目"]
     Z -- "否" --> AB["跳过列表缓存删除"]
-    AA --> AC["组装 weCrew 后调用 broadcastWeAgentEvent(deleteWeAgentEvent, weCrew)"]
+    AA --> AC["组装 deletePayload 后调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, deletePayload)"]
     AB --> AC
     AC --> AD{"是否还有未处理 partnerAccount"}
     X -- "是" --> AE["取出 latestDetail"]
@@ -232,7 +232,7 @@ flowchart TD
     AI --> AJ{"是否命中 current_we_agent_detail"}
     AJ -- "是" --> AK["同步更新 current_we_agent_detail"]
     AJ -- "否" --> AL["跳过当前助理缓存更新"]
-    AK --> AM["调用 broadcastWeAgentEvent(updateWeAgentDetailEvent, weCrew)"]
+    AK --> AM["调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, updatePayload)"]
     AL --> AM
     AH --> AD
     AM --> AD
@@ -250,7 +250,7 @@ flowchart TD
     AT -- "否" --> AV["不新增 we_agent_details 缓存"]
     AU --> AW["组装广播快照，优先使用更新后的缓存详情"]
     AV --> AW["组装最小广播快照，仅用于通知"]
-    AW --> AX["调用 broadcastWeAgentEvent(updateWeAgentDetailEvent, weCrew)"]
+    AW --> AX["调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, updatePayload)"]
     AX --> AY["结束"]
 ```
 
@@ -278,7 +278,7 @@ flowchart TD
     I --> J{"详情缓存是否存在对应助理"}
     J -- "是" --> K["删除 we_agent_details 中对应条目并回写"]
     J -- "否" --> L["跳过详情缓存处理"]
-    K --> M["调用 broadcastWeAgentEvent(deleteWeAgentEvent, weCrew)"]
+    K --> M["调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, deletePayload)"]
     L --> M
     M --> N
 
@@ -304,7 +304,7 @@ flowchart TD
     AF -- "否" --> AH["不处理列表缓存"]
     AG --> AI["若 we_agent_details 有对应详情缓存则删除"]
     AH --> AI
-    AI --> AJ["调用 broadcastWeAgentEvent(deleteWeAgentEvent, weCrew)"]
+    AI --> AJ["调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, deletePayload)"]
     AJ --> AL
     AE -- "是" --> AM["保存 transitionPlan.updatedList 到 we_agent_list_cache"]
     AM --> AN{"transitionPlan 是否有 nextPartnerAccount"}
@@ -320,7 +320,7 @@ flowchart TD
     AO --> AU
     AU --> AV["按 getWeAgentUri 同一套规则组装 nextUris"]
     AV --> AW["openWeAgentCUI(nextUris) 仍为 TODO"]
-    AW --> AX["调用 broadcastWeAgentEvent(deleteWeAgentEvent, weCrew)"]
+    AW --> AX["调用 broadcastWeAgentEvent(welink.agentskills.agentUpdated, deletePayload)"]
     AX --> AL
 ```
 
@@ -331,8 +331,8 @@ flowchart TD
 1. SDK 初始化时注册 IM 模块通知广播，统一接收 IM 模块透传的服务端助理更新和删除通知。
 2. 新增 SDK 内部广播封装：`broadcastWeAgentEvent(eventName: string, data: any): void`。
 3. 服务端主动通知载荷统一改为 `action + weCrew + notifyWecodeId` 结构。
-4. 助理更新事件统一广播 `updateWeAgentDetailEvent`，`data` 数据结构与服务端下发的 `weCrew` 一致。
-5. 助理删除事件统一广播 `deleteWeAgentEvent`，`data` 数据结构与服务端下发的 `weCrew` 一致。
+4. 助理更新与删除统一广播 `welink.agentskills.agentUpdated`，通过 payload 中的 `type` 区分 `update` 与 `delete`。
+5. 统一广播 payload 中的 `data` 与对应服务端下发的 `weCrew` 一致。
 6. 冷启动和离线恢复在线时，对已有 `we_agent_details` 做批量补偿刷新。
 7. `weAgentCUI` 页面订阅更新和删除广播，仅处理当前聊天助理相关事件。
 
@@ -361,19 +361,39 @@ broadcastWeAgentEvent(eventName: string, data: any): void
 
 广播约定：
 
-| 场景 | SDK 内部 eventName | HWH5EXT.registerEventListener type | data |
+| 场景 | SDK 内部 eventName | HWH5EXT.registerEventListener type | payload |
 |---|---|---|
-| 助理详情更新 | `updateWeAgentDetailEvent` | `agentskills_update_weAgentDetail` | 与服务端下发更新通知中的 `weCrew` 一致，即至少包含 `robotId`、`partnerAccount`、`name`、`icon`、`description` |
-| 助理删除 | `deleteWeAgentEvent` | `agentskills_delete_weAgent` | 与服务端下发删除通知中的 `weCrew` 一致，即至少包含 `robotId`、`partnerAccount` |
+| 助理详情更新 | `welink.agentskills.agentUpdated` | `welink.agentskills.agentUpdated` | `{ type: 'update', data: weCrew }`，其中 `data` 与服务端下发更新通知中的 `weCrew` 一致，即至少包含 `robotId`、`partnerAccount`、`name`、`icon`、`description` |
+| 助理删除 | `welink.agentskills.agentUpdated` | `welink.agentskills.agentUpdated` | `{ type: 'delete', data: weCrew }`，其中 `data` 与服务端下发删除通知中的 `weCrew` 一致，即至少包含 `robotId`、`partnerAccount` |
 
 广播规则：
 
-1. 若场景触发了助理更新，SDK 调用 `broadcastWeAgentEvent('updateWeAgentDetailEvent', weCrew)` 对外广播。
-2. 若场景触发了助理删除，SDK 调用 `broadcastWeAgentEvent('deleteWeAgentEvent', weCrew)` 对外广播。
-3. `broadcastWeAgentEvent` 内部需将 SDK 内部事件名映射为 HWH5EXT 页面事件名：
-   - `updateWeAgentDetailEvent` -> `agentskills_update_weAgentDetail`；
-   - `deleteWeAgentEvent` -> `agentskills_delete_weAgent`。
-4. 广播触发时机固定放在本地缓存处理之后，且缓存处理结果不影响广播。
+1. 若场景触发了助理更新，SDK 调用 `broadcastWeAgentEvent('welink.agentskills.agentUpdated', updatePayload)` 对外广播。
+2. 若场景触发了助理删除，SDK 调用 `broadcastWeAgentEvent('welink.agentskills.agentUpdated', deletePayload)` 对外广播。
+3. `updatePayload` 结构固定为：
+   ```json
+   {
+     "type": "update",
+     "data": {
+       "robotId": "123",
+       "partnerAccount": "123",
+       "name": "分身小白",
+       "icon": "/mcloud/xxx",
+       "description": "数字分身小白能做..."
+     }
+   }
+   ```
+4. `deletePayload` 结构固定为：
+   ```json
+   {
+     "type": "delete",
+     "data": {
+       "robotId": "123",
+       "partnerAccount": "123"
+     }
+   }
+   ```
+5. 广播触发时机固定放在本地缓存处理之后，且缓存处理结果不影响广播。
 
 SDK 初始化监听注册：
 
@@ -396,7 +416,7 @@ SDK 初始化监听注册：
 4. 若存在，则使用 `weCrew` 中的更新字段覆盖 `we_agent_details[partnerAccount]`。
 5. 若 `current_we_agent_detail` 命中同一助理，则同步覆盖为最新内容。
 6. 若本地 `we_agent_details` 中不存在该助理缓存详情，则不新增缓存，不调用查详情服务端接口补拉。
-7. SDK 最后调用 `broadcastWeAgentEvent('updateWeAgentDetailEvent', weCrew)`，将通知中的 `weCrew` 直接作为 `data` 对外广播。
+7. SDK 最后调用 `broadcastWeAgentEvent('welink.agentskills.agentUpdated', updatePayload)`，其中 `updatePayload.data` 为通知中的 `weCrew`。
 
 服务端主动删除处理：
 
@@ -405,7 +425,7 @@ SDK 初始化监听注册：
 3. SDK 读取本地 `we_agent_list_cache`，若存在则从列表缓存中删除对应助理并回写。
 4. SDK 读取本地 `we_agent_details`，若存在对应助理详情缓存，则移除对应条目并回写。
 5. 该场景不读取也不修改 `current_we_agent_detail`，是否为当前助理由广播消费方自行判断。
-6. SDK 最后调用 `broadcastWeAgentEvent('deleteWeAgentEvent', weCrew)`，将通知中的 `weCrew` 直接作为 `data` 对外广播。
+6. SDK 最后调用 `broadcastWeAgentEvent('welink.agentskills.agentUpdated', deletePayload)`，其中 `deletePayload.data` 为通知中的 `weCrew`。
 
 冷启动与离线恢复在线补偿刷新：
 
@@ -438,7 +458,7 @@ SDK 初始化监听注册：
 4. 若 `we_agent_details` 中命中对应缓存详情，则仅更新该缓存详情中的 `name`、`icon`、`description`。
 5. 若 `we_agent_details` 中未命中对应缓存详情，则保持现有实现，不新增详情缓存。
 6. 现有三端接口返回 `success` 结果，不改变原接口返回语义。
-7. 本方案若补充 `updateWeAgentDetailEvent` 广播，广播点放在现有缓存更新完成之后；广播 `data` 需组装为与服务端更新通知 `weCrew` 一致的结构，即包含 `robotId`、`partnerAccount`、`name`、`icon`、`description`，仅用于通知，不写入 `we_agent_details`。
+7. 本方案若补充更新广播，广播点放在现有缓存更新完成之后；广播事件为 `welink.agentskills.agentUpdated`，payload 结构为 `{ type: 'update', data: weCrew }`，其中 `data` 需组装为与服务端更新通知 `weCrew` 一致的结构，即包含 `robotId`、`partnerAccount`、`name`、`icon`、`description`，仅用于通知，不写入 `we_agent_details`。
 
 本端主动调用 `deleteWeAgent` 成功后的处理：
 
@@ -478,74 +498,68 @@ SDK 初始化监听注册：
    - 若下一个助理详情为空，则按 `getWeAgentUri` fallback 规则组装 `nextUris`；
    - `openWeAgentCUI(nextUris)` 仍为接口文档和三端代码中的 TODO，当前不实际拉起页面；
    - 若本地 `we_agent_details` 中存在当前被删除助理对应详情缓存，则删除该条详情缓存并回写。
-7. 本方案若补充 `deleteWeAgentEvent` 广播，广播点放在上述现有删除成功处理完成之后；广播 `data` 需组装为与服务端删除通知 `weCrew` 一致的结构，即包含删除目标 `robotId`、`partnerAccount`。
+7. 本方案若补充删除广播，广播点放在上述现有删除成功处理完成之后；广播事件为 `welink.agentskills.agentUpdated`，payload 结构为 `{ type: 'delete', data: weCrew }`，其中 `data` 需组装为与服务端删除通知 `weCrew` 一致的结构，即包含删除目标 `robotId`、`partnerAccount`。
 
 `weAgentCUI` 页面消费规则：
 
-1. 页面初始化后，通过 `HWH5EXT.registerEventListener` JSAPI 分别注册更新和删除监听。
+1. 页面初始化后，通过 `HWH5EXT.registerEventListener` JSAPI 注册统一的助理变更监听。
 2. `HWH5EXT.registerEventListener` 入参包含：
    - `type`：事件名；
    - `func`：监听事件响应回调。
-3. 页面注册助理详情更新监听：
+3. 页面注册助理变更监听：
    ```typescript
    HWH5EXT.registerEventListener({
-     type: 'agentskills_update_weAgentDetail',
-     func: (data: {
-       robotId?: string;
-       partnerAccount?: string;
-       name?: string;
-       icon?: string;
-       description?: string;
+     type: 'welink.agentskills.agentUpdated',
+     func: (payload: {
+       type: 'update' | 'delete';
+       data: {
+         robotId?: string;
+         partnerAccount?: string;
+         name?: string;
+         icon?: string;
+         description?: string;
+       };
      }) => {
-       // 仅处理当前聊天助理的更新事件。
+       // 根据 payload.type 区分更新或删除。
      }
    });
    ```
-4. 页面注册助理删除监听：
-   ```typescript
-   HWH5EXT.registerEventListener({
-     type: 'agentskills_delete_weAgent',
-     func: (data: { robotId?: string; partnerAccount?: string }) => {
-       // 仅处理当前聊天助理的删除事件。
-     }
-   });
-   ```
-5. SDK 侧调用 `broadcastWeAgentEvent(eventName, data)` 后，由客户端广播机制触发映射后的 `HWH5EXT.registerEventListener` 对应 `type` 的 `func` 回调，并将对应广播 `data` 原样透传给页面。
-6. `agentskills_update_weAgentDetail` 的 `func` 仅处理当前聊天助理的更新事件。
-7. 若回调数据中的 `partnerAccount` 与当前页面助理一致，则更新页面中的助理名称、简介、头像等信息。
-8. 若更新事件不是当前页面助理，则忽略。
-9. `agentskills_delete_weAgent` 的 `func` 仅处理当前聊天助理的删除事件。
-10. 若回调数据中的 `partnerAccount` 与当前页面助理一致，则弹窗提示用户“助理已删除”。
-11. 弹窗底部按钮固定为“切换助理”，弹窗不可取消。
-12. 点击“切换助理”后跳转到切换助理页面。
-13. 删除非当前助理时，页面不做 UI 变化。
+4. SDK 侧调用 `broadcastWeAgentEvent('welink.agentskills.agentUpdated', payload)` 后，由客户端广播机制触发 `HWH5EXT.registerEventListener` 对应 `type` 的 `func` 回调，并将对应广播 payload 原样透传给页面。
+5. 当 `payload.type = 'update'` 时，`func` 仅处理当前聊天助理的更新事件。
+6. 若 `payload.data.partnerAccount` 与当前页面助理一致，则更新页面中的助理名称、简介、头像等信息。
+7. 若更新事件不是当前页面助理，则忽略。
+8. 当 `payload.type = 'delete'` 时，`func` 仅处理当前聊天助理的删除事件。
+9. 若 `payload.data.partnerAccount` 与当前页面助理一致，则弹窗提示用户“助理已删除”。
+10. 弹窗底部按钮固定为“切换助理”，弹窗不可取消。
+11. 点击“切换助理”后跳转到切换助理页面。
+12. 删除非当前助理时，页面不做 UI 变化。
 
 `weAgentCUI` 页面消费流程图：
 
 ```mermaid
 flowchart TD
     A["weAgentCUI 页面初始化"] --> B["读取当前聊天助理 partnerAccount / robotId"]
-    B --> C["调用 HWH5EXT.registerEventListener 注册 agentskills_update_weAgentDetail"]
-    B --> D["调用 HWH5EXT.registerEventListener 注册 agentskills_delete_weAgent"]
+    B --> C["调用 HWH5EXT.registerEventListener 注册 welink.agentskills.agentUpdated"]
 
-    C --> E["等待 SDK broadcastWeAgentEvent(updateWeAgentDetailEvent, weCrew)"]
-    D --> F["等待 SDK broadcastWeAgentEvent(deleteWeAgentEvent, weCrew)"]
+    C --> E["等待 SDK broadcastWeAgentEvent(welink.agentskills.agentUpdated, payload)"]
 
-    E --> G["映射为 agentskills_update_weAgentDetail 并触发 func 回调"]
-    G --> H{"回调数据是否匹配当前助理"}
-    H -- "否" --> I["忽略更新事件"]
-    H -- "是" --> J["刷新页面助理名称 / 简介 / 头像"]
-    J --> K["结束"]
-    I --> K
+    E --> G["触发 welink.agentskills.agentUpdated 的 func 回调"]
+    G --> H{"payload.type 是否为 update"}
+    H -- "是" --> I{"payload.data 是否匹配当前助理"}
+    I -- "否" --> J["忽略更新事件"]
+    I -- "是" --> K["刷新页面助理名称 / 简介 / 头像"]
+    K --> R["结束"]
+    J --> R
 
-    F --> L["映射为 agentskills_delete_weAgent 并触发 func 回调"]
-    L --> M{"回调数据是否匹配当前助理"}
-    M -- "否" --> N["忽略删除事件"]
-    M -- "是" --> O["展示“助理已删除”弹窗"]
-    O --> P["弹窗不可取消，按钮固定为“切换助理”"]
-    P --> Q["点击“切换助理”跳转切换助理页面"]
-    Q --> R["结束"]
-    N --> R
+    H -- "否" --> L{"payload.type 是否为 delete"}
+    L -- "否" --> M["忽略未知 type"]
+    L -- "是" --> N{"payload.data 是否匹配当前助理"}
+    N -- "否" --> O["忽略删除事件"]
+    N -- "是" --> P["展示“助理已删除”弹窗"]
+    P --> Q["弹窗不可取消，按钮固定为“切换助理”；点击后跳转切换助理页面"]
+    Q --> R
+    M --> R
+    O --> R
 ```
 
 ### 4.3 兼容与边界
@@ -567,19 +581,19 @@ flowchart TD
 
 1. `getWeAgentDetails`：语义不变，继续用于指定助理详情查询与缓存写入。
 2. `getAssistantDetails`：语义不变，继续优先返回缓存并异步刷新。
-3. `updateWeAgent`：保留三端现有“只更新命中的当前详情与详情缓存，不新增详情缓存”的逻辑，成功后补充广播 `updateWeAgentDetailEvent`。
-4. `deleteWeAgent`：保留三端现有“非当前助理只更新已存在列表缓存、当前助理执行下一个助理切换”的逻辑，并补充“若 `we_agent_details` 存在被删助手详情缓存则删除对应条目”，成功后补充广播 `deleteWeAgentEvent`。
+3. `updateWeAgent`：保留三端现有“只更新命中的当前详情与详情缓存，不新增详情缓存”的逻辑，成功后补充 `welink.agentskills.agentUpdated` 广播，payload.type 为 `update`。
+4. `deleteWeAgent`：保留三端现有“非当前助理只更新已存在列表缓存、当前助理执行下一个助理切换”的逻辑，并补充“若 `we_agent_details` 存在被删助手详情缓存则删除对应条目”，成功后补充 `welink.agentskills.agentUpdated` 广播，payload.type 为 `delete`。
 5. `notifyAssistantDetailUpdated`：仍只负责 `openAssistantEditPage` 的本地编辑页回调，不替代宿主级广播通知。
 6. `GET /v1/robot-partners/{partnerAccounts}`：用于冷启动和离线恢复在线后的批量补偿刷新。
 7. SDK 初始化入口：新增 IM 模块通知广播注册调用，监听回调按服务端透传载荷中的 `action` 分发到更新或删除处理流程。
-8. `HWH5EXT.registerEventListener`：`weAgentCUI` 页面通过该 JSAPI 注册 `agentskills_update_weAgentDetail` 与 `agentskills_delete_weAgent`，SDK 通过 `broadcastWeAgentEvent` 触发对应回调并透传对应广播数据。
+8. `HWH5EXT.registerEventListener`：`weAgentCUI` 页面通过该 JSAPI 注册 `welink.agentskills.agentUpdated`，SDK 通过 `broadcastWeAgentEvent` 触发对应回调并透传对应广播 payload。
 9. 助理详情页：专属助手详情页固定不展示编辑按钮；6 月前历史版本详情页也需屏蔽编辑按钮。
 
 ### 4.5 文档需要同步修改的内容
 
 1. `SkillClientSdkInterfaceV2.md`：补充 SDK 初始化注册 IM 模块通知广播、IM 广播透传服务端返回数据、服务端下发 `action + weCrew + notifyWecodeId` 载荷结构和广播事件约定。
 2. Android / iOS / HarmonyOS SDK 接口说明：补充更新、删除、补偿刷新触发广播的时机。
-3. `ai-chat-viewer` 相关需求或设计文档：补充 `weAgentCUI` 页面通过 `HWH5EXT.registerEventListener` 消费 `agentskills_update_weAgentDetail`、`agentskills_delete_weAgent` 的处理规则。
+3. `ai-chat-viewer` 相关需求或设计文档：补充 `weAgentCUI` 页面通过 `HWH5EXT.registerEventListener` 消费 `welink.agentskills.agentUpdated` 的处理规则。
 4. 助理详情页相关文档：补充专属助手详情页不显示编辑按钮，以及 6 月前历史版本屏蔽编辑按钮的规则。
 
 ## 5. 性能
@@ -642,7 +656,7 @@ flowchart TD
 
 ### 9.1 功能测试
 
-1. 服务端下发 `action = update`，本地存在目标助理详情缓存时，校验 `we_agent_details`、`current_we_agent_detail` 和 `updateWeAgentDetailEvent`。
+1. 服务端下发 `action = update`，本地存在目标助理详情缓存时，校验 `we_agent_details`、`current_we_agent_detail` 和 `welink.agentskills.agentUpdated` 更新广播。
 2. 服务端下发 `action = update`，本地不存在目标助理详情缓存时，校验不新增缓存但仍触发更新广播。
 3. 服务端下发 `action = delete`，本地存在目标助理时，校验列表缓存和详情缓存被删除，并触发删除广播。
 4. 服务端下发 `action = delete`，本地不存在目标助理时，校验不报错且仍触发删除广播。
@@ -651,12 +665,12 @@ flowchart TD
 7. 冷启动时 `we_agent_details` 非空，批量接口返回详情有差异，校验缓存更新和更新广播。
 8. 冷启动时批量接口未返回某个本地助理，校验该助理详情缓存和列表缓存删除，并触发删除广播。
 9. 离线恢复在线后重复执行补偿刷新，校验无差异时不触发无意义广播。
-10. 本端 `updateWeAgent` 成功后，校验仅更新命中的当前详情或详情缓存、不新增详情缓存，并触发 `updateWeAgentDetailEvent`。
-11. 本端 `deleteWeAgent` 删除非当前助理成功后，校验仅在删除前已有列表缓存时更新列表缓存；若 `we_agent_details` 有对应助手详情缓存，则删除对应详情缓存；并触发 `deleteWeAgentEvent`。
-12. 本端 `deleteWeAgent` 删除当前助理成功后，校验列表缓存移除目标助理、当前详情切换到下一个助理或清空、`nextUris` 按现有规则组装；若 `we_agent_details` 有被删助手详情缓存，则删除对应详情缓存；并触发 `deleteWeAgentEvent`。
-13. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'agentskills_update_weAgentDetail', func })` 注册更新监听，并校验 `broadcastWeAgentEvent('updateWeAgentDetailEvent', weCrew)` 可触发该 `func`。
-14. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'agentskills_delete_weAgent', func })` 注册删除监听，并校验 `broadcastWeAgentEvent('deleteWeAgentEvent', weCrew)` 可触发该 `func`。
-15. 校验 `agentskills_update_weAgentDetail` 与 `agentskills_delete_weAgent` 的回调 `data` 结构均与对应 SDK 广播数据一致，并与服务端下发的 `weCrew` 一致。
+10. 本端 `updateWeAgent` 成功后，校验仅更新命中的当前详情或详情缓存、不新增详情缓存，并触发 `welink.agentskills.agentUpdated` 广播，payload.type 为 `update`。
+11. 本端 `deleteWeAgent` 删除非当前助理成功后，校验仅在删除前已有列表缓存时更新列表缓存；若 `we_agent_details` 有对应助手详情缓存，则删除对应详情缓存；并触发 `welink.agentskills.agentUpdated` 广播，payload.type 为 `delete`。
+12. 本端 `deleteWeAgent` 删除当前助理成功后，校验列表缓存移除目标助理、当前详情切换到下一个助理或清空、`nextUris` 按现有规则组装；若 `we_agent_details` 有被删助手详情缓存，则删除对应详情缓存；并触发 `welink.agentskills.agentUpdated` 广播，payload.type 为 `delete`。
+13. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'welink.agentskills.agentUpdated', func })` 注册统一监听，并校验更新广播可触发该 `func`。
+14. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'welink.agentskills.agentUpdated', func })` 注册统一监听，并校验删除广播可触发该 `func`。
+15. 校验 `welink.agentskills.agentUpdated` 的更新回调 payload 为 `{ type: 'update', data: weCrew }`，删除回调 payload 为 `{ type: 'delete', data: weCrew }`。
 16. `weAgentCUI` 收到当前助理更新事件后，校验名称、简介、头像刷新。
 17. `weAgentCUI` 收到非当前助理更新或删除事件后，校验页面不变化。
 18. `weAgentCUI` 收到当前助理删除事件后，校验展示不可取消弹窗，且“切换助理”可跳转到切换助理页面。
@@ -675,12 +689,12 @@ flowchart TD
 ### 9.3 文档一致性检查
 
 1. 服务端通知示例统一为 `action + weCrew + notifyWecodeId`。
-2. 更新广播事件名统一为 `updateWeAgentDetailEvent`。
-3. 删除广播事件名统一为 `deleteWeAgentEvent`。
-4. 更新与删除广播的 `data` 数据结构统一与服务端下发的 `weCrew` 一致。
+2. 更新与删除广播事件名统一为 `welink.agentskills.agentUpdated`。
+3. 更新广播 payload 统一为 `{ type: 'update', data: weCrew }`。
+4. 删除广播 payload 统一为 `{ type: 'delete', data: weCrew }`。
 5. 三端 SDK 文档中的缓存 key、触发时机、边界处理规则保持一致。
 6. 三端 SDK 文档中的 IM 模块通知广播注册时机、幂等策略、透传载荷解析和失败降级规则保持一致。
-7. `weAgentCUI` 页面文档中的 `HWH5EXT.registerEventListener` 入参 `type`、`func` 与 SDK 事件映射保持一致：更新为 `agentskills_update_weAgentDetail`，删除为 `agentskills_delete_weAgent`。
+7. `weAgentCUI` 页面文档中的 `HWH5EXT.registerEventListener` 入参 `type`、`func` 与 SDK 广播保持一致：`type` 统一为 `welink.agentskills.agentUpdated`。
 8. 助理详情页文档需补充 6 月前历史版本屏蔽编辑按钮的兼容策略。
 9. 助理详情页文档需补充专属助手详情页不显示编辑按钮的展示规则。
 
