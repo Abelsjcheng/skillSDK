@@ -52,12 +52,21 @@ export interface QuestionOption {
   description?: string;
 }
 
+export type QuestionAnswerMatrix = string[][];
+export type MessageContent = string | QuestionAnswerMatrix;
+
+export interface QuestionAnswerSummary {
+  question: string;
+  answers: string[];
+}
+
 export interface QuestionAnswerSubmission {
-  answer: string;
+  answer: QuestionAnswerMatrix;
   messageId?: string;
   toolCallId?: string;
   questionId?: string;
   subagentSessionId?: string;
+  answerDetails?: QuestionAnswerSummary[];
 }
 
 export type QuestionOptionInput = string | QuestionOption;
@@ -66,6 +75,14 @@ export interface QuestionItemInput {
   header?: string;
   question?: string;
   options?: QuestionOptionInput[] | null;
+  multiSelect?: boolean | null;
+}
+
+export interface QuestionItem {
+  header?: string;
+  question?: string;
+  options?: QuestionOption[];
+  multiSelect?: boolean;
 }
 
 interface ToolPartFields<TValue, TStatus> {
@@ -78,13 +95,13 @@ interface ToolPartFields<TValue, TStatus> {
   title?: TValue;
 }
 
-interface QuestionPartFields<TValue, TOptions> {
+interface QuestionPartFields<TValue, TOptions, TQuestions> {
   header?: TValue;
   question?: TValue;
   questionId?: TValue;
   options?: TOptions;
   multiSelect?: boolean | null;
-  questions?: QuestionItemInput[] | null;
+  questions?: TQuestions | null;
   extParam?: object | null;
 }
 
@@ -107,7 +124,7 @@ interface FilePartFields<TValue> {
 /** StreamMessage delivered from SessionListener onMessage callback. */
 export interface StreamMessage
   extends ToolPartFields<string | null, PartStatus | string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[]>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   // transport-level fields
@@ -161,7 +178,7 @@ export interface SessionMessage {
   seq: number | null;
   welinkSessionId: string;
   role: BackendMessageRole;
-  content: string | null;
+  content: MessageContent | null;
   contentType: BackendContentType;
   meta: object | null;
   messageSeq: number | null;
@@ -171,7 +188,7 @@ export interface SessionMessage {
 
 export interface SessionMessagePart
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[]>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   partId: string;
@@ -189,7 +206,7 @@ export interface SessionMessagePart
 /** A structured part within an assistant message */
 export interface MessagePart
   extends ToolPartFields<string, PartStatus>,
-  QuestionPartFields<string, QuestionOption[]>,
+  QuestionPartFields<string, QuestionOption[], QuestionItem[]>,
   PermissionPartFields<string, PermissionResponse | string>,
   FilePartFields<string> {
   partId: string;
@@ -209,7 +226,7 @@ export interface MessagePart
 export interface Message {
   id: string;
   role: MessageRole;
-  content: string;
+  content: MessageContent;
   contentType?: BackendContentType | 'code';
   timestamp: number;
   isStreaming?: boolean;
@@ -218,6 +235,7 @@ export interface Message {
   meta?: {
     tokens?: StreamMessage['tokens'];
     cost?: number;
+    questionAnswers?: QuestionAnswerSummary[];
   };
 }
 
@@ -238,7 +256,7 @@ export interface SessionMessageSnapshot {
   seq: number | null;
   messageSeq?: number | null;
   role: string;
-  content: string | null;
+  content: MessageContent | null;
   contentType?: BackendContentType | 'code';
   meta?: object | null;
   createdAt?: string;
@@ -248,7 +266,7 @@ export interface SessionMessageSnapshot {
 /** Part snapshot for streaming recovery */
 export interface MessagePartSnapshot
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[]>,
   PermissionPartFields<string | null, string | null>,
   FilePartFields<string | null> {
   partId: string;
@@ -290,7 +308,7 @@ interface MessageOperationResponseBase {
   seq: number | null;
   messageSeq: number | null;
   role: BackendMessageRole;
-  content: string | null;
+  content: MessageContent | null;
   contentType: BackendContentType;
   createdAt: string;
   meta: object | null;

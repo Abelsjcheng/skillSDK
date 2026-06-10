@@ -26,6 +26,7 @@ import type {
 } from '../types/bridge';
 import type {
   GetSessionMessageHistoryResponse,
+  MessageContent,
   ReplyPermissionResponse,
   SendMessageResponse,
   SendMessageToIMResponse,
@@ -35,6 +36,16 @@ import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { reportApiError, reportApiSuccess } from './telemetry';
 import { reportUemEvent } from './hwext';
 import { WeLog } from './logger';
+
+function getContentLength(content: MessageContent | string | null | undefined): number {
+  if (typeof content === 'string') {
+    return content.length;
+  }
+  if (Array.isArray(content)) {
+    return JSON.stringify(content).length;
+  }
+  return 0;
+}
 
 function reportClickEvent(
   eventId: string,
@@ -205,7 +216,7 @@ export async function trackApiSendMessage(
     void reportApiSuccess('api_send_message', '发送消息接口', {
       request: {
         welinkSessionId: params.welinkSessionId,
-        contentLength: params.content.length,
+        contentLength: getContentLength(params.content),
         toolCallId: params.toolCallId,
         questionId: params.questionId,
         subagentSessionId: params.subagentSessionId,
@@ -219,7 +230,7 @@ export async function trackApiSendMessage(
     void reportApiError('api_send_message', '发送消息接口', error, {
       request: {
         welinkSessionId: params.welinkSessionId,
-        contentLength: params.content.length,
+        contentLength: getContentLength(params.content),
         toolCallId: params.toolCallId,
         questionId: params.questionId,
         subagentSessionId: params.subagentSessionId,

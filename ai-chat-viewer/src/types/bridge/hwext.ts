@@ -8,6 +8,7 @@ import type {
   SendMessageToIMResponse,
   StopSkillResponse,
   StreamMessage,
+  MessageContent,
 } from '../index';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../digitalTwin';
 
@@ -32,7 +33,7 @@ export interface UnregisterSessionListenerParams {
 
 export interface SendMessageParams {
   welinkSessionId: string;
-  content: string;
+  content: MessageContent;
   toolCallId?: string;
   questionId?: string;
   subagentSessionId?: string;

@@ -2,6 +2,45 @@ import { render } from '@testing-library/react';
 import { MessageBubble } from '../MessageBubble';
 import type { Message, MessagePart } from '../../types';
 
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: string }) => {
+    const React = require('react');
+    const content = String(children ?? '');
+    if (content.trim().startsWith('- ')) {
+      return React.createElement(
+        'ul',
+        null,
+        content.split('\n').filter(Boolean).map((item, index) =>
+          React.createElement('li', { key: index }, item.replace(/^- /, '')),
+        ),
+      );
+    }
+    return React.createElement(
+      React.Fragment,
+      null,
+      content.split(/\n\n+/).filter(Boolean).map((paragraph, index) =>
+        React.createElement('p', { key: index }, paragraph),
+      ),
+    );
+  },
+}));
+jest.mock('remark-gfm', () => () => undefined);
+jest.mock('remark-breaks', () => () => undefined);
+jest.mock('remark-math', () => () => undefined);
+jest.mock('rehype-raw', () => () => undefined);
+jest.mock('rehype-katex', () => () => undefined);
+jest.mock('../markdownComponents', () => ({
+  createMarkdownComponents: () => ({}),
+  normalizeMarkdownHtml: (content: string) => content,
+}));
+jest.mock('../ToolCard', () => ({
+  ToolCard: () => {
+    const React = require('react');
+    return React.createElement('div', null, 'ToolCard');
+  },
+}));
+
 function createAssistantMessage(content: string): Message {
   return {
     id: 'message-1',
@@ -116,5 +155,34 @@ describe('MessageBubble', () => {
 
     expect(container.querySelector('.permission-card')).toBeInTheDocument();
     expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
+  });
+
+  it('renders question answer arrays as a question and answer table for user messages', () => {
+    const answerMessage = {
+      id: 'user-answer-1',
+      role: 'user',
+      content: [['Android'], ['HarmonyOS', 'Web'], []],
+      contentType: 'plain',
+      timestamp: Date.now(),
+      isStreaming: false,
+      meta: {
+        questionAnswers: [
+          { question: 'Choose the first platform', answers: ['Android'] },
+          { question: 'Choose secondary platforms', answers: ['HarmonyOS', 'Web'] },
+          { question: 'Optional note', answers: [] },
+        ],
+      },
+    } as unknown as Message;
+
+    const { container } = render(
+      <MessageBubble message={answerMessage} welinkSessionId="session-1" />,
+    );
+
+    expect(container.querySelector('.question-answer-table')).toBeInTheDocument();
+    expect(container.querySelector('.question-answer-table__question')).toHaveTextContent('Choose the first platform');
+    expect(container.querySelector('.question-answer-table__answer')).toHaveTextContent('Android');
+    expect(container).toHaveTextContent('Choose secondary platforms');
+    expect(container).toHaveTextContent('HarmonyOS、Web');
+    expect(container).toHaveTextContent('Optional note');
   });
 });

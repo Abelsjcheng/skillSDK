@@ -1,6 +1,7 @@
 import type {
   GetSessionMessageHistoryResponse,
   GetSessionMessageResponse,
+  MessageContent,
   RegenerateAnswerResponse,
   SendMessageResponse,
   SessionMessage,
@@ -293,6 +294,16 @@ function splitReplyContent(content: string): string[] {
     cursor += chunkSize;
   }
   return chunks.length > 0 ? chunks : [content];
+}
+
+function messageContentToText(content: MessageContent | null | undefined): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return JSON.stringify(content);
+  }
+  return '';
 }
 
 function buildTextPart(
@@ -825,7 +836,7 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
 function createMessage(
   sessionId: string,
   role: 'user' | 'assistant',
-  content: string,
+  content: MessageContent,
   messageSeq: number,
   partId?: string,
 ): SessionMessage {
@@ -839,7 +850,7 @@ function createMessage(
     contentType: 'plain',
     meta: null,
     messageSeq,
-    parts: partId ? buildTextPart(partId, content) : null,
+    parts: partId && typeof content === 'string' ? buildTextPart(partId, content) : null,
     createdAt,
   };
 }
@@ -1847,7 +1858,7 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         role: 'user',
         messageId: userMessage.id,
         messageSeq: userMessage.messageSeq,
-        content: userMessage.content,
+        content: messageContentToText(userMessage.content),
         emittedAt: userMessage.createdAt,
       });
     });
@@ -2280,7 +2291,7 @@ function buildMockApi(): HWH5EXT {
       const assistantMessage = createMessage(
         record.session.welinkSessionId,
         'assistant',
-        buildAssistantReply(latestUser?.content ?? 'Please continue'),
+        buildAssistantReply(messageContentToText(latestUser?.content) || 'Please continue'),
         record.nextMessageSeq,
         nextId('part_regenerate'),
       );
@@ -2363,6 +2374,7 @@ function buildMockApi(): HWH5EXT {
 
     sendMessage: async (params: SendMessageParams): Promise<SendMessageResponse> => {
       const record = getSessionRecordOrThrow(params.welinkSessionId);
+      const userContentText = messageContentToText(params.content);
       const userMessage = createMessage(
         record.session.welinkSessionId,
         'user',
@@ -2372,10 +2384,10 @@ function buildMockApi(): HWH5EXT {
       record.nextMessageSeq += 1;
       upsertSessionRecord(record, userMessage);
       if (matchesSubagentSession(params.subagentSessionId, SUBAGENT_QUESTION_PREFIX)) {
-        scheduleSubagentQuestionReply(record, params.subagentSessionId!, params.content);
+        scheduleSubagentQuestionReply(record, params.subagentSessionId!, userContentText);
         return toSendMessageResponse(userMessage);
       }
-      scheduleAssistantReply(record, params.content);
+      scheduleAssistantReply(record, userContentText);
       return toSendMessageResponse(userMessage);
     },
 

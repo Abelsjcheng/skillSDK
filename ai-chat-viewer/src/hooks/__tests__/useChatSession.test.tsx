@@ -318,7 +318,7 @@ describe('useChatSession', () => {
 
     await act(async () => {
       await result.current.onQuestionAnswered({
-        answer: 'Android',
+        answer: [['Android']],
         messageId: result.current.messages[0].id,
         toolCallId: questionPart?.toolCallId,
         questionId: questionPart?.questionId,
@@ -327,9 +327,25 @@ describe('useChatSession', () => {
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
       welinkSessionId: 'session_1',
-      content: 'Android',
+      content: [['Android']],
       toolCallId: 'tool_call_1',
       questionId: 'question_1',
+    }));
+  });
+
+  it('keeps ordinary user messages as trimmed strings', async () => {
+    const { result } = renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+    }));
+
+    await act(async () => {
+      await result.current.onSend('  hello  ');
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      welinkSessionId: 'session_1',
+      content: 'hello',
     }));
   });
 });
