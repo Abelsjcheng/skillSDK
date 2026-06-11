@@ -473,11 +473,17 @@
   }
 
   .thinking-block__content {
+    box-sizing: border-box;
     padding: 12px;
     border-top: 1px solid #ececec;
     background-color: #fff;
     font-size: 13px;
+    line-height: 20px;
     color: #666;
+    max-height: 400px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   // QuestionCard
