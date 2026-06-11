@@ -34,6 +34,34 @@
     }
   }
 
+  &.pc-mode {
+    .content--we-agent-cui {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+      -ms-overflow-style: auto;
+
+      &::-webkit-scrollbar {
+        display: block;
+        width: 6px;
+        height: 6px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 100px;
+      }
+    }
+
+    .messages-container--we-agent-cui {
+      padding: 0 var(--we-agent-cui-pc-content-gutter, 150px);
+      box-sizing: border-box;
+    }
+  }
+
   .messages-container {
     display: flex;
     flex-direction: column;

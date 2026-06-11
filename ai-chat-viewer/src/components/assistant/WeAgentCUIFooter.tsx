@@ -81,6 +81,16 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     }
 
     const minHeightValue = `${PC_TEXTAREA_MIN_HEIGHT}px`;
+    if (value.trim().length === 0) {
+      if (textarea.style.height !== minHeightValue) {
+        textarea.style.height = minHeightValue;
+      }
+      if (textarea.style.overflowY !== 'hidden') {
+        textarea.style.overflowY = 'hidden';
+      }
+      return;
+    }
+
     if (textarea.style.height !== minHeightValue) {
       textarea.style.height = minHeightValue;
     }

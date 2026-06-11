@@ -332,6 +332,7 @@
 }
 
 .app-container--we-agent-cui.pc-mode {
+  --we-agent-cui-pc-content-gutter: 150px;
   height: 100vh;
   padding: 0;
   background-image: url('../imgs/assistant-cui-pc-bg.png');
@@ -348,38 +349,21 @@
   }
 
   .we-agent-cui-chat-panel {
-    padding: 0 150px;
+    padding: 0;
     transition: padding 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: padding;
   }
 
-  .content--we-agent-cui {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
-    -ms-overflow-style: auto;
-
-    &::-webkit-scrollbar {
-      display: block;
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 100px;
-    }
-  }
-
   .we-agent-cui-bottom {
+    padding: 0 var(--we-agent-cui-pc-content-gutter);
+    box-sizing: border-box;
     overflow: visible;
   }
 
   .we-agent-cui-welcome {
     margin-top: 64px;
+    padding: 0 var(--we-agent-cui-pc-content-gutter);
+    box-sizing: border-box;
 
     > * + * {
       margin-top: 0;
@@ -403,12 +387,14 @@
 }
 
 .app-container--we-agent-cui.pc-mode.has-history-sidebar {
+  --we-agent-cui-pc-content-gutter: 50px;
+
   .we-agent-cui-main {
     padding-left: 260px;
   }
 
   .we-agent-cui-chat-panel {
-    padding: 0 50px;
+    padding: 0;
   }
 }
 
