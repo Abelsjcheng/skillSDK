@@ -35,7 +35,7 @@
 1. 不新增统一监听接口，继续复用客户端已有广播机制。
 2. 不新增新的持久化缓存 key，继续沿用 `current_we_agent_detail`、`we_agent_details`、`we_agent_list_cache`。
 3. 服务端主动更新通知场景下，不额外调用 `getWeAgentDetails` 或查详情接口补拉详情。
-4. 服务端主动删除通知场景下，不复用 `deleteWeAgent` 的当前助理切换逻辑，不组装 `nextUris`。
+4. 服务端主动删除通知场景下，不复用 `deleteWeAgent` 的当前助理跳转逻辑，不组装跳转 URI。
 
 ## 2. 方案图
 
@@ -286,12 +286,12 @@ flowchart TD
     O --> P["构建 DeleteWeAgentContext"]
     P --> Q{"删除目标是否命中 current_we_agent_detail"}
     Q -- "否" --> R["不准备当前助理跳转上下文"]
-    Q -- "是" --> V["prepareDeleteWeAgentTransition"]
+    Q -- "是" --> V["准备删除前助理列表快照"]
     V --> W["优先读取删除前 we_agent_list_cache 快照"]
     W --> X{"列表缓存是否存在"}
     X -- "否" --> Y["调用 getWeAgentList 获取删除前列表"]
     X -- "是" --> Z["使用本地删除前列表"]
-    Y --> AA["基于删除前列表快照预计算 updatedList"]
+    Y --> AA["记录删除前列表快照"]
     Z --> AA
     R --> AB["调用 DELETE /v4-1/we-crew"]
     AA --> AB
@@ -306,7 +306,7 @@ flowchart TD
     AH --> AI
     AI --> AJ["调用 broadcastWeAgentEvent(agentskills.agentUpdated, deletePayload)"]
     AJ --> AL
-    AE -- "是" --> AM["保存 transitionPlan.updatedList 到 we_agent_list_cache"]
+    AE -- "是" --> AM["从列表快照移除目标助理并回写 we_agent_list_cache"]
     AM --> AN{"删除后列表是否存在主助理"}
     AN -- "否" --> AO["删除 current_we_agent_detail"]
     AN -- "是" --> AP["优先从 we_agent_details 读取主助理详情"]
@@ -319,7 +319,7 @@ flowchart TD
     AR --> AU["若 we_agent_details 有被删除助理详情缓存则删除"]
     AO --> AU
     AU --> AV{"是否有可跳转主助理详情"}
-    AV -- "是" --> AW["按主助理详情组装 nextUris 并跳转主助理"]
+    AV -- "是" --> AW["按主助理详情组装跳转 URI 并跳转主助理"]
     AV -- "否" --> AY["跳转到激活页面"]
     AW --> AX["调用 broadcastWeAgentEvent(agentskills.agentUpdated, deletePayload)"]
     AY --> AX
@@ -468,9 +468,9 @@ SDK 初始化监听注册：
 
 | 平台 | 删除后处理方法 | 关键行为 |
 |---|---|---|
-| Android | `handleDeleteWeAgentResult(...)` / `handleDeleteWeAgentSuccess(...)` | 非当前助理只更新已存在列表缓存；当前助理基于删除后列表判断主助理，有主助理则切换并跳转主助理，无主助理则跳转激活页面； |
-| iOS | `handleDeleteWeAgentResultWithContext:...` / `handleDeleteWeAgentSuccessWithPlan:...` | 非当前助理只更新已存在列表缓存；当前助理基于删除后列表判断主助理，有主助理则切换并跳转主助理，无主助理则跳转激活页面； |
-| HarmonyOS | `handleDeleteWeAgentResult(...)` / `handleDeleteCurrentWeAgentSuccess(...)` | 非当前助理只更新已存在列表缓存；当前助理基于删除后列表判断主助理，有主助理则切换并跳转主助理，无主助理则跳转激活页面； |
+| Android | `handleDeleteWeAgentResult(...)` / `handleDeleteWeAgentSuccess(...)` | 非当前助理只更新已存在列表缓存；当前助理不计算下一个助理，仅基于删除后列表判断主助理，有主助理则切换并跳转主助理，无主助理则跳转激活页面； |
+| iOS | `handleDeleteWeAgentResultWithContext:...` / `handleDeleteWeAgentSuccessWithPlan:...` | 非当前助理只更新已存在列表缓存；当前助理不计算下一个助理，仅基于删除后列表判断主助理，有主助理则切换并跳转主助理，无主助理则跳转激活页面； |
+| HarmonyOS | `handleDeleteWeAgentResult(...)` / `handleDeleteCurrentWeAgentSuccess(...)` | 非当前助理只更新已存在列表缓存；当前助理不计算下一个助理，仅基于删除后列表判断主助理，有主助理则切换并跳转主助理，无主助理则跳转激活页面； |
 
 1. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个：
    - 仅传 `partnerAccount` 时，透传 `partnerAccount`；
@@ -485,17 +485,16 @@ SDK 初始化监听注册：
    - 仅尝试更新本地 `we_agent_list_cache`；
    - 若本地存在助理列表缓存，则从缓存列表中移除当前被删除助理，并将删除后的列表回写；
    - 若本地不存在助理列表缓存，则不主动调用 `getWeAgentList`，也不做缓存处理；
-   - 不触发当前助理切换逻辑，不修改 `current_we_agent_detail`，不组装 `nextUris`；
+   - 不触发当前助理跳转逻辑，不修改 `current_we_agent_detail`，不组装跳转 URI；
    - 若本地 `we_agent_details` 中存在当前被删除助理对应详情缓存，则删除该条详情缓存并回写。
 6. 若删除目标是当前助理：
-   - 删除接口请求前先准备切换上下文；三端代码中 `prepareDeleteWeAgentContext` 会在 `requestDeleteWeAgent` 前执行，用于基于删除前列表快照预计算删除后的列表 `transitionPlan.updatedList`；
+   - 删除接口请求前只准备删除前列表快照，不计算当前助理的下一个助理；
    - 优先读取本地 `we_agent_list_cache` 作为删除前列表快照；
    - 若本地没有列表缓存，则调用 `getWeAgentList` 对应接口获取最新列表，并更新列表缓存；
-   - 基于删除前列表快照定位被删助理，并预先计算删除后的助理列表；
-   - 服务端删除成功后，基于删除前列表快照移除被删助理，并回写 `we_agent_list_cache`；
-   - 根据删除后的助理列表判断是否存在主助理；主助理判断以服务端助理列表协议中的主助理标识为准，SDK 不自行按列表顺序推断主助理；
+   - 服务端删除成功后，从列表快照中移除被删助理，得到删除后的助理列表，并回写 `we_agent_list_cache`；
+   - 根据删除后的助理列表判断是否存在主助理；主助理判断以服务端助理列表协议中的主助理标识为准，SDK 不自行按列表顺序推断主助理，也不按列表位置兜底选择其他助理；
    - 若存在主助理，则优先从 `we_agent_details[mainPartnerAccount]` 读取详情，未命中时调用 `GET /v1/robot-partners/{partnerAccount}` 获取主助理详情并写入 `we_agent_details`；
-   - 成功获取主助理详情时，将其写入 `current_we_agent_detail`，并在内存中按 `getWeAgentUri` 同一套规则组装 `nextUris` 后跳转主助理；
+   - 成功获取主助理详情时，将其写入 `current_we_agent_detail`，并在内存中按 `getWeAgentUri` 同一套规则组装跳转 URI 后跳转主助理；
    - 若删除后的助理列表中不存在主助理，或主助理详情获取失败，则清空 `current_we_agent_detail` 并跳转到激活页面；
    - 若本地 `we_agent_details` 中存在当前被删除助理对应详情缓存，则删除该条详情缓存并回写。
 7. 本方案若补充删除广播，广播点放在上述现有删除成功处理完成之后；广播事件为 `agentskills.agentUpdated`，payload 结构为 `{ type: 'delete', data: weCrew }`，其中 `data` 需组装为与服务端删除通知 `weCrew` 一致的结构，即包含删除目标 `robotId`、`partnerAccount`。
