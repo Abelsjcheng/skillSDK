@@ -138,6 +138,46 @@
 
 }
 
+.app-container--we-agent-cui.pc-mode .weAgent-code-content {
+  &.code-block {
+    border-color: #dfe3ea;
+    background: #ffffff;
+  }
+
+  .code-block__header {
+    border-bottom-color: #e5e8ef;
+    background: #f6f8fb;
+  }
+
+  .code-block__syntax {
+    background: #fbfcfe !important;
+    color: #2f3337 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    -ms-overflow-style: auto;
+
+    &::-webkit-scrollbar {
+      display: block;
+      width: 6px;
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 100px;
+    }
+  }
+
+  .code-block__syntax pre[class*='language-'],
+  .code-block__syntax code[class*='language-'] {
+    background: #fbfcfe !important;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .app-container--we-agent-cui:not(.pc-mode) .weAgent-code-content {
     &.code-block {

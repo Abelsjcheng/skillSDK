@@ -11,6 +11,9 @@ import type {
 } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
+const PC_TEXTAREA_MIN_HEIGHT = 44;
+const PC_TEXTAREA_MAX_HEIGHT = 132;
+
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,
   mode,
@@ -23,6 +26,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isGenerating = mode === 'generating';
   const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
     { mode: 'enter', label: t('weAgent.shortcut.enterSend') },
@@ -65,6 +69,36 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       document.removeEventListener('mousedown', handleDocumentMouseDown);
     };
   }, [isPcMiniApp, isShortcutPopupOpen]);
+
+  useEffect(() => {
+    if (!isPcMiniApp) {
+      return;
+    }
+
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    const minHeightValue = `${PC_TEXTAREA_MIN_HEIGHT}px`;
+    if (textarea.style.height !== minHeightValue) {
+      textarea.style.height = minHeightValue;
+    }
+
+    const nextHeight = Math.min(
+      Math.max(textarea.scrollHeight, PC_TEXTAREA_MIN_HEIGHT),
+      PC_TEXTAREA_MAX_HEIGHT,
+    );
+    const nextHeightValue = `${nextHeight}px`;
+    if (textarea.style.height !== nextHeightValue) {
+      textarea.style.height = nextHeightValue;
+    }
+
+    const nextOverflowY = textarea.scrollHeight > PC_TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+    if (textarea.style.overflowY !== nextOverflowY) {
+      textarea.style.overflowY = nextOverflowY;
+    }
+  }, [isPcMiniApp, value]);
 
   const handleSend = () => {
     const trimmedValue = value.trim();
@@ -132,6 +166,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       onClick={handleSendButtonClick}
       disabled={isGenerating ? false : !value.trim()}
       aria-label={sendButtonLabel}
+      data-tooltip={isPcMiniApp && isGenerating ? sendButtonLabel : undefined}
     >
       <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" draggable="false" />
     </button>
@@ -161,12 +196,13 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   return (
     <div className="we-agent-cui-footer we-agent-cui-footer--pc">
       <textarea
+        ref={textareaRef}
         className="we-agent-cui-footer__input"
         placeholder={t('weAgent.inputPlaceholder')}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handlePcKeyDown}
-        rows={1}
+        rows={2}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();

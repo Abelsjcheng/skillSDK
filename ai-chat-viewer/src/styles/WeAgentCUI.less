@@ -273,6 +273,7 @@
     border: 2px solid rgba(255, 255, 255, 1);
     overflow: hidden;
     box-sizing: border-box;
+    box-shadow: 0px 1px 6px 0px rgba(0, 0, 0, 0.08);
   }
 
   .we-agent-cui-welcome__avatar {
@@ -352,6 +353,27 @@
     will-change: padding;
   }
 
+  .content--we-agent-cui {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    -ms-overflow-style: auto;
+
+    &::-webkit-scrollbar {
+      display: block;
+      width: 6px;
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 100px;
+    }
+  }
+
   .we-agent-cui-bottom {
     overflow: visible;
   }
@@ -366,13 +388,14 @@
 
   .we-agent-cui-welcome__title {
     margin-top: 16px;
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 600;
     line-height: 30px;
   }
 
   .we-agent-cui-welcome__subtitle {
     margin-top: 24px;
+    color: rgb(153, 153, 153);
     font-size: 14px;
     font-weight: 400;
     line-height: 24px;
