@@ -5,7 +5,7 @@ export function isPcMiniApp(): boolean {
     return false;
   }
 
-  return false;
+  return Boolean(window.Pedestal && typeof window.Pedestal.callMethod === "function");
 }
 
 function resolveIsProEnv(): boolean {

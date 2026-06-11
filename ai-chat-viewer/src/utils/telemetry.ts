@@ -126,7 +126,7 @@ export async function reportApiTelemetry(
   payload: ApiTelemetryPayload,
 ): Promise<void> {
   try {
-    await emitTelemetry(eventId, eventTitle, payload);
+    await emitTelemetry(eventId, eventTitle, { ...payload });
   } catch (error) {
     WeLog(`telemetry reportApiTelemetry failed | extra=${JSON.stringify({ eventId, type: payload.type })} | error=${JSON.stringify(error)}`);
   }

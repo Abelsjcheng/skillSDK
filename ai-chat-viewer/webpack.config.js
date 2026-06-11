@@ -85,7 +85,7 @@ module.exports = (env = {}, argv = {}) => {
           changeOrigin: true,
         },
         {
-          context: ['/ws'],
+          context: ['/ws/skill'],
           target: 'ws://localhost:8082',
           ws: true,
           changeOrigin: true,

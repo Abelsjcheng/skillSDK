@@ -13,6 +13,11 @@ import type {
   SessionStatus,
   AgentStatus,
 } from '../types';
+export type {
+  PlantUmlRenderParams,
+  PlantUmlRenderResponse,
+  PlantUmlRenderResult,
+} from '../types/plantUml';
 
 export type {
   AppProps,

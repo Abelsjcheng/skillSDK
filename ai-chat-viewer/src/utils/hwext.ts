@@ -9,6 +9,7 @@ import type {
   ControlSkillWeCodeResponse,
 } from '../types';
 import type { CreateDigitalTwinParams } from '../types/digitalTwin';
+import type { PlantUmlRenderParams, PlantUmlRenderResult } from '../types/plantUml';
 import type {
   AgentTypeListResult,
   BuildOpenWeAgentCUIOptions,
@@ -73,6 +74,7 @@ import {
   trackApiUpdateWeAgent,
   trackApiUpdateQrcodeInfo,
 } from './uemUtil';
+import { normalizePlantUmlRenderResult } from './plantUmlRenderer';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
@@ -157,6 +159,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       return call<ControlSkillWeCodeResponse>('controlSkillWeCode', params);
     },
     createNewSession: (params) => call<SkillSession>('createNewSession', params),
+    renderPlantUml: (params) => call<PlantUmlRenderResult>('renderPlantUml', params).then(normalizePlantUmlRenderResult),
     createDigitalTwin: (params) => assistantCall<CreateDigitalTwinResult>('createDigitalTwin', params),
     getAgentType: () => assistantCall<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => assistantCall<WeAgentListResult>('getWeAgentList', params),
@@ -193,6 +196,18 @@ function getJsApiOrThrow(): HWH5EXT {
     return createPedestalAdapter(getPedestalOrThrow());
   }
   return getHWH5EXT();
+}
+
+function createMissingRendererError(message: string): Error & { code: 'missing_renderer' } {
+  return Object.assign(new Error(message), { code: 'missing_renderer' as const });
+}
+
+function getPlantUmlRendererOrThrow(): HWH5EXT['renderPlantUml'] {
+  const jsApi = resolveJsApi();
+  if (!jsApi || typeof jsApi.renderPlantUml !== 'function') {
+    throw createMissingRendererError('PlantUML renderer is not available.');
+  }
+  return jsApi.renderPlantUml.bind(jsApi);
 }
 
 function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetWeAgentDetailsParams {
@@ -582,6 +597,16 @@ export async function createNewSession(params: CreateNewSessionParams): Promise<
   return trackApiCreateNewSession(
     normalizedParams,
     Promise.resolve(getJsApiOrThrow().createNewSession(normalizedParams)),
+  );
+}
+
+export async function renderPlantUml(
+  params: PlantUmlRenderParams,
+  _options?: { signal?: AbortSignal },
+): Promise<PlantUmlRenderResult> {
+  const renderer = getPlantUmlRendererOrThrow();
+  return normalizePlantUmlRenderResult(
+    await Promise.resolve(renderer(params)),
   );
 }
 

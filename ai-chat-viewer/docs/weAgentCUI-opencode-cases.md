@@ -66,6 +66,7 @@
 | C17 | `subagent` + `thinking/tool/text` | 是 | 主流程消息中出现可折叠子任务块，展示子 agent 的分析、工具执行与结论 | `mock-subagent` |
 | C18 | `subagent` + `question` | 是 | 子 agent 发起追问，卡片会冒泡到主流程，回答时会带 `subagentSessionId` 回传 | `mock-subagent-question` |
 | C19 | `subagent` + `permission.ask/reply` | 是 | 子 agent 发起权限申请，权限卡片会冒泡到主流程，授权回填也会携带 `subagentSessionId` | `mock-subagent-permission` |
+| C20 | `text.*`（PlantUML Markdown） | 是 | `plantuml` / `puml` 代码块稳定后渲染为图片，PC 可导出 PNG | `请用 PlantUML 画一个用户登录时序图。` |
 
 ## 4. 详细 Case
 
@@ -140,6 +141,57 @@
 
 - 消息仍属于 `text` part，不会额外拆 part
 - 历史消息与实时消息都能复用相同渲染路径
+
+---
+
+## C20. PlantUML Markdown 服务端渲染
+
+### 适用场景
+
+AI 回复中的 `plantuml` / `puml` fenced code block 由 SDK 内部请求服务端渲染为图片，并覆盖失败态、PC 导出和失败埋点。
+
+### 事件序列
+
+```json
+[
+  { "type": "session.status", "sessionStatus": "busy" },
+  {
+    "type": "text.delta",
+    "partId": "text_plantuml_1",
+    "role": "assistant",
+    "content": "```plantuml\n@startuml\nAlice -> Bob: hello\n@enduml\n```"
+  },
+  {
+    "type": "text.done",
+    "partId": "text_plantuml_1",
+    "role": "assistant",
+    "content": "```plantuml\n@startuml\nAlice -> Bob: hello\n@enduml\n```"
+  },
+  { "type": "session.status", "sessionStatus": "idle" }
+]
+```
+
+### 推荐提示词
+
+```text
+请用 PlantUML 输出一个用户登录时序图，代码块语言标记为 plantuml。
+```
+
+### 预期 UI
+
+- 流式期间只展示图表生成中，不请求服务端
+- `session.status=idle` 后由 SDK 内部调用 PlantUML 渲染接口，请求固定 path `/api/skill/plantuml/render`
+- SVG 预览使用 `Blob + URL.createObjectURL + img` 展示，不直接插入 SVG 源码
+- PC 端预览成功后展示“导出图片”，点击后请求 PNG 并通过 SDK 内部 `downloadPlantUmlImage` / `downloadFileWithPedestal` 保存
+- 非 PC 端不展示导出入口
+
+### 校验点
+
+- 服务端入参为 `{ content, convertType, fileType: 'puml' }`
+- 服务端 `code === "0"` 且 `data.image` 非空才算成功
+- `messgaeCn` 为中文错误消息，`messageEn` 为英文错误消息
+- 预览失败调用 `reportPlantUmlRenderFailed`，导出失败调用 `reportPlantUmlExportFailed`
+- 失败埋点不包含 PlantUML 源码
 
 ---
 

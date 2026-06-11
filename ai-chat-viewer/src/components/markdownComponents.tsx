@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Components } from 'react-markdown';
 import { CodeBlock } from './CodeBlock';
+import { PlantUmlBlock } from './PlantUmlBlock';
 import { openH5Webview } from '../utils/hwext';
 
 const INVALID_HTML_TAG_PATTERN = /<\/?([^\s>/]+)(?=[\s>/])/g;
@@ -52,6 +53,10 @@ export function createMarkdownComponents(includeCodeBlock = false): Components {
           const match = /language-(\w+)/.exec(className ?? '');
           const codeString = String(children).replace(/\n$/, '');
           if (match) {
+            const language = match[1].toLowerCase();
+            if (language === 'plantuml' || language === 'puml') {
+              return <PlantUmlBlock code={codeString} />;
+            }
             return <CodeBlock code={codeString} language={match[1]} />;
           }
           return (

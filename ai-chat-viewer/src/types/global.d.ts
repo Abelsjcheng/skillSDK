@@ -5,6 +5,7 @@ declare global {
     HWH5EXT?: HWH5EXT;
     Pedestal?: Pedestal;
     HWH5: HWH5Bridge;
+    require?: (moduleName: string) => unknown;
     onReceive?: (schema: string, payload: string) => void;
   }
 }

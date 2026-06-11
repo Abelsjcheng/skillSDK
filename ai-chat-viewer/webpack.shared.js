@@ -25,6 +25,7 @@ const TRANSPILE_DEPENDENCIES = [
   'i18next',
   'react-markdown',
   'react-i18next',
+  'react-zoom-pan-pinch',
   'react-syntax-highlighter',
   'remark-breaks',
   'remark-gfm',

@@ -336,3 +336,4 @@ export interface ControlSkillWeCodeResponse {
 }
 
 export * from './hooks';
+export * from './plantUml';

@@ -470,6 +470,8 @@ function createOpencodeArgs(prompt, toolSessionId) {
     '--format',
     'json',
     '--pure',
+    '--model',
+    'mimo/mimo-v2.5-pro',
   ];
 
   if (toolSessionId) {
@@ -610,7 +612,7 @@ function startOpencodeRun(session, prompt) {
     cwd: DEFAULT_WORKDIR,
     env: {
       ...process.env,
-      XDG_CONFIG_HOME: DEFAULT_CONFIG_HOME,
+      ...(process.platform === 'win32' ? { XDG_CONFIG_HOME: DEFAULT_CONFIG_HOME } : {}),
       NO_COLOR: '1',
     },
     shell: process.platform === 'win32',
@@ -916,7 +918,7 @@ app.use((error, _req, res, _next) => {
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
 server.on('upgrade', (request, socket, head) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host}`);

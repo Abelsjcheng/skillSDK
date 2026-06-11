@@ -4,6 +4,11 @@ import SkillCUI from '../pages/skillCUI';
 import type { SkillCUIProps } from '../types/pages';
 import { ensureLanguageInitialized } from '../i18n/config';
 export type { SkillCUIProps };
+export type {
+  PlantUmlRenderParams,
+  PlantUmlRenderResponse,
+  PlantUmlRenderResult,
+} from '../types/plantUml';
 
 const rootMap = new WeakMap<Element, Root>();
 

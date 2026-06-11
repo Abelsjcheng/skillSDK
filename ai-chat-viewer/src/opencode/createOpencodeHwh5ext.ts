@@ -39,6 +39,12 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
+import type { PlantUmlRenderParams, PlantUmlRenderResponse, PlantUmlRenderResult } from '../types/plantUml';
+import {
+  normalizePlantUmlRenderResult,
+  pickPlantUmlServerMessage,
+  PLANTUML_RENDER_PATH,
+} from '../utils/plantUmlRenderer';
 
 interface OpenCodeBridgeConfig {
   apiBaseUrl: string;
@@ -55,8 +61,10 @@ interface OpenCodeBridgeConfig {
 }
 
 interface ApiEnvelope<T> {
-  code: number;
-  errormsg: string;
+  code: number | string;
+  errormsg?: string;
+  messgaeCn?: string;
+  messageEn?: string;
   data: T;
 }
 
@@ -308,8 +316,15 @@ async function requestJson<T>(
     && 'data' in payload
   ) {
     const wrappedPayload = payload as ApiEnvelope<T>;
-    if (wrappedPayload.code !== 0) {
-      throw new Error(wrappedPayload.errormsg || 'Request failed');
+    if (wrappedPayload.code !== 0 && wrappedPayload.code !== '0') {
+      throw Object.assign(
+        new Error(
+          wrappedPayload.errormsg
+          || pickPlantUmlServerMessage(wrappedPayload as Partial<PlantUmlRenderResponse>)
+          || 'Request failed',
+        ),
+        { code: wrappedPayload.code },
+      );
     }
     return wrappedPayload.data;
   }
@@ -703,6 +718,22 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         },
       );
       return normalizeSession(session);
+    },
+
+    async renderPlantUml(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> {
+      const result = await requestJson<PlantUmlRenderResult>(
+        config,
+        PLANTUML_RENDER_PATH,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            content: params.content,
+            convertType: params.convertType,
+            fileType: 'puml',
+          }),
+        },
+      );
+      return normalizePlantUmlRenderResult(result);
     },
 
     async createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> {

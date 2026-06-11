@@ -17,6 +17,7 @@ import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
 import { SubtaskBlock } from './SubtaskBlock';
 import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
+import { MarkdownRuntimeConfigProvider } from './MarkdownRuntimeConfigContext';
 import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
@@ -101,15 +102,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     () => createMarkdownComponents(true),
     [],
   );
+  const markdownRuntimeValue = {
+    isStreaming: Boolean(message.isStreaming),
+    page: isPlainVariant ? 'skillCUI' : 'weAgentCUI',
+  };
 
-  const renderMarkdown = (content: string) => (
-    <ReactMarkdown
-      remarkPlugins={MARKDOWN_REMARK_PLUGINS}
-      rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
-      components={markdownComponents}
+  const renderMarkdown = (content: string, isStreaming = false) => (
+    <MarkdownRuntimeConfigProvider
+      value={{
+        ...markdownRuntimeValue,
+        isStreaming,
+      }}
     >
-      {normalizeMarkdownHtml(content)}
-    </ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+        rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
+        components={markdownComponents}
+      >
+        {normalizeMarkdownHtml(content)}
+      </ReactMarkdown>
+    </MarkdownRuntimeConfigProvider>
   );
 
   const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
@@ -118,7 +130,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         return <ThinkingBlock key={part.partId} part={part} />;
 
       case 'tool':
-        return <ToolCard key={part.partId} part={part} />;
+        return (
+          <MarkdownRuntimeConfigProvider key={part.partId} value={markdownRuntimeValue}>
+            <ToolCard part={part} />
+          </MarkdownRuntimeConfigProvider>
+        );
 
       case 'question':
         return (
@@ -173,7 +189,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       default:
         return (
           <div key={part.partId} className="text-part">
-            {renderMarkdown(part.content)}
+            {renderMarkdown(part.content, Boolean(part.isStreaming || message.isStreaming))}
           </div>
         );
     }
@@ -196,7 +212,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content);
+      return renderMarkdown(message.content, Boolean(message.isStreaming));
     }
     return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
   };

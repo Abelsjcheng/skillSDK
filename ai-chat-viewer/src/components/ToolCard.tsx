@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -10,6 +10,7 @@ import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import errorIcon from '../imgs/error_icon.svg';
 import successIcon from '../imgs/success_icon.svg';
 import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
+import { MarkdownRuntimeConfigContext, MarkdownRuntimeConfigProvider } from './MarkdownRuntimeConfigContext';
 import type { ToolCardProps } from '../types/components';
 
 const statusLabels: Record<string, string> = {
@@ -28,6 +29,7 @@ const statusIcons: Record<string, string> = {
 
 export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
   const [expanded, setExpanded] = useState(false);
+  const markdownRuntimeConfig = useContext(MarkdownRuntimeConfigContext);
   const status = part.status ?? 'pending';
   const statusLabel = statusLabels[status] ?? status;
   const statusIcon = statusIcons[status] ?? successIcon;
@@ -40,13 +42,20 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
     : '';
 
   const renderMarkdown = (content: string) => (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
-      rehypePlugins={[rehypeRaw, rehypeKatex]}
-      components={markdownComponents}
+    <MarkdownRuntimeConfigProvider
+      value={{
+        ...markdownRuntimeConfig,
+        isStreaming: status === 'running' || Boolean(part.isStreaming),
+      }}
     >
-      {normalizeMarkdownHtml(content)}
-    </ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+        rehypePlugins={[rehypeRaw, rehypeKatex]}
+        components={markdownComponents}
+      >
+        {normalizeMarkdownHtml(content)}
+      </ReactMarkdown>
+    </MarkdownRuntimeConfigProvider>
   );
 
   return (

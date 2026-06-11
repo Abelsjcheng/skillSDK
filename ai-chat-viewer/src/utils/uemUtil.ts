@@ -1,5 +1,4 @@
 import type {
-  CreateDigitalTwinParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
   DeleteWeAgentParams,
@@ -24,6 +23,7 @@ import type {
   WeAgentDetailsArrayResult,
   WeAgentListResult,
 } from '../types/bridge';
+import type { CreateDigitalTwinParams } from '../types/digitalTwin';
 import type {
   GetSessionMessageHistoryResponse,
   ReplyPermissionResponse,
@@ -31,8 +31,9 @@ import type {
   SendMessageToIMResponse,
   StopSkillResponse,
 } from '../types';
+import type { PlantUmlFailureTelemetryPayload } from '../types/plantUml';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
-import { reportApiError, reportApiSuccess } from './telemetry';
+import { reportApiError, reportApiSuccess, reportFlowTelemetry } from './telemetry';
 import { reportUemEvent } from './hwext';
 import { WeLog } from './logger';
 
@@ -95,6 +96,25 @@ export function reportSendMessageClick(
     robot_Id: assistantDetail?.id,
     bizRobotId: assistantDetail?.bizRobotId,
   });
+}
+
+function reportPlantUmlFailureEvent(
+  eventId: string,
+  eventTitle: string,
+  payload: PlantUmlFailureTelemetryPayload,
+): void {
+  void reportFlowTelemetry(eventId, eventTitle, {
+    ...payload,
+    type: 'error',
+  });
+}
+
+export function reportPlantUmlRenderFailed(payload: PlantUmlFailureTelemetryPayload): void {
+  reportPlantUmlFailureEvent('plantuml_render_failed', 'PlantUML 渲染失败', payload);
+}
+
+export function reportPlantUmlExportFailed(payload: PlantUmlFailureTelemetryPayload): void {
+  reportPlantUmlFailureEvent('plantuml_export_failed', 'PlantUML 导出失败', payload);
 }
 
 export async function trackApiCreateNewSession(
