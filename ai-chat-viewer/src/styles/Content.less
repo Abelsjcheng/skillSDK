@@ -143,6 +143,29 @@
     }
   }
 
+  .question-answer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    white-space: pre-wrap;
+  }
+
+  .question-answer-list__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    line-height: 22px;
+  }
+
+  .question-answer-list__index {
+    flex: 0 0 auto;
+  }
+
+  .question-answer-list__text {
+    min-width: 0;
+    word-break: break-word;
+  }
+
   .message-actions {
     display: flex;
     justify-content: flex-end;

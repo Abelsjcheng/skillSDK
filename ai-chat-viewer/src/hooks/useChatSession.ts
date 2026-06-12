@@ -14,7 +14,6 @@ import {
   collectUserMessageIds,
   contentTypeForRole,
   genMessageId,
-  isQuestionAnswerContent,
   mapRawParts,
   messageOperationToMessage,
   normalizeRole,
@@ -113,7 +112,6 @@ export function useChatSession({
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const knownUserMessageIdsRef = useRef(new Set<string>());
-  const hiddenQuestionAnswerMessageIdsRef = useRef(new Set<string>());
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
@@ -152,7 +150,6 @@ export function useChatSession({
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
-    hiddenQuestionAnswerMessageIdsRef.current.clear();
     nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
@@ -366,15 +363,13 @@ export function useChatSession({
     // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
     onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
 
-    if (isQuestionReply) {
-      const userMessageId = String(result.id);
-      hiddenQuestionAnswerMessageIdsRef.current.add(userMessageId);
-      knownUserMessageIdsRef.current.add(userMessageId);
-      return result;
-    }
-
     const mappedUserMessage = messageOperationToMessage(result);
-    const userMessage: Message = mappedUserMessage;
+    const userMessage: Message = isQuestionReply
+      ? {
+        ...mappedUserMessage,
+        content,
+      }
+      : mappedUserMessage;
     setMessages((prev) => {
       if (prev.some((message) => message.id === userMessage.id)) {
         return prev;
@@ -518,14 +513,6 @@ export function useChatSession({
           }
           finalizeStreamingMessage();
           setSessionStatus('busy');
-          if (
-            hiddenQuestionAnswerMessageIdsRef.current.has(nextMessage.id)
-            || isQuestionAnswerContent(nextMessage.content)
-          ) {
-            knownUserMessageIdsRef.current.add(nextMessage.id);
-            showPendingAssistantPreview(activeWelinkSessionIdRef.current);
-            break;
-          }
           setMessages((prev) => {
             if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
               return prev;

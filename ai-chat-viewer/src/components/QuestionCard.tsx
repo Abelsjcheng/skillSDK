@@ -5,6 +5,7 @@ import type { QuestionCardProps } from '../types/components';
 import type { MessagePart, QuestionAnswerMatrix, QuestionItem, QuestionOption } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { WeLog } from '../utils/logger';
+import { parseQuestionAnswerMatrix } from '../utils/message';
 
 interface RenderQuestion {
   header?: string;
@@ -65,6 +66,15 @@ function optionLabels(question: RenderQuestion): Set<string> {
 function createAnswerMatrixFromOutput(part: MessagePart, questions: RenderQuestion[]): QuestionAnswerMatrix {
   const answers = questions.map(() => [] as string[]);
   const answerText = getAnswerText(part);
+  if (!answerText) {
+    return answers;
+  }
+
+  const parsedAnswer = parseQuestionAnswerMatrix(answerText);
+  if (parsedAnswer) {
+    return questions.map((_, index) => parsedAnswer[index] ?? []);
+  }
+
   if (answerText && answers.length > 0) {
     answers[0] = [answerText];
   }

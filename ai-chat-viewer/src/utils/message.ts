@@ -55,24 +55,25 @@ export function isQuestionAnswerMatrix(content: unknown): content is QuestionAns
     && content.every((row) => Array.isArray(row) && row.every((item) => typeof item === 'string'));
 }
 
-export function isQuestionAnswerContent(content: MessageContent | null | undefined): boolean {
+export function parseQuestionAnswerMatrix(content: MessageContent | null | undefined): QuestionAnswerMatrix | null {
   if (isQuestionAnswerMatrix(content)) {
-    return true;
+    return content;
   }
 
   if (typeof content !== 'string') {
-    return false;
+    return null;
   }
 
   const trimmed = content.trim();
   if (!trimmed.startsWith('[[') || !trimmed.endsWith(']]')) {
-    return false;
+    return null;
   }
 
   try {
-    return isQuestionAnswerMatrix(JSON.parse(trimmed));
+    const parsed = JSON.parse(trimmed);
+    return isQuestionAnswerMatrix(parsed) ? parsed : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -421,10 +422,6 @@ export function shouldRenderMessagePart(part: MessagePart): boolean {
 }
 
 export function shouldRenderMessage(message: Message): boolean {
-  if (normalizeRole(message.role) === 'user' && isQuestionAnswerContent(message.content)) {
-    return false;
-  }
-
   if (message.parts?.some(shouldRenderMessagePart)) {
     return true;
   }
@@ -473,9 +470,6 @@ export function snapshotMessageToMessage(snapshot: SessionMessageSnapshot): Mess
 export function getLatestUserContent(messages: Message[]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
-    if (msg.role === 'user' && isQuestionAnswerContent(msg.content)) {
-      continue;
-    }
     const content = messageContentToPlainText(msg.content).trim();
     if (msg.role === 'user' && content) {
       return content;

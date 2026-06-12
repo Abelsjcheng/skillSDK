@@ -1,4 +1,5 @@
 ﻿import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -21,9 +22,9 @@ import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
-  isQuestionAnswerContent,
   messageContentToPlainText,
   normalizeRole,
+  parseQuestionAnswerMatrix,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
 } from '../utils/message';
@@ -92,6 +93,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
 }) => {
+  const { t } = useTranslation();
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
@@ -113,6 +115,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {normalizeMarkdownHtml(content)}
     </ReactMarkdown>
   );
+
+  const renderQuestionAnswerContent = (answers: string[][]): React.ReactNode => {
+    if (answers.length === 1 && answers[0]?.length === 1) {
+      return <span style={{ whiteSpace: 'pre-wrap' }}>{answers[0][0]}</span>;
+    }
+
+    return (
+      <div className="question-answer-list">
+        {answers.map((answerItems, index) => (
+          <div className="question-answer-list__item" key={`${index}-${answerItems.join('|')}`}>
+            <span className="question-answer-list__index">{index + 1}.</span>
+            <span className="question-answer-list__text">
+              {answerItems.length > 0 ? answerItems.join('、') : t('question.unanswered')}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
     switch (part.type) {
@@ -193,8 +214,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (isUser && isQuestionAnswerContent(message.content)) {
-      return null;
+    const questionAnswers = isUser ? parseQuestionAnswerMatrix(message.content) : null;
+    if (questionAnswers) {
+      return renderQuestionAnswerContent(questionAnswers);
     }
 
     const contentText = messageContentToPlainText(message.content);
