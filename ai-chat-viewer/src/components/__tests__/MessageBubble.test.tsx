@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { MessageBubble } from '../MessageBubble';
 import type { Message, MessagePart } from '../../types';
 
@@ -156,6 +156,39 @@ describe('MessageBubble', () => {
 
     expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
     expect(container).toHaveTextContent('当前思考内容默认可见');
+  });
+
+  it('allows current streaming thinking content to be collapsed and expanded manually', () => {
+    const thinkingPart: MessagePart = {
+      partId: 'thinking-part-3',
+      type: 'thinking',
+      content: '当前思考内容可手动折叠',
+      isStreaming: true,
+    };
+
+    const { container, rerender } = render(
+      <MessageBubble
+        message={createCurrentAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    const header = container.querySelector('.thinking-block__header') as HTMLElement;
+    expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(container.querySelector('.thinking-block__content')).not.toBeInTheDocument();
+
+    rerender(
+      <MessageBubble
+        message={createCurrentAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+    expect(container.querySelector('.thinking-block__content')).not.toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
   });
 
   it('keeps unresolved history permission interactive after reload', () => {

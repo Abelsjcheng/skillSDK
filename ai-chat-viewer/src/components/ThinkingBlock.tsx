@@ -14,7 +14,6 @@ import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownCompo
 export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part, defaultExpanded = false }) => {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const prevStreamingRef = useRef(part.isStreaming);
   const userInteractedRef = useRef(false);
   const markdownComponents = useRef<Components>(createMarkdownComponents());
 
@@ -24,16 +23,9 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part, defaultExpan
     }
   }, [defaultExpanded]);
 
-  useEffect(() => {
-    if (defaultExpanded && part.isStreaming && !prevStreamingRef.current && !userInteractedRef.current) {
-      setExpanded(true);
-    }
-    prevStreamingRef.current = part.isStreaming;
-  }, [defaultExpanded, part.isStreaming]);
-
   const handleToggle = () => {
     userInteractedRef.current = true;
-    setExpanded(!expanded);
+    setExpanded((nextExpanded) => !nextExpanded);
   };
 
   return (
