@@ -11,24 +11,36 @@ import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import type { ThinkingBlockProps } from '../types/components';
 import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
 
-export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part }) => {
+export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ part, defaultExpanded = false }) => {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const prevStreamingRef = useRef(part.isStreaming);
+  const userInteractedRef = useRef(false);
   const markdownComponents = useRef<Components>(createMarkdownComponents());
 
   useEffect(() => {
-    if (part.isStreaming && !prevStreamingRef.current) {
+    if (defaultExpanded && !userInteractedRef.current) {
+      setExpanded(true);
+    }
+  }, [defaultExpanded]);
+
+  useEffect(() => {
+    if (defaultExpanded && part.isStreaming && !prevStreamingRef.current && !userInteractedRef.current) {
       setExpanded(true);
     }
     prevStreamingRef.current = part.isStreaming;
-  }, [part.isStreaming]);
+  }, [defaultExpanded, part.isStreaming]);
+
+  const handleToggle = () => {
+    userInteractedRef.current = true;
+    setExpanded(!expanded);
+  };
 
   return (
     <div className={`thinking-block ${part.isStreaming ? 'streaming' : ''}`}>
       <div
         className="thinking-block__header"
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         role="button"
         tabIndex={0}
       >

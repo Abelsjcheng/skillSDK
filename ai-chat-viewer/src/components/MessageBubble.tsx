@@ -115,7 +115,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
     switch (part.type) {
       case 'thinking':
-        return <ThinkingBlock key={part.partId} part={part} />;
+        return (
+          <ThinkingBlock
+            key={part.partId}
+            part={part}
+            defaultExpanded={!message.isHistory && Boolean(message.isStreaming || part.isStreaming)}
+          />
+        );
 
       case 'tool':
         return <ToolCard key={part.partId} part={part} />;

@@ -61,6 +61,17 @@ function createHistoryAssistantMessage(parts: MessagePart[]): Message {
   };
 }
 
+function createCurrentAssistantMessage(parts: MessagePart[]): Message {
+  return {
+    id: 'current-message-1',
+    role: 'assistant',
+    content: '',
+    timestamp: Date.now(),
+    isStreaming: true,
+    parts,
+  };
+}
+
 describe('MessageBubble', () => {
   it('renders paragraph markdown content without streaming cursor', () => {
     const { container } = render(
@@ -108,11 +119,11 @@ describe('MessageBubble', () => {
     expect(button).not.toBeDisabled();
   });
 
-  it('expands history thinking content by default', () => {
+  it('keeps history thinking content collapsed by default', () => {
     const thinkingPart: MessagePart = {
       partId: 'thinking-part-1',
       type: 'thinking',
-      content: '历史思考内容默认可见',
+      content: '历史思考内容默认不可见',
       isStreaming: false,
     };
 
@@ -123,8 +134,28 @@ describe('MessageBubble', () => {
       />,
     );
 
+    expect(container.querySelector('.thinking-block')).toBeInTheDocument();
+    expect(container.querySelector('.thinking-block__content')).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent('历史思考内容默认不可见');
+  });
+
+  it('expands current streaming thinking content by default', () => {
+    const thinkingPart: MessagePart = {
+      partId: 'thinking-part-2',
+      type: 'thinking',
+      content: '当前思考内容默认可见',
+      isStreaming: true,
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createCurrentAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
     expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
-    expect(container).toHaveTextContent('历史思考内容默认可见');
+    expect(container).toHaveTextContent('当前思考内容默认可见');
   });
 
   it('keeps unresolved history permission interactive after reload', () => {
