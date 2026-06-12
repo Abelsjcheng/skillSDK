@@ -7,7 +7,6 @@ import type {
   MessagePart,
   PendingAssistantPreview,
   QuestionAnswerSubmission,
-  QuestionAnswerSummary,
   SessionStatus,
   StreamMessage,
 } from '../types';
@@ -15,6 +14,7 @@ import {
   collectUserMessageIds,
   contentTypeForRole,
   genMessageId,
+  isQuestionAnswerContent,
   mapRawParts,
   messageOperationToMessage,
   normalizeRole,
@@ -60,6 +60,32 @@ function buildUserMessage(msg: StreamMessage): Message | null {
   };
 }
 
+function matchesPartUpdate(part: MessagePart, partType: MessagePart['type'], msg: StreamMessage): boolean {
+  if (part.type !== partType) {
+    return false;
+  }
+
+  const hasPartIdMatch = Boolean(msg.partId && part.partId === msg.partId);
+  const hasToolCallIdMatch = Boolean(msg.toolCallId && part.toolCallId === msg.toolCallId);
+  const hasQuestionIdMatch = partType === 'question'
+    && Boolean(msg.questionId && part.questionId === msg.questionId);
+
+  if (msg.partId) {
+    if (!hasPartIdMatch) {
+      return false;
+    }
+    if (msg.toolCallId && part.toolCallId && msg.toolCallId !== part.toolCallId) {
+      return false;
+    }
+    if (partType === 'question' && msg.questionId && part.questionId && msg.questionId !== part.questionId) {
+      return false;
+    }
+    return true;
+  }
+
+  return hasQuestionIdMatch || hasToolCallIdMatch;
+}
+
 export function useChatSession({
   mode,
   welinkSessionId,
@@ -87,6 +113,7 @@ export function useChatSession({
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const knownUserMessageIdsRef = useRef(new Set<string>());
+  const hiddenQuestionAnswerMessageIdsRef = useRef(new Set<string>());
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
@@ -125,6 +152,7 @@ export function useChatSession({
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
+    hiddenQuestionAnswerMessageIdsRef.current.clear();
     nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
@@ -318,7 +346,6 @@ export function useChatSession({
     toolCallId?: string,
     questionId?: string,
     subagentSessionId?: string,
-    answerDetails?: QuestionAnswerSummary[],
   ) => {
     if (!welinkSessionId) {
       showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
@@ -326,6 +353,7 @@ export function useChatSession({
     }
 
     const requestContent = typeof content === 'string' ? content.trim() : JSON.stringify(content);
+    const isQuestionReply = Array.isArray(content);
 
     const result = await sendMessageApi({
       welinkSessionId,
@@ -338,17 +366,15 @@ export function useChatSession({
     // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
     onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
 
+    if (isQuestionReply) {
+      const userMessageId = String(result.id);
+      hiddenQuestionAnswerMessageIdsRef.current.add(userMessageId);
+      knownUserMessageIdsRef.current.add(userMessageId);
+      return result;
+    }
+
     const mappedUserMessage = messageOperationToMessage(result);
-    const userMessage: Message = Array.isArray(content)
-      ? {
-        ...mappedUserMessage,
-        content,
-        meta: {
-          ...mappedUserMessage.meta,
-          questionAnswers: answerDetails,
-        },
-      }
-      : mappedUserMessage;
+    const userMessage: Message = mappedUserMessage;
     setMessages((prev) => {
       if (prev.some((message) => message.id === userMessage.id)) {
         return prev;
@@ -363,7 +389,6 @@ export function useChatSession({
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
-    answerDetails,
     messageId,
     toolCallId,
     questionId,
@@ -372,7 +397,7 @@ export function useChatSession({
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId, answerDetails);
+      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, messageId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
@@ -414,27 +439,17 @@ export function useChatSession({
       if (
         (msg.type === 'question' || msg.type === 'tool.update')
         && (msg.status === 'completed' || msg.status === 'error')
-        && latestStreamingMsgIdRef.current === msg?.messageId
       ) {
         const partType = msg.type === 'question' ? 'question' : 'tool';
         const hasMatchingPart = messagesRef.current.some((message) =>
-          message.parts?.some((part) => (
-            part.type === partType
-            && (
-              (msg.partId != null && part.partId === msg.partId)
-              &&((msg.toolCallId != null && part.toolCallId === msg.toolCallId)||(msg.questionId != null && part.questionId === msg.questionId) )
-            )
-          )),
+          message.parts?.some((part) => matchesPartUpdate(part, partType, msg)),
         );
 
         if (hasMatchingPart) {
           setMessages((prev) => updateLatestPart(
             prev,
             partType,
-            (part) => (
-              (msg.partId != null && part.partId === msg.partId)
-              &&((msg.toolCallId != null && part.toolCallId === msg.toolCallId)||(msg.questionId != null && part.questionId === msg.questionId) )
-            ),
+            (part) => matchesPartUpdate(part, partType, msg),
             (part) => ({
               ...part,
               // 对 question 标记为已回答
@@ -444,6 +459,10 @@ export function useChatSession({
               isStreaming: false,
             }),
           ));
+          return;
+        }
+
+        if (msg.type === 'question') {
           return;
         }
       }
@@ -499,6 +518,14 @@ export function useChatSession({
           }
           finalizeStreamingMessage();
           setSessionStatus('busy');
+          if (
+            hiddenQuestionAnswerMessageIdsRef.current.has(nextMessage.id)
+            || isQuestionAnswerContent(nextMessage.content)
+          ) {
+            knownUserMessageIdsRef.current.add(nextMessage.id);
+            showPendingAssistantPreview(activeWelinkSessionIdRef.current);
+            break;
+          }
           setMessages((prev) => {
             if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
               return prev;

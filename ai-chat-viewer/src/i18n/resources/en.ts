@@ -63,8 +63,6 @@ export const en = {
   'question.customPlaceholder': 'Enter a custom answer...',
   'question.customOptionLabel': 'Custom',
   'question.customAnswerPlaceholder': 'Please enter a custom answer',
-  'question.answered': 'Answered',
-  'question.unanswered': 'No answer',
   'question.progress': 'Question {{current}} / {{total}}',
   'question.prevQuestion': 'Previous',
   'question.nextQuestion': 'Next',

@@ -55,18 +55,12 @@ export interface QuestionOption {
 export type QuestionAnswerMatrix = string[][];
 export type MessageContent = string | QuestionAnswerMatrix;
 
-export interface QuestionAnswerSummary {
-  question: string;
-  answers: string[];
-}
-
 export interface QuestionAnswerSubmission {
   answer: QuestionAnswerMatrix;
   messageId?: string;
   toolCallId?: string;
   questionId?: string;
   subagentSessionId?: string;
-  answerDetails?: QuestionAnswerSummary[];
 }
 
 export type QuestionOptionInput = string | QuestionOption;
@@ -235,7 +229,6 @@ export interface Message {
   meta?: {
     tokens?: StreamMessage['tokens'];
     cost?: number;
-    questionAnswers?: QuestionAnswerSummary[];
   };
 }
 

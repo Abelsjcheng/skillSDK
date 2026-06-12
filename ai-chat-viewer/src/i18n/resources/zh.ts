@@ -60,8 +60,6 @@ export const zh = {
   'question.customPlaceholder': '请输入自定义回答...',
   'question.customOptionLabel': '自定义',
   'question.customAnswerPlaceholder': '请输出自定义答案',
-  'question.answered': '已回答',
-  'question.unanswered': '未回答',
   'question.progress': '第 {{current}} / {{total}} 题',
   'question.prevQuestion': '上一题',
   'question.nextQuestion': '下一题',

@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useTranslation } from 'react-i18next';
 import sendQuestionIcon from '../imgs/send_question_icon.svg';
 import type { QuestionCardProps } from '../types/components';
-import type { MessagePart, QuestionAnswerMatrix, QuestionAnswerSummary, QuestionItem, QuestionOption } from '../types';
+import type { MessagePart, QuestionAnswerMatrix, QuestionItem, QuestionOption } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { WeLog } from '../utils/logger';
 
@@ -100,20 +100,6 @@ function buildAnswerMatrix(questions: RenderQuestion[], drafts: QuestionDraft[])
   });
 }
 
-function buildAnswerDetails(
-  questions: RenderQuestion[],
-  answers: QuestionAnswerMatrix,
-): QuestionAnswerSummary[] {
-  return questions.map((question, index) => ({
-    question: question.question || question.header || `Question ${index + 1}`,
-    answers: answers[index] ?? [],
-  }));
-}
-
-function formatAnswers(answers: string[], emptyText: string): string {
-  return answers.length > 0 ? answers.join('、') : emptyText;
-}
-
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   part,
   messageId,
@@ -122,15 +108,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 }) => {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const submittedLocallyRef = useRef(false);
   const questions = useMemo(() => getRenderQuestions(part), [part]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [drafts, setDrafts] = useState<QuestionDraft[]>(() => createDraftsFromAnswers(
     questions,
     createAnswerMatrixFromOutput(part, questions),
   ));
-  const [submittedAnswers, setSubmittedAnswers] = useState<QuestionAnswerMatrix>(() =>
-    createAnswerMatrixFromOutput(part, questions),
-  );
   const [answered, setAnswered] = useState(Boolean(part.answered || getAnswerText(part)));
   const [submitting, setSubmitting] = useState(false);
   const [customFocused, setCustomFocused] = useState(false);
@@ -141,7 +125,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const isLocked = answered || submitting || readonly;
   const trimmedInput = currentDraft.customInput.trim();
   const isCustomSelected = Boolean(trimmedInput) || (!answered && customFocused);
-  const emptyAnswerText = t('question.unanswered');
 
   const resizeTextarea = () => {
     const textarea = textareaRef.current;
@@ -158,9 +141,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   useEffect(() => {
+    if (submittedLocallyRef.current && (part.answered || getAnswerText(part))) {
+      setAnswered(true);
+      return;
+    }
+
     const nextAnswers = createAnswerMatrixFromOutput(part, questions);
     setAnswered(Boolean(part.answered || getAnswerText(part)));
-    setSubmittedAnswers(nextAnswers);
     setDrafts(createDraftsFromAnswers(questions, nextAnswers));
     setCurrentIndex(0);
   }, [part, questions]);
@@ -182,24 +169,21 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     }
 
     const previousDrafts = drafts;
-    const previousAnswers = submittedAnswers;
     setDrafts(nextDrafts);
     setSubmitting(true);
     try {
       await onAnswered({
         answer: answers,
-        answerDetails: buildAnswerDetails(questions, answers),
         messageId,
         toolCallId: part.toolCallId,
         questionId: part.questionId,
         subagentSessionId: part.subagentSessionId,
       });
+      submittedLocallyRef.current = true;
       setAnswered(true);
-      setSubmittedAnswers(answers);
       setDrafts(createDraftsFromAnswers(questions, answers));
     } catch (err) {
       setDrafts(previousDrafts);
-      setSubmittedAnswers(previousAnswers);
       WeLog(`QuestionCard submit answer failed | extra=${JSON.stringify({
         partId: part.partId,
         toolCallId: part.toolCallId,
@@ -278,7 +262,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     current: currentIndex + 1,
     total: questions.length,
   });
-  const summaryAnswers = answered ? submittedAnswers : buildAnswerMatrix(questions, drafts);
 
   return (
     <div className={`question-card ${answered ? 'question-card--answered' : ''}`}>
@@ -412,24 +395,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               {t('common.submit')}
             </button>
           )}
-        </div>
-      ) : null}
-
-      {answered ? (
-        <div className="question-card__result">
-          <div className="question-card__result-title">{t('question.answered')}</div>
-          <div className="question-answer-table question-card__answer-table">
-            {questions.map((question, index) => (
-              <div className="question-answer-table__row" key={`${question.question}-${index}`}>
-                <div className="question-answer-table__question">
-                  {question.question || question.header || `Question ${index + 1}`}
-                </div>
-                <div className="question-answer-table__answer">
-                  {formatAnswers(summaryAnswers[index] ?? [], emptyAnswerText)}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       ) : null}
     </div>

@@ -17,11 +17,11 @@ import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
 import { SubtaskBlock } from './SubtaskBlock';
 import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
-import type { Message, MessagePart, QuestionAnswerMatrix, QuestionAnswerSummary } from '../types';
+import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
-  isQuestionAnswerMatrix,
+  isQuestionAnswerContent,
   messageContentToPlainText,
   normalizeRole,
   shouldRenderMessagePart,
@@ -114,25 +114,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     </ReactMarkdown>
   );
 
-  const renderQuestionAnswerTable = (
-    answers: QuestionAnswerMatrix,
-    details?: QuestionAnswerSummary[],
-  ) => (
-    <div className="question-answer-table">
-      {answers.map((answerItems, index) => {
-        const detail = details?.[index];
-        const question = detail?.question || `问题 ${index + 1}`;
-        const answerText = answerItems.length > 0 ? answerItems.join('、') : '未回答';
-        return (
-          <div className="question-answer-table__row" key={`${question}-${index}`}>
-            <div className="question-answer-table__question">{question}</div>
-            <div className="question-answer-table__answer">{answerText}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-
   const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
     switch (part.type) {
       case 'thinking':
@@ -212,8 +193,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (isQuestionAnswerMatrix(message.content)) {
-      return renderQuestionAnswerTable(message.content, message.meta?.questionAnswers);
+    if (isUser && isQuestionAnswerContent(message.content)) {
+      return null;
     }
 
     const contentText = messageContentToPlainText(message.content);
