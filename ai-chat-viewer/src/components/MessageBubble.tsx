@@ -21,7 +21,9 @@ import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
+  formatQuestionAnswerDisplay,
   normalizeRole,
+  parseQuestionAnswerMatrix,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
 } from '../utils/message';
@@ -96,6 +98,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
   const isPlainVariant = variant === 'plain';
   const canRenderActions = showActions && !isUser;
+  const displayContent = useMemo(() => {
+    if (!isUser) {
+      return message.content;
+    }
+    const questionAnswerMatrix = parseQuestionAnswerMatrix(message.content);
+    return questionAnswerMatrix
+      ? formatQuestionAnswerDisplay([], questionAnswerMatrix)
+      : message.content;
+  }, [isUser, message.content]);
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -191,23 +202,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (!message.content.trim()) {
+    if (!displayContent.trim()) {
       return null;
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content);
+      return renderMarkdown(displayContent);
     }
-    return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{displayContent}</span>;
   };
 
   const handleCopy = () => {
     if (onCopy) {
-      void onCopy(message.content);
+      void onCopy(displayContent);
       return;
     }
 
-    void copyTextToClipboard(message.content)
+    void copyTextToClipboard(displayContent)
       .then(() => {
         showToast('复制成功');
       })
@@ -218,11 +229,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleSendToIM = () => {
-    void onSendToIM?.(message.content);
+    void onSendToIM?.(displayContent);
   };
 
   const renderActions = () => {
-    if (!canRenderActions || message.isStreaming || !message.content) {
+    if (!canRenderActions || message.isStreaming || !displayContent) {
       return null;
     }
 

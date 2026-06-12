@@ -3,6 +3,8 @@ import type {
   MessagePart,
   MessagePartSnapshot,
   MessageRole,
+  QuestionAnswerMatrix,
+  QuestionItem,
   QuestionOption,
   RegenerateAnswerResponse,
   SendMessageResponse,
@@ -17,6 +19,23 @@ export type RawMessagePart = SessionMessagePart | MessagePartSnapshot;
 const MESSAGE_PART_STATUS = new Set(['pending', 'running', 'completed', 'error']);
 
 let nextMsgId = 1;
+
+interface QuestionFieldSource {
+  input?: unknown;
+  header?: unknown;
+  question?: unknown;
+  options?: unknown;
+  multiSelect?: unknown;
+  questions?: unknown;
+  content?: unknown;
+}
+
+interface QuestionAnswerDisplayLabels {
+  unanswered?: string;
+  questionPrefix?: string;
+  answerSeparator?: string;
+  questionTitle?: (index: number) => string;
+}
 
 export function genMessageId(prefix = 'msg'): string {
   return `${prefix}_${Date.now()}_${nextMsgId++}`;
@@ -45,6 +64,14 @@ export function collectUserMessageIds(messages: Message[]): Set<string> {
 
 function hasVisibleText(value?: string | null): boolean {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function normalizeBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
 }
 
 export function contentTypeForRole(role: Message['role']): NonNullable<Message['contentType']> {
@@ -140,41 +167,176 @@ export function normalizeQuestionOptions(options: unknown): QuestionOption[] | u
   return normalized.length > 0 ? normalized : undefined;
 }
 
-export function extractQuestionFields(
-  input: unknown,
-): Pick<MessagePart, 'header' | 'question' | 'options'> {
-  if (!input || typeof input !== 'object') {
-    return {};
+function normalizeQuestionRecord(record: unknown): QuestionItem | undefined {
+  if (!record || typeof record !== 'object') {
+    return undefined;
   }
 
-  const inputRecord = input as {
+  const questionRecord = record as {
     header?: unknown;
     question?: unknown;
     options?: unknown;
-    questions?: unknown;
+    multiSelect?: unknown;
   };
+  const header = normalizeOptionalString(questionRecord.header);
+  const question = normalizeOptionalString(questionRecord.question) ?? '';
+  const options = normalizeQuestionOptions(questionRecord.options) ?? [];
+  const multiSelect = normalizeBoolean(questionRecord.multiSelect) ?? false;
 
-  if (Array.isArray(inputRecord.questions) && inputRecord.questions.length > 0) {
-    const firstQuestion = inputRecord.questions[0];
-    if (firstQuestion && typeof firstQuestion === 'object') {
-      const questionRecord = firstQuestion as {
-        header?: unknown;
-        question?: unknown;
-        options?: unknown;
-      };
-      return {
-        header: typeof questionRecord.header === 'string' ? questionRecord.header : undefined,
-        question: typeof questionRecord.question === 'string' ? questionRecord.question : undefined,
-        options: normalizeQuestionOptions(questionRecord.options),
-      };
-    }
+  if (!header && !question.trim() && options.length === 0) {
+    return undefined;
   }
 
   return {
-    header: typeof inputRecord.header === 'string' ? inputRecord.header : undefined,
-    question: typeof inputRecord.question === 'string' ? inputRecord.question : undefined,
-    options: normalizeQuestionOptions(inputRecord.options),
+    ...(header ? { header } : {}),
+    question,
+    options,
+    multiSelect,
   };
+}
+
+function normalizeQuestionRecords(records: unknown): QuestionItem[] | undefined {
+  if (!Array.isArray(records)) {
+    return undefined;
+  }
+
+  const normalized = records.reduce<QuestionItem[]>((result, record) => {
+    const question = normalizeQuestionRecord(record);
+    if (question) {
+      result.push(question);
+    }
+    return result;
+  }, []);
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function normalizeQuestionItems(source: QuestionFieldSource): QuestionItem[] | undefined {
+  const directQuestions = normalizeQuestionRecords(source.questions);
+  if (directQuestions) {
+    return directQuestions;
+  }
+
+  const inputRecord = source.input && typeof source.input === 'object'
+    ? source.input as {
+      header?: unknown;
+      question?: unknown;
+      options?: unknown;
+      multiSelect?: unknown;
+      questions?: unknown;
+    }
+    : null;
+  const inputQuestions = normalizeQuestionRecords(inputRecord?.questions);
+  if (inputQuestions) {
+    return inputQuestions;
+  }
+
+  const header = normalizeOptionalString(source.header) ?? normalizeOptionalString(inputRecord?.header);
+  const question = normalizeOptionalString(source.question)
+    ?? normalizeOptionalString(inputRecord?.question)
+    ?? normalizeOptionalString(source.content)
+    ?? '';
+  const options = normalizeQuestionOptions(inputRecord?.options)
+    ?? normalizeQuestionOptions(source.options)
+    ?? [];
+  const multiSelect = normalizeBoolean(source.multiSelect)
+    ?? normalizeBoolean(inputRecord?.multiSelect)
+    ?? false;
+
+  if (!header && !question.trim() && options.length === 0) {
+    return undefined;
+  }
+
+  return [{
+    ...(header ? { header } : {}),
+    question,
+    options,
+    multiSelect,
+  }];
+}
+
+export function extractQuestionFields(
+  input: unknown,
+): Pick<MessagePart, 'header' | 'question' | 'options' | 'multiSelect' | 'questions'> {
+  const questions = normalizeQuestionItems({ input });
+  const firstQuestion = questions?.[0];
+  if (!firstQuestion) {
+    return {};
+  }
+
+  return {
+    header: firstQuestion.header,
+    question: firstQuestion.question,
+    options: firstQuestion.options.length > 0 ? firstQuestion.options : undefined,
+    multiSelect: firstQuestion.multiSelect,
+    questions,
+  };
+}
+
+export function serializeQuestionAnswerMatrix(answer: QuestionAnswerMatrix): string {
+  return JSON.stringify(answer);
+}
+
+export function parseQuestionAnswerMatrix(value: unknown): QuestionAnswerMatrix | undefined {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+
+    const normalized = parsed.map((item) => {
+      if (!Array.isArray(item)) {
+        return null;
+      }
+      return item
+        .filter((answer): answer is string => typeof answer === 'string')
+        .map((answer) => answer.trim())
+        .filter(Boolean);
+    });
+
+    if (normalized.some((item) => item === null)) {
+      return undefined;
+    }
+
+    return normalized as QuestionAnswerMatrix;
+  } catch {
+    return undefined;
+  }
+}
+
+export function alignQuestionAnswerMatrix(
+  questions: QuestionItem[],
+  answer: QuestionAnswerMatrix,
+): QuestionAnswerMatrix {
+  return questions.map((_, index) => answer[index] ?? []);
+}
+
+export function formatQuestionAnswerDisplay(
+  questions: QuestionItem[],
+  answer: QuestionAnswerMatrix,
+  labels: QuestionAnswerDisplayLabels = {},
+): string {
+  const unanswered = labels.unanswered ?? '未回答';
+  const questionPrefix = labels.questionPrefix ?? '第';
+  const answerSeparator = labels.answerSeparator ?? '、';
+  const questionCount = Math.max(questions.length, answer.length);
+  const lines: string[] = [];
+
+  for (let index = 0; index < questionCount; index += 1) {
+    const question = questions[index];
+    const title = question?.question?.trim()
+      || question?.header?.trim()
+      || labels.questionTitle?.(index)
+      || `${questionPrefix}${index + 1}题`;
+    const answers = answer[index] ?? [];
+    lines.push(`${title}: ${answers.length > 0 ? answers.join(answerSeparator) : unanswered}`);
+  }
+
+  return lines.join('\n');
 }
 
 function normalizeResolvedStatus(status: unknown): string {
@@ -182,12 +344,21 @@ function normalizeResolvedStatus(status: unknown): string {
 }
 
 export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: boolean): MessagePart {
-  const questionFields = extractQuestionFields(rawPart.input);
+  const questionItems = normalizeQuestionItems({
+    input: rawPart.input,
+    header: rawPart.header,
+    question: rawPart.question,
+    options: rawPart.options,
+    multiSelect: rawPart.multiSelect,
+    questions: rawPart.questions,
+    content: rawPart.content,
+  });
+  const firstQuestion = questionItems?.[0];
   const rawStatus = normalizeResolvedStatus(rawPart.status);
   const normalizedStatus = normalizePartStatus(rawPart.status);
   const normalizedOutput = typeof rawPart.output === 'string' ? rawPart.output : undefined;
   const normalizedResponse = typeof rawPart.response === 'string' ? rawPart.response : undefined;
-  const normalizedQuestion = rawPart.question ?? questionFields.question ?? undefined;
+  const normalizedQuestion = firstQuestion?.question || rawPart.question || undefined;
   const questionAnswered = rawPart.type === 'question'
     && (
       (rawPart as { answered?: boolean | null }).answered === true
@@ -218,10 +389,12 @@ export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: bo
     input: rawPart.input ?? undefined,
     output: normalizedOutput,
     title: rawPart.title ?? undefined,
-    header: rawPart.header ?? questionFields.header ?? undefined,
+    header: rawPart.header ?? firstQuestion?.header ?? undefined,
     question: normalizedQuestion,
     questionId: rawPart.questionId ?? undefined,
-    options: questionFields.options ?? normalizeQuestionOptions(rawPart.options) ?? undefined,
+    options: firstQuestion && firstQuestion.options.length > 0
+      ? firstQuestion.options
+      : normalizeQuestionOptions(rawPart.options) ?? undefined,
     answered: questionAnswered || undefined,
     permissionId: rawPart.permissionId ?? undefined,
     permType: rawPart.permType ?? undefined,
@@ -230,8 +403,8 @@ export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: bo
     fileName: rawPart.fileName ?? undefined,
     fileUrl: rawPart.fileUrl ?? undefined,
     fileMime: rawPart.fileMime ?? undefined,
-    multiSelect: rawPart.multiSelect ?? undefined,
-    questions: rawPart.questions ?? undefined,
+    multiSelect: firstQuestion?.multiSelect ?? rawPart.multiSelect ?? undefined,
+    questions: questionItems,
     extParam: rawPart.extParam ?? undefined,
     subagentSessionId: rawPart.subagentSessionId ?? undefined,
     subagentName: rawPart.subagentName ?? undefined,
@@ -267,6 +440,11 @@ export function shouldRenderMessagePart(part: MessagePart): boolean {
         || hasVisibleText(part.header)
         || hasVisibleText(part.question)
         || Boolean(part.options?.length)
+        || Boolean(part.questions?.some((question) => (
+          hasVisibleText(question.header)
+          || hasVisibleText(question.question)
+          || question.options.length > 0
+        )))
         || hasVisibleText(part.output)
         || Boolean(part.answered);
     case 'permission':

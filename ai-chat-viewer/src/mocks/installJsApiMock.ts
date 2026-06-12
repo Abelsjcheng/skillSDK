@@ -81,6 +81,13 @@ interface SubagentMockContext {
   subagentName: string;
 }
 
+interface MockQuestionItem {
+  header: string;
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect?: boolean;
+}
+
 type MockReplyScenario =
   | {
     type: 'normal';
@@ -111,6 +118,8 @@ type MockReplyScenario =
     header: string;
     question: string;
     options: Array<{ label: string; description?: string }>;
+    multiSelect?: boolean;
+    questions?: MockQuestionItem[];
   }
   | {
     type: 'permission';
@@ -377,6 +386,8 @@ function buildQuestionPart(
   options: Array<{ label: string; description?: string }>,
   partSeq = 1,
   subagent?: SubagentMockContext,
+  multiSelect?: boolean,
+  questions?: MockQuestionItem[],
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -389,6 +400,8 @@ function buildQuestionPart(
     header,
     question,
     options,
+    ...(multiSelect != null ? { multiSelect } : {}),
+    ...(questions ? { questions } : {}),
     ...(subagent
       ? {
         subagentSessionId: subagent.subagentSessionId,
@@ -710,6 +723,42 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
       },
       toolOutput: 'Matched MessageBubble.tsx, utils/message.ts, and SubtaskBlock.tsx.',
       subagentContent: 'The subagent confirmed that subagent-tagged parts are grouped at render time and remain compatible with history and streaming recovery.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-multi-question', 'trigger-multi-question', '触发多题'])) {
+    const questions: MockQuestionItem[] = [
+      {
+        header: 'Platform priority',
+        question: 'Which platform should this requirement prioritize first?',
+        options: [
+          { label: 'Android', description: 'Focus on Java/Kotlin SDK changes' },
+          { label: 'iOS', description: 'Focus on Objective-C/Swift SDK changes' },
+          { label: 'HarmonyOS', description: 'Focus on ArkTS SDK changes' },
+        ],
+        multiSelect: false,
+      },
+      {
+        header: 'Implementation scope',
+        question: 'Which areas should be included in this pass?',
+        options: [
+          { label: 'Parsing', description: 'Normalize questions from history and streaming events' },
+          { label: 'Interaction', description: 'Support navigation, multi-select, and custom answers' },
+          { label: 'Transport', description: 'Serialize answers before sending to the service' },
+        ],
+        multiSelect: true,
+      },
+    ];
+
+    return {
+      type: 'question',
+      toolCallId: nextId('tool_call_multi_question'),
+      questionId: nextId('question_multi'),
+      header: questions[0].header,
+      question: questions[0].question,
+      options: questions[0].options,
+      multiSelect: questions[0].multiSelect,
+      questions,
     };
   }
 
@@ -1570,6 +1619,8 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         header: scenario.header,
         question: scenario.question,
         options: scenario.options,
+        ...(scenario.multiSelect != null ? { multiSelect: scenario.multiSelect } : {}),
+        ...(scenario.questions ? { questions: scenario.questions } : {}),
         status: 'running',
       });
     });
@@ -1584,6 +1635,9 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
           scenario.question,
           scenario.options,
           1,
+          undefined,
+          scenario.multiSelect,
+          scenario.questions,
         ),
       ]);
       emit(sessionId, {

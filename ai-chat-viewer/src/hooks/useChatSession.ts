@@ -17,6 +17,7 @@ import {
   messageOperationToMessage,
   normalizeRole,
   sessionMessageToMessage,
+  serializeQuestionAnswerMatrix,
   snapshotMessageToMessage,
   updateLatestPart,
 } from '../utils/message';
@@ -316,6 +317,7 @@ export function useChatSession({
     toolCallId?: string,
     questionId?: string,
     subagentSessionId?: string,
+    displayContent?: string,
   ) => {
     if (!welinkSessionId) {
       showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
@@ -333,7 +335,10 @@ export function useChatSession({
     // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
     onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
 
-    const userMessage = messageOperationToMessage(result);
+    const userMessage = {
+      ...messageOperationToMessage(result),
+      ...(displayContent ? { content: displayContent } : {}),
+    };
     setMessages((prev) => {
       if (prev.some((message) => message.id === userMessage.id)) {
         return prev;
@@ -348,6 +353,7 @@ export function useChatSession({
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
+    displayContent,
     messageId,
     toolCallId,
     questionId,
@@ -356,7 +362,13 @@ export function useChatSession({
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
+      await sendUserMessage(
+        serializeQuestionAnswerMatrix(answer),
+        toolCallId,
+        questionId,
+        subagentSessionId,
+        displayContent,
+      );
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, messageId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
@@ -398,7 +410,6 @@ export function useChatSession({
       if (
         (msg.type === 'question' || msg.type === 'tool.update')
         && (msg.status === 'completed' || msg.status === 'error')
-        && latestStreamingMsgIdRef.current === msg?.messageId
       ) {
         const partType = msg.type === 'question' ? 'question' : 'tool';
         const hasMatchingPart = messagesRef.current.some((message) =>
