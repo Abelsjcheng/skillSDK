@@ -255,12 +255,19 @@ function splitReplyContent(content: string): string[] {
   return chunks.length > 0 ? chunks : [content];
 }
 
-function matchesMockKeyword(content: string, keywords: string[]): boolean {
-  const normalized = content.trim().toLowerCase();
+function messageContentToText(content: SendMessageParams['content']): string {
+  return content;
+}
+
+function matchesMockKeyword(content: SendMessageParams['content'], keywords: string[]): boolean {
+  const normalized = messageContentToText(content).trim().toLowerCase();
   return keywords.some((keyword) => normalized.includes(keyword));
 }
 
-function buildLocalSendMessageResponse(welinkSessionId: string, content: string): SendMessageResponse {
+function buildLocalSendMessageResponse(
+  welinkSessionId: string,
+  content: SendMessageParams['content'],
+): SendMessageResponse {
   const createdAt = nowIso();
   return {
     id: nextLocalId('opencode_user_message'),

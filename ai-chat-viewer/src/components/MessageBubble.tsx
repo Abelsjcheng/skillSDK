@@ -17,10 +17,12 @@ import { PermissionCard } from './PermissionCard';
 import { ErrorBlock } from './ErrorBlock';
 import { SubtaskBlock } from './SubtaskBlock';
 import { createMarkdownComponents, normalizeMarkdownHtml } from './markdownComponents';
-import type { Message, MessagePart } from '../types';
+import type { Message, MessagePart, QuestionAnswerMatrix, QuestionAnswerSummary } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
+  isQuestionAnswerMatrix,
+  messageContentToPlainText,
   normalizeRole,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
@@ -51,7 +53,7 @@ function messageContainsCodeBlock(message: Message): boolean {
   if (message.parts?.some((part) => part.type === 'text' && hasMarkdownCodeBlock(part.content))) {
     return true;
   }
-  return hasMarkdownCodeBlock(message.content);
+  return hasMarkdownCodeBlock(messageContentToPlainText(message.content));
 }
 
 function isQuestionPartReadonly(part: MessagePart, readonly: boolean): boolean {
@@ -110,6 +112,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     >
       {normalizeMarkdownHtml(content)}
     </ReactMarkdown>
+  );
+
+  const renderQuestionAnswerTable = (
+    answers: QuestionAnswerMatrix,
+    details?: QuestionAnswerSummary[],
+  ) => (
+    <div className="question-answer-table">
+      {answers.map((answerItems, index) => {
+        const detail = details?.[index];
+        const question = detail?.question || `问题 ${index + 1}`;
+        const answerText = answerItems.length > 0 ? answerItems.join('、') : '未回答';
+        return (
+          <div className="question-answer-table__row" key={`${question}-${index}`}>
+            <div className="question-answer-table__question">{question}</div>
+            <div className="question-answer-table__answer">{answerText}</div>
+          </div>
+        );
+      })}
+    </div>
   );
 
   const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
@@ -191,23 +212,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (!message.content.trim()) {
+    if (isQuestionAnswerMatrix(message.content)) {
+      return renderQuestionAnswerTable(message.content, message.meta?.questionAnswers);
+    }
+
+    const contentText = messageContentToPlainText(message.content);
+    if (!contentText.trim()) {
       return null;
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content);
+      return renderMarkdown(contentText);
     }
-    return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{contentText}</span>;
   };
 
   const handleCopy = () => {
     if (onCopy) {
-      void onCopy(message.content);
+      void onCopy(messageContentToPlainText(message.content));
       return;
     }
 
-    void copyTextToClipboard(message.content)
+    void copyTextToClipboard(messageContentToPlainText(message.content))
       .then(() => {
         showToast('复制成功');
       })
@@ -218,11 +244,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleSendToIM = () => {
-    void onSendToIM?.(message.content);
+    void onSendToIM?.(messageContentToPlainText(message.content));
   };
 
   const renderActions = () => {
-    if (!canRenderActions || message.isStreaming || !message.content) {
+    if (!canRenderActions || message.isStreaming || !messageContentToPlainText(message.content)) {
       return null;
     }
 

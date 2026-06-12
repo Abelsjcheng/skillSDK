@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { StreamAssembler } from '../protocol/StreamAssembler';
 import type {
   Message,
+  MessageContent,
   MessagePart,
   PendingAssistantPreview,
   QuestionAnswerSubmission,
+  QuestionAnswerSummary,
   SessionStatus,
   StreamMessage,
 } from '../types';
@@ -312,19 +314,22 @@ export function useChatSession({
   }, [mode, welinkSessionId]);
 
   const sendUserMessage = useCallback(async (
-    content: string,
+    content: MessageContent,
     toolCallId?: string,
     questionId?: string,
     subagentSessionId?: string,
+    answerDetails?: QuestionAnswerSummary[],
   ) => {
     if (!welinkSessionId) {
       showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
+    const requestContent = typeof content === 'string' ? content.trim() : JSON.stringify(content);
+
     const result = await sendMessageApi({
       welinkSessionId,
-      content: content.trim(),
+      content: requestContent,
       ...(toolCallId ? { toolCallId } : {}),
       ...(questionId ? { questionId } : {}),
       ...(subagentSessionId ? { subagentSessionId } : {}),
@@ -333,7 +338,17 @@ export function useChatSession({
     // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
     onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
 
-    const userMessage = messageOperationToMessage(result);
+    const mappedUserMessage = messageOperationToMessage(result);
+    const userMessage: Message = Array.isArray(content)
+      ? {
+        ...mappedUserMessage,
+        content,
+        meta: {
+          ...mappedUserMessage.meta,
+          questionAnswers: answerDetails,
+        },
+      }
+      : mappedUserMessage;
     setMessages((prev) => {
       if (prev.some((message) => message.id === userMessage.id)) {
         return prev;
@@ -348,6 +363,7 @@ export function useChatSession({
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
+    answerDetails,
     messageId,
     toolCallId,
     questionId,
@@ -356,7 +372,7 @@ export function useChatSession({
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
+      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId, answerDetails);
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, messageId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
