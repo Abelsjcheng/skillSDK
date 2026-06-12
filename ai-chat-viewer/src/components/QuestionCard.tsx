@@ -5,7 +5,7 @@ import type { QuestionCardProps } from '../types/components';
 import type { MessagePart, QuestionAnswerMatrix, QuestionItem, QuestionOption } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
 import { WeLog } from '../utils/logger';
-import { parseQuestionAnswerMatrix } from '../utils/message';
+import { extractQuestionItems, parseQuestionAnswerMatrix } from '../utils/message';
 
 interface RenderQuestion {
   header?: string;
@@ -48,6 +48,14 @@ function getRenderQuestions(part: MessagePart): RenderQuestion[] {
 
   if (questionItems.length > 0) {
     return questionItems;
+  }
+
+  const inputQuestionItems = extractQuestionItems(part.input)
+    ?.map(normalizeRenderQuestion)
+    .filter((item): item is RenderQuestion => Boolean(item)) ?? [];
+
+  if (inputQuestionItems.length > 0) {
+    return inputQuestionItems;
   }
 
   const legacyQuestion = normalizeRenderQuestion({
