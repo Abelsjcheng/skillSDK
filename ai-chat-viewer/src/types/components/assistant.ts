@@ -100,6 +100,8 @@ export interface ShortcutOption {
 export interface WeAgentCUIFooterProps {
   isPcMiniApp?: boolean;
   mode: 'generate' | 'generating' | 'regenerate';
+  ak?: string;
+  partnerAccount?: string;
   onSend: (message: string) => void;
   onStop: () => void;
   onInputFocus?: () => void;

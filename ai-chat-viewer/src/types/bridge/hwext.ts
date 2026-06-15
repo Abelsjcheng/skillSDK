@@ -377,6 +377,13 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  fetch?: (url: string, options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+  }) => Promise<unknown> | unknown;
+  getStorage?: (params: { key: string }) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,

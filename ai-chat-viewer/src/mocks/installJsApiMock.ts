@@ -46,6 +46,13 @@ import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
+  fetch?: (url: string, options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+  }) => Promise<unknown> | unknown;
+  getStorage?: (params: { key: string }) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
   addEventListener?: (params: { type: 'back'; func: () => boolean }) => Promise<unknown> | unknown;
@@ -61,6 +68,8 @@ interface MockHWH5Bridge {
   navigateBack: () => void;
   close: () => void;
 }
+
+const hwh5StorageStore = new Map<string, unknown>();
 
 interface SessionRecord {
   session: SkillSession;
@@ -2216,6 +2225,51 @@ function ensureMockHWH5Bridge(): void {
   if (typeof hwh5.showToast !== 'function') {
     hwh5.showToast = async ({ msg, type }) => {
       console.info('[ai-chat-viewer] mock HWH5.showToast', { msg, type });
+    };
+  }
+
+  if (typeof hwh5.fetch !== 'function') {
+    hwh5.fetch = async (url) => {
+      if (url === '/api/v1/slash-commands/query') {
+        return {
+          json: async () => ({
+            code: 200,
+            errormsg: '',
+            data: [
+              { command: '/new', description: '新建会话' },
+              { command: '/help', description: '查看可用命令' },
+              { command: '/clear', description: '清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文' },
+              { command: '/clear1', description: '清空当前上下文' },
+              { command: '/clear2', description: '清空当前上下文' },
+              { command: '/clear3', description: '清空当前上下文' },
+              { command: '/clear4', description: '清空当前上下文' },
+              { command: '/clear5', description: '清空当前上下文' },
+              { command: '/clear6', description: '清空当前上下文' },
+              { command: '/clear7', description: '清空当前上下文' },
+              { command: '/clear8', description: '清空当前上下文' },
+              { command: '/clear9', description: '清空当前上下文' },
+              { command: '/clear10', description: '清空当前上下文' },
+              { command: '/clear11', description: '清空当前上下文' },
+              { command: '/clear12', description: '清空当前上下文' },
+              { command: '/clear13', description: '清空当前上下文' },
+              { command: '/clear14', description: '清空当前上下文' },
+            ],
+          }),
+        };
+      }
+      return {
+        json: async () => ({ code: 404, message: `mock HWH5.fetch unknown url: ${url}` }),
+      };
+    };
+  }
+
+  if (typeof hwh5.getStorage !== 'function') {
+    hwh5.getStorage = async ({ key }) => ({ data: hwh5StorageStore.get(key) ?? null });
+  }
+
+  if (typeof hwh5.setStorage !== 'function') {
+    hwh5.setStorage = async ({ key, data }) => {
+      hwh5StorageStore.set(key, data);
     };
   }
 

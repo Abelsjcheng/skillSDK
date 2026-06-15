@@ -50,6 +50,14 @@ function reportClickEvent(
   });
 }
 
+function hashTelemetryValue(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 export function reportSelectAssistantClick(): void {
   reportClickEvent('activate_select_assistant_click', '选择助理');
 }
@@ -80,6 +88,79 @@ export function reportCreateSessionClick(detail: WeAgentDetails | null, error?: 
     bizRobotTag: detail?.bizRobotTag ?? '',
     type: error ? 'error' : 'ok',
   });
+}
+
+export function reportSlashCommandPanelTrigger(params: {
+  partnerAccount: string;
+  commandCount: number;
+  source: 'storage' | 'db' | 'memory' | 'network';
+  isPcMiniApp: boolean;
+}): void {
+  reportClickEvent('slash_command_panel_trigger', 'Slash命令面板展示', {
+    page: 'weAgentCUI',
+    partnerAccount: params.partnerAccount,
+    commandCount: params.commandCount,
+    source: params.source,
+    deviceType: params.isPcMiniApp ? 'pc' : 'mobile',
+  });
+}
+
+export function reportSlashCommandSelect(params: {
+  partnerAccount: string;
+  command: string;
+  queryLength: number;
+  selectMethod: 'enter' | 'click';
+  isPcMiniApp: boolean;
+}): void {
+  reportClickEvent('slash_command_select', 'Slash命令选择', {
+    page: 'weAgentCUI',
+    partnerAccount: params.partnerAccount,
+    commandNameHash: hashTelemetryValue(params.command),
+    queryLength: params.queryLength,
+    selectMethod: params.selectMethod,
+    deviceType: params.isPcMiniApp ? 'pc' : 'mobile',
+  });
+}
+
+export async function trackApiSlashCommandQuery<T extends { length: number }>(
+  params: {
+    ak: string;
+    partnerAccount: string;
+    throttled?: boolean;
+    reusedInFlight?: boolean;
+    fallbackStorageRead?: boolean;
+  },
+  request: Promise<T>,
+): Promise<T> {
+  try {
+    const result = await request;
+    void reportApiSuccess('api_slash_commands_query', '获取Slash命令列表接口', {
+      request: {
+        ak: params.ak,
+        hasAk: Boolean(params.ak),
+        partnerAccount: params.partnerAccount,
+      },
+      response: {
+        commandCount: result.length,
+      },
+      throttled: Boolean(params.throttled),
+      reusedInFlight: Boolean(params.reusedInFlight),
+      fallbackStorageRead: Boolean(params.fallbackStorageRead),
+    });
+    return result;
+  } catch (error) {
+    void reportApiError('api_slash_commands_query', '获取Slash命令列表接口', error, {
+      request: {
+        ak: params.ak,
+        hasAk: Boolean(params.ak),
+        partnerAccount: params.partnerAccount,
+      },
+      throttled: Boolean(params.throttled),
+      reusedInFlight: Boolean(params.reusedInFlight),
+      fallbackStorageRead: Boolean(params.fallbackStorageRead),
+    });
+    throw error;
+  }
 }
 
 export function reportSendMessageClick(
