@@ -11,7 +11,7 @@
 
 当前助理 Tab 已支持打开当前助理的 `weAgentCUI` 页面和切换助理，但缺少会话未读消息提醒能力。新需求要求在助理 Tab 按钮、`weAgentCUI` 历史会话入口、历史会话列表 item 上展示未读小红点，帮助用户感知当前助理是否存在未读会话消息。
 
-本方案将未读状态收口到服务端管控，端侧只做缓存、刷新、广播和 UI 展示，不在客户端计算未读数，也不对非当前选择助理展示 Tab 小红点。SDK 初始化时会主动调用服务端接口获取全量所有助理的已读/未读消息状态并缓存；SDK 初始化同时注册 IM 通知广播，接收服务端后续广播的对应助理已读和未读消息数据，并更新该助理的未读缓存。
+本方案将未读状态收口到服务端管控，端侧只做缓存、刷新、广播和 UI 展示，不在客户端计算未读数，也不对非当前选择助理展示 Tab 小红点。SDK 初始化时会主动调用服务端接口获取全量所有助理的已读/未读消息状态并缓存；SDK 初始化同时注册 IM 通知广播，接收服务端后续广播的对应助理已读和未读消息数据，并将所有未读缓存变更放入 SDK 内部未读缓存处理队列串行处理，避免初始化全量数据、IM 广播增量数据、已读回流数据并发写缓存造成时序问题。
 
 需要特别处理三端页面生命周期差异：HarmonyOS 和 iOS 冷启动时会预加载 `weAgentCUI` 页面，并执行页面中的全部逻辑代码，但此时页面并未前台显示；Android 冷启动不会预加载 `weAgentCUI` 页面。因此 `weAgentCUI` 初始化阶段只能注册可见性监听和准备本地状态，不得直接上报已读，也不得把预加载视为用户已打开页面。所有会影响小红点消失的动作必须等待 `onVisible` 返回 `visibility = 1` 后执行。
 
@@ -55,9 +55,10 @@ flowchart LR
         ServerState --> Push
     end
 
-    subgraph Cache["SDK 缓存与判断"]
-        C --> CacheUpdate["更新 / 写入 we_agent_unread_cache"]
-        Push --> CacheUpdate
+    subgraph Cache["SDK 缓存队列与判断"]
+        C --> Queue["未读缓存处理队列"]
+        Push --> Queue
+        Queue --> CacheUpdate["串行更新 / 写入 we_agent_unread_cache"]
         CacheUpdate --> Current["读取 current_we_agent_detail"]
         Current --> HasUnread{"当前助理是否有未读"}
     end
@@ -79,7 +80,7 @@ flowchart LR
 
 ### 2.2 方案核心
 
-核心方案是：SDK 初始化全量拉取所有助理已读/未读状态并缓存，IM 广播持续增量更新指定助理的已读/未读状态；助理 Tab 只消费当前助理的布尔未读态；`weAgentCUI` 初始化时只注册可见性监听，在移动端真实前台可见时才上报已读并读取 SDK 缓存刷新小红点。
+核心方案是：SDK 初始化全量拉取所有助理已读/未读状态，IM 广播持续增量更新指定助理的已读/未读状态；所有会修改 `we_agent_unread_cache` 的事件先进入 SDK 内部未读缓存处理队列，队列按入队顺序串行写缓存并广播当前助理状态；助理 Tab 只消费当前助理的布尔未读态；`weAgentCUI` 初始化时只注册可见性监听，在移动端真实前台可见时才上报已读并读取 SDK 缓存刷新小红点。
 
 ## 3. 时序图
 
@@ -97,8 +98,9 @@ sequenceDiagram
     SDK->>IM: 注册未读消息广播监听
     SDK->>Server: 获取全量所有助理已读/未读消息状态
     Server-->>SDK: 返回所有助理与会话维度未读状态
-    SDK->>Storage: 覆盖写入全量 we_agent_unread_cache
-    SDK->>Storage: 读取 current_we_agent_detail
+    SDK->>SDK: 将 initFull 事件放入未读缓存处理队列
+    SDK->>Storage: 队列串行覆盖写入全量 we_agent_unread_cache
+    SDK->>Storage: 队列读取 current_we_agent_detail
     SDK-->>Host: 广播当前助理未读状态
     Host->>Host: 刷新助理 Tab 小红点
 ```
@@ -120,8 +122,9 @@ sequenceDiagram
     Server->>Server: 更新该助理会话未读状态
     Server->>IM: 下发指定助理已读/未读消息变更数据
     IM->>SDK: 透传服务端已读/未读消息数据
-    SDK->>Storage: 更新对应助理的 we_agent_unread_cache
-    SDK->>Storage: 读取 current_we_agent_detail
+    SDK->>SDK: 将 serverPush / pcReadPush 事件放入未读缓存处理队列
+    SDK->>Storage: 队列串行更新对应助理的 we_agent_unread_cache
+    SDK->>Storage: 队列读取 current_we_agent_detail
     SDK-->>Host: 若影响当前助理则广播当前助理未读状态
     SDK-->>CUI: 若影响当前助理则广播当前助理未读状态
     Host->>Host: 只刷新当前助理 Tab 小红点
@@ -171,8 +174,9 @@ sequenceDiagram
     Server-->>CUI: 已读上报成功
     Server->>IM: 广播该助理已读后的未读状态
     IM->>SDK: 透传已读/未读变更
-    SDK->>SDK: 更新该助理未读缓存
-    SDK->>SDK: 判断当前助理是否仍存在未读消息
+    SDK->>SDK: 将 readReportPush 事件放入未读缓存处理队列
+    SDK->>SDK: 队列串行更新该助理未读缓存
+    SDK->>SDK: 队列判断当前助理是否仍存在未读消息
     CUI->>SDK: getWeAgentUnreadMessage({ partnerAccount })
     SDK-->>CUI: 返回当前助理缓存中的未读状态
     SDK-->>Host: 广播当前助理最新未读状态
@@ -207,14 +211,15 @@ sequenceDiagram
 
 ### 4.1 调整点
 
-1. SDK 初始化时主动请求服务端获取全量所有助理的已读/未读消息状态，并写入本地缓存。
-2. SDK 初始化时注册 IM 模块通知广播，接收服务端后续广播的指定助理已读和未读消息数据，并更新对应助理的未读缓存。
+1. SDK 初始化时主动请求服务端获取全量所有助理的已读/未读消息状态，并通过未读缓存处理队列写入本地缓存。
+2. SDK 初始化时注册 IM 模块通知广播，接收服务端后续广播的指定助理已读和未读消息数据，并通过未读缓存处理队列更新对应助理的未读缓存。
 3. SDK 新增获取助理未读消息接口，入参为 `partnerAccount`，用于获取当前助理的未读消息缓存；当前方案中实时性由初始化全量查询和 IM 广播增量更新保障，不要求每个页面场景再次请求服务端刷新。
 4. SDK 新增或封装已读上报能力，供 `weAgentCUI` 页面在移动端前台可见时调用。
 5. SDK 新增当前助理未读状态广播，宿主根据广播刷新助理 Tab 小红点。
 6. `weAgentCUI` 页面初始化阶段只监听 `HWH5.addEventListener({ type: 'onVisible', func })`，不执行已读上报，也不触发用于页面展示的未读刷新。
 7. `weAgentCUI` 收到 `visibility = 1` 后才上报已读，并调用 SDK 未读接口刷新历史按钮小红点和会话 item 小红点。
 8. 服务端通过后台开关和黑名单控制是否返回或下发小红点可见状态，端侧不绕过服务端开关。
+9. 新增 SDK 内部未读缓存处理队列，所有会修改 `we_agent_unread_cache` 的事件都进入队列串行处理，避免初始化全量查询、IM 广播增量更新、PC/移动端已读回流同时到达时并发写缓存。
 
 ### 4.2 核心实现方式
 
@@ -254,10 +259,38 @@ type WeAgentSessionUnreadState = {
 1. `assistantUnread` 只表示当前助理是否存在未读会话消息，不表示未读数。
 2. `sessions[welinkSessionId].unread` 用于历史会话列表 item 小红点展示。
 3. `redDotVisible` 由服务端后台开关、黑名单和未读状态共同决定；当服务端返回 `false` 时，即使存在未读，端侧也不展示小红点。
-4. SDK 初始化全量查询会覆盖写入所有助理的 `we_agent_unread_cache`；IM 广播只更新广播载荷中指定助理的缓存。
-5. SDK 对外广播时只广播当前助理的未读状态，避免非当前助理影响助理 Tab。
+4. SDK 初始化全量查询和 IM 广播增量更新均不直接并发写缓存，必须先进入未读缓存处理队列。
+5. SDK 初始化全量查询会通过队列覆盖写入所有助理的 `we_agent_unread_cache`；IM 广播通过队列只更新广播载荷中指定助理的缓存。
+6. SDK 对外广播时只广播当前助理的未读状态，避免非当前助理影响助理 Tab。
 
-#### 4.2.2 SDK 未读接口
+#### 4.2.2 未读缓存处理队列
+
+SDK 内部新增未读缓存处理队列：
+
+1. 队列为 SDK 内部实现，不新增公开接口，也不新增持久化缓存 key。
+2. 所有会修改 `we_agent_unread_cache` 的事件都必须先进入队列，由队列按入队顺序串行处理；同一时刻只处理一个事件，当前事件完成缓存读写和广播后再处理下一个事件。
+3. 队列事件来源包括：
+   - `initFull`：SDK 初始化请求服务端返回的全量所有助理已读/未读状态；
+   - `serverPush`：IM 模块透传的服务端指定助理已读/未读变更；
+   - `readReportPush`：移动端 `weAgentCUI` 前台已读上报后，服务端通过 IM 广播回来的已读后状态；
+   - `pcReadPush`：PC 端打开助理会话并上报已读后，服务端通过 IM 广播回来的已读后状态。
+4. 队列事件建议结构：
+
+```typescript
+type WeAgentUnreadCacheEvent = {
+  source: 'initFull' | 'serverPush' | 'readReportPush' | 'pcReadPush'
+  partnerAccount?: string
+  robotId?: string
+  payload: WeAgentUnreadState | WeAgentUnreadCache
+}
+```
+
+5. `initFull` 事件覆盖写入全量 `we_agent_unread_cache`；增量事件只更新 `payload.partnerAccount` 对应助理缓存，不影响其他助理。
+6. 队列处理完缓存后读取 `current_we_agent_detail`，若本次事件影响当前助理，则广播当前助理最新未读状态；若不影响当前助理，则只更新缓存，不刷新助理 Tab。
+7. `getWeAgentUnreadMessage({ partnerAccount })` 只读取队列已落盘的缓存，不主动插队、不等待正在处理的事件完成；如果业务需要最新状态，以后续队列广播为准。
+8. 本方案不做回流广播去重，不做版本或时间戳比较；服务端未返回稳定 `version` / `eventTime` 时，以队列入队顺序保证单端缓存写入串行化。
+
+#### 4.2.3 SDK 未读接口
 
 建议新增接口：
 
@@ -301,7 +334,7 @@ getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAge
 }
 ```
 
-#### 4.2.3 已读上报接口
+#### 4.2.4 已读上报接口
 
 建议新增接口：
 
@@ -323,9 +356,9 @@ reportWeAgentSessionRead(params: ReportWeAgentSessionReadParams): Promise<Report
 |---|---|---|
 | `status` | `string` | 固定返回 `success` |
 
-已读上报成功后，不直接以已读上报接口返回结果清理助理 Tab 小红点；SDK 以服务端 IM 广播回来的已读/未读状态作为最终缓存来源。若已读上报由页面直接请求服务端，则 SDK 只通过 IM 广播更新缓存，并重新判断当前助理是否仍存在未读会话。
+已读上报成功后，不直接以已读上报接口返回结果清理助理 Tab 小红点；SDK 以服务端 IM 广播回来的已读/未读状态作为最终缓存来源。若已读上报由页面直接请求服务端，则 SDK 只通过 IM 广播生成未读缓存处理事件，入队更新缓存后重新判断当前助理是否仍存在未读会话。
 
-#### 4.2.4 SDK 未读广播
+#### 4.2.5 SDK 未读广播
 
 建议新增 SDK 对外广播事件：
 
@@ -353,14 +386,14 @@ type: 'agentskills.weAgentUnreadChanged'
 
 广播规则：
 
-1. SDK 初始化全量未读状态查询完成并写入缓存后，广播一次当前助理未读状态。
-2. IM 模块透传服务端指定助理已读/未读变更后，SDK 更新该助理缓存；若变更影响当前助理，则同时广播给宿主和已注册监听的 `weAgentCUI` 页面。
+1. SDK 初始化全量未读状态查询完成后，先将 `initFull` 事件放入未读缓存处理队列；队列写入缓存后广播一次当前助理未读状态。
+2. IM 模块透传服务端指定助理已读/未读变更后，先将增量事件放入未读缓存处理队列；队列更新该助理缓存后，若变更影响当前助理，则同时广播给宿主和已注册监听的 `weAgentCUI` 页面。
 3. 切换助理后调用 `getWeAgentUnreadMessage({ partnerAccount: B })`，返回缓存态后广播一次 B 助理未读状态；不要求切换场景额外请求服务端刷新。
-4. 已读上报后等待服务端 IM 广播更新缓存；SDK 收到已读消息后需要重新判断当前助理是否仍存在未读会话，并广播当前助理最新未读状态：仍有未读则广播 `assistantUnread=true`，无未读则广播 `assistantUnread=false`。
+4. 已读上报后等待服务端 IM 广播；SDK 收到已读消息后将事件放入未读缓存处理队列，队列更新缓存后重新判断当前助理是否仍存在未读会话，并广播当前助理最新未读状态：仍有未读则广播 `assistantUnread=true`，无未读则广播 `assistantUnread=false`。
 5. 若服务端后台开关关闭或命中黑名单，`redDotVisible=false`，宿主和页面均不得展示小红点。
 6. `weAgentCUI` 收到广播后只处理当前助理数据：根据 `assistantUnread` 与 `redDotVisible` 刷新历史会话入口小红点，根据 `sessions[].unread` 刷新已打开历史会话列表中的 item 小红点。
 
-#### 4.2.5 助理 Tab 展示规则
+#### 4.2.6 助理 Tab 展示规则
 
 1. 助理 Tab 只消费当前选择助理的 `redDotVisible`。
 2. `redDotVisible=true` 时展示小红点；`false` 时隐藏小红点。
@@ -368,7 +401,7 @@ type: 'agentskills.weAgentUnreadChanged'
 4. 当前助理为空、激活页状态、服务端接口失败或缓存缺失时，默认不展示小红点。
 5. 从 A 助理切到 B 助理后，必须以 B 助理为准重新调用 `getWeAgentUnreadMessage({ partnerAccount: B })`，不能沿用 A 助理状态。
 
-#### 4.2.6 weAgentCUI 页面展示规则
+#### 4.2.7 weAgentCUI 页面展示规则
 
 1. 页面初始化后立即调用 `HWH5.addEventListener({ type: 'onVisible', func })` 监听可见性。
 2. 页面初始化阶段不得直接调用已读上报接口；HarmonyOS 和 iOS 冷启动预加载会执行页面代码，但不代表用户已前台打开 `weAgentCUI`。
@@ -394,12 +427,15 @@ type: 'agentskills.weAgentUnreadChanged'
 7. 历史会话分页加载时，未读状态来自 SDK 未读缓存或服务端未读接口，不从历史会话列表条目自行推断。
 8. HarmonyOS 和 iOS 冷启动预加载 `weAgentCUI` 时，页面执行初始化逻辑但未前台展示；该阶段不得触发已读上报，也不得因为页面代码执行而隐藏助理 Tab、历史按钮或会话 item 小红点。
 9. 若预加载阶段没有收到 `onVisible` 回调，页面默认按不可见处理；只有明确收到 `visibility = 1` 才进入前台已读流程。
+10. 初始化全量查询返回、IM 广播增量更新、移动端已读回流、PC 端已读回流可能并发到达；SDK 必须统一入未读缓存处理队列，按入队顺序串行写缓存和广播。
+11. 队列不做服务端回流广播去重，不做最终态 diff；若同一助理连续收到多条状态变更，按队列顺序依次落缓存和广播，最终状态由最后处理完成的事件决定。
+12. 队列中的单个事件处理失败时，需要记录日志或埋码，并继续处理后续事件，避免阻塞未读状态后续收敛。
 
 ### 4.4 相关接口联动
 
-1. SDK 初始化入口：主动调用服务端全量未读接口获取所有助理已读/未读消息状态并缓存，同时注册 IM 未读广播监听。
+1. SDK 初始化入口：主动调用服务端全量未读接口获取所有助理已读/未读消息状态，同时注册 IM 未读广播监听；全量返回数据需以 `initFull` 事件放入未读缓存处理队列后再写缓存。
 2. `getWeAgentUnreadMessage`：新增 SDK 接口，入参为 `partnerAccount`，从缓存返回该助理未读状态与会话未读列表；普通页面场景不触发服务端刷新。
-3. `reportWeAgentSessionRead`：新增 SDK 或页面可调用能力，仅用于 `weAgentCUI` 收到 `visibility = 1` 后上报当前会话已读。
+3. `reportWeAgentSessionRead`：新增 SDK 或页面可调用能力，仅用于 `weAgentCUI` 收到 `visibility = 1` 后上报当前会话已读；已读上报成功后等待服务端 IM 广播入队更新缓存。
 4. `getWeAgentUri` / `openWeAgent`：打开或切换当前助理后，读取当前助理未读缓存并刷新助理 Tab 小红点。
 5. `getHistorySessionsList`：历史会话列表仍负责返回会话列表；小红点状态通过未读接口补充，不要求该接口直接承载未读数。
 6. `HWH5.addEventListener`：`weAgentCUI` 页面监听 `onVisible`，根据 `visibility` 判断是否上报已读。
@@ -407,7 +443,7 @@ type: 'agentskills.weAgentUnreadChanged'
 
 ### 4.5 文档需要同步修改的内容
 
-1. `SkillClientSdkInterfaceV2.md`：补充 SDK 初始化全量未读查询、IM 已读/未读广播缓存更新、`getWeAgentUnreadMessage`、`reportWeAgentSessionRead` 接口定义和按 `partnerAccount` 读取缓存规则。
+1. `SkillClientSdkInterfaceV2.md`：补充 SDK 初始化全量未读查询、IM 已读/未读广播缓存更新、未读缓存处理队列、`getWeAgentUnreadMessage`、`reportWeAgentSessionRead` 接口定义和按 `partnerAccount` 读取缓存规则。
 2. `小程序JSAPI接口文档.md`：补充 `HWH5.addEventListener({ type: 'onVisible', func })` 在 `weAgentCUI` 已读上报场景的使用约束。
 3. Android / iOS / HarmonyOS SDK 接口说明：补充 IM 未读广播监听、未读缓存、广播事件和失败降级规则。
 4. `ai-chat-viewer` 相关文档：补充助理 Tab、历史会话按钮和历史会话 item 的小红点消费规则。
@@ -427,6 +463,7 @@ type: 'agentskills.weAgentUnreadChanged'
 3. 不新增后台常驻任务。
 4. 页面不可见或处于 HarmonyOS / iOS 冷启动预加载态时不触发已读上报。
 5. 未读状态由初始化全量查询和 IM 广播事件驱动更新，不新增轮询或高频刷新。
+6. 未读缓存处理队列只串行化本地缓存写入和广播，不新增后台常驻任务。
 
 ## 7. 埋码
 
@@ -489,6 +526,9 @@ type: 'agentskills.weAgentUnreadChanged'
 18. 命中黑名单用户时，端侧不展示助理 Tab、历史按钮和历史 item 小红点。
 19. 初始化请求失败但本地有缓存时，优先展示缓存状态，并在后续 IM 广播到达后校正。
 20. 初始化请求失败且本地无缓存时，默认不展示小红点，并等待后续 IM 广播增量更新。
+21. 初始化全量查询返回和 IM 广播增量更新同时到达时，校验两个事件均进入未读缓存处理队列，并按入队顺序串行写入 `we_agent_unread_cache`。
+22. 移动端已读上报回流广播和 PC 端已读回流广播连续到达时，校验队列依次更新对应助理缓存，并按最后处理完成的状态刷新助理 Tab、历史入口和会话 item 小红点。
+23. 队列处理非当前助理未读变更时，校验只更新对应助理缓存，不广播当前助理 Tab 小红点变化。
 
 ### 9.2 兼容测试
 
@@ -505,4 +545,4 @@ type: 'agentskills.weAgentUnreadChanged'
 
 ## 10. 最终建议
 
-建议采用“服务端管控 + SDK 初始化全量缓存 + IM 广播增量更新 + 页面按当前助理消费”的方案。服务端负责开关、黑名单、跨端已读一致性和最终未读状态；SDK 初始化主动拉取所有助理已读/未读状态并缓存，后续通过 IM 广播更新指定助理缓存并广播当前助理状态；宿主和 `weAgentCUI` 只消费布尔小红点状态，不计算未读数。后续优先补齐服务端协议和 `SkillClientSdkInterfaceV2.md` 接口定义，再推进 Android、iOS、HarmonyOS 与 `ai-chat-viewer` 联调。
+建议采用“服务端管控 + SDK 初始化全量缓存 + IM 广播增量更新 + 未读缓存处理队列 + 页面按当前助理消费”的方案。服务端负责开关、黑名单、跨端已读一致性和最终未读状态；SDK 初始化主动拉取所有助理已读/未读状态，后续通过 IM 广播接收指定助理变更，所有缓存变更统一进入队列串行写入并广播当前助理状态；宿主和 `weAgentCUI` 只消费布尔小红点状态，不计算未读数。后续优先补齐服务端协议和 `SkillClientSdkInterfaceV2.md` 接口定义，再推进 Android、iOS、HarmonyOS 与 `ai-chat-viewer` 联调。
