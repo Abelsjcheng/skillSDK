@@ -337,6 +337,7 @@ flowchart TD
 5. 统一广播 payload 中的 `data` 与对应服务端下发的 `weCrew` 一致。
 6. 冷启动和离线恢复在线时，对已有 `we_agent_details` 做批量补偿刷新。
 7. `weAgentCUI` 页面订阅更新和删除广播，仅处理当前聊天助理相关事件。
+8. 新增 SDK 内部助理缓存处理队列，所有会修改 `we_agent_details`、`we_agent_list_cache`、`current_we_agent_detail` 的事件都进入队列串行处理，避免本端主动操作与服务端同步广播回流并发写缓存。
 
 ### 4.2 核心实现方式
 
@@ -347,6 +348,32 @@ flowchart TD
 | `current_we_agent_detail` | 当前助理详情对象 |
 | `we_agent_details` | 助理详情缓存对象，key 为 `partnerAccount`，value 为对应助理详情对象 |
 | `we_agent_list_cache` | 助理列表缓存 |
+
+SDK 内部新增助理缓存处理队列：
+
+1. 队列为 SDK 内部实现，不新增公开接口，也不新增持久化缓存 key。
+2. 所有会修改助理缓存的事件都必须先进入队列，由队列按入队顺序串行处理；同一时刻只处理一个事件，当前事件完成缓存读写和广播后再处理下一个事件。
+3. 队列事件来源包括：
+   - 本端主动 `updateWeAgent` 成功；
+   - 本端主动 `deleteWeAgent` 成功；
+   - 服务端主动广播 `action = update`；
+   - 服务端主动广播 `action = delete`；
+   - 冷启动或离线恢复在线补偿刷新。
+4. 队列事件建议结构：
+   ```typescript
+   type WeAgentCacheMutation = {
+     action: 'update' | 'delete';
+     source: 'localApi' | 'serverPush' | 'compensate';
+     partnerAccount?: string;
+     robotId?: string;
+     data: Record<string, unknown>;
+     enqueueTime: number;
+   };
+   ```
+5. 本阶段不做服务端回流广播去重，不做广播前最终态 diff；本端主动操作成功后的队列事件处理完成后必须广播，服务端广播回流到达后也按服务端广播规则处理。
+6. 服务端未返回 `version` 和 `eventTime`，队列不做版本或时间戳比较。
+7. `update` 事件只更新本地已存在的助理缓存；若 `we_agent_details` 不存在对应助理缓存，则不新增缓存、不补拉详情，因此删除后迟到的 `update` 不会恢复已删除助理。
+8. `delete` 事件按幂等方式处理；若列表缓存或详情缓存中已不存在目标助理，则跳过对应缓存处理，不报错。
 
 SDK 内部统一封装广播调用：
 
@@ -364,7 +391,7 @@ broadcastWeAgentEvent(eventName: string, data: any): void
 广播约定：
 
 | 场景 | SDK 内部 eventName | HWH5EXT.registerEventListener type | payload |
-|---|---|---|
+|---|---|---|---|
 | 助理详情更新 | `agentskills.agentUpdated` | `agentskills.agentUpdated` | `{ type: 'update', data: weCrew }`，其中 `data` 与服务端下发更新通知中的 `weCrew` 一致，即至少包含 `robotId`、`partnerAccount`、`name`、`icon`、`description` |
 | 助理删除 | `agentskills.agentUpdated` | `agentskills.agentUpdated` | `{ type: 'delete', data: weCrew }`，其中 `data` 与服务端下发删除通知中的 `weCrew` 一致，即至少包含 `robotId`、`partnerAccount` |
 
@@ -414,20 +441,22 @@ SDK 初始化监听注册：
 
 1. SDK 从通知载荷中读取 `action`，仅当 `action = 'update'` 时进入详情更新流程。
 2. SDK 从 `weCrew` 中解析助理唯一标识，优先使用 `partnerAccount`，若服务端同时提供 `robotId` 也一并保留。
-3. SDK 读取本地 `we_agent_details`，检查是否已存在该助理缓存详情。
-4. 若存在，则使用 `weCrew` 中的更新字段覆盖 `we_agent_details[partnerAccount]`。
-5. 若 `current_we_agent_detail` 命中同一助理，则同步覆盖为最新内容。
-6. 若本地 `we_agent_details` 中不存在该助理缓存详情，则不新增缓存，不调用查详情服务端接口补拉。
-7. SDK 最后调用 `broadcastWeAgentEvent('agentskills.agentUpdated', updatePayload)`，其中 `updatePayload.data` 为通知中的 `weCrew`。
+3. SDK 组装 `source = 'serverPush'`、`action = 'update'` 的助理缓存处理事件，并放入助理缓存处理队列。
+4. 队列处理该事件时读取本地 `we_agent_details`，检查是否已存在该助理缓存详情。
+5. 若存在，则使用 `weCrew` 中的更新字段覆盖 `we_agent_details[partnerAccount]`。
+6. 若 `current_we_agent_detail` 命中同一助理，则同步覆盖为最新内容。
+7. 若本地 `we_agent_details` 中不存在该助理缓存详情，则不新增缓存，不调用查详情服务端接口补拉。
+8. 队列最后调用 `broadcastWeAgentEvent('agentskills.agentUpdated', updatePayload)`，其中 `updatePayload.data` 为通知中的 `weCrew`。
 
 服务端主动删除处理：
 
 1. SDK 从通知载荷中读取 `action`，仅当 `action = 'delete'` 时进入删除流程。
 2. SDK 从 `weCrew` 中解析删除目标标识，`partnerAccount` 与 `robotId` 至少一个存在。
-3. SDK 读取本地 `we_agent_list_cache`，若存在则从列表缓存中删除对应助理并回写。
-4. SDK 读取本地 `we_agent_details`，若存在对应助理详情缓存，则移除对应条目并回写。
-5. 该场景不读取也不修改 `current_we_agent_detail`，是否为当前助理由广播消费方自行判断。
-6. SDK 最后调用 `broadcastWeAgentEvent('agentskills.agentUpdated', deletePayload)`，其中 `deletePayload.data` 为通知中的 `weCrew`。
+3. SDK 组装 `source = 'serverPush'`、`action = 'delete'` 的助理缓存处理事件，并放入助理缓存处理队列。
+4. 队列处理该事件时读取本地 `we_agent_list_cache`，若存在则从列表缓存中删除对应助理并回写。
+5. 队列读取本地 `we_agent_details`，若存在对应助理详情缓存，则移除对应条目并回写。
+6. 该场景不读取也不修改 `current_we_agent_detail`，是否为当前助理由广播消费方自行判断。
+7. 队列最后调用 `broadcastWeAgentEvent('agentskills.agentUpdated', deletePayload)`，其中 `deletePayload.data` 为通知中的 `weCrew`。
 
 冷启动与离线恢复在线补偿刷新：
 
@@ -436,9 +465,9 @@ SDK 初始化监听注册：
 3. SDK 从缓存对象中取出所有 `partnerAccount`，并按逗号拼接成字符串 `partnerAccounts`。
 4. SDK 异步调用批量查详情服务端接口：`GET /v1/robot-partners/{partnerAccounts}`。
 5. SDK 解析服务端返回的助理详情列表，并建立以 `partnerAccount` 为 key 的映射。
-6. 若服务端返回了对应助理详情，则与旧缓存详情比较；存在差异时更新 `we_agent_details[partnerAccount]` 并广播更新。
-7. 若该助理同时命中 `current_we_agent_detail`，则同步覆盖当前助理缓存。
-8. 若服务端未返回对应 `partnerAccount` 的助理详情，则视为该助理已删除，同步删除详情缓存和列表缓存中的对应项，并广播删除。
+6. 若服务端返回了对应助理详情，则组装 `source = 'compensate'`、`action = 'update'` 的助理缓存处理事件入队；队列与旧缓存详情比较，存在差异时更新 `we_agent_details[partnerAccount]` 并广播更新。
+7. 若该助理同时命中 `current_we_agent_detail`，则由队列同步覆盖当前助理缓存。
+8. 若服务端未返回对应 `partnerAccount` 的助理详情，则视为该助理已删除，组装 `source = 'compensate'`、`action = 'delete'` 的助理缓存处理事件入队；队列同步删除详情缓存和列表缓存中的对应项，并广播删除。
 9. 若批量请求失败，则仅记录日志，不更新缓存，也不触发广播。
 
 本端主动调用 `updateWeAgent` 成功后的处理：
@@ -452,15 +481,16 @@ SDK 初始化监听注册：
 | HarmonyOS | `WeAgentStore.updateCachedDetails(...)` | 更新命中的当前详情与详情缓存，不新增详情缓存 |
 
 1. 三端现有实现先校验 `partnerAccount` 与 `robotId` 至少一个存在，并要求 `name`、`icon`、`description` 为有效字符串。
-2. 服务端更新接口成功后，三端均调用现有缓存更新方法：
+2. 服务端更新接口成功后，三端组装 `source = 'localApi'`、`action = 'update'` 的助理缓存处理事件，并放入助理缓存处理队列。
+3. 队列处理该事件时复用三端现有缓存更新方法：
    - Android：`updateCachedWeAgentDetails(partnerAccount, robotId, name, icon, description)`；
    - iOS：`updateCachedWeAgentDetailsWithPartnerAccount:robotId:name:icon:description:`；
    - HarmonyOS：`updateCachedDetails(partnerAccount, robotId, name, icon, description)`。
-3. 若 `current_we_agent_detail` 匹配 `partnerAccount` 或 `robotId`，则仅更新当前详情中的 `name`、`icon`、`description`。
-4. 若 `we_agent_details` 中命中对应缓存详情，则仅更新该缓存详情中的 `name`、`icon`、`description`。
-5. 若 `we_agent_details` 中未命中对应缓存详情，则保持现有实现，不新增详情缓存。
-6. 现有三端接口返回 `success` 结果，不改变原接口返回语义。
-7. 本方案若补充更新广播，广播点放在现有缓存更新完成之后；广播事件为 `agentskills.agentUpdated`，payload 结构为 `{ type: 'update', data: weCrew }`，其中 `data` 需组装为与服务端更新通知 `weCrew` 一致的结构，即包含 `robotId`、`partnerAccount`、`name`、`icon`、`description`，仅用于通知，不写入 `we_agent_details`。
+4. 若 `current_we_agent_detail` 匹配 `partnerAccount` 或 `robotId`，则仅更新当前详情中的 `name`、`icon`、`description`。
+5. 若 `we_agent_details` 中命中对应缓存详情，则仅更新该缓存详情中的 `name`、`icon`、`description`。
+6. 若 `we_agent_details` 中未命中对应缓存详情，则保持现有实现，不新增详情缓存。
+7. 现有三端接口返回 `success` 结果，不改变原接口返回语义。
+8. 本端主动调用 `updateWeAgent` 成功后必须广播助理更新事件，广播点放在队列完成现有缓存更新之后；广播事件为 `agentskills.agentUpdated`，payload 结构为 `{ type: 'update', data: weCrew }`，其中 `data` 需组装为与服务端更新通知 `weCrew` 一致的结构，即包含 `robotId`、`partnerAccount`、`name`、`icon`、`description`，仅用于通知，不写入 `we_agent_details`。
 
 本端主动调用 `deleteWeAgent` 成功后的处理：
 
@@ -480,7 +510,7 @@ SDK 初始化监听注册：
    - 当前详情存在，且 `partnerAccount` 或 `id/robotId` 与删除目标匹配时，视为删除当前助理；
    - 否则视为删除非当前助理。
 3. SDK 调用服务端删除接口 `DELETE /v4-1/we-crew`。
-4. 服务端删除成功后，原接口返回 `deleteResult: "success"`；服务端失败时保持现有异常处理，透传或包装服务端错误，不触发本端删除成功广播。
+4. 服务端删除成功后，原接口返回 `deleteResult: "success"`，SDK 组装 `source = 'localApi'`、`action = 'delete'` 的助理缓存处理事件，并放入助理缓存处理队列；服务端失败时保持现有异常处理，透传或包装服务端错误，不触发本端删除成功广播。
 5. 若删除目标不是当前助理：
    - 仅尝试更新本地 `we_agent_list_cache`；
    - 若本地存在助理列表缓存，则从缓存列表中移除当前被删除助理，并将删除后的列表回写；
@@ -497,7 +527,7 @@ SDK 初始化监听注册：
    - 成功获取主助理详情时，将其写入 `current_we_agent_detail`，并在内存中按 `getWeAgentUri` 同一套规则组装跳转 URI 后跳转主助理；
    - 若删除后的助理列表中不存在主助理，或主助理详情获取失败，则清空 `current_we_agent_detail` 并跳转到激活页面；
    - 若本地 `we_agent_details` 中存在当前被删除助理对应详情缓存，则删除该条详情缓存并回写。
-7. 本方案若补充删除广播，广播点放在上述现有删除成功处理完成之后；广播事件为 `agentskills.agentUpdated`，payload 结构为 `{ type: 'delete', data: weCrew }`，其中 `data` 需组装为与服务端删除通知 `weCrew` 一致的结构，即包含删除目标 `robotId`、`partnerAccount`。
+7. 本端主动调用 `deleteWeAgent` 成功后必须广播助理删除事件，广播点放在队列完成上述现有删除成功处理之后；广播事件为 `agentskills.agentUpdated`，payload 结构为 `{ type: 'delete', data: weCrew }`，其中 `data` 需组装为与服务端删除通知 `weCrew` 一致的结构，即包含删除目标 `robotId`、`partnerAccount`。
 
 `weAgentCUI` 页面消费规则：
 
@@ -573,18 +603,21 @@ flowchart TD
 8. IM 模块通知广播注册失败不阻塞 SDK 初始化，后续仍可依赖冷启动和离线恢复在线补偿刷新收敛缓存。
 9. SDK 重复初始化、IM 模块重连、前后台切换恢复时，监听注册必须幂等，避免同一服务端通知触发多次缓存处理和客户端广播。
 10. IM 模块通知广播只负责透传服务端返回数据；若透传载荷缺少 `action` 或 `weCrew`，SDK 记录日志并忽略该通知。
-11. 历史版本兼容：对于 6 月前的历史版本，助理详情页需屏蔽编辑按钮，避免旧版本进入不支持新同步通知链路的编辑流程。
-12. 专属助手详情页不显示编辑按钮，避免专属助手进入编辑流程。
+11. 本阶段不做服务端回流广播去重，不做广播前最终态 diff；若本端主动操作成功后服务端又同步广播同一助理更新或删除，服务端广播仍会入队并按服务端广播规则处理。
+12. 因为服务端未返回 `version` 和 `eventTime`，队列不做版本或时间戳比较，仅通过串行处理避免并发写缓存。
+13. 删除后迟到的更新广播进入队列后，若本地 `we_agent_details` 已不存在对应助理缓存，则不新增缓存、不恢复已删除助理。
+14. 历史版本兼容：对于 6 月前的历史版本，助理详情页需屏蔽编辑按钮，避免旧版本进入不支持新同步通知链路的编辑流程。
+15. 专属助手详情页不显示编辑按钮，避免专属助手进入编辑流程。
 
 ### 4.4 相关接口联动
 
 1. `getWeAgentDetails`：语义不变，继续用于指定助理详情查询与缓存写入。
 2. `getAssistantDetails`：语义不变，继续优先返回缓存并异步刷新。
-3. `updateWeAgent`：保留三端现有“只更新命中的当前详情与详情缓存，不新增详情缓存”的逻辑，成功后补充 `agentskills.agentUpdated` 广播，payload.type 为 `update`。
-4. `deleteWeAgent`：非当前助理只更新已存在列表缓存；当前助理删除成功后，基于删除后的助理列表判断是否存在主助理，有主助理则跳转主助理，无主助理则跳转激活页面；并补充“若 `we_agent_details` 存在被删助手详情缓存则删除对应条目”，成功后补充 `agentskills.agentUpdated` 广播，payload.type 为 `delete`。
+3. `updateWeAgent`：保留三端现有“只更新命中的当前详情与详情缓存，不新增详情缓存”的逻辑，成功后将 `localApi update` 事件放入助理缓存处理队列，队列处理完成后必须触发 `agentskills.agentUpdated` 广播，payload.type 为 `update`。
+4. `deleteWeAgent`：非当前助理只更新已存在列表缓存；当前助理删除成功后，基于删除后的助理列表判断是否存在主助理，有主助理则跳转主助理，无主助理则跳转激活页面；并补充“若 `we_agent_details` 存在被删助手详情缓存则删除对应条目”，成功后将 `localApi delete` 事件放入助理缓存处理队列，队列处理完成后必须触发 `agentskills.agentUpdated` 广播，payload.type 为 `delete`。
 5. `notifyAssistantDetailUpdated`：仍只负责 `openAssistantEditPage` 的本地编辑页回调，不替代宿主级广播通知。
 6. `GET /v1/robot-partners/{partnerAccounts}`：用于冷启动和离线恢复在线后的批量补偿刷新。
-7. SDK 初始化入口：新增 IM 模块通知广播注册调用，监听回调按服务端透传载荷中的 `action` 分发到更新或删除处理流程。
+7. SDK 初始化入口：新增 IM 模块通知广播注册调用，监听回调按服务端透传载荷中的 `action` 组装 `serverPush update/delete` 事件并放入助理缓存处理队列。
 8. `HWH5EXT.registerEventListener`：`weAgentCUI` 页面通过该 JSAPI 注册 `agentskills.agentUpdated`，SDK 通过 `broadcastWeAgentEvent` 触发对应回调并透传对应广播 payload。
 9. 助理详情页：专属助手详情页固定不展示编辑按钮；6 月前历史版本详情页也需屏蔽编辑按钮。
 
@@ -660,19 +693,23 @@ flowchart TD
 3. 服务端下发 `action = delete`，本地存在目标助理时，校验列表缓存和详情缓存被删除，并触发删除广播。
 4. 服务端下发 `action = delete`，本地不存在目标助理时，校验不报错且仍触发删除广播。
 5. SDK 初始化时校验 IM 模块通知广播已注册，IM 模块透传服务端模拟通知后能进入对应更新或删除流程。
-6. SDK 重复初始化或 IM 模块重连时，校验监听注册幂等，同一服务端通知只触发一次缓存处理和一次客户端广播。
+6. SDK 重复初始化或 IM 模块重连时，校验监听注册幂等，同一服务端通知只入队一次、只触发一次缓存处理和一次客户端广播。
 7. 冷启动时 `we_agent_details` 非空，批量接口返回详情有差异，校验缓存更新和更新广播。
 8. 冷启动时批量接口未返回某个本地助理，校验该助理详情缓存和列表缓存删除，并触发删除广播。
 9. 离线恢复在线后重复执行补偿刷新，校验无差异时不触发无意义广播。
 10. 本端 `updateWeAgent` 成功后，校验仅更新命中的当前详情或详情缓存、不新增详情缓存，并触发 `agentskills.agentUpdated` 广播，payload.type 为 `update`。
 11. 本端 `deleteWeAgent` 删除非当前助理成功后，校验仅在删除前已有列表缓存时更新列表缓存；若 `we_agent_details` 有对应助手详情缓存，则删除对应详情缓存；并触发 `agentskills.agentUpdated` 广播，payload.type 为 `delete`。
 12. 本端 `deleteWeAgent` 删除当前助理成功后，校验列表缓存移除目标助理；若删除后列表存在主助理，则当前详情切换为主助理详情并跳转主助理；若删除后列表不存在主助理，则清空当前详情并跳转激活页面；若 `we_agent_details` 有被删助手详情缓存，则删除对应详情缓存；并触发 `agentskills.agentUpdated` 广播，payload.type 为 `delete`。
-13. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'agentskills.agentUpdated', func })` 注册统一监听，并校验更新广播可触发该 `func`。
-14. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'agentskills.agentUpdated', func })` 注册统一监听，并校验删除广播可触发该 `func`。
-15. 校验 `agentskills.agentUpdated` 的更新回调 payload 为 `{ type: 'update', data: weCrew }`，删除回调 payload 为 `{ type: 'delete', data: weCrew }`。
-16. `weAgentCUI` 收到当前助理更新事件后，校验名称、简介、头像刷新。
-17. `weAgentCUI` 收到非当前助理更新或删除事件后，校验页面不变化。
-18. `weAgentCUI` 收到当前助理删除事件后，校验展示不可取消弹窗，且“切换助理”可跳转到切换助理页面。
+13. 本端 `updateWeAgent` 成功后，服务端同步广播同一助理更新，校验两个事件按入队顺序串行处理，不发生并发写缓存。
+14. 本端 `deleteWeAgent` 成功后，服务端同步广播同一助理删除，校验两个事件按入队顺序串行处理，第二次删除缓存已不存在时跳过对应缓存处理且不报错。
+15. 本端 `deleteWeAgent` 成功后，若迟到的服务端 `update` 广播进入队列，且 `we_agent_details` 已不存在对应助理缓存，校验不新增缓存、不恢复已删除助理。
+16. 同时触发本端主动操作、服务端广播和补偿刷新时，校验所有缓存变更事件进入同一队列并按顺序处理。
+17. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'agentskills.agentUpdated', func })` 注册统一监听，并校验更新广播可触发该 `func`。
+18. `weAgentCUI` 初始化时通过 `HWH5EXT.registerEventListener({ type: 'agentskills.agentUpdated', func })` 注册统一监听，并校验删除广播可触发该 `func`。
+19. 校验 `agentskills.agentUpdated` 的更新回调 payload 为 `{ type: 'update', data: weCrew }`，删除回调 payload 为 `{ type: 'delete', data: weCrew }`。
+20. `weAgentCUI` 收到当前助理更新事件后，校验名称、简介、头像刷新。
+21. `weAgentCUI` 收到非当前助理更新或删除事件后，校验页面不变化。
+22. `weAgentCUI` 收到当前助理删除事件后，校验展示不可取消弹窗，且“切换助理”可跳转到切换助理页面。
 
 ### 9.2 兼容测试
 
