@@ -37,6 +37,7 @@ import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks
 import { reportSendMessageClick } from '../utils/uemUtil';
 
 const HISTORY_PAGE_SIZE = 20;
+const MESSAGE_COPY_TOAST_OPTIONS = { toastClassName: 'toast toast--message-copy' } as const;
 
 function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
   return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
@@ -782,10 +783,10 @@ export function useChatSession({
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
-      showToast(tRef.current('common.copySuccess'));
+      showToast(tRef.current('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
     } catch (err) {
       WeLog(`useChatSession copy failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(tRef.current('assistantDetail.copyFailed'));
+      showToast(tRef.current('common.copyFailed'), MESSAGE_COPY_TOAST_OPTIONS);
     }
   }, [mode, welinkSessionId]);
 

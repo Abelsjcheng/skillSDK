@@ -333,11 +333,13 @@ function App({ assistantAccount = '' }: AppProps) {
               messages={session.messages}
               pendingAssistantPreview={session.pendingAssistantPreview}
               welinkSessionId={session.welinkSessionId}
+              showMessageActions
               scrollToBottomSignal={session.scrollToBottomSignal}
               isLoadingHistory={session.isLoadingHistory}
               hasMoreHistory={session.hasMoreHistory}
               onLoadMoreHistory={session.onLoadMoreHistory}
               onQuestionAnswered={session.onQuestionAnswered}
+              onCopy={session.onCopy}
               weAgentUserName={weAgentUserName}
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}

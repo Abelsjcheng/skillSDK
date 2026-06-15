@@ -296,6 +296,45 @@ export function shouldRenderMessage(message: Message): boolean {
   return hasVisibleText(message.content);
 }
 
+function isCompletedCopyPart(part: MessagePart): boolean {
+  return !part.isStreaming && part.status !== 'pending' && part.status !== 'running';
+}
+
+function collectCopyTextParts(parts: MessagePart[]): string[] {
+  return parts.reduce<string[]>((result, part) => {
+    if (!isCompletedCopyPart(part)) {
+      return result;
+    }
+
+    if (part.type === 'text') {
+      const content = part.content.trim();
+      if (content) {
+        result.push(content);
+      }
+      return result;
+    }
+
+    if (part.type === 'subtask' && part.subParts?.length) {
+      result.push(...collectCopyTextParts(part.subParts));
+    }
+
+    return result;
+  }, []);
+}
+
+export function getAssistantMessageCopyText(message: Message): string {
+  if (normalizeRole(message.role) !== 'assistant' || message.isStreaming) {
+    return '';
+  }
+
+  const textParts = message.parts ? collectCopyTextParts(message.parts) : [];
+  if (textParts.length > 0) {
+    return textParts.join('\n\n');
+  }
+
+  return message.content.trim();
+}
+
 export function sessionMessageToMessage(sessionMessage: SessionMessage): Message {
   return {
     id: String(sessionMessage.id),

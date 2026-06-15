@@ -1,5 +1,6 @@
 ﻿import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useTranslation } from 'react-i18next';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
@@ -21,6 +22,7 @@ import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
+  getAssistantMessageCopyText,
   normalizeRole,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
@@ -76,6 +78,7 @@ function isPermissionPartReadonly(part: MessagePart, readonly: boolean): boolean
 
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
 const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
+const MESSAGE_COPY_TOAST_OPTIONS = { toastClassName: 'toast toast--message-copy' } as const;
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -90,12 +93,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
 }) => {
+  const { t } = useTranslation();
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
   const isPlainVariant = variant === 'plain';
   const canRenderActions = showActions && !isUser;
+  const copyText = useMemo(() => getAssistantMessageCopyText(message), [message]);
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -202,18 +207,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleCopy = () => {
-    if (onCopy) {
-      void onCopy(message.content);
+    if (!copyText) {
       return;
     }
 
-    void copyTextToClipboard(message.content)
+    if (onCopy) {
+      void onCopy(copyText);
+      return;
+    }
+
+    void copyTextToClipboard(copyText)
       .then(() => {
-        showToast('复制成功');
+        showToast(t('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
       })
       .catch((error) => {
         WeLog(`MessageBubble copy failed | error=${JSON.stringify(error)}`);
-        showToast('复制失败');
+        showToast(t('common.copyFailed'), MESSAGE_COPY_TOAST_OPTIONS);
       });
   };
 
@@ -222,7 +231,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderActions = () => {
-    if (!canRenderActions || message.isStreaming || !message.content) {
+    if (!canRenderActions || !copyText) {
       return null;
     }
 
@@ -233,10 +242,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             type="button"
             className="action-btn copy-btn"
             onClick={handleCopy}
-            title="复制内容"
+            title={t('common.copyContent')}
           >
             <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
-            <span className="action-btn__text">复制</span>
           </button>
         ) : null}
         {onSendToIM ? (
@@ -306,6 +314,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ].filter(Boolean).join(' ')}
         >
           <div className="message-content">{messageContent}</div>
+          {renderActions()}
         </div>
       </div>
     </div>
