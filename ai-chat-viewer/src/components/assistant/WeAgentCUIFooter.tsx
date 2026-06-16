@@ -1,6 +1,6 @@
 import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import checkIcon from '../../imgs/check.svg';
+import checkIcon from '../../imgs/check_icon.svg';
 import sendIcon from '../../imgs/send_icon.svg';
 import stopIcon from '../../imgs/stop_icon.svg';
 import '../../styles/WeAgentCUIFooter.less';
