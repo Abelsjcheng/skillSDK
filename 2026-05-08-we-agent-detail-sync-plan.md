@@ -29,6 +29,8 @@
 5. 本端主动调用 `deleteWeAgent` 成功后，在列表缓存与当前助理跳转逻辑完成后补充广播助理删除事件；若删除目标是当前助理，则直接调用 `SkillClientSdkInterfaceV2.md` 中的 `getWeAgentUri` 方法，由该方法内部判断是否存在主助理，有主助理时返回主助理 URI，否则返回激活页面 URI。
 6. 专属助手的详情页不显示编辑按钮。
 7. `ai-chat-viewer` 的 `weAgentCUI` 页面在收到助理更新或删除通知后，能够及时刷新助理信息，或引导用户切换到其他助理。
+8. 面向通讯录提供助理更新与删除联动能力：通讯录可通过 SDK 端侧详情广播通知和删除广播通知感知状态变化，并通过既有 JSAPI 调用 `openAssistantEditPage` 与 `deleteWeAgent` 完成编辑入口打开和删除操作。
+9. 通讯录调用 `openAssistantEditPage` 时按 `SkillClientSdkInterfaceV2.md` 使用 `partnerAccount` 或 `robotId` 定位助理；更新后的助理详情数据不再通过 `openAssistantEditPage` 回调返回，通讯录统一通过注册 `agentskills.agentUpdated` 端侧详情广播通知获取。
 
 ### 1.3 非目标
 
@@ -51,6 +53,9 @@ flowchart TD
     F --> G["broadcastWeAgentEvent"]
     G --> H["客户端已有 WeBroadCast"]
     H --> I["ai-chat-viewer weAgentCUI 消费更新或删除事件"]
+    H --> J["通讯录消费端侧详情/删除广播通知"]
+    K["通讯录"] --> L["openAssistantEditPage / deleteWeAgent"]
+    L --> E
 ```
 
 ### 2.2 方案核心
@@ -323,6 +328,7 @@ flowchart TD
 6. 冷启动和离线恢复在线时，对已有 `we_agent_details` 做批量补偿刷新。
 7. `weAgentCUI` 页面订阅更新和删除广播，仅处理当前聊天助理相关事件。
 8. 新增 SDK 内部助理缓存处理队列，所有会修改 `we_agent_details`、`we_agent_list_cache`、`current_we_agent_detail` 的事件都进入队列串行处理，避免本端主动操作与服务端同步广播回流并发写缓存。
+9. 新增通讯录接入说明：通讯录复用 `openAssistantEditPage` 打开编辑页，复用 `deleteWeAgent` 删除助理，并订阅端侧详情广播通知和删除广播通知保持通讯录列表与详情同步。
 
 ### 4.2 核心实现方式
 
@@ -408,6 +414,39 @@ broadcastWeAgentEvent(eventName: string, data: any): void
    }
    ```
 5. 广播触发时机固定放在本地缓存处理之后，且缓存处理结果不影响广播。
+
+通讯录更新与删除接入：
+
+1. 通讯录打开编辑页时调用 `openAssistantEditPage(params)`，入参与 `SkillClientSdkInterfaceV2.md` 保持一致：`partnerAccount` 与 `robotId` 至少传一个，SDK 优先使用 `partnerAccount` 作为唯一标识，未传 `partnerAccount` 时使用 `robotId`。
+2. `openAssistantEditPage` 只负责打开助理编辑页面，不再接收或注册更新回调，也不承载通讯录的数据回传职责。
+3. 通讯录需要通过既有客户端事件机制订阅 `agentskills.agentUpdated`，消费 SDK 端侧详情广播通知和删除广播通知。
+4. 编辑页完成更新并触发 SDK 更新成功链路后，SDK 通过 `agentskills.agentUpdated` 下发 `{ type: 'update', data: weCrew }`；通讯录从该端侧详情广播通知中获取更新后的 `name`、`icon`、`description`。
+5. 通讯录收到 `{ type: 'update', data: weCrew }` 后，按 `partnerAccount` 优先、`robotId` 兜底匹配本地通讯录条目，刷新对应助理的名称、头像和简介。
+6. 通讯录收到 `{ type: 'delete', data: weCrew }` 后，按 `partnerAccount` 优先、`robotId` 兜底移除对应通讯录条目；若当前正在展示该助理详情，则关闭详情或展示已删除状态。
+7. 通讯录删除助理时调用 `deleteWeAgent({ partnerAccount?, robotId? })`，不直接绕过 SDK 调用服务端删除接口；SDK 在删除成功后处理缓存、当前助理跳转和 `agentskills.agentUpdated` 删除广播。
+8. `deleteWeAgent` 调用失败时沿用现有失败处理，不更新缓存，不触发删除广播；通讯录保持原有条目并展示自身错误提示。
+
+```mermaid
+sequenceDiagram
+    participant Contact as 通讯录
+    participant SDK as SDK
+    participant Edit as 助理编辑页
+    participant Server as 服务端
+    participant Cache as 本地缓存
+    participant Broadcast as 客户端广播
+
+    Contact->>SDK: openAssistantEditPage({ partnerAccount/robotId })
+    SDK->>Edit: 打开助理编辑页
+    Edit->>SDK: 提交助理详情更新
+    SDK->>Broadcast: agentskills.agentUpdated(update)
+    Broadcast-->>Contact: 端侧详情广播通知
+    Contact->>SDK: deleteWeAgent({ partnerAccount/robotId })
+    SDK->>Server: DELETE /v4-1/we-crew
+    Server-->>SDK: deleteResult = success
+    SDK->>Cache: 删除目标助理缓存
+    SDK->>Broadcast: agentskills.agentUpdated(delete)
+    Broadcast-->>Contact: 端侧删除广播通知
+```
 
 SDK 初始化监听注册：
 
@@ -600,12 +639,14 @@ flowchart TD
 1. `getWeAgentDetails`：语义不变，继续用于指定助理详情查询与缓存写入。
 2. `getAssistantDetails`：语义不变，继续优先返回缓存并异步刷新。
 3. `updateWeAgent`：保留三端现有“只更新命中的当前详情与详情缓存，不新增详情缓存”的逻辑，成功后将 `localApi update` 事件放入助理缓存处理队列，队列处理完成后必须触发 `agentskills.agentUpdated` 广播，payload.type 为 `update`。
-4. `deleteWeAgent`：非当前助理只更新已存在列表缓存；当前助理删除成功后，删除列表、`current_we_agent_detail` 与详情缓存中的目标助理，然后直接调用 `getWeAgentUri` 获取跳转 URI，由 `getWeAgentUri` 内部判断是否有主助理，有主助理则返回主助理 URI，否则返回激活页面 URI；成功后将 `localApi delete` 事件放入助理缓存处理队列，队列处理完成后必须触发 `agentskills.agentUpdated` 广播，payload.type 为 `delete`。
-5. `notifyAssistantDetailUpdated`：仍只负责 `openAssistantEditPage` 的本地编辑页回调，不替代宿主级广播通知。
-6. `GET /v1/robot-partners/{partnerAccounts}`：用于冷启动和离线恢复在线后的批量补偿刷新。
-7. SDK 初始化入口：新增 IM 模块通知广播注册调用，监听回调按服务端透传载荷中的 `action` 组装 `serverPush update/delete` 事件并放入助理缓存处理队列。
-8. `HWH5EXT.registerEventListener`：`weAgentCUI` 页面通过该 JSAPI 注册 `agentskills.agentUpdated`，SDK 通过 `broadcastWeAgentEvent` 触发对应回调并透传对应广播 payload。
-9. 助理详情页：专属助手详情页固定不展示编辑按钮；6 月前历史版本详情页也需屏蔽编辑按钮。
+4. `deleteWeAgent`：非当前助理只更新已存在列表缓存；当前助理删除成功后，删除列表、`current_we_agent_detail` 与详情缓存中的目标助理，然后直接调用 `getWeAgentUri` 获取跳转 URI，由 `getWeAgentUri` 内部判断是否有主助理，有主助理则返回主助理 URI，否则返回激活页面 URI；成功后将 `localApi delete` 事件放入助理缓存处理队列，队列处理完成后必须触发 `agentskills.agentUpdated` 广播，payload.type 为 `delete`。该接口同时作为提供给通讯录的助理删除入口，通讯录调用成功后通过返回结果和删除广播收敛本地列表。
+5. `openAssistantEditPage`：提供给通讯录或详情入口打开助理编辑页，入参以 `SkillClientSdkInterfaceV2.md` 为准，使用 `partnerAccount` 优先、`robotId` 兜底定位助理；该接口不再包含更新回调，不发起服务端请求，也不负责向通讯录回传更新后数据。
+6. `notifyAssistantDetailUpdated`：不再作为通讯录获取更新后数据的通道；通讯录必须订阅 `agentskills.agentUpdated` 作为端侧详情广播通知，并从 `{ type: 'update', data: weCrew }` 中获取更新后的助理数据。
+7. `GET /v1/robot-partners/{partnerAccounts}`：用于冷启动和离线恢复在线后的批量补偿刷新。
+8. SDK 初始化入口：新增 IM 模块通知广播注册调用，监听回调按服务端透传载荷中的 `action` 组装 `serverPush update/delete` 事件并放入助理缓存处理队列。
+9. `HWH5EXT.registerEventListener`：`weAgentCUI` 页面和通讯录通过该 JSAPI 注册 `agentskills.agentUpdated`，SDK 通过 `broadcastWeAgentEvent` 触发对应回调并透传对应广播 payload。
+10. 通讯录：订阅端侧详情广播通知和删除广播通知；收到更新广播时刷新匹配助理条目，收到删除广播时移除匹配助理条目并处理当前详情展示状态。
+11. 助理详情页：专属助手详情页固定不展示编辑按钮；6 月前历史版本详情页也需屏蔽编辑按钮。
 
 ### 4.5 文档需要同步修改的内容
 
@@ -613,6 +654,7 @@ flowchart TD
 2. Android / iOS / HarmonyOS SDK 接口说明：补充更新、删除、补偿刷新触发广播的时机。
 3. `ai-chat-viewer` 相关需求或设计文档：补充 `weAgentCUI` 页面通过 `HWH5EXT.registerEventListener` 消费 `agentskills.agentUpdated` 的处理规则。
 4. 助理详情页相关文档：补充专属助手详情页不显示编辑按钮，以及 6 月前历史版本屏蔽编辑按钮的规则。
+5. 通讯录接入文档：补充 `openAssistantEditPage`、`deleteWeAgent` 的调用规则，以及端侧详情广播通知、删除广播通知的订阅与消费规则。
 
 ## 5. 性能
 
@@ -656,17 +698,19 @@ flowchart TD
 5. SDK 初始化流程中的 IM 模块通知广播注册逻辑。
 6. 助理详情页历史版本兼容展示逻辑：6 月前历史版本需屏蔽编辑按钮。
 7. 助理详情页专属助手展示逻辑：专属助手详情页需隐藏编辑按钮。
+8. 通讯录的助理编辑入口、删除入口、列表刷新和详情关闭逻辑。
 
 ### 8.2 间接影响
 
 1. 助理列表页或切换助理页可能读取到被同步更新后的列表缓存。
 2. 多端同时编辑或删除同一助理时，宿主页面对当前助理状态的感知更及时。
 3. 冷启动或离线恢复在线后，本地缓存与服务端状态更快收敛。
+4. 通讯录在旧版本宿主未订阅广播时仍可完成接口调用，但列表与详情的实时同步能力依赖广播接入。
 
 ### 8.3 不影响
 
 1. 不改变 `getWeAgentDetails`、`getAssistantDetails`、`updateWeAgent`、`deleteWeAgent` 的既有对外入参和返回语义。
-2. 不改变 `notifyAssistantDetailUpdated` 的既有职责。
+2. 不改变 `notifyAssistantDetailUpdated` 的既有职责边界，但通讯录不再依赖该接口获取更新后数据。
 3. 不新增持久化缓存 key。
 4. 不改变服务端主动删除通知场景的处理边界：仍只处理本地缓存和广播，不复用本端 `deleteWeAgent` 的当前助理跳转逻辑。
 
@@ -696,6 +740,12 @@ flowchart TD
 20. `weAgentCUI` 收到当前助理更新事件后，校验名称、简介、头像刷新。
 21. `weAgentCUI` 收到非当前助理更新或删除事件后，校验页面不变化。
 22. `weAgentCUI` 收到当前助理删除事件后，校验展示不可取消弹窗，且“切换助理”可跳转到切换助理页面。
+23. 通讯录调用 `openAssistantEditPage({ partnerAccount/robotId })` 时，校验 SDK 按 `partnerAccount` 优先、`robotId` 兜底定位助理并打开助理编辑页，且接口不再要求或注册更新回调。
+24. 通讯录订阅 `agentskills.agentUpdated` 后，收到 `{ type: 'update', data: weCrew }` 时校验可从端侧详情广播通知中获取更新后的 `name`、`icon`、`description`，并按 `partnerAccount` 优先、`robotId` 兜底刷新对应通讯录条目。
+25. 编辑页完成助理详情更新后，校验通讯录只通过端侧详情广播通知刷新数据，不依赖 `openAssistantEditPage` 回调。
+26. 通讯录调用 `deleteWeAgent` 删除助理成功后，校验 SDK 触发 `{ type: 'delete', data: weCrew }` 删除广播，通讯录移除对应条目；若当前展示该助理详情，则关闭详情或展示已删除状态。
+27. 通讯录调用 `deleteWeAgent` 失败时，校验不更新 SDK 缓存、不触发删除广播，通讯录保留原条目并展示失败提示。
+28. 通讯录重复收到同一助理的端侧详情广播通知时，校验以同一助理标识做幂等刷新，不产生重复条目。
 
 ### 9.2 兼容测试
 
@@ -707,6 +757,7 @@ flowchart TD
 6. IM 模块通知广播注册失败、重复注册、销毁后重新初始化、切换账号后重新注册或过滤通知的行为。
 7. 6 月前历史版本进入助理详情页时，校验编辑按钮被屏蔽；6 月及之后版本按既有规则展示编辑入口。
 8. 专属助手进入详情页时，校验不显示编辑按钮。
+9. 通讯录只传 `partnerAccount`、只传 `robotId`、二者都传时，校验 `openAssistantEditPage`、`deleteWeAgent` 和广播消费的助理匹配规则一致。
 
 ### 9.3 文档一致性检查
 
@@ -719,6 +770,7 @@ flowchart TD
 7. `weAgentCUI` 页面文档中的 `HWH5EXT.registerEventListener` 入参 `type`、`func` 与 SDK 广播保持一致：`type` 统一为 `agentskills.agentUpdated`。
 8. 助理详情页文档需补充 6 月前历史版本屏蔽编辑按钮的兼容策略。
 9. 助理详情页文档需补充专属助手详情页不显示编辑按钮的展示规则。
+10. 通讯录接入文档中的 `openAssistantEditPage`、`deleteWeAgent`、端侧详情广播通知和删除广播通知与 `SkillClientSdkInterfaceV2.md` 保持一致。
 
 ## 10. 最终建议
 
