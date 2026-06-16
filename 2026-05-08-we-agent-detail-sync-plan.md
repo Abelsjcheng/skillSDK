@@ -417,6 +417,15 @@ broadcastWeAgentEvent(eventName: string, data: any): void
 
 通讯录更新与删除接入：
 
+接口能力明细表：
+
+| 能力 | 接入方式 | 调用/订阅方 | 入参或 payload | 返回或回调 | 触发时机 | 通讯录处理 | 备注 |
+|---|---|---|---|---|---|---|---|
+| 打开助理编辑页 | `openAssistantEditPage(params)` | 通讯录主动调用 | `partnerAccount?`、`robotId?`，二者至少传一个，优先使用 `partnerAccount` 定位助理 | 返回打开结果；不包含更新回调 | 用户在通讯录点击编辑入口 | 只负责进入编辑页，不从该接口读取更新后的名称、头像、简介 | 该接口不发起服务端请求，不承载数据回传 |
+| 删除助理 | `deleteWeAgent(params)` | 通讯录主动调用 | `partnerAccount?`、`robotId?`，二者至少传一个 | 成功返回 `deleteResult: "success"`；失败沿用现有错误返回 | 用户在通讯录确认删除助理 | 成功后等待或消费删除广播移除条目；失败时保留条目并展示错误提示 | 通讯录不直接调用服务端删除接口，统一走 SDK 删除链路 |
+| 详情更新通知 | `agentskills.agentUpdated', func })` | 通讯录订阅 | `{ type: 'update', data: weCrew }`，`data` 至少包含 `robotId`、`partnerAccount`、`name`、`icon`、`description` | 通过 `func` 接收广播 payload | 服务端主动更新、本端 `updateWeAgent` 成功、冷启动或离线恢复补偿发现详情变化 | 按 `partnerAccount` 优先、`robotId` 兜底匹配条目，刷新名称、头像、简介 | 通讯录获取更新后数据的唯一推荐通道 |
+| 删除通知 | `agentskills.agentUpdated, func })` | 通讯录订阅 | `{ type: 'delete', data: weCrew }`，`data` 至少包含 `robotId`、`partnerAccount` | 通过 `func` 接收广播 payload | 服务端主动删除、本端 `deleteWeAgent` 成功、冷启动或离线恢复补偿发现助理已删除 | 按 `partnerAccount` 优先、`robotId` 兜底移除条目；当前正在展示详情时关闭详情或展示已删除状态 | 删除广播需幂等处理，重复收到不报错 |
+
 1. 通讯录打开编辑页时调用 `openAssistantEditPage(params)`，入参与 `SkillClientSdkInterfaceV2.md` 保持一致：`partnerAccount` 与 `robotId` 至少传一个，SDK 优先使用 `partnerAccount` 作为唯一标识，未传 `partnerAccount` 时使用 `robotId`。
 2. `openAssistantEditPage` 只负责打开助理编辑页面，不再接收或注册更新回调，也不承载通讯录的数据回传职责。
 3. 通讯录需要通过既有客户端事件机制订阅 `agentskills.agentUpdated`，消费 SDK 端侧详情广播通知和删除广播通知。
