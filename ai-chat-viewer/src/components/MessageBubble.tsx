@@ -8,8 +8,8 @@ import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
 import AvatarImage from './AvatarImage';
 import { copyTextToClipboard } from '../utils/clipboard';
-import copyIcon from '../imgs/icon-copy.svg';
-import sendImIcon from '../imgs/send_icon.svg';
+import copyIcon from '../imgs/copy_icon.svg';
+import sendImIcon from '../imgs/send_im_icon.png';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
@@ -52,26 +52,6 @@ function messageContainsCodeBlock(message: Message): boolean {
     return true;
   }
   return hasMarkdownCodeBlock(message.content);
-}
-
-function isQuestionPartReadonly(part: MessagePart, readonly: boolean): boolean {
-  if (part.type !== 'question') {
-    return readonly;
-  }
-  if (part.answered) {
-    return readonly;
-  }
-  return false;
-}
-
-function isPermissionPartReadonly(part: MessagePart, readonly: boolean): boolean {
-  if (part.type !== 'permission') {
-    return readonly;
-  }
-  if (part.permResolved) {
-    return readonly;
-  }
-  return false;
 }
 
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
@@ -127,7 +107,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             part={part}
             messageId={message.id}
             onAnswered={onQuestionAnswered}
-            readonly={isQuestionPartReadonly(part, isHistoryAssistantReadonly)}
+            readonly={isHistoryAssistantReadonly}
           />
         );
 
@@ -137,7 +117,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
-            readonly={isPermissionPartReadonly(part, isHistoryAssistantReadonly)}
+            readonly={isHistoryAssistantReadonly}
           />
         );
 
@@ -208,12 +188,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
 
     void copyTextToClipboard(message.content)
-      .then(() => {
-        showToast('复制成功');
-      })
+      .then(() => {})
       .catch((error) => {
         WeLog(`MessageBubble copy failed | error=${JSON.stringify(error)}`);
-        showToast('复制失败');
       });
   };
 

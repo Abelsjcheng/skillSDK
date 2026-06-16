@@ -1,22 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import type { AvatarImageProps } from '../types/components';
-import { isRemoteAvatarUrl } from '../utils/avatar';
 
 const loadedRemoteAvatarSet = new Set<string>();
 
 const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) => {
-  const [resolvedSrc, setResolvedSrc] = useState(fallbackSrc);
+  const [resolvedSrc, setResolvedSrc] = useState(loadedRemoteAvatarSet.has(src ?? '') ? src : fallbackSrc);
 
   useEffect(() => {
     const nextSrc = (src ?? '').trim();
 
     if (!nextSrc) {
       setResolvedSrc(fallbackSrc);
-      return undefined;
-    }
-
-    if (!isRemoteAvatarUrl(nextSrc)) {
-      setResolvedSrc(nextSrc);
       return undefined;
     }
 

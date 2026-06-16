@@ -12,7 +12,7 @@ import { ensureLanguageInitialized } from '../i18n/config';
 import closeIcon from '../imgs/close_icon.svg';
 import defaultAvatar from '../imgs/defaultAvatar.png';
 import editIcon from '../imgs/edit_icon.png';
-import iconCopy from '../imgs/icon-copy.svg';
+import iconCopy from '../imgs/copy_icon.svg';
 import moreIcon from '../imgs/more_icon.png';
 import closeEyeIcon from '../imgs/close_eye_icon.svg';
 import openEyeIcon from '../imgs/open_eye_icon.svg';
