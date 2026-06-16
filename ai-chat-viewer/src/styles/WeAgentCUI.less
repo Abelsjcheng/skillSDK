@@ -611,6 +611,7 @@
   min-height: 0;
   overflow-y: auto;
   -ms-overflow-style: none;
+  scrollbar-width: none;
   display: flex;
   flex-direction: column;
 
@@ -662,28 +663,6 @@
   width: 0;
   height: 0;
   display: none;
-}
-
-.we-agent-history-sidebar--pc .we-agent-history-sidebar__body {
-  -ms-overflow-style: auto;
-}
-
-.we-agent-history-sidebar--pc .we-agent-history-sidebar__body::-webkit-scrollbar {
-  display: block;
-  width: 12px;
-  height: 12px;
-}
-
-.we-agent-history-sidebar--pc .we-agent-history-sidebar__body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.we-agent-history-sidebar--pc .we-agent-history-sidebar__body::-webkit-scrollbar-thumb {
-  min-height: 24px;
-  border-right: 6px solid transparent;
-  border-radius: 100px;
-  background: rgba(0, 0, 0, 0.2);
-  background-clip: padding-box;
 }
 
 .we-agent-history-sidebar__empty {

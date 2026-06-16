@@ -83,14 +83,13 @@
 }
 
 .we-agent-cui-footer--pc {
+  position: relative;
   height: auto;
   min-height: 104px;
   padding: 12px 12px 8px;
   border: 1px solid transparent;
   border-radius: 12px;
-  background:
-    linear-gradient(var(--we-agent-footer-bg), var(--we-agent-footer-bg)) padding-box,
-    linear-gradient(135deg, #0d92ff 0%, #0d92ff 50%, #5145ff 100%) border-box;
+  background: var(--we-agent-footer-bg);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -100,18 +99,33 @@
   }
 }
 
+.we-agent-cui-footer--pc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #0d92ff 0%, #0d92ff 50%, #5145ff 100%);
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
 .we-agent-cui-footer--pc:focus-within {
   border-color: transparent;
 }
 
 .we-agent-cui-footer--pc .we-agent-cui-footer__input {
   margin: 0;
-  width: 100%;
+  width: calc(100% + 8px);
   flex: 0 0 auto;
   height: 44px;
   min-height: 44px;
   max-height: 132px;
-  padding: 0 12px;
+  padding: 0 8px 0 0;
   border: none;
   border-radius: 4px;
   background: #ffffff;
@@ -125,7 +139,7 @@
 }
 
 .we-agent-cui-footer--pc .we-agent-cui-footer__input::-webkit-scrollbar {
-  width: 10px;
+  width: 6px;
   height: 6px;
 }
 
@@ -134,9 +148,8 @@
 }
 
 .we-agent-cui-footer--pc .we-agent-cui-footer__input::-webkit-scrollbar-thumb {
-  border-right: 4px solid transparent;
+  min-height: 24px;
   background: rgba(0, 0, 0, 0.2);
-  background-clip: padding-box;
   border-radius: 100px;
 }
 
