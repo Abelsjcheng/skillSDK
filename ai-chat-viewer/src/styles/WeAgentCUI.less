@@ -332,7 +332,9 @@
 }
 
 .app-container--we-agent-cui.pc-mode {
-  --we-agent-cui-pc-content-gutter: 150px;
+  --we-agent-cui-content-max-width: 1000px;
+  --we-agent-cui-content-gutter: clamp(16px, 8.2vw, 98px);
+  --we-agent-cui-bottom-gap: clamp(16px, 2.67vw, 32px);
   height: 100vh;
   padding: 0;
   background-image: url('../imgs/assistant-cui-pc-bg.png');
@@ -343,7 +345,7 @@
   }
 
   .we-agent-cui-main {
-    padding: 16px 0 30px;
+    padding: 16px 0 var(--we-agent-cui-bottom-gap);
     transition: padding-left 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: padding-left;
   }
@@ -355,14 +357,21 @@
   }
 
   .we-agent-cui-bottom {
-    padding: 0 var(--we-agent-cui-pc-content-gutter);
+    width: calc(100% - (var(--we-agent-cui-content-gutter) * 2));
+    max-width: var(--we-agent-cui-content-max-width);
+    margin: 0 auto;
+    padding: 0;
     box-sizing: border-box;
     overflow: visible;
   }
 
   .we-agent-cui-welcome {
+    width: calc(100% - (var(--we-agent-cui-content-gutter) * 2));
+    max-width: var(--we-agent-cui-content-max-width);
     margin-top: 64px;
-    padding: 0 var(--we-agent-cui-pc-content-gutter);
+    margin-right: auto;
+    margin-left: auto;
+    padding: 0;
     box-sizing: border-box;
 
     > * + * {
@@ -387,8 +396,6 @@
 }
 
 .app-container--we-agent-cui.pc-mode.has-history-sidebar {
-  --we-agent-cui-pc-content-gutter: 50px;
-
   .we-agent-cui-main {
     padding-left: 260px;
   }
@@ -604,7 +611,6 @@
   min-height: 0;
   overflow-y: auto;
   -ms-overflow-style: none;
-  scrollbar-width: none;
   display: flex;
   flex-direction: column;
 
@@ -656,6 +662,28 @@
   width: 0;
   height: 0;
   display: none;
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__body {
+  -ms-overflow-style: auto;
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__body::-webkit-scrollbar {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.we-agent-history-sidebar--pc .we-agent-history-sidebar__body::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  border-right: 6px solid transparent;
+  border-radius: 100px;
+  background: rgba(0, 0, 0, 0.2);
+  background-clip: padding-box;
 }
 
 .we-agent-history-sidebar__empty {

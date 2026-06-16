@@ -53,9 +53,14 @@
       }
     }
 
-    .messages-container--we-agent-cui {
-      padding: 0 var(--we-agent-cui-pc-content-gutter, 150px);
-      box-sizing: border-box;
+    &.app-container--we-agent-cui {
+      .messages-container--we-agent-cui {
+        width: calc(100% - (var(--we-agent-cui-content-gutter, 98px) * 2));
+        max-width: var(--we-agent-cui-content-max-width, 1000px);
+        margin: 0 auto;
+        padding: 0;
+        box-sizing: border-box;
+      }
     }
   }
 
