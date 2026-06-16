@@ -104,9 +104,11 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1px;
+  padding: 1.5px;
   background: linear-gradient(135deg, #0d92ff 0%, #0d92ff 50%, #5145ff 100%);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 0.2s ease;
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -116,6 +118,10 @@
 
 .we-agent-cui-footer--pc:focus-within {
   border-color: transparent;
+}
+
+.we-agent-cui-footer--pc:focus-within::before {
+  opacity: 1;
 }
 
 .we-agent-cui-footer--pc .we-agent-cui-footer__input {
