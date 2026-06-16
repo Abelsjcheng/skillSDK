@@ -16,7 +16,7 @@ import iconCopy from '../imgs/copy_icon.svg';
 import moreIcon from '../imgs/more_icon.png';
 import closeEyeIcon from '../imgs/close_eye_icon.svg';
 import openEyeIcon from '../imgs/open_eye_icon.svg';
-import serviceIcon from '../imgs/icon-service.svg';
+import customerIcon from '../imgs/customer_icon.svg';
 import type { WeAgentDetails, WeAgentListItem } from '../types/bridge';
 import type { AssistantPageHeaderAction } from '../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
@@ -297,7 +297,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
     () => [
       {
         label: t('common.service'),
-        icon: serviceIcon,
+        icon: customerIcon,
         onClick: handleServiceClick,
       },
       {
