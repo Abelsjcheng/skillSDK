@@ -333,8 +333,8 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
-  createNewSession(params: CreateNewSessionParams): Promise<SkillSession> | SkillSession;
   renderPlantUml(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> | PlantUmlRenderResult;
+  createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
   createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> | CreateDigitalTwinResult;
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
