@@ -50,27 +50,7 @@ function normalizeMatrixLength(questions: QuestionItem[], answerMatrix: Question
   return questions.map((_, index) => answerMatrix[index] ?? []);
 }
 
-function hasQuestionOutput(question: QuestionItem): boolean {
-  return Object.prototype.hasOwnProperty.call(question, 'output');
-}
-
-function getQuestionOutputAnswerMatrix(questions: QuestionItem[]): QuestionAnswerMatrix | undefined {
-  if (!questions.some(hasQuestionOutput)) {
-    return undefined;
-  }
-
-  return questions.map((question) => {
-    const output = question.output?.trim();
-    return output ? [output] : [];
-  });
-}
-
 function getInitialAnswerMatrix(part: MessagePart, questions: QuestionItem[]): QuestionAnswerMatrix {
-  const questionOutputMatrix = getQuestionOutputAnswerMatrix(questions);
-  if (questionOutputMatrix) {
-    return normalizeMatrixLength(questions, questionOutputMatrix);
-  }
-
   const parsedMatrix = parseQuestionAnswerMatrix(part.output);
   if (parsedMatrix) {
     return alignQuestionAnswerMatrix(questions, parsedMatrix);
@@ -78,10 +58,16 @@ function getInitialAnswerMatrix(part: MessagePart, questions: QuestionItem[]): Q
 
   const legacyAnswer = getLegacyAnswerText(part);
   if (legacyAnswer) {
-    return normalizeMatrixLength(questions, [[legacyAnswer]]);
+    return [[legacyAnswer]];
   }
 
   return questions.map(() => []);
+}
+
+function shouldDisplayOnlyFirstQuestion(part: MessagePart, questions: QuestionItem[]): boolean {
+  return questions.length > 1
+    && Boolean(getLegacyAnswerText(part))
+    && !parseQuestionAnswerMatrix(part.output);
 }
 
 function splitAnswerMatrix(questions: QuestionItem[], answerMatrix: QuestionAnswerMatrix): QuestionDraftState {
@@ -310,10 +296,15 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   );
 
   const renderAnsweredSummary = () => {
-    const answerMatrix = buildAnswerMatrix(questions, selectedAnswers, customInputs);
+    const legacyAnswer = getLegacyAnswerText(part);
+    const displayOnlyFirstQuestion = shouldDisplayOnlyFirstQuestion(part, questions);
+    const summaryQuestions = displayOnlyFirstQuestion ? questions.slice(0, 1) : questions;
+    const answerMatrix = displayOnlyFirstQuestion
+      ? [[legacyAnswer]]
+      : buildAnswerMatrix(questions, selectedAnswers, customInputs);
     return (
       <div className="question-card__answered-list">
-        {questions.map((question, index) => {
+        {summaryQuestions.map((question, index) => {
           const answers = answerMatrix[index] ?? [];
           const title = question.question.trim() || question.header || t('question.defaultTitle', { index: index + 1 });
           return (

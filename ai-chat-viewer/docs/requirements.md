@@ -890,8 +890,8 @@
    - 用户回答后的 AI 后续回复继续按现有流式链路渲染为后续独立 AI 消息块，不并入原 `QuestionCard`；
    - 问题回答消息在排序上需直接落到当前消息列表尾部，不得复用普通输入框发送场景中“插入到当前流式 AI 消息前”的特殊逻辑；
    - 若后续收到 `question completed/error` 事件时，原 question 所在助手消息已经结束流式态，则只更新原 `QuestionCard` 的回答状态与结果，不重新创建新的 question 助手消息块；
-   - `question` 渲染只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段，不再从 `input` 中解析题目和选项数据；
-   - 历史消息存在顶层 `questions` 时，每一题的已回答展示优先使用对应 `questions[i].output`；若不存在顶层 `questions`，则按旧单题展示并读取最外层 `output`；
+   - `question` 渲染默认只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段；仅历史消息在顶层 `questions` 缺失时允许从 `input.questions` 兜底取题目数组，实时、snapshot、发送返回消息不从 `input` 中解析题目和选项数据；
+   - 历史消息的已回答展示只读取最外层 `output`：`string[][]` JSON 按题目顺序映射，普通字符串只作为第一题答案展示，忽略 `questions` item 内的 `output` 字段；
    - 为兼容历史数据或简化结构，若后端仅返回字符串数组，也需按 `label` 兜底渲染。
 21. `WeAgentCUI` 中收到 AI 流式错误事件时：
    - 适用事件类型包含 `session.error` 与 `error`；
@@ -1264,7 +1264,6 @@
    - `PermissionCard` 与 `ToolCard` 的暗黑模式样式参考 `CodeBlock`：卡片主体统一使用暗黑卡片底色与浅描边，头部使用更浅一层的深色背景，内容区保持透明层级，不新增暗黑资源、不改单独组件结构；
    - 移动端历史会话侧边栏暗黑模式下：面板背景颜色 `rgba(31,33,34,1)`；头部标题文本颜色 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”文本颜色 `rgba(127,130,131,1)`；每个会话 item 文本颜色 `rgba(220,221,221,1)`；选中高亮后 item 背景颜色 `rgba(4,45,77,1)`，文本颜色 `rgba(13,148,255,1)`。
 9. 暗黑模式色值需优先收口到共享主题变量层，再由各页面样式文件在各自根 class 作用域下消费，避免再次引入全局样式污染。
-
 
 
 

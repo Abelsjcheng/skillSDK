@@ -70,7 +70,6 @@ export interface QuestionItemInput {
   question?: string;
   options?: QuestionOptionInput[] | null;
   multiSelect?: boolean | null;
-  output?: string | null;
 }
 
 export interface QuestionItem {
@@ -78,7 +77,6 @@ export interface QuestionItem {
   question: string;
   options: QuestionOption[];
   multiSelect: boolean;
-  output?: string;
 }
 
 interface ToolPartFields<TValue, TStatus> {

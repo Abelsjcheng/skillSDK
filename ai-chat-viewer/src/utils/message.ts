@@ -29,6 +29,10 @@ interface QuestionFieldSource {
   content?: unknown;
 }
 
+interface MapRawPartOptions {
+  allowInputQuestionsFallback?: boolean;
+}
+
 interface QuestionAnswerDisplayLabels {
   unanswered?: string;
   questionPrefix?: string;
@@ -176,13 +180,11 @@ function normalizeQuestionRecord(record: unknown): QuestionItem | undefined {
     question?: unknown;
     options?: unknown;
     multiSelect?: unknown;
-    output?: unknown;
   };
   const header = normalizeOptionalString(questionRecord.header);
   const question = normalizeOptionalString(questionRecord.question) ?? '';
   const options = normalizeQuestionOptions(questionRecord.options) ?? [];
   const multiSelect = normalizeBoolean(questionRecord.multiSelect) ?? false;
-  const output = normalizeOptionalString(questionRecord.output)?.trim();
 
   if (!header && !question.trim() && options.length === 0) {
     return undefined;
@@ -193,7 +195,6 @@ function normalizeQuestionRecord(record: unknown): QuestionItem | undefined {
     question,
     options,
     multiSelect,
-    ...(typeof output === 'string' ? { output } : {}),
   };
 }
 
@@ -322,13 +323,30 @@ function normalizeResolvedStatus(status: unknown): string {
   return typeof status === 'string' ? status.trim().toLowerCase() : '';
 }
 
-export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: boolean): MessagePart {
+function getInputQuestions(input: unknown): unknown | undefined {
+  if (!input || typeof input !== 'object') {
+    return undefined;
+  }
+
+  return (input as { questions?: unknown }).questions;
+}
+
+export function mapRawPartToMessagePart(
+  rawPart: RawMessagePart,
+  isStreaming: boolean,
+  options: MapRawPartOptions = {},
+): MessagePart {
+  const fallbackQuestions = rawPart.type === 'question'
+    && options.allowInputQuestionsFallback
+    && rawPart.questions == null
+    ? getInputQuestions(rawPart.input)
+    : undefined;
   const questionItems = normalizeQuestionItems({
     header: rawPart.header,
     question: rawPart.question,
     options: rawPart.options,
     multiSelect: rawPart.multiSelect,
-    questions: rawPart.questions,
+    questions: rawPart.questions ?? fallbackQuestions,
     content: rawPart.content,
   });
   const firstQuestion = questionItems?.[0];
@@ -392,11 +410,12 @@ export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: bo
 export function mapRawParts(
   rawParts: RawMessagePart[] | null | undefined,
   isStreaming: boolean,
+  options: MapRawPartOptions = {},
 ): MessagePart[] | undefined {
   if (!rawParts || rawParts.length === 0) {
     return undefined;
   }
-  return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming));
+  return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming, options));
 }
 
 export function shouldRenderMessagePart(part: MessagePart): boolean {
@@ -421,7 +440,6 @@ export function shouldRenderMessagePart(part: MessagePart): boolean {
         || Boolean(part.questions?.some((question) => (
           hasVisibleText(question.header)
           || hasVisibleText(question.question)
-          || hasVisibleText(question.output)
           || question.options.length > 0
         )))
         || hasVisibleText(part.output)
@@ -461,7 +479,7 @@ export function sessionMessageToMessage(sessionMessage: SessionMessage): Message
     contentType: sessionMessage.contentType ?? 'plain',
     timestamp: new Date(sessionMessage.createdAt).getTime(),
     isStreaming: false,
-    parts: mapRawParts(sessionMessage.parts, false),
+    parts: mapRawParts(sessionMessage.parts, false, { allowInputQuestionsFallback: true }),
   };
 }
 
