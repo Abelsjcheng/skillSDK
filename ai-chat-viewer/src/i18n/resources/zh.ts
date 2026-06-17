@@ -63,7 +63,7 @@ export const zh = {
   'question.answered': '已回答',
   'question.previous': '上一题',
   'question.next': '下一题',
-  'question.submitAnswers': '提交答案',
+  'question.submitAnswers': '提交',
   'question.unanswered': '未回答',
   'question.answerSeparator': '、',
   'question.defaultTitle': '第{{index}}题',

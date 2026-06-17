@@ -885,11 +885,13 @@
    - 用户提交问题回答成功后，原 AI `QuestionCard` 中仍需保留“已回答”状态和回答结果展示；
    - 参考 `skill-miniapp` 的处理方式，`QuestionCard` 组件本身只负责展示和本地“已回答”状态维护，不在组件内部直接调用宿主 `sendMessage`；
    - `QuestionCard` 提交回答时仅向页面上层上抛 `answer` 与 `toolCallId`，由页面上层统一复用现有发送链路调用 `sendMessage`；
+   - 提交回答时兼容旧单答案链路：单题且只有一个答案时发送答案字符串；多题、多选或多个答案时发送二维数组 JSON 字符串；
    - 同时，用户本次回答内容还需插入为一条独立的用户消息气泡，进入正常消息流展示；
    - 用户回答后的 AI 后续回复继续按现有流式链路渲染为后续独立 AI 消息块，不并入原 `QuestionCard`；
    - 问题回答消息在排序上需直接落到当前消息列表尾部，不得复用普通输入框发送场景中“插入到当前流式 AI 消息前”的特殊逻辑；
    - 若后续收到 `question completed/error` 事件时，原 question 所在助手消息已经结束流式态，则只更新原 `QuestionCard` 的回答状态与结果，不重新创建新的 question 助手消息块；
-   - 当同一条 `question` 同时存在顶层 `options` 与 `input.questions[0].options` / `input.options` 时，需优先使用带对象结构的 `input` 内选项数据，避免被仅含字符串的顶层 `options` 覆盖，导致 `description` 丢失；
+   - `question` 渲染只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段，不再从 `input` 中解析题目和选项数据；
+   - 历史消息存在顶层 `questions` 时，每一题的已回答展示优先使用对应 `questions[i].output`；若不存在顶层 `questions`，则按旧单题展示并读取最外层 `output`；
    - 为兼容历史数据或简化结构，若后端仅返回字符串数组，也需按 `label` 兜底渲染。
 21. `WeAgentCUI` 中收到 AI 流式错误事件时：
    - 适用事件类型包含 `session.error` 与 `error`；
@@ -1262,8 +1264,6 @@
    - `PermissionCard` 与 `ToolCard` 的暗黑模式样式参考 `CodeBlock`：卡片主体统一使用暗黑卡片底色与浅描边，头部使用更浅一层的深色背景，内容区保持透明层级，不新增暗黑资源、不改单独组件结构；
    - 移动端历史会话侧边栏暗黑模式下：面板背景颜色 `rgba(31,33,34,1)`；头部标题文本颜色 `rgba(220,221,221,1)`；分组标题“今天 / 昨天 / 3天前”文本颜色 `rgba(127,130,131,1)`；每个会话 item 文本颜色 `rgba(220,221,221,1)`；选中高亮后 item 背景颜色 `rgba(4,45,77,1)`，文本颜色 `rgba(13,148,255,1)`。
 9. 暗黑模式色值需优先收口到共享主题变量层，再由各页面样式文件在各自根 class 作用域下消费，避免再次引入全局样式污染。
-
-
 
 
 

@@ -66,7 +66,7 @@ export const en = {
   'question.answered': 'Answered',
   'question.previous': 'Previous',
   'question.next': 'Next',
-  'question.submitAnswers': 'Submit answers',
+  'question.submitAnswers': 'Submit',
   'question.unanswered': 'Unanswered',
   'question.answerSeparator': ', ',
   'question.defaultTitle': 'Question {{index}}',

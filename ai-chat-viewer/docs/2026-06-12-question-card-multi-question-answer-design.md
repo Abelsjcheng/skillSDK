@@ -11,7 +11,7 @@
 
 当前 `QuestionCard` 主要按单题、单选的问答卡片处理：服务端下发一个 `question`、一组 `options`，用户点击答案后直接提交。新的服务端协议中，`part` 数据可能包含 `questions` 字段，该字段为问题数组，每个问题包含 `header`、`question`、`options`、`multiSelect`。其中 `multiSelect: true` 表示当前问题支持多选，`false` 表示单选。
 
-同时，每个问题仍需要保留自定义答案输入能力。提交到服务端时，需要把所有题目的回答按题目顺序表示成二维数组，并通过 `JSON.stringify` 转成字符串作为现有 `sendMessage` 的 `content`。
+同时，每个问题仍需要保留自定义答案输入能力。内部仍把所有题目的回答按题目顺序表示成二维数组；提交到服务端时，为兼容旧链路，单题单答案发送答案字符串，其他场景通过 `JSON.stringify` 转成二维数组 JSON 字符串作为现有 `sendMessage` 的 `content`。
 
 问题回答提交后还存在两类状态一致性风险：第一，`QuestionCard` 组件本地设置 `answered` 后，如果父级消息列表被后续 delta / streaming / snapshot 以旧 part 覆盖，卡片会短暂回到未回答态，出现闪烁或重置；第二，多题场景中父级 part 引用变化可能触发组件重新初始化，导致 `currentQuestionIndex` 被重置为 0。方案需要把回答完成态提升到消息 part 层做本地预更新，并让组件只在真正切换卡片或题目结构变化时重置草稿状态。
 
@@ -24,7 +24,7 @@
 5. 当存在多道题或当前题为多选时，用户选择后点击统一提交按钮发送答案。
 6. 多题场景支持上一题、下一题切换，切换后保留已选答案和自定义输入。
 7. 兼容没有返回 `questions` 字段的旧数据，继续按旧单题单选逻辑处理。
-8. 提交答案时统一转换为 `string[][]` 的 JSON 字符串，例如 `[["A","B"],[]]`。
+8. 提交答案时兼容旧单答案链路：单题且只有一个答案时发送答案字符串；其他场景转换为 `string[][]` 的 JSON 字符串，例如 `[["A","B"],[]]`。
 9. 用户消息气泡展示可读摘要，不直接展示原始 JSON 字符串。
 10. 回答完成后的原问题卡片展示只读答案摘要，并保持后续 AI 回复作为独立助手消息继续渲染。
 11. 提交回答时对原 assistant question part 做本地 Optimistic Update，立即写入 `answered` 与 `output`，避免后续刷新造成闪烁或回退。
@@ -58,7 +58,7 @@ flowchart TD
     J --> K["题目前后切换与统一提交"]
     I --> L["上抛 QuestionAnswerSubmission"]
     K --> L
-    L --> M["useChatSession 序列化 JSON 字符串"]
+    L --> M["useChatSession 生成发送 content"]
     M --> N["定位原 assistant question part"]
     N --> O["Optimistic Update answered + output"]
     O --> P["复用现有 sendMessage 发送 content"]
@@ -70,9 +70,9 @@ flowchart TD
 
 ### 2.2 方案核心
 
-将服务端 question 数据统一收口到归一化工具，UI 层只消费标准 `QuestionItem[]`，回答状态统一维护为 `string[][]`。发送链路保持现有接口不变，仅在问题回答场景把二维答案矩阵序列化为 JSON 字符串，并额外保留界面可读文案用于本地消息展示。
+将服务端 question 数据统一收口到归一化工具，UI 层只消费标准 `QuestionItem[]`，回答状态统一维护为 `string[][]`。发送链路保持现有接口不变，问题回答场景在发送前根据答案矩阵选择最终 `content`：单题单答案复用旧链路发送答案字符串，其他场景发送二维答案矩阵 JSON 字符串，并额外保留界面可读文案用于本地消息展示。
 
-回答提交成功态需要由 `useChatSession` 写回原 assistant question part：`part.output` 保存发送给服务端的二维数组 JSON 字符串，`part.answered` 立即置为 `true`；本地用户消息使用 `displayContent` 和问题回答标记展示可读摘要。后续实时 delta、streaming snapshot 或 completed/error 事件到达时，需要合并这份本地回答补丁，不能用旧 part 覆盖已回答态。
+回答提交成功态需要由 `useChatSession` 写回原 assistant question part：`part.output` 保存最终发送给服务端的 `content`，`part.answered` 立即置为 `true`；本地用户消息使用 `displayContent` 和问题回答标记展示可读摘要。后续实时 delta、streaming snapshot 或 completed/error 事件到达时，需要合并这份本地回答补丁，不能用旧 part 覆盖已回答态。
 
 ## 3. 时序图
 
@@ -107,9 +107,9 @@ sequenceDiagram
     User->>Card: 点击单选 option
     Card->>Card: 生成答案矩阵 [["选项"]]
     Card-->>Chat: onQuestionAnswered(answer, displayContent, partId)
-    Chat->>Chat: JSON.stringify(answer)
+    Chat->>Chat: 单题单答案生成旧答案字符串
     Chat->>List: 定位原 question part 并预更新 answered/output
-    Chat->>API: sendMessage(content = "[[\"选项\"]]")
+    Chat->>API: sendMessage(content = "选项")
     API-->>Chat: 发送成功
     Chat-->>List: 插入带问题回答标记的可读用户消息
     Chat-->>Card: 原卡片进入已回答只读态
@@ -134,7 +134,7 @@ sequenceDiagram
     Card-->>Chat: onQuestionAnswered(answerMatrix, displayContent, partId)
     Chat->>Chat: 缓存本地回答补丁
     Chat->>Card: 原 question part 预更新为已回答
-    Chat->>API: sendMessage(content = JSON.stringify(answerMatrix))
+    Chat->>API: sendMessage(content = answerContent)
     API-->>Chat: 发送成功 / 失败
     Chat->>Chat: 成功保留补丁，失败回滚原 part
     API-->>Server: 现有问题回答链路
@@ -151,7 +151,7 @@ sequenceDiagram
 3. 历史解析与实时流式解析统一使用同一套归一化规则，避免 snapshot、history、stream 三条路径解析结果不一致。
 4. `QuestionCard` 状态从单答案模型升级为 `currentQuestionIndex`、`selectedAnswers`、`customInputs`、`answered`、`submitting`。
 5. `QuestionAnswerSubmission` 除答案矩阵外携带 `partId`、`messageId`、`toolCallId`、`questionId`、`subagentSessionId`，便于上层定位原 assistant question part。
-6. `useChatSession` 在问题回答场景内把答案矩阵转成 JSON 字符串，再复用现有发送接口；同时本地预更新原 question part 的 `answered` 与 `output`。
+6. `useChatSession` 在问题回答场景内把答案矩阵转成发送字符串，单题单答案复用旧答案字符串，其他场景使用 JSON 字符串，再复用现有发送接口；同时本地预更新原 question part 的 `answered` 与 `output`。
 7. `useChatSession` 维护已回答 question 的本地补丁缓存，后续 delta / streaming / snapshot 刷新时继续合并，避免旧 part 覆盖已回答态。
 8. `QuestionCard` 只在卡片身份或题目结构变化时重置 `currentQuestionIndex`，普通 props 引用变化不得重置当前题。
 9. `MessageBubble` 只在用户消息带问题回答标记，或能通过上下文确认是 question 回答时，才把 `string[][]` JSON 字符串展示为可读摘要。
@@ -163,11 +163,12 @@ sequenceDiagram
 
 解析层统一产出 `QuestionItem[]`：
 
-1. 若 `part.questions` 是有效数组，则逐项读取 `header`、`question`、`options`、`multiSelect`。
+1. 若 `part.questions` 是有效数组，则逐项读取 `header`、`question`、`options`、`multiSelect`、`output`。
 2. 若没有 `questions`，则用旧协议中的 `header`、`question`、`options` 补成单题。
 3. `multiSelect` 只读取正式字段 `multiSelect`，默认值为 `false`。
 4. `options` 同时兼容字符串数组和对象数组，最终统一为 `{ label, description? }[]`。
-5. 为兼容现有渲染入口，归一化后同步保留首题的旧字段值：`header`、`question`、`options`、`multiSelect`。
+5. question 渲染不再从 `input` 字段读取题目、选项、多选状态或问题数组；`input` 只允许作为原始 part 字段透传给其他场景。
+6. 为兼容现有渲染入口，归一化后同步保留首题的旧字段值：`header`、`question`、`options`、`multiSelect`。
 
 #### 4.2.2 答案矩阵
 
@@ -188,6 +189,8 @@ type QuestionAnswerMatrix = string[][];
 1. 第一道题选择了 `功能设计`。
 2. 第二道题选择了两个 option，并填写了一个自定义答案 `其他说明`。
 3. 第三道题未回答，保留空数组占位。
+
+历史已回答展示额外支持 `questions[i].output`：当顶层 `questions[]` 中任一题带有 `output` 字段时，答案矩阵按题目顺序由每一项 `output` 生成，空 `output` 或缺失 `output` 的题目展示“未回答”。如果不存在顶层 `questions[]`，则按旧单题逻辑读取最外层 `part.output`。
 
 #### 4.2.3 单题单选
 
@@ -222,7 +225,7 @@ type QuestionAnswerMatrix = string[][];
 
 `QuestionCard` 点击提交后只负责上抛答案，不直接调用宿主发送接口。`useChatSession.handleQuestionAnswered()` 接收提交数据后需要立即执行以下动作：
 
-1. 生成 `serializedAnswer = JSON.stringify(answerMatrix)`。
+1. 生成发送用 `answerContent`：当 `answerMatrix` 形态为 `[["answer"]]` 时返回 `"answer"`，否则返回 `JSON.stringify(answerMatrix)`。
 2. 通过 `messageId + partId` 优先定位原 assistant question part；若缺少 `partId`，再用 `toolCallId`、`questionId`、`subagentSessionId` 组合匹配。
 3. 将目标 part 本地预更新为：
 
@@ -230,17 +233,17 @@ type QuestionAnswerMatrix = string[][];
 {
   ...part,
   answered: true,
-  output: serializedAnswer,
+  output: answerContent,
   isStreaming: false
 }
 ```
 
 4. 将同一份补丁写入 `answeredQuestionPatchesRef`，补丁 key 优先使用 `partId`，缺失时使用 `toolCallId/questionId/subagentSessionId` 组合。
-5. 调用现有 `sendMessageApi`，请求体中 `content` 仍是 `serializedAnswer`。
+5. 调用现有 `sendMessageApi`，请求体中 `content` 仍是字符串，值为 `answerContent`。
 6. 发送成功后插入用户消息，用户消息展示 `displayContent`，并打上问题回答标记。
 7. 发送失败时回滚预更新的原 part，并移除对应补丁，避免界面误显示已回答。
 
-注意：原 question part 的 `output` 必须保存二维数组 JSON 字符串，不能保存可读摘要。`QuestionCard` 后续会从 `part.output` 解析答案矩阵，如果写入可读摘要，会退化为旧单答案兼容并丢失多题结构。
+注意：原 question part 的 `output` 必须保存最终发送给服务端的 `answerContent`，不能保存可读摘要。单题单答案时 `answerContent` 是旧链路答案字符串；多题或多选时 `answerContent` 是二维数组 JSON 字符串，`QuestionCard` 后续可按矩阵恢复答案。
 
 #### 4.2.7 后续 delta / snapshot 的回答补丁合并
 
@@ -267,7 +270,7 @@ type QuestionAnswerMatrix = string[][];
 
 问题回答用户消息有两个内容形态：
 
-1. 发送给服务端的 `content`：二维数组 JSON 字符串。
+1. 发送给服务端的 `content`：单题单答案为答案字符串，其他场景为二维数组 JSON 字符串。
 2. 展示给用户的 `displayContent`：可读答案摘要。
 
 本地插入用户消息时应优先使用 `displayContent` 展示，并在 UI 消息实体上增加问题回答标记，例如 `meta.questionAnswer = true` 或 `meta.kind = 'question_answer'`。`MessageBubble` 只有在存在该标记时，才把原始 `string[][]` JSON 解析为问题回答摘要。
@@ -279,25 +282,26 @@ type QuestionAnswerMatrix = string[][];
 ### 4.3 兼容与边界
 
 1. 没有 `questions` 字段时，按旧单题单选逻辑补齐题目数组。
-2. 历史消息中 `part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵；若不是 JSON，则按旧单答案字符串兼容为 `[["旧答案"]]`。
-3. 用户普通聊天内容即使是合法 `string[][]` JSON 字符串，只要没有问题回答标记或上下文关联，也按普通文本展示和复制。
-4. 多题提交不强制所有题目必答，未回答题目保留为空数组。
-5. 自定义答案去除首尾空白后再进入答案矩阵，空字符串不提交。
-6. 服务端返回的 `questions` 中若某一项缺少有效 `question`，该项不应作为可渲染题目进入 UI。
-7. 若服务端同时返回旧字段和 `questions` 字段，以 `questions` 作为新协议主数据，旧字段仅作为首题兼容展示字段。
-8. 若服务端没有提供 option，仍允许用户通过自定义输入提交答案。
-9. 本地 Optimistic Update 失败回滚时，需要恢复提交前的原 part 状态，避免用户误以为答案已提交成功。
-10. 本地补丁只作用于 question part，不影响同一条 assistant message 中其他 text、tool、permission、error part。
-11. 单题紧凑展示只用于用户消息摘要，不改变 `QuestionCard` 已回答卡片的题干展示。
+2. 历史消息存在顶层 `questions[]` 且题目项包含 `output` 时，逐题优先展示 `questions[i].output`；缺失 `output` 的题目展示“未回答”。
+3. 历史消息不存在顶层 `questions[]` 时，`part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵；若不是 JSON，则按旧单答案字符串兼容为 `[["旧答案"]]`。
+4. 用户普通聊天内容即使是合法 `string[][]` JSON 字符串，只要没有问题回答标记或上下文关联，也按普通文本展示和复制。
+5. 多题提交不强制所有题目必答，未回答题目保留为空数组。
+6. 自定义答案去除首尾空白后再进入答案矩阵，空字符串不提交。
+7. 服务端返回的 `questions` 中若某一项缺少有效 `question`，该项不应作为可渲染题目进入 UI。
+8. 若服务端同时返回旧字段和 `questions` 字段，以 `questions` 作为新协议主数据，旧字段仅作为首题兼容展示字段。
+9. 若服务端没有提供 option，仍允许用户通过自定义输入提交答案。
+10. 本地 Optimistic Update 失败回滚时，需要恢复提交前的原 part 状态，避免用户误以为答案已提交成功。
+11. 本地补丁只作用于 question part，不影响同一条 assistant message 中其他 text、tool、permission、error part。
+12. 单题紧凑展示只用于用户消息摘要，不改变 `QuestionCard` 已回答卡片的题干展示。
 
 ### 4.4 相关接口联动
 
 1. `sendMessageApi` 请求体保持现状，`content` 仍为字符串。
-2. 问题回答场景中，`content` 的字符串内容为 `JSON.stringify(answerMatrix)`。
+2. 问题回答场景中，`content` 的字符串内容由答案矩阵决定：`[["answer"]]` 发送 `"answer"`，其他矩阵发送 `JSON.stringify(answerMatrix)`。
 3. `partId` 仅用于前端本地定位原 question part，不新增到发送接口请求体；`toolCallId`、`questionId`、`subagentSessionId` 沿用当前问题回答链路透传。
 4. 本地插入用户消息时优先使用 `displayContent`，避免界面直接展示 JSON，并给 UI 消息打上问题回答标记。
-5. 原 assistant question part 的 `output` 写入最终发送给服务端的 JSON 字符串，保证历史恢复和只读卡片能按二维矩阵解析。
-6. `contentLength` 仍按最终发送到服务端的 JSON 字符串长度统计。
+5. 原 assistant question part 的 `output` 写入最终发送给服务端的 `content`，保证旧单答案和新矩阵答案都能恢复只读卡片。
+6. `contentLength` 仍按最终发送到服务端的字符串长度统计。
 7. 后续 AI 回复继续通过现有 HWH5EXT / OpenCode 流式消息链路进入，不新增单独回调。
 
 ### 4.5 文档需要同步修改的内容
@@ -306,7 +310,7 @@ type QuestionAnswerMatrix = string[][];
 2. `docs/design-decisions.md`：补充归一化边界、`QuestionCard` 只上抛答案、不直接调用发送接口的决策。
 3. `docs/weAgentCUI-ai-reply-rendering.md`：补充 question part 在历史、实时、完成态和 Optimistic Update 下的渲染一致性。
 4. `docs/weAgentCUI-opencode-cases.md`：补充本地 Mock 触发多题和多选的手动验证用例。
-5. 若存在对外协议文档，需要同步说明 `content` 在问题回答场景中为二维数组 JSON 字符串，`displayContent` 和问题回答标记属于前端展示层能力。
+5. 若存在对外协议文档，需要同步说明 `content` 在问题回答场景中仍为字符串：单题单答案是答案字符串，其他场景是二维数组 JSON 字符串；`displayContent` 和问题回答标记属于前端展示层能力。
 
 ## 5. 性能
 
@@ -340,8 +344,8 @@ type QuestionAnswerMatrix = string[][];
 
 1. 后续 AI 回复的消息排序需要继续保持为独立 assistant 消息。
 2. 历史会话恢复时，已回答 question 的展示依赖 `part.output` 解析结果。
-3. 埋点或日志中若统计 `contentLength`，问题回答场景长度会变成 JSON 字符串长度。
-4. 服务端若仍按单字符串读取答案，需要同步适配二维数组 JSON 字符串解析。
+3. 埋点或日志中若统计 `contentLength`，问题回答场景按最终发送字符串长度统计；旧单答案为答案字符串长度，多题或多选为 JSON 字符串长度。
+4. 服务端需同时兼容旧答案字符串和二维数组 JSON 字符串解析。
 5. 如果服务端历史消息暂不持久化问题回答标记，前端历史展示需要依赖上下文关联兜底，存在无法识别的历史用户回答会按普通文本展示。
 
 ### 7.3 不影响
@@ -360,7 +364,7 @@ type QuestionAnswerMatrix = string[][];
 1. 旧协议无 `questions[]` 的单题单选，点击 option 后立即提交。
 2. 单选题保持现有圆点单选视觉。
 3. 多选题使用复选框视觉，并可选择多个 option。
-4. 单题多选需要点击提交，发送内容为二维数组 JSON 字符串，例如 `[["A","B"]]`。
+4. 单题多选需要点击提交；只有一个答案时兼容发送答案字符串，多个答案时发送二维数组 JSON 字符串，例如 `[["A","B"]]`。
 5. 多题可上一题、下一题切换，切换后答案保留且可修改。
 6. 多题中未回答题目提交为 `[]`。
 7. 多选题 option 与自定义答案合并到同一个内层数组。
@@ -374,22 +378,24 @@ type QuestionAnswerMatrix = string[][];
 
 ### 9.2 兼容测试
 
-1. 历史消息中 `part.output` 为旧单字符串答案时，仍能展示为已回答。
-2. 历史消息中 `part.output` 为二维数组 JSON 字符串时，能按多题摘要展示。
-3. `options` 为字符串数组时，仍按 `label` 渲染。
-4. `options` 为对象数组时，保留 `description` 展示。
-5. 只有自定义输入、没有 option 的问题仍可提交。
-6. 普通用户聊天消息即使内容是合法 `string[][]`，只要没有问题回答标记或上下文关联，仍按普通文本展示。
-7. 问题回答发送失败时，原 question part 回滚到提交前状态，并允许用户继续修改和重试。
-8. completed/error 事件携带服务端 output 时，以服务端 output 更新本地补丁；未携带 output 时保留本地已提交 JSON。
+1. 历史消息存在顶层 `questions[]` 且每题有 `output` 时，逐题展示对应答案。
+2. 历史消息存在顶层 `questions[]` 且部分题目无 `output` 时，无输出题目展示“未回答”。
+3. 历史消息不存在顶层 `questions[]` 且 `part.output` 为旧单字符串答案时，仍能展示为已回答。
+4. 历史消息不存在顶层 `questions[]` 且 `part.output` 为二维数组 JSON 字符串时，能按答案矩阵展示。
+5. `options` 为字符串数组时，仍按 `label` 渲染。
+6. `options` 为对象数组时，保留 `description` 展示。
+7. 只有自定义输入、没有 option 的问题仍可提交。
+8. 普通用户聊天消息即使内容是合法 `string[][]`，只要没有问题回答标记或上下文关联，仍按普通文本展示。
+9. 问题回答发送失败时，原 question part 回滚到提交前状态，并允许用户继续修改和重试。
+10. completed/error 事件携带服务端 output 时，以服务端 output 更新本地补丁；未携带 output 时保留本地已提交 JSON。
 
 ### 9.3 文档一致性检查
 
 1. 检查需求文档中的协议字段与实现字段一致，特别是 `questions`、`multiSelect`、`options`。
 2. 检查设计决策文档中 `QuestionCard` 职责边界与实现一致。
 3. 检查 Mock 文档中的触发关键词、示例问题数量、多选字段与实际 Mock 一致。
-4. 检查对外协议说明中是否明确问题回答 `content` 为二维数组 JSON 字符串。
-5. 检查文档中是否明确 `part.output` 保存 JSON 字符串、`displayContent` 只用于前端展示。
+4. 检查对外协议说明中是否明确问题回答 `content` 为字符串，且存在旧答案字符串与二维数组 JSON 字符串两种内容形态。
+5. 检查文档中是否明确 `part.output` 保存最终发送字符串、`displayContent` 只用于前端展示。
 6. 检查文档中是否明确普通用户消息不能仅凭 JSON 形状被识别为问题回答。
 
 ## 10. 最终建议
@@ -403,7 +409,7 @@ type QuestionAnswerMatrix = string[][];
 3. 接入 `useChatSession` 的 Optimistic Update、失败回滚、本地补丁缓存和 delta / snapshot 补丁合并。
 4. 完成用户消息展示标记和单题紧凑摘要，避免普通 JSON 文本被误解析。
 5. 最后补充 Mock 验证和文档一致性检查。
-6. 服务端同步确认问题回答场景 `content` 的解析方式，从单字符串升级为二维数组 JSON 字符串。
+6. 服务端同步确认问题回答场景 `content` 的解析方式，同时兼容旧单答案字符串和二维数组 JSON 字符串。
 
 ## 11. 安全
 
@@ -426,5 +432,5 @@ type QuestionAnswerMatrix = string[][];
 2. `parseQuestionAnswerMatrix`：合法二维数组 JSON、非法 JSON、非二维数组、旧单字符串兼容。
 3. `formatQuestionAnswerDisplay`：多题、多选、空题“未回答”、无题目信息的用户消息展示、单题紧凑展示。
 4. `QuestionCard`：单题单选立即提交、多选草稿提交、多题切换保留答案、父级 part 更新不重置当前题、提交后只读展示。
-5. `useChatSession`：问题回答场景中发送 JSON 字符串，同时本地用户消息展示 `displayContent`，并对原 question part 做 Optimistic Update 与失败回滚。
+5. `useChatSession`：问题回答场景中单题单答案发送答案字符串，其他场景发送 JSON 字符串，同时本地用户消息展示 `displayContent`，并对原 question part 做 Optimistic Update 与失败回滚。
 6. `MessageBubble`：只有问题回答标记或上下文关联命中时才解析 `string[][]` JSON，普通 JSON 文本保持原样展示。

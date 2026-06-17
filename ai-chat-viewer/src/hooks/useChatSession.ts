@@ -17,7 +17,7 @@ import {
   messageOperationToMessage,
   normalizeRole,
   sessionMessageToMessage,
-  serializeQuestionAnswerMatrix,
+  serializeQuestionAnswerContent,
   snapshotMessageToMessage,
   updateLatestPart,
 } from '../utils/message';
@@ -363,7 +363,7 @@ export function useChatSession({
 
     try {
       await sendUserMessage(
-        serializeQuestionAnswerMatrix(answer),
+        serializeQuestionAnswerContent(answer),
         toolCallId,
         questionId,
         subagentSessionId,

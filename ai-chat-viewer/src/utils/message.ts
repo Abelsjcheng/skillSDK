@@ -21,7 +21,6 @@ const MESSAGE_PART_STATUS = new Set(['pending', 'running', 'completed', 'error']
 let nextMsgId = 1;
 
 interface QuestionFieldSource {
-  input?: unknown;
   header?: unknown;
   question?: unknown;
   options?: unknown;
@@ -177,11 +176,13 @@ function normalizeQuestionRecord(record: unknown): QuestionItem | undefined {
     question?: unknown;
     options?: unknown;
     multiSelect?: unknown;
+    output?: unknown;
   };
   const header = normalizeOptionalString(questionRecord.header);
   const question = normalizeOptionalString(questionRecord.question) ?? '';
   const options = normalizeQuestionOptions(questionRecord.options) ?? [];
   const multiSelect = normalizeBoolean(questionRecord.multiSelect) ?? false;
+  const output = normalizeOptionalString(questionRecord.output)?.trim();
 
   if (!header && !question.trim() && options.length === 0) {
     return undefined;
@@ -192,6 +193,7 @@ function normalizeQuestionRecord(record: unknown): QuestionItem | undefined {
     question,
     options,
     multiSelect,
+    ...(typeof output === 'string' ? { output } : {}),
   };
 }
 
@@ -217,31 +219,12 @@ export function normalizeQuestionItems(source: QuestionFieldSource): QuestionIte
     return directQuestions;
   }
 
-  const inputRecord = source.input && typeof source.input === 'object'
-    ? source.input as {
-      header?: unknown;
-      question?: unknown;
-      options?: unknown;
-      multiSelect?: unknown;
-      questions?: unknown;
-    }
-    : null;
-  const inputQuestions = normalizeQuestionRecords(inputRecord?.questions);
-  if (inputQuestions) {
-    return inputQuestions;
-  }
-
-  const header = normalizeOptionalString(source.header) ?? normalizeOptionalString(inputRecord?.header);
+  const header = normalizeOptionalString(source.header);
   const question = normalizeOptionalString(source.question)
-    ?? normalizeOptionalString(inputRecord?.question)
     ?? normalizeOptionalString(source.content)
     ?? '';
-  const options = normalizeQuestionOptions(inputRecord?.options)
-    ?? normalizeQuestionOptions(source.options)
-    ?? [];
-  const multiSelect = normalizeBoolean(source.multiSelect)
-    ?? normalizeBoolean(inputRecord?.multiSelect)
-    ?? false;
+  const options = normalizeQuestionOptions(source.options) ?? [];
+  const multiSelect = normalizeBoolean(source.multiSelect) ?? false;
 
   if (!header && !question.trim() && options.length === 0) {
     return undefined;
@@ -255,26 +238,22 @@ export function normalizeQuestionItems(source: QuestionFieldSource): QuestionIte
   }];
 }
 
-export function extractQuestionFields(
-  input: unknown,
-): Pick<MessagePart, 'header' | 'question' | 'options' | 'multiSelect' | 'questions'> {
-  const questions = normalizeQuestionItems({ input });
-  const firstQuestion = questions?.[0];
-  if (!firstQuestion) {
-    return {};
-  }
-
-  return {
-    header: firstQuestion.header,
-    question: firstQuestion.question,
-    options: firstQuestion.options.length > 0 ? firstQuestion.options : undefined,
-    multiSelect: firstQuestion.multiSelect,
-    questions,
-  };
-}
-
 export function serializeQuestionAnswerMatrix(answer: QuestionAnswerMatrix): string {
   return JSON.stringify(answer);
+}
+
+export function serializeQuestionAnswerContent(answer: QuestionAnswerMatrix): string {
+  if (answer.length === 1) {
+    const firstQuestionAnswers = answer[0] ?? [];
+    if (firstQuestionAnswers.length === 1) {
+      const singleAnswer = firstQuestionAnswers[0]?.trim();
+      if (singleAnswer) {
+        return singleAnswer;
+      }
+    }
+  }
+
+  return serializeQuestionAnswerMatrix(answer);
 }
 
 export function parseQuestionAnswerMatrix(value: unknown): QuestionAnswerMatrix | undefined {
@@ -345,7 +324,6 @@ function normalizeResolvedStatus(status: unknown): string {
 
 export function mapRawPartToMessagePart(rawPart: RawMessagePart, isStreaming: boolean): MessagePart {
   const questionItems = normalizeQuestionItems({
-    input: rawPart.input,
     header: rawPart.header,
     question: rawPart.question,
     options: rawPart.options,
@@ -443,6 +421,7 @@ export function shouldRenderMessagePart(part: MessagePart): boolean {
         || Boolean(part.questions?.some((question) => (
           hasVisibleText(question.header)
           || hasVisibleText(question.question)
+          || hasVisibleText(question.output)
           || question.options.length > 0
         )))
         || hasVisibleText(part.output)

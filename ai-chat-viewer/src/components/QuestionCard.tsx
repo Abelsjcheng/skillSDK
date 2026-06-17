@@ -33,7 +33,6 @@ function buildFallbackQuestion(part: MessagePart): QuestionItem {
 
 function buildQuestionItems(part: MessagePart): QuestionItem[] {
   return normalizeQuestionItems({
-    input: part.input,
     header: part.header,
     question: part.question,
     options: part.options,
@@ -51,7 +50,27 @@ function normalizeMatrixLength(questions: QuestionItem[], answerMatrix: Question
   return questions.map((_, index) => answerMatrix[index] ?? []);
 }
 
+function hasQuestionOutput(question: QuestionItem): boolean {
+  return Object.prototype.hasOwnProperty.call(question, 'output');
+}
+
+function getQuestionOutputAnswerMatrix(questions: QuestionItem[]): QuestionAnswerMatrix | undefined {
+  if (!questions.some(hasQuestionOutput)) {
+    return undefined;
+  }
+
+  return questions.map((question) => {
+    const output = question.output?.trim();
+    return output ? [output] : [];
+  });
+}
+
 function getInitialAnswerMatrix(part: MessagePart, questions: QuestionItem[]): QuestionAnswerMatrix {
+  const questionOutputMatrix = getQuestionOutputAnswerMatrix(questions);
+  if (questionOutputMatrix) {
+    return normalizeMatrixLength(questions, questionOutputMatrix);
+  }
+
   const parsedMatrix = parseQuestionAnswerMatrix(part.output);
   if (parsedMatrix) {
     return alignQuestionAnswerMatrix(questions, parsedMatrix);

@@ -505,7 +505,7 @@ interface CreateDigitalTwinParams {
 24. PC 端历史会话分组标题由“今天 / 昨天 / 3天前”组成；“今天”“昨天”“3天前”标题容器高度统一 `32px`，`padding: 6px 12px`，文本样式 `12px/400`、`rgba(153,153,153,1)`。
 25. PC 端历史会话 item 容器高度统一 `32px`，`padding: 6px 12px`；item 文本样式 `12px/400`、`rgba(51,51,51,1)`，当前会话选中态背景改为白色、圆角半径 `8px`。
 26. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
-27. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
+27. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。`question` 渲染只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段，不再从 `input.questions` 或 `input.options` 解析题目与选项。历史消息存在顶层 `questions` 时，每一题的已回答展示优先取对应 `questions[i].output`；若不存在顶层 `questions`，则按旧单题展示并读取最外层 `output`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，提交回答时单题单答案复用旧答案字符串，多题、多选或多个答案发送二维数组 JSON 字符串，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
 28. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
 29. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
 30. `PermissionCard` 的渲染时序按确认状态拆分：
@@ -638,8 +638,6 @@ interface CreateDigitalTwinParams {
 16. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
 17. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
 18. 创建个人助理流程中若多个步骤页都需要读取系统暗黑模式，不在 `StepBasicInfo`、`StepBrainSelect` 内各自重复维护 `matchMedia('(prefers-color-scheme: dark)')` 监听；统一抽成共享 hook 复用，保证初始化逻辑、监听注册与卸载策略一致。
-
-
 
 
 

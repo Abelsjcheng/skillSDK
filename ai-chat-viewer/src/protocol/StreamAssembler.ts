@@ -113,7 +113,6 @@ export class StreamAssembler {
           msg.partId ? p.partId === msg.partId : p.type === 'question',
         );
         const questionItems = normalizeQuestionItems({
-          input: msg.input ?? questionPart?.input,
           header: msg.header ?? questionPart?.header,
           question: msg.question ?? questionPart?.question,
           options: msg.options ?? questionPart?.options,
@@ -270,7 +269,6 @@ export class StreamAssembler {
     this.partOrder = [];
     partSnapshots.forEach((partSnapshot) => {
       const questionItems = normalizeQuestionItems({
-        input: partSnapshot.input,
         header: partSnapshot.header,
         question: partSnapshot.question,
         options: partSnapshot.options,
