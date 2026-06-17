@@ -20,7 +20,7 @@
 1. 支持服务端在同一个 question part 中下发多道问题。
 2. 支持单题多选，多选题使用复选框视觉，单选题保持现有单选圆点视觉。
 3. 支持每道题填写自定义答案，并与该题已选 option 合并到同一个内层数组。
-4. 当只有一道题且该题为单选时，保持点击 option 立即提交的旧交互。
+4. 当只有一道题且该题为单选时，保持点击 option 立即提交；若用户填写自定义答案，则显示底部提交按钮，点击提交后发送答案。
 5. 当存在多道题或当前题为多选时，用户选择后点击统一提交按钮发送答案。
 6. 多题场景支持上一题、下一题切换，切换后保留已选答案和自定义输入。
 7. 兼容没有返回 `questions` 字段的旧数据，继续按旧单题单选逻辑处理。
@@ -55,7 +55,7 @@ flowchart TD
     F --> M
     M --> G["QuestionCard 消费标准题目数组"]
     G --> H{"单题且单选"}
-    H -- "是" --> I["点击 option / 自定义发送后立即提交 [[answer]]"]
+    H -- "是" --> I["点击 option 立即提交；自定义答案点底部提交"]
     H -- "否" --> J["维护二维答案矩阵 string[][]"]
     J --> K["题目前后切换与统一提交"]
     I --> L["上抛 QuestionAnswerSubmission"]
@@ -96,7 +96,7 @@ sequenceDiagram
     UI->>UI: 初始化当前题索引、二维答案矩阵、自定义输入
 ```
 
-### 3.2 单题单选立即提交
+### 3.2 单题单选提交
 
 ```mermaid
 sequenceDiagram
@@ -106,8 +106,15 @@ sequenceDiagram
     participant API as sendMessageApi
     participant List as 消息列表
 
-    User->>Card: 点击单选 option
-    Card->>Card: 生成答案矩阵 [["选项"]]
+    alt 点击单选 option
+        User->>Card: 点击单选 option
+        Card->>Card: 生成答案矩阵 [["选项"]]
+    else 填写自定义答案
+        User->>Card: 填写自定义答案
+        Card->>Card: 显示底部提交按钮
+        User->>Card: 点击提交
+        Card->>Card: 生成答案矩阵 [["自定义答案"]]
+    end
     Card-->>Chat: onQuestionAnswered(answer, displayContent, partId)
     Chat->>Chat: 单题单答案生成旧答案字符串
     Chat->>List: 定位原 question part 并预更新 answered/output
@@ -201,7 +208,7 @@ type QuestionAnswerMatrix = string[][];
 
 1. option 使用现有单选圆点视觉。
 2. 点击 option 后立即提交 `[["选项 label"]]`。
-3. 填写自定义答案后点击发送，提交 `[["自定义答案"]]`。
+3. 填写自定义答案后，不显示输入框尾部发送图标，改为显示底部提交按钮；用户点击提交后提交 `[["自定义答案"]]`。
 4. 提交成功后卡片锁定并展示只读答案。
 
 #### 4.2.4 多题或多选
@@ -280,7 +287,7 @@ type QuestionAnswerMatrix = string[][];
 
 历史消息如果服务端暂时无法持久化该标记，可使用上下文兜底：只有当相邻或关联 assistant question part 的 `output` 与该用户消息 `content` 一致，或能通过 `toolCallId/questionId` 确认关联关系时，才按问题回答展示。否则即使用户普通消息内容是合法的 `[["A"]]`，也必须按普通文本展示。
 
-`formatQuestionAnswerDisplay` 增加单题紧凑展示能力。用户消息气泡和 `displayContent` 可启用紧凑模式：单题答案直接展示 `A` 或 `A、B`，不显示冗余的 `第1题:`；`QuestionCard` 已回答摘要继续保留题干和答案，避免在卡片内部丢失问题上下文。
+`formatQuestionAnswerDisplay` 增加答案-only 展示能力。用户消息气泡和 `displayContent` 只展示答案文本：单题直接展示 `A` 或 `A、B`，多题按行展示每题答案，不显示 `第1题:`、`第2题:` 等题目前缀；`QuestionCard` 已回答摘要继续保留题干和答案，避免在卡片内部丢失问题上下文。
 
 ### 4.3 兼容与边界
 
@@ -296,7 +303,7 @@ type QuestionAnswerMatrix = string[][];
 10. 若服务端没有提供 option，仍允许用户通过自定义输入提交答案。
 11. 本地 Optimistic Update 失败回滚时，需要恢复提交前的原 part 状态，避免用户误以为答案已提交成功。
 12. 本地补丁只作用于 question part，不影响同一条 assistant message 中其他 text、tool、permission、error part。
-13. 单题紧凑展示只用于用户消息摘要，不改变 `QuestionCard` 已回答卡片的题干展示。
+13. 答案-only 展示只用于用户消息摘要，不改变 `QuestionCard` 已回答卡片的题干展示。
 
 ### 4.4 相关接口联动
 
@@ -366,19 +373,20 @@ type QuestionAnswerMatrix = string[][];
 ### 9.1 功能测试
 
 1. 旧协议无 `questions[]` 的单题单选，点击 option 后立即提交。
-2. 单选题保持现有圆点单选视觉。
-3. 多选题使用复选框视觉，并可选择多个 option。
-4. 单题多选需要点击提交；只有一个答案时兼容发送答案字符串，多个答案时发送二维数组 JSON 字符串，例如 `[["A","B"]]`。
-5. 多题可上一题、下一题切换，切换后答案保留且可修改。
-6. 多题中未回答题目提交为 `[]`。
-7. 多选题 option 与自定义答案合并到同一个内层数组。
-8. 提交成功后原 `QuestionCard` 展示只读答案摘要。
-9. 用户消息气泡展示可读摘要，不展示原始 JSON。
-10. 后续 AI 回复仍作为独立 assistant 消息出现。
-11. 提交后原 question part 立即进入已回答态，不等待服务端 completed/error 事件。
-12. 提交后后续 delta / streaming / snapshot 到达时，原卡片不闪烁回未回答态。
-13. 多题切换到第二题或后续题目后，父级 part 的 answered/output/status 刷新不会把 `currentQuestionIndex` 重置为 0。
-14. 单题用户消息摘要展示为答案本身，不展示冗余的 `第1题:`。
+2. 单题单选填写自定义答案时，不展示输入框尾部发送图标，改为展示底部提交按钮并由该按钮提交。
+3. 单选题保持现有圆点单选视觉。
+4. 多选题使用复选框视觉，并可选择多个 option。
+5. 单题多选需要点击提交；只有一个答案时兼容发送答案字符串，多个答案时发送二维数组 JSON 字符串，例如 `[["A","B"]]`。
+6. 多题可上一题、下一题切换，切换后答案保留且可修改。
+7. 多题中未回答题目提交为 `[]`。
+8. 多选题 option 与自定义答案合并到同一个内层数组。
+9. 提交成功后原 `QuestionCard` 展示只读答案摘要。
+10. 用户消息气泡展示可读摘要，不展示原始 JSON。
+11. 后续 AI 回复仍作为独立 assistant 消息出现。
+12. 提交后原 question part 立即进入已回答态，不等待服务端 completed/error 事件。
+13. 提交后后续 delta / streaming / snapshot 到达时，原卡片不闪烁回未回答态。
+14. 多题切换到第二题或后续题目后，父级 part 的 answered/output/status 刷新不会把 `currentQuestionIndex` 重置为 0。
+15. 用户消息摘要展示为答案本身，多题按行展示答案，不展示冗余的 `第1题:`、`第2题:`。
 
 ### 9.2 兼容测试
 
@@ -412,7 +420,7 @@ type QuestionAnswerMatrix = string[][];
 1. 先完成类型与归一化工具，保证历史、实时、snapshot 三条入口输出一致。
 2. 再改造 `QuestionCard` 状态模型和交互，并加入卡片身份、题目结构签名，控制当前题索引重置时机。
 3. 接入 `useChatSession` 的 Optimistic Update、失败回滚、本地补丁缓存和 delta / snapshot 补丁合并。
-4. 完成用户消息展示标记和单题紧凑摘要，避免普通 JSON 文本被误解析。
+4. 完成用户消息展示标记和答案-only 摘要，避免普通 JSON 文本被误解析。
 5. 最后补充 Mock 验证和文档一致性检查。
 6. 服务端同步确认问题回答场景 `content` 的解析方式，同时兼容旧单答案字符串和二维数组 JSON 字符串。
 
@@ -435,7 +443,7 @@ type QuestionAnswerMatrix = string[][];
 
 1. `normalizeQuestionItems`：新 `questions[]`、旧单题字段、字符串 options、对象 options、`multiSelect` 默认值。
 2. `parseQuestionAnswerMatrix`：合法二维数组 JSON、非法 JSON、非二维数组、旧单字符串兼容。
-3. `formatQuestionAnswerDisplay`：多题、多选、空题“未回答”、无题目信息的用户消息展示、单题紧凑展示。
+3. `formatQuestionAnswerDisplay`：多题、多选、空题“未回答”、无题目信息的用户消息展示、用户消息答案-only 展示。
 4. `QuestionCard`：单题单选立即提交、多选草稿提交、多题切换保留答案、父级 part 更新不重置当前题、提交后只读展示。
 5. `useChatSession`：问题回答场景中单题单答案发送答案字符串，其他场景发送 JSON 字符串，同时本地用户消息展示 `displayContent`，并对原 question part 做 Optimistic Update 与失败回滚。
 6. `MessageBubble`：只有问题回答标记或上下文关联命中时才解析 `string[][]` JSON，普通 JSON 文本保持原样展示。

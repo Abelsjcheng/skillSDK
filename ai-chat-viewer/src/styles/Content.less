@@ -656,7 +656,7 @@
     border-radius: 8px;
     border: 1px solid rgba(0, 0, 0, 0.08);
     background: rgba(255, 255, 255, 1);
-    padding: 6px 30px 6px 8px;
+    padding: 6px 8px;
     min-height: 36px;
     box-sizing: border-box;
   }
@@ -705,38 +705,6 @@
 
   .question-card__input::placeholder {
     color: rgba(204, 204, 204, 1);
-  }
-
-  .question-card__submit {
-    position: absolute;
-    right: 8px;
-    bottom: 8px;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-
-    img {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-
-    &:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-  }
-
-  .question-card__submit.is-hidden {
-    opacity: 0;
-    pointer-events: none;
   }
 
   .question-card__footer {
@@ -810,6 +778,10 @@
 
   .question-card__answered-answer {
     margin-top: 4px;
+    padding: 4px 6px;
+    border: 1px solid rgba(13, 148, 255, 1);
+    border-radius: 4px;
+    background: rgba(236, 246, 255, 1);
     color: rgba(51, 51, 51, 1);
     font-size: 14px;
     line-height: 22px;

@@ -84,7 +84,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
     const questionAnswerMatrix = parseQuestionAnswerMatrix(message.content);
     return questionAnswerMatrix
-      ? formatQuestionAnswerDisplay([], questionAnswerMatrix)
+      ? formatQuestionAnswerDisplay([], questionAnswerMatrix, { showQuestionTitle: false })
       : message.content;
   }, [isUser, message.content]);
 

@@ -38,6 +38,7 @@ interface QuestionAnswerDisplayLabels {
   questionPrefix?: string;
   answerSeparator?: string;
   questionTitle?: (index: number) => string;
+  showQuestionTitle?: boolean;
 }
 
 export function genMessageId(prefix = 'msg'): string {
@@ -303,6 +304,7 @@ export function formatQuestionAnswerDisplay(
   const unanswered = labels.unanswered ?? '未回答';
   const questionPrefix = labels.questionPrefix ?? '第';
   const answerSeparator = labels.answerSeparator ?? '、';
+  const showQuestionTitle = labels.showQuestionTitle !== false;
   const questionCount = Math.max(questions.length, answer.length);
   const lines: string[] = [];
 
@@ -313,7 +315,8 @@ export function formatQuestionAnswerDisplay(
       || labels.questionTitle?.(index)
       || `${questionPrefix}${index + 1}题`;
     const answers = answer[index] ?? [];
-    lines.push(`${title}: ${answers.length > 0 ? answers.join(answerSeparator) : unanswered}`);
+    const answerText = answers.length > 0 ? answers.join(answerSeparator) : unanswered;
+    lines.push(showQuestionTitle ? `${title}: ${answerText}` : answerText);
   }
 
   return lines.join('\n');

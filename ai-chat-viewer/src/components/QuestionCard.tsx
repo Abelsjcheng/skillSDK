@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import sendQuestionIcon from '../imgs/send_question_icon.svg';
 import type { QuestionCardProps } from '../types/components';
 import type { MessagePart, QuestionAnswerMatrix, QuestionItem } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
@@ -134,13 +133,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const currentCustomInput = customInputs[currentQuestionIndex] ?? '';
   const trimmedInput = currentCustomInput.trim();
   const requiresManualSubmit = questions.length > 1 || questions.some((question) => question.multiSelect);
+  const requiresCustomFooterSubmit = !requiresManualSubmit && Boolean(trimmedInput);
+  const shouldShowFooterSubmit = requiresManualSubmit || requiresCustomFooterSubmit;
   const isLocked = answered || submitting || readonly;
+  const isAnswerSubmitDisabled = isLocked || (!requiresManualSubmit && !trimmedInput);
 
   const buildDisplayContent = (answerMatrix: QuestionAnswerMatrix): string =>
     formatQuestionAnswerDisplay(questions, answerMatrix, {
       unanswered: t('question.unanswered'),
       answerSeparator: t('question.answerSeparator'),
       questionTitle: (index) => t('question.defaultTitle', { index: index + 1 }),
+      showQuestionTitle: false,
     });
 
   const resizeTextarea = () => {
@@ -254,24 +257,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         index === currentQuestionIndex ? [] : prev[index] ?? []
       )));
     }
-  };
-
-  const handleCustomSubmit = () => {
-    if (!trimmedInput || requiresManualSubmit) {
-      return;
-    }
-    const previousSelectedAnswers = selectedAnswers;
-    const previousCustomInputs = customInputs;
-    const nextSelectedAnswers = questions.map((_, index) => (
-      index === currentQuestionIndex ? [] : selectedAnswers[index] ?? []
-    ));
-    const nextCustomInputs = questions.map((_, index) => (
-      index === currentQuestionIndex ? trimmedInput : customInputs[index] ?? ''
-    ));
-    setSelectedAnswers(nextSelectedAnswers);
-    setCustomInputs(nextCustomInputs);
-    const answerMatrix = buildAnswerMatrix(questions, nextSelectedAnswers, nextCustomInputs);
-    void submitAnswerMatrix(answerMatrix, previousSelectedAnswers, previousCustomInputs);
   };
 
   const handleCustomCardClick = () => {
@@ -417,29 +402,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 disabled={isLocked}
                 rows={1}
               />
-              <button
-                type="button"
-                className={[
-                  'question-card__submit',
-                  !trimmedInput || requiresManualSubmit ? 'is-hidden' : '',
-                ].filter(Boolean).join(' ')}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  runButtonClickWithDebounce(event, () => {
-                    handleCustomSubmit();
-                  });
-                }}
-                disabled={isLocked}
-                aria-label={t('common.submit')}
-              >
-                <img src={sendQuestionIcon} alt="" aria-hidden="true" />
-              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {requiresManualSubmit ? (
+      {shouldShowFooterSubmit ? (
         <div className="question-card__footer">
           {questions.length > 1 ? (
             <div className="question-card__nav">
@@ -469,7 +437,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 submitCurrentDraft();
               });
             }}
-            disabled={isLocked}
+            disabled={isAnswerSubmitDisabled}
           >
             {t('question.submitAnswers')}
           </button>
