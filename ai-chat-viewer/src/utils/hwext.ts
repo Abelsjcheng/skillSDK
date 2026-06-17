@@ -16,6 +16,9 @@ import type {
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteHistorySessionParams,
+  DeleteHistorySessionResponse,
+  DeleteHistorySessionResult,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
   GetHistorySessionsListParams,
@@ -615,6 +618,33 @@ export async function updateWeAgent(params: UpdateWeAgentParams): Promise<Update
 
 export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
   return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
+}
+
+export async function deleteHistorySession(
+  params: DeleteHistorySessionParams,
+): Promise<DeleteHistorySessionResult> {
+  const sessionId = params.welinkSessionId.trim();
+  if (!sessionId) {
+    throw new Error('welinkSessionId is required.');
+  }
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetch !== 'function') {
+    throw new Error('HWH5.fetch is not available.');
+  }
+
+  const response = await Promise.resolve(window.HWH5.fetch<DeleteHistorySessionResponse>(
+    `/api/skill/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: 'delete',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  ));
+  const reply = await response.json();
+  if (reply?.code !== 0 || !reply.data) {
+    throw reply;
+  }
+  return reply.data;
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {

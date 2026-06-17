@@ -1,4 +1,37 @@
-import { buildOpenWeAgentCUIParams } from '../hwext';
+import { buildOpenWeAgentCUIParams, deleteHistorySession } from '../hwext';
+
+describe('deleteHistorySession', () => {
+  beforeEach(() => {
+    (window as any).HWH5 = {
+      fetch: jest.fn().mockResolvedValue({
+        json: jest.fn().mockResolvedValue({
+          code: 0,
+          data: {
+            status: 'deleted',
+            welinkSessionId: 'session/1',
+          },
+        }),
+      }),
+    };
+  });
+
+  it('deletes a session through HWH5.fetch without a request body', async () => {
+    await expect(deleteHistorySession({ welinkSessionId: 'session/1' })).resolves.toEqual({
+      status: 'deleted',
+      welinkSessionId: 'session/1',
+    });
+
+    expect(window.HWH5.fetch).toHaveBeenCalledWith(
+      '/api/skill/sessions/session%2F1',
+      {
+        method: 'delete',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+  });
+});
 
 describe('buildOpenWeAgentCUIParams', () => {
   it('uses from=weAgent instead of robotId for myAgent external uri', () => {

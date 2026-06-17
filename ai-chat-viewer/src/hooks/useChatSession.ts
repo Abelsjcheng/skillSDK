@@ -64,6 +64,7 @@ export function useChatSession({
   assistantDetail,
   onSessionTitleChange,
   onSessionActivity,
+  onSessionDeleted,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -93,11 +94,13 @@ export function useChatSession({
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const onSessionActivityRef = useRef(onSessionActivity);
+  const onSessionDeletedRef = useRef(onSessionDeleted);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
   const agentOfflineTextRef = useRef('agent已离线');
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
   onSessionActivityRef.current = onSessionActivity;
+  onSessionDeletedRef.current = onSessionDeleted;
   aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
@@ -389,6 +392,19 @@ export function useChatSession({
 
     const onMessage = (msg: StreamMessage) => {
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
+      if (msg.type === 'session.deleted') {
+        const deletedSessionId = String(
+          msg.sessionId
+            ?? (typeof msg.content === 'object' && msg.content !== null
+              ? (msg.content as { welinkSessionId?: unknown }).welinkSessionId
+              : '')
+            ?? '',
+        ).trim();
+        if (deletedSessionId && deletedSessionId === activeWelinkSessionId) {
+          onSessionDeletedRef.current?.(deletedSessionId);
+        }
+        return;
+      }
       if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
         return;
       }
@@ -581,6 +597,7 @@ export function useChatSession({
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
+            finalizeStreamingMessageById(latestStreamingMsgIdRef.current);
             setSessionStatus('idle');
             hidePendingAssistantPreview();
           } else if (msg.sessionStatus === 'busy') {
@@ -733,6 +750,7 @@ export function useChatSession({
     };
   }, [
     appendAssistantErrorBlock,
+    finalizeStreamingMessageById,
     getOrCreateStreamingAssembler,
     hidePendingAssistantPreview,
     mode,

@@ -1,12 +1,13 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WeAgentHistorySidebar from '../assistant/WeAgentHistorySidebar';
 import type { SkillSession } from '../../types/bridge';
 import type { HistorySessionsCache } from '../../types/components';
 import * as constants from '../../constants';
-import { getHistorySessionsList } from '../../utils/hwext';
+import { deleteHistorySession, getHistorySessionsList } from '../../utils/hwext';
 
 jest.mock('../../utils/hwext', () => ({
+  deleteHistorySession: jest.fn(),
   getHistorySessionsList: jest.fn(),
 }));
 
@@ -23,6 +24,7 @@ jest.mock('../../utils/logger', () => ({
 }));
 
 const mockGetHistorySessionsList = getHistorySessionsList as jest.MockedFunction<typeof getHistorySessionsList>;
+const mockDeleteHistorySession = deleteHistorySession as jest.MockedFunction<typeof deleteHistorySession>;
 
 function createSession(overrides: Partial<SkillSession> = {}): SkillSession {
   return {
@@ -61,6 +63,10 @@ describe('WeAgentHistorySidebar', () => {
     document.body.innerHTML = '';
     isPcMiniAppSpy = jest.spyOn(constants, 'isPcMiniApp');
     isPcMiniAppSpy.mockReturnValue(true);
+    mockDeleteHistorySession.mockResolvedValue({
+      status: 'deleted',
+      welinkSessionId: 'session-1',
+    });
   });
 
   afterEach(() => {
@@ -158,5 +164,147 @@ describe('WeAgentHistorySidebar', () => {
 
     expect(onSessionSelect).toHaveBeenCalledWith('session-1');
     expect(document.querySelector('.we-agent-history-sidebar.is-open')).toBeInTheDocument();
+  });
+
+  it('deletes a session from the PC context menu after confirmation', async () => {
+    const onSessionDeleted = jest.fn();
+    const firstSession = createSession({ welinkSessionId: 'session-1', title: 'First session' });
+    const secondSession = createSession({ welinkSessionId: 'session-2', title: 'Second session' });
+
+    render(
+      <WeAgentHistorySidebar
+        assistantAccount="assistant-1"
+        cachedCache={createCache([firstSession, secondSession])}
+        defaultOpen
+        historyLoaded
+        onSessionDeleted={onSessionDeleted}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'First session' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+
+    await waitFor(() => {
+      expect(mockDeleteHistorySession).toHaveBeenCalledWith({
+        welinkSessionId: 'session-1',
+      });
+    });
+    expect(onSessionDeleted).toHaveBeenCalledWith('session-1');
+  });
+
+  it('opens an action popup at the lower right of a session item when space allows', () => {
+    const onSessionSelect = jest.fn();
+
+    render(
+      <WeAgentHistorySidebar
+        assistantAccount="assistant-1"
+        cachedCache={createCache([createSession()])}
+        defaultOpen
+        historyLoaded
+        onSessionSelect={onSessionSelect}
+      />,
+    );
+
+    const sessionItem = screen.getByRole('button', { name: 'Today session' });
+    jest.spyOn(sessionItem, 'getBoundingClientRect').mockReturnValue({
+      top: 80,
+      right: 220,
+      bottom: 112,
+      left: 20,
+      width: 200,
+      height: 32,
+      x: 20,
+      y: 80,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.contextMenu(sessionItem);
+
+    expect(onSessionSelect).not.toHaveBeenCalled();
+    const menu = screen.getByRole('menu', { name: '会话操作' });
+    expect(menu).toHaveStyle({ right: `${window.innerWidth - 220}px`, top: '116px' });
+    expect(menu).not.toHaveClass('is-above');
+    expect(screen.queryByRole('menuitem', { name: '重命名' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '删除' })).toBeInTheDocument();
+  });
+
+  it('opens the action popup at the upper right when lower space is insufficient', () => {
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      writable: true,
+      value: 140,
+    });
+
+    render(
+      <WeAgentHistorySidebar
+        assistantAccount="assistant-1"
+        cachedCache={createCache([createSession()])}
+        defaultOpen
+        historyLoaded
+      />,
+    );
+
+    const sessionItem = screen.getByRole('button', { name: 'Today session' });
+    jest.spyOn(sessionItem, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      right: 220,
+      bottom: 132,
+      left: 20,
+      width: 200,
+      height: 32,
+      x: 20,
+      y: 100,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.contextMenu(sessionItem);
+
+    const menu = screen.getByRole('menu', { name: '会话操作' });
+    expect(menu).toHaveStyle({ right: `${window.innerWidth - 220}px`, top: '96px' });
+    expect(menu).toHaveClass('is-above');
+  });
+
+  it('opens the delete action popup on mobile long press without selecting the session', () => {
+    jest.useFakeTimers();
+    isPcMiniAppSpy.mockReturnValue(false);
+    const onSessionSelect = jest.fn();
+
+    render(
+      <WeAgentHistorySidebar
+        assistantAccount="assistant-1"
+        cachedCache={createCache([createSession()])}
+        defaultOpen
+        historyLoaded
+        onSessionSelect={onSessionSelect}
+      />,
+    );
+
+    const sessionItem = screen.getByRole('button', { name: 'Today session' });
+    jest.spyOn(sessionItem, 'getBoundingClientRect').mockReturnValue({
+      top: 80,
+      right: 220,
+      bottom: 112,
+      left: 20,
+      width: 200,
+      height: 32,
+      x: 20,
+      y: 80,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.touchStart(sessionItem);
+    act(() => {
+      jest.advanceTimersByTime(520);
+    });
+
+    expect(screen.getByRole('menu', { name: '会话操作' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '删除' })).toBeInTheDocument();
+
+    fireEvent.touchEnd(sessionItem);
+    fireEvent.click(sessionItem);
+
+    expect(onSessionSelect).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 });

@@ -9,6 +9,7 @@ export interface UseChatSessionOptions {
   assistantDetail?: WeAgentDetails | null;
   onSessionTitleChange?: (sessionId: string, title: string) => void;
   onSessionActivity?: (sessionId: string, updatedAt: string) => void;
+  onSessionDeleted?: (sessionId: string) => void;
 }
 
 export interface UseChatSessionResult {

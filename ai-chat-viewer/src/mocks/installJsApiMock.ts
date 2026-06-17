@@ -60,6 +60,10 @@ interface MockHWH5Bridge {
   getAccountInfo?: () => Promise<string>;
   navigateBack: () => void;
   close: () => void;
+  fetch?: <T = unknown>(
+    url: string,
+    options: { method: string; headers: Record<string, string>; body?: string },
+  ) => Promise<{ json: () => Promise<T> }> | { json: () => Promise<T> };
 }
 
 interface SessionRecord {
@@ -193,6 +197,10 @@ type MockReplyScenario =
 declare global {
   interface Window {
     __AI_CHAT_VIEWER_JSAPI_MOCK__?: boolean;
+    __AI_CHAT_VIEWER_MOCK__?: {
+      emitSessionDeleted: (sessionId: string) => boolean;
+      listSessionIds: () => string[];
+    };
   }
 }
 
@@ -896,6 +904,46 @@ function emit(sessionId: string, payload: MockEmitPayload): void {
   }
 
   dispatchToSessionListener(listener, message);
+}
+
+function emitSessionDeleted(sessionId: string): boolean {
+  const normalizedSessionId = sessionId.trim();
+  if (!normalizedSessionId) {
+    return false;
+  }
+
+  const record = sessionStore.get(normalizedSessionId);
+  if (record) {
+    clearSessionTimers(record);
+    record.nextStreamSeq += 1;
+  }
+
+  const listener = listeners.get(normalizedSessionId);
+  const message = {
+    type: 'session.deleted',
+    welinkSessionId: normalizedSessionId,
+    sessionId: normalizedSessionId,
+    seq: record?.nextStreamSeq ?? null,
+    emittedAt: nowIso(),
+    content: {
+      welinkSessionId: normalizedSessionId,
+    },
+  } as StreamMessage;
+
+  sessionStore.delete(normalizedSessionId);
+
+  if (listener) {
+    dispatchToSessionListener(listener, message);
+  }
+
+  return Boolean(record || listener);
+}
+
+function installMockDebugTools(): void {
+  window.__AI_CHAT_VIEWER_MOCK__ = {
+    emitSessionDeleted: emitSessionDeleted,
+    listSessionIds: () => Array.from(sessionStore.keys()),
+  };
 }
 
 function clearSessionTimers(record: SessionRecord): void {
@@ -2211,6 +2259,35 @@ function ensureMockHWH5Bridge(): void {
     };
   }
 
+  if (typeof hwh5.fetch !== 'function') {
+    hwh5.fetch = async <T = unknown>(url: string, options: { method: string }) => {
+      const method = options.method.toLowerCase();
+      const matchedDeleteSession = url.match(/^\/api\/skill\/sessions\/([^/?#]+)$/);
+      if (method === 'delete' && matchedDeleteSession) {
+        const sessionId = decodeURIComponent(matchedDeleteSession[1]);
+        const existed = emitSessionDeleted(sessionId);
+        const reply = existed
+          ? {
+            code: 0,
+            data: {
+              status: 'deleted',
+              welinkSessionId: sessionId,
+            },
+          }
+          : {
+            code: 400,
+            message: 'Invalid session id',
+          };
+
+        return {
+          json: async () => reply as T,
+        };
+      }
+
+      throw new Error(`mock HWH5.fetch unsupported request: ${method.toUpperCase()} ${url}`);
+    };
+  }
+
   window.HWH5 = hwh5 as any;
 }
 
@@ -2610,6 +2687,7 @@ export function installJsApiMock(): void {
 
     seedMockData();
     ensureMockHWH5Bridge();
+    installMockDebugTools();
 
     if (!window.HWH5EXT) {
       window.HWH5EXT = buildMockApi();

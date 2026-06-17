@@ -175,6 +175,20 @@ export interface DeleteWeAgentResult {
   deleteResult: string;
 }
 
+export interface DeleteHistorySessionParams {
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResult {
+  status: string;
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResponse {
+  code: number;
+  data: DeleteHistorySessionResult;
+}
+
 export interface QueryQrcodeInfoParams {
   qrcode: string;
 }
@@ -310,6 +324,12 @@ export interface FetchFullOptions {
   headers: Record<string, string>;
 }
 
+export interface HWH5FetchOptions {
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+}
+
 export interface FetchFullResponse<T = unknown> {
   json: () => Promise<T>;
 }
@@ -380,6 +400,10 @@ export interface HWH5Bridge {
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,
+  ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
+  fetch?: <T = unknown>(
+    url: string,
+    options: HWH5FetchOptions,
   ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
   onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
   offKeyboardHeightChange?: () => void;
