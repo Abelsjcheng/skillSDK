@@ -8,8 +8,8 @@ import type {
   RegenerateAnswerResponse,
   ControlSkillWeCodeResponse,
 } from '../types';
-import type { CreateDigitalTwinParams } from '../types/digitalTwin';
 import type { PlantUmlRenderParams, PlantUmlRenderResult } from '../types/plantUml';
+import type { CreateDigitalTwinParams, GetFilePathResult, InternalAssistantOption, UploadTinyImageResult } from '../types/digitalTwin';
 import type {
   AgentTypeListResult,
   BuildOpenWeAgentCUIOptions,
@@ -55,7 +55,7 @@ import type {
   WeAgentListResult,
   WeAgentUriResult,
 } from '../types/bridge';
-import { APP_ID, isPcMiniApp } from '../constants';
+import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -80,7 +80,7 @@ const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
-export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
+const CREATE_ASSISTANT_WHITELIST_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 function tryGetPedestal(): Pedestal | null {
@@ -316,7 +316,6 @@ export function getUrlHost(value: string): string {
   if (!normalizedValue) {
     return '';
   }
-
   const matched = normalizedValue.match(/^[a-zA-Z][a-zA-Z\d+.-]*:\/\/([^/?#]+)/);
   return matched?.[1]?.trim() ?? '';
 }
@@ -334,10 +333,6 @@ export function resolveWeCodeUrlForOpenWeAgentCUI(
   _partnerAccount: string,
 ): string {
   const normalizedWeCodeUrl = normalizeString(detail.weCodeUrl);
-
-  if (detail.bizRobotId?.trim()) {
-    return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
-  }
 
   return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
 }
@@ -472,6 +467,19 @@ export function registerAppLanguageListener(listener: (language: 'zh' | 'en') =>
       listener(language);
     })
   }
+  window?.HWH5?.addEventListener({
+    type: 'welinkConfig',
+    func: (data: string) => {
+      try {
+        const configData = JSON.parse(data);
+        const type = configData?.type;
+        const language = toAppLanguage(configData?.welinkConfig[type]);
+        listener(language);
+      } catch (error) {
+        WeLog(`welinkConfig listener failed | error=${JSON.stringify(error)}`);
+      }
+    }
+  })
 }
 
 export function registerTabForUpdate(listener: () => void): void {
@@ -518,7 +526,7 @@ export async function reportUemEvent(
   }
 
   await Promise.resolve(window.HWH5.uem('event', {
-    type: 'info',
+    type: 'INFO',
     code: eventId,
     name: eventTitle,
     result: true,
@@ -577,7 +585,15 @@ export function unregisterSessionListener(params: UnregisterSessionListenerParam
 }
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
-  return trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+  try {
+    const result = await trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+    if (!result.id) {
+      return Promise.reject({ errorCode: 6000, errorMessage: '发送消息失败' })
+    }
+    return result;
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {

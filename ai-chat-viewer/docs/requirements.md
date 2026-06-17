@@ -425,7 +425,7 @@
 3. 内部助手选项资源：通过 `window.getAgentType()` 动态获取（每项包含 `name/icon/bizRobotId`）。
 4. 激活助理轮播图资源：`src/imgs/activate-guide-1.svg`、`src/imgs/activate-guide-2.svg`。
 5. 助理通用背景图资源：移动端 `src/imgs/assistant-cui-bg.png`，PC 端 `src/imgs/assistant-cui-pc-bg.png`。
-6. 助理详情/切换助理页面图标资源：`src/imgs/icon-back.svg`、`src/imgs/icon-service.svg`。
+6. 助理详情/切换助理页面图标资源：`src/imgs/icon-back.svg`、`src/imgs/customer_icon.svg`。
 7. 助理详情/切换助理页面 PC 标题区关闭图标资源：`src/imgs/icon-close.svg`。
 8. 助理详情/切换助理页面头像资源：`src/imgs/assistant-avatar.svg`、`src/imgs/switch-assistant-avatar.svg`。
 
