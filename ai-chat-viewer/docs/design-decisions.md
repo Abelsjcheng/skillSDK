@@ -48,7 +48,7 @@
 23. `src/styles/AssistantDetail.less`
 24. `src/styles/SwitchAssistant.less`
 25. `src/imgs/icon-back.svg`
-26. `src/imgs/icon-service.svg`
+26. `src/imgs/customer_icon.svg`
 27. `src/imgs/icon-close.svg`
 28. `src/imgs/assistant-avatar.svg`
 29. `src/imgs/switch-assistant-avatar.svg`
@@ -478,7 +478,7 @@ interface CreateDigitalTwinParams {
 10. 样式文件 `src/styles/WeAgentCUI.less` 负责维护 WeAgentCUI 布局，class 前缀统一使用 `we-agent-cui-`。
 11. 新增图标资源：
    - `src/imgs/icon-we-agent-new-session.svg`
-   - `src/imgs/icon-we-agent-history.svg`
+   - `src/imgs/no-history_icon.svg`
    - `src/imgs/icon-we-agent-send.svg`
 12. `aiChat` 页面及其相关逻辑已移除，不再保留 `variant` 分支与 `/aiChat` 路由。
 13. 在 `weAgentCUI` 变体下，当消息列表为空时，`Content` 区渲染欢迎块（头像 + 标题 + 副标题），样式规则如下：

@@ -68,6 +68,7 @@ export const zh = {
   'question.answerSeparator': '、',
   'question.defaultTitle': '第{{index}}题',
   'thinking.title': '思考过程',
+  'thinking.streamingCompleted': '思考完成',
   'thinking.streaming': '思考中...',
   'activateAssistant.loadFailed': '获取助手列表失败',
   'activateAssistant.guideAlt': '激活助手引导图',

@@ -116,7 +116,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       }
       try {
         const uploadFileResult = (await uploadFile({
-          serverlUrl: '',
+          serverUrl: '',
           filePath: file.filePath,
           name: 'file',
           formData: {
