@@ -200,7 +200,7 @@ type QuestionAnswerMatrix = string[][];
 2. 第二道题选择了两个 option，并填写了一个自定义答案 `其他说明`。
 3. 第三道题未回答，保留空数组占位。
 
-历史已回答展示只读取最外层 `part.output`，不读取 `questions[i].output`。当 `part.output` 是 `string[][]` JSON 字符串时，按题目顺序映射到每个问题；当 `part.output` 是普通字符串时，仅作为第一个问题的答案展示。若历史消息顶层缺少 `questions[]`，可先从 `input.questions` 兜底得到题目数组，再按最外层 `part.output` 解析答案。
+历史已回答展示只读取最外层 `part.output`，不读取 `questions[i].output`。当 `part.output` 是 `string[][]` JSON 字符串时，按题目顺序映射到每个问题；当 `part.output` 是普通字符串时，先尝试识别旧兼容链路生成的多题问答 transcript，例如“问题1\n答案1\n\n问题2\n答案2”，识别成功则按多条问答展示，识别失败才作为第一个问题的答案展示。若历史消息顶层缺少 `questions[]`，可先从 `input.questions` 兜底得到题目数组，再按最外层 `part.output` 解析答案。
 
 #### 4.2.3 单题单选
 
@@ -294,7 +294,7 @@ type QuestionAnswerMatrix = string[][];
 1. 没有 `questions` 字段时，按旧单题单选逻辑补齐题目数组。
 2. 历史消息存在顶层 `questions[]` 时，答案仍只读取最外层 `part.output`；题目项内即使存在 `output` 也忽略。
 3. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 时，仅历史解析路径使用该题目数组兜底；实时、snapshot、发送返回路径不启用该兜底。
-4. `part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵并按题目顺序展示；若不是 JSON，则按旧单答案字符串兼容为第一题答案，多题场景只展示第一题和该答案。
+4. `part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵并按题目顺序展示；若不是 JSON，则先保守识别旧多题问答 transcript，识别成功按多条问答展示，识别失败再按旧单答案字符串兼容为第一题答案。
 5. 用户普通聊天内容即使是合法 `string[][]` JSON 字符串，只要没有问题回答标记或上下文关联，也按普通文本展示和复制。
 6. 多题提交不强制所有题目必答，未回答题目保留为空数组。
 7. 自定义答案去除首尾空白后再进入答案矩阵，空字符串不提交。
@@ -391,9 +391,9 @@ type QuestionAnswerMatrix = string[][];
 ### 9.2 兼容测试
 
 1. 历史消息存在顶层 `questions[]` 且 `part.output` 为二维数组 JSON 字符串时，按顺序展示每题答案。
-2. 历史消息存在顶层 `questions[]` 且 `part.output` 为普通字符串时，只展示第一题和该答案。
+2. 历史消息存在顶层 `questions[]` 且 `part.output` 为旧多题问答 transcript 普通字符串时，按 transcript 中的多条问答展示。
 3. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为二维数组 JSON 字符串时，按顺序展示每题答案。
-4. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为普通字符串时，只展示第一题和该答案。
+4. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为旧多题问答 transcript 普通字符串时，按 transcript 中的多条问答展示。
 5. 实时 question 或 streaming snapshot 只有 `input.questions` 时，不从 `input` 恢复为 question 内容。
 6. `options` 为字符串数组时，仍按 `label` 渲染。
 7. `options` 为对象数组时，保留 `description` 展示。

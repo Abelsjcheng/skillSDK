@@ -7,6 +7,7 @@ import { WeLog } from '../utils/logger';
 import {
   alignQuestionAnswerMatrix,
   formatQuestionAnswerDisplay,
+  parseLegacyQuestionAnswerTranscript,
   normalizeQuestionItems,
   parseQuestionAnswerMatrix,
 } from '../utils/message';
@@ -281,6 +282,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   );
 
   const renderAnsweredSummary = () => {
+    const legacyTranscriptItems = readonly ? parseLegacyQuestionAnswerTranscript(part.output) : undefined;
+    if (legacyTranscriptItems) {
+      return (
+        <div className="question-card__answered-list">
+          {legacyTranscriptItems.map((item, index) => (
+            <div className="question-card__answered-item" key={`${item.question}-${index}`}>
+              <div className="question-card__answered-question">{item.question}</div>
+              <div className="question-card__answered-answer">{item.answer}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     const legacyAnswer = getLegacyAnswerText(part);
     const displayOnlyFirstQuestion = shouldDisplayOnlyFirstQuestion(part, questions);
     const summaryQuestions = displayOnlyFirstQuestion ? questions.slice(0, 1) : questions;

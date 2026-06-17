@@ -41,6 +41,11 @@ interface QuestionAnswerDisplayLabels {
   showQuestionTitle?: boolean;
 }
 
+export interface LegacyQuestionAnswerTranscriptItem {
+  question: string;
+  answer: string;
+}
+
 export function genMessageId(prefix = 'msg'): string {
   return `${prefix}_${Date.now()}_${nextMsgId++}`;
 }
@@ -287,6 +292,47 @@ export function parseQuestionAnswerMatrix(value: unknown): QuestionAnswerMatrix 
   } catch {
     return undefined;
   }
+}
+
+export function parseLegacyQuestionAnswerTranscript(
+  value: unknown,
+): LegacyQuestionAnswerTranscriptItem[] | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const text = value.trim();
+  if (!text) {
+    return undefined;
+  }
+
+  const blocks = text
+    .split(/(?:\r?\n[^\S\r\n]*){2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  if (blocks.length < 2) {
+    return undefined;
+  }
+
+  const items = blocks.map((block) => {
+    const lines = block
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length < 2) {
+      return null;
+    }
+
+    const question = lines[0];
+    const answer = lines.slice(1).join('\n').trim();
+    return question && answer ? { question, answer } : null;
+  });
+
+  if (items.some((item) => item === null)) {
+    return undefined;
+  }
+
+  return items as LegacyQuestionAnswerTranscriptItem[];
 }
 
 export function alignQuestionAnswerMatrix(
