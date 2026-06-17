@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import defaultAvatar from '../imgs/defaultAvatar.png';
-import generatingIcon from '../imgs/generating_icon.png';
+import generatingIcon from '../imgs/generating_icon.gif';
 import type { PendingAssistantBubbleProps } from '../types/components';
 import AvatarImage from './AvatarImage';
 

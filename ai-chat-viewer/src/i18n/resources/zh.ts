@@ -65,6 +65,7 @@ export const zh = {
   'question.customAnswerPlaceholder': '请输出自定义答案',
   'question.answered': '已回答',
   'thinking.title': '思考过程',
+  'thinking.streamingCompleted': '思考完成',
   'thinking.streaming': '思考中...',
   'activateAssistant.loadFailed': '获取助手列表失败',
   'activateAssistant.guideAlt': '激活助手引导图',

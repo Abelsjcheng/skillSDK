@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
-import starIcon from '../imgs/star_icon.svg';
+import starIcon from '../imgs/star_icon.png';
 import type { SubtaskBlockProps } from '../types/components';
 
 const statusLabels: Record<string, string> = {

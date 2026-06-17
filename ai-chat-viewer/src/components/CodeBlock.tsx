@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
-import copyIcon from '../imgs/icon-copy.svg';
+import copyIcon from '../imgs/copy_icon.svg';
 import '../styles/CodeBlock.less';
 import type { CodeBlockProps } from '../types/components';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';

@@ -68,6 +68,7 @@ export const en = {
   'question.customAnswerPlaceholder': 'Please enter a custom answer',
   'question.answered': 'Answered',
   'thinking.title': 'Thought Process',
+  'thinking.streamingCompleted': 'Thinking completed',
   'thinking.streaming': 'Thinking...',
   'activateAssistant.loadFailed': 'Failed to load agents',
   'activateAssistant.guideAlt': 'Activation agent guide illustration',
