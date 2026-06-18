@@ -9,8 +9,7 @@ import type { EditAssistantContentProps } from '../../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
-  getWeAgentDetails,
-  notifyAssistantDetailUpdated,
+  getAssistantDetails,
   openH5Webview,
   updateWeAgent,
 } from '../../utils/hwext';
@@ -38,7 +37,6 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
   source = 'external',
   initialDetail = null,
   partnerAccount = '',
-  robotId = '',
   onClose,
   onSuccess = noop,
 }) => {
@@ -56,11 +54,6 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
   }, []);
 
   useEffect(() => {
-    if (source === 'assistantDetail' && initialDetail) {
-      setDetail(initialDetail);
-      return;
-    }
-
     const normalizedPartnerAccount = partnerAccount.trim();
     if (!normalizedPartnerAccount) {
       setDetail(initialDetail);
@@ -71,13 +64,13 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getWeAgentDetails({ partnerAccount: normalizedPartnerAccount });
+        const result = await getAssistantDetails({ partnerAccount: normalizedPartnerAccount });
         const nextDetail = result?.weAgentDetailsArray?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);
         }
       } catch (error) {
-        WeLog(`EditAssistantContent getWeAgentDetails failed | extra=${JSON.stringify({ partnerAccount: normalizedPartnerAccount })} | error=${JSON.stringify(error)}`);
+        WeLog(`EditAssistantContent getAssistantDetails failed | extra=${JSON.stringify({ partnerAccount: normalizedPartnerAccount })} | error=${JSON.stringify(error)}`);
         showToast(t('editAssistant.loadFailed'));
         if (!cancelled) {
           setDetail(initialDetail);
@@ -90,23 +83,21 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [initialDetail, partnerAccount, source, t]);
+  }, [initialDetail, partnerAccount, t]);
 
   const initialValue = useMemo(() => (detail ? resolveInitialValue(detail) : null), [detail]);
 
   const handleSubmit = useCallback(
     async (payload: DigitalTwinBasicInfoPayload) => {
       const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
-      const targetRobotId = robotId.trim();
-      if (!targetPartnerAccount && !targetRobotId) {
+      if (!targetPartnerAccount) {
         showToast(t('editAssistant.invalidTarget'));
         return;
       }
 
       try {
         await updateWeAgent({
-          ...(targetPartnerAccount ? { partnerAccount: targetPartnerAccount } : {}),
-          ...(targetRobotId ? { robotId: targetRobotId } : {}),
+          partnerAccount: targetPartnerAccount,
           name: payload.name,
           icon: payload.icon,
           description: payload.description,
@@ -114,36 +105,16 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
       } catch (error) {
         WeLog(`EditAssistantContent update failed | extra=${JSON.stringify({
           partnerAccount: targetPartnerAccount,
-          robotId: targetRobotId,
           source,
         })} | error=${JSON.stringify(error)}`);
         showToast(t('editAssistant.updateFailed'));
         return;
       }
 
-      if (source === 'external') {
-        try {
-          await notifyAssistantDetailUpdated({
-            ...(targetPartnerAccount ? { partnerAccount: targetPartnerAccount } : {}),
-            ...(targetRobotId ? { robotId: targetRobotId } : {}),
-            name: payload.name,
-            icon: payload.icon,
-            description: payload.description,
-          });
-        } catch (error) {
-          WeLog(`EditAssistantContent notifyAssistantDetailUpdated failed | extra=${JSON.stringify({
-            partnerAccount: targetPartnerAccount,
-            robotId: targetRobotId,
-          })} | error=${JSON.stringify(error)}`);
-          showToast(t('editAssistant.notifyFailed'));
-          return;
-        }
-      }
-
       onSuccess(payload);
       onClose();
     },
-    [detail, onClose, onSuccess, partnerAccount, robotId, source, t],
+    [detail, onClose, onSuccess, partnerAccount, source, t],
   );
 
   return (

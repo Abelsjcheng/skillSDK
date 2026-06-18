@@ -13,6 +13,7 @@ import type {
   CreateNewSessionParams,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
+  GetAssistantDetailsParams,
   GetSessionMessageHistoryParams,
   GetHistorySessionsListParams,
   GetSessionMessageParams,
@@ -20,12 +21,11 @@ import type {
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   QueryQrcodeInfoResult,
   RegenerateAnswerParams,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   ReplyPermissionParams,
   SendMessageParams,
@@ -2349,6 +2349,12 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
+    registerEventListener: (params: RegisterEventListenerParams): void => {
+      window.addEventListener(params.type, ((event: Event) => {
+        params.func((event as CustomEvent).detail);
+      }) as EventListener);
+    },
+
     registerSessionListener: (params: RegisterSessionListenerParams): void => {
       listeners.set(params.welinkSessionId, {
         onMessage: params.onMessage,
@@ -2516,6 +2522,13 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
+    getAssistantDetails: async (params: GetAssistantDetailsParams): Promise<WeAgentDetailsArrayResult> => {
+      const detail = assistantDetailsStore.get(params.partnerAccount);
+      return {
+        weAgentDetailsArray: detail ? [cloneAssistantDetail(detail)] : [],
+      };
+    },
+
     updateWeAgent: async (params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> => {
       const detail = findAssistantDetail(params);
       if (!detail) {
@@ -2564,15 +2577,6 @@ function buildMockApi(): HWH5EXT {
     updateQrcodeInfo: async (): Promise<UpdateQrcodeInfoResult> => ({
       status: 'success',
     }),
-
-    notifyAssistantDetailUpdated: async (
-      params: NotifyAssistantDetailUpdatedParams,
-    ): Promise<NotifyAssistantDetailUpdatedResult> => {
-      window.dispatchEvent(new CustomEvent('assistant-detail-updated', { detail: { ...params } }));
-      return {
-        status: 'success',
-      };
-    },
 
     getHistorySessionsList: async (params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> => {
       const page = Math.max(0, params.page ?? 0);

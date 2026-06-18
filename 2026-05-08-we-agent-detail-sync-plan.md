@@ -24,7 +24,7 @@
 
 1. IM 模块通知广播注册方法先由外部宿主或 IM 模块接入层实现并标记 TODO；本阶段 SDK 只实现收到 IM 透传 payload 后的解析、缓存处理和对外广播逻辑。
 2. 服务端主动下发助理详情更新或删除通知时，SDK 自动更新本地缓存，并通过客户端已有广播机制对外通知。
-3. 网络从离线恢复在线后的补偿刷新场景本阶段不实现；冷启动补偿也不作为本阶段三端代码落地范围。
+3. 客户端冷启动时，SDK 读取 `we_agent_details` 和 `current_we_agent_detail`，合并去重后使用现有 `getWeAgentDetails` 对应服务端接口批量查询有效 `partnerAccount`，并根据返回结果补偿更新或删除本地缓存；网络从离线恢复在线后的补偿刷新场景本阶段仍不实现。
 4. 本端主动调用 `updateWeAgent` 成功后，在现有缓存更新逻辑完成后补充广播助理更新事件。
 5. 本端主动调用 `deleteWeAgent` 成功后，在列表缓存与当前助理跳转逻辑完成后补充广播助理删除事件；若删除目标是当前助理，则直接调用 `SkillClientSdkInterfaceV2.md` 中的 `getWeAgentUri` 方法，由该方法内部判断是否存在主助理，有主助理时返回主助理 URI，否则返回激活页面 URI。
 6. 专属助手的详情页不显示编辑按钮。
@@ -46,7 +46,7 @@
 flowchart TD
     A["外部 IM 接入层 TODO"] --> B["透传服务端通知 payload 给 SDK"]
     B --> C["SDK 接收 IM 模块透传的服务端通知"]
-    D["本端更新删除成功"] --> E["SDK 解析助理标识与详情数据"]
+    D["冷启动补偿 / 本端更新删除成功"] --> E["SDK 解析助理标识与详情数据"]
     C --> E
     E --> F["更新 we_agent_details / we_agent_list_cache / current_we_agent_detail"]
     F --> G["broadcastWeAgentEvent"]
@@ -59,7 +59,7 @@ flowchart TD
 
 ### 2.2 方案核心
 
-IM 模块通知广播注册先由外部接入层处理并保留 TODO；SDK 本阶段暴露或保留内部入口接收 IM 模块透传的原始 payload。SDK 收到透传载荷后，先校验外层 `notify_module = welink-athena`，再将 `notify_data` 按 JSON 字符串解析为 `action + weCrew + notifyWecodeId` 业务载荷，最后统一将助理详情更新和删除事件收口为“缓存处理后广播”的内部流程。服务端主动通知和本端操作成功复用同一套事件语义，网络从离线恢复在线后的补偿刷新本阶段暂不实现。
+IM 模块通知广播注册先由外部接入层处理并保留 TODO；SDK 本阶段暴露或保留内部入口接收 IM 模块透传的原始 payload。SDK 收到透传载荷后，先校验外层 `notify_module = welink-athena`，再将 `notify_data` 按 JSON 字符串解析为 `action + weCrew + notifyWecodeId` 业务载荷，最后统一将助理详情更新和删除事件收口为“缓存处理后广播”的内部流程。服务端主动通知、本端操作成功和冷启动补偿刷新复用同一套事件语义；网络从离线恢复在线后的补偿刷新本阶段暂不实现。
 
 ## 3. 时序图
 
@@ -167,16 +167,25 @@ sequenceDiagram
 }
 ```
 
-### 3.4 冷启动与离线恢复在线补偿刷新
+### 3.4 冷启动补偿刷新
 
 ```mermaid
 sequenceDiagram
     participant SDK as SDK
     participant Cache as 本地缓存
+    participant Server as 服务端
+    participant Broadcast as 客户端广播
 
-    SDK->>SDK: 本阶段暂不实现补偿刷新
-    SDK->>Cache: 不读取缓存集合，不发起批量详情请求
+    SDK->>Cache: 读取 we_agent_details 和 current_we_agent_detail
+    SDK->>SDK: 合并去重有效 partnerAccount
+    SDK->>Server: 复用 getWeAgentDetails 接口，传入逗号拼接的 partnerAccounts
+    Server-->>SDK: 返回助理详情列表
+    SDK->>Cache: 返回详情时覆盖已有详情缓存及命中的当前详情
+    SDK->>Cache: 未返回对应助理时删除详情、列表及命中的当前详情
+    SDK->>Broadcast: 按差异广播 update 或 delete，source=server
 ```
+
+网络从离线恢复在线后的补偿刷新本阶段不实现。
 
 ### 3.5 本端主动更新或删除成功
 
@@ -228,8 +237,26 @@ flowchart TD
     L2 --> M
     L3 --> M
 
-    B -- "冷启动 / 离线恢复在线补偿刷新" --> N["本阶段暂不实现"]
-    N --> AN["结束"]
+    B -- "冷启动补偿刷新" --> N["读取 we_agent_details 和 current_we_agent_detail"]
+    N --> O["合并去重有效 partnerAccount"]
+    O --> P{"待查询集合是否为空"}
+    P -- "是" --> AN["结束"]
+    P -- "否" --> Q["按逗号拼接 partnerAccounts"]
+    Q --> R["复用 getWeAgentDetails 服务端接口批量查询"]
+    R --> S{"请求是否成功"}
+    S -- "否" --> AN
+    S -- "是" --> T["按 partnerAccount 建立服务端详情映射"]
+    T --> U["逐个比较本地缓存与服务端详情"]
+    U --> V{"服务端是否返回该助理"}
+    V -- "是且有差异" --> W["覆盖已有详情缓存及命中的当前详情"]
+    W --> X["直接以完整详情广播 update，source=server"]
+    V -- "是且无差异" --> Y["不广播"]
+    V -- "否" --> Z["删除详情缓存、列表缓存及命中的当前详情"]
+    Z --> AA["广播 delete，source=server"]
+    X --> AB["处理下一账号"]
+    Y --> AB
+    AA --> AB
+    AB --> AN
 
     B -- "本端 updateWeAgent 成功" --> AO["服务端更新接口成功"]
     AO --> AP["调用现有 updateCachedWeAgentDetails / updateCachedDetails"]
@@ -318,7 +345,7 @@ flowchart TD
 4. 助理更新与删除统一广播 `agentskills.agentUpdated`，通过 payload 中的 `type` 区分 `update` 与 `delete`。
 5. 助理详情更新广播前必须通过 `GET /v1/robot-partners/{partnerAccount}` 获取完整助理详情，广播 payload 中的 `data` 为该完整助理详情对象；若本次详情请求失败或无法确定 `partnerAccount`，则不触发更新广播。
 6. 助理更新与删除广播 payload 均新增 `extraData` 对象，`extraData.source` 用于区分本地广播来源：`server` 表示由服务端通知触发，`local` 表示由本端主动 API 成功触发。
-7. 冷启动和离线恢复在线补偿刷新本阶段暂不实现。
+7. 冷启动时执行批量补偿刷新；网络从离线恢复在线后的补偿刷新本阶段暂不实现。
 8. `weAgentCUI` 页面订阅更新和删除广播，仅处理当前聊天助理相关事件。
 9. 新增 SDK 内部助理缓存处理队列，所有会修改 `we_agent_details`、`we_agent_list_cache`、`current_we_agent_detail` 的事件都进入队列串行处理，避免本端主动操作与服务端同步广播回流并发写缓存。
 10. 新增通讯录接入说明：通讯录复用 `openAssistantEditPage` 打开编辑页，复用 `deleteWeAgent` 删除助理，并订阅端侧详情广播通知和删除广播通知保持通讯录列表与详情同步。
@@ -342,12 +369,12 @@ SDK 内部新增助理缓存处理队列：
    - 本端主动 `deleteWeAgent` 成功；
    - 服务端主动广播 `action = update`；
    - 服务端主动广播 `action = delete`；
-   - 冷启动或离线恢复在线补偿刷新本阶段暂不进入队列。
+   - 冷启动补偿刷新；
 4. 队列事件建议结构：
    ```typescript
    type WeAgentCacheMutation = {
      action: 'update' | 'delete';
-     source: 'localApi' | 'serverPush';
+     source: 'localApi' | 'serverPush' | 'coldStart';
      partnerAccount?: string;
      robotId?: string;
      data: Record<string, unknown>;
@@ -519,9 +546,24 @@ IM 通知透传接收处理：
 6. 该场景不读取也不修改 `current_we_agent_detail`，是否为当前助理由广播消费方自行判断。
 7. 队列最后调用 `broadcastWeAgentEvent('agentskills.agentUpdated', deletePayload)`，其中 `deletePayload.data` 为通知中的 `weCrew`，`deletePayload.extraData.source = 'server'`。
 
-冷启动与离线恢复在线补偿刷新：
+冷启动补偿刷新：
 
-本阶段暂不实现。三端代码只落地服务端 IM 透传 payload 的接收处理、本端 `updateWeAgent` / `deleteWeAgent` 成功后的缓存处理与统一广播。后续如需补偿刷新，再补充批量详情接口、差异判断、事件入队和测试用例。
+1. Android 在 `SkillSDK.initialize(...)` 完成网络与缓存配置后异步触发；HarmonyOS 在首次创建 `SkillSDK` 单例并完成组件初始化后异步触发；iOS 在配置完成并刷新 HTTP 配置后异步触发。
+2. 冷启动刷新不阻塞 SDK 初始化主流程，请求失败仅记录日志，不修改缓存、不触发广播。
+3. 本阶段不增加 `notStarted / running / completed` 等运行状态，也不增加重复执行拦截；每次宿主冷启动进入对应 SDK 初始化入口时直接触发一次补偿刷新。
+4. SDK 读取按 `userId` 隔离的 `we_agent_details` 和 `current_we_agent_detail`。
+5. 从 `we_agent_details` 的 key 集合和 `current_we_agent_detail.partnerAccount` 提取账号，去空、合并、去重，得到待查询 `partnerAccount` 集合；全流程只使用 `partnerAccount`，不使用 `robotId` 匹配缓存。
+6. 待查询集合为空时直接结束，不发起网络请求。
+7. 将账号集合按逗号拼接为 `partnerAccounts`。
+8. 批量查询复用 `getWeAgentDetails` 当前调用的同一个服务端接口 `GET /v1/robot-partners/{partnerAccount}`；服务端已支持将路径参数传为逗号拼接的 `partnerAccounts`，因此三端只需扩展现有网络方法以接收该字符串，不新增服务端接口或独立 HTTP 方法。
+9. 服务端返回助理详情列表后，以 `partnerAccount` 建立映射，并逐个处理本地待查询账号。
+10. 服务端返回对应完整详情时，与本地 `we_agent_details[partnerAccount]` 以及命中的 `current_we_agent_detail` 比较：
+    - 无差异时不修改缓存、不广播；
+    - 有差异时只覆盖本地已存在的详情缓存；命中当前助理时同步覆盖 `current_we_agent_detail`，并广播 `{ type: 'update', data: assistantDetail, extraData: { source: 'server' } }`。
+11. 冷启动批量请求已经返回完整助理详情，更新广播直接使用该详情作为 `data`，不再通过 `broadcastWeAgentEvent` 重复发起单助理详情请求。
+12. 服务端未返回某个待查询 `partnerAccount` 时，视为该助理已删除：从 `we_agent_details` 和 `we_agent_list_cache` 移除对应条目；若命中 `current_we_agent_detail` 则清除当前详情，并广播 `{ type: 'delete', data: { partnerAccount }, extraData: { source: 'server' } }`。
+13. 批量请求失败、超时、返回结构异常时，本次冷启动补偿整体结束，不修改任何缓存、不触发广播。
+14. 网络从离线恢复在线后的补偿刷新本阶段仍不实现。
 
 本端主动调用 `updateWeAgent` 成功后的处理：
 
@@ -656,8 +698,8 @@ flowchart TD
 4. 更新广播前若无法确定 `partnerAccount`，或 `GET /v1/robot-partners/{partnerAccount}` 请求失败、超时、返回结构异常、未返回有效助理详情，则不触发更新广播。
 5. 删除通知中若本地缓存不存在目标助理，SDK 仍触发删除广播。
 6. 服务端主动删除通知不修改 `current_we_agent_detail`，避免 SDK 在非用户主动删除场景中擅自切换当前助理。
-7. 冷启动和离线恢复在线的批量补偿刷新本阶段不实现，不作为本次三端 SDK 代码验收范围。
-8. 批量补偿刷新相关的“未返回助理视为删除”等规则留待后续补偿刷新方案落地时再补充。
+7. 冷启动批量补偿刷新纳入本次三端 SDK 代码验收范围；网络从离线恢复在线后的补偿刷新仍不实现。
+8. 冷启动批量结果未返回某个待查询 `partnerAccount` 时，视为该助理已删除，并清理对应详情、列表及命中的当前详情缓存。
 9. `partnerAccount` 缺失但存在 `robotId` 时，可用 `robotId` 辅助从列表缓存或详情缓存中反查目标；若仍无法确定 `partnerAccount`，删除广播至少携带 `robotId`，更新广播不触发。
 10. IM 模块通知广播注册失败、重复注册、重连和销毁重注册策略本阶段由外部接入层 TODO，不放入 SDK 内部实现范围。
 11. SDK 接收处理入口应保持幂等友好：同一删除通知重复到达时缓存删除不报错；同一更新通知重复到达时按最新补拉详情结果广播。
@@ -667,6 +709,7 @@ flowchart TD
 15. 删除后迟到的更新广播进入队列后，若本地 `we_agent_details` 已不存在对应助理缓存，则不新增缓存；若仍能成功补拉完整助理详情，则可触发更新广播，是否消费由页面按当前状态判断。
 16. 历史版本兼容：对于 6 月前的历史版本，助理详情页需屏蔽编辑按钮，避免旧版本进入不支持新同步通知链路的编辑流程。
 17. 专属助手详情页不显示编辑按钮，避免专属助手进入编辑流程。
+18. 冷启动补偿本阶段不增加运行状态或重复执行保护；宿主应在真实冷启动初始化入口调用，若宿主重复执行初始化入口，SDK 允许再次发起补偿请求。
 
 ### 4.4 相关接口联动
 
@@ -676,7 +719,7 @@ flowchart TD
 4. `deleteWeAgent`：入参仅支持必填 `partnerAccount` 定位助理；非当前助理只更新已存在列表缓存；当前助理删除成功后，删除列表、`current_we_agent_detail` 与详情缓存中的目标助理，然后直接调用 `getWeAgentUri` 获取跳转 URI，由 `getWeAgentUri` 内部判断是否有主助理，有主助理则返回主助理 URI，否则返回激活页面 URI；成功后将 `localApi delete` 事件放入助理缓存处理队列，队列处理完成后必须触发 `agentskills.agentUpdated` 删除广播，payload.type 为 `delete`，`extraData.source = 'local'`。该接口同时作为提供给通讯录的助理删除入口，通讯录调用成功后通过返回结果和删除广播收敛本地列表。
 5. `openAssistantEditPage`：提供给通讯录或详情入口打开助理编辑页，入参以 `SkillClientSdkInterfaceV2.md` 为准，仅使用必填 `partnerAccount` 定位助理；该接口不再包含更新回调，不发起服务端请求，也不负责向通讯录回传更新后数据。
 6. `notifyAssistantDetailUpdated`：按最新接口文档已删除，不再作为通讯录获取更新后数据的通道；通讯录必须订阅 `agentskills.agentUpdated` 作为端侧详情广播通知，并从 `{ type: 'update', data: assistantDetail, extraData }` 中获取更新后的完整助理详情。
-7. `GET /v1/robot-partners/{partnerAccounts}`：批量补偿刷新接口本阶段不落地；三端仅使用 `GET /v1/robot-partners/{partnerAccount}` 为更新广播补拉完整详情。
+7. `getWeAgentDetails` 对应的 `GET /v1/robot-partners/{partnerAccount}` 服务端接口已支持批量查询；冷启动时将多个账号按逗号拼接为 `partnerAccounts` 并作为同一路径参数传入，不新增服务端接口。
 8. IM 通知接入入口：外部接入层完成 IM 模块通知广播注册后，将原始 payload 透传给 SDK；SDK 接收处理入口先校验外层 `notify_module = welink-athena`，再解析 `notify_data` 字符串中的 `action` 和 `weCrew`，组装 `serverPush update/delete` 事件并进入缓存处理与广播流程。
 9. `HWH5EXT.registerEventListener`：`weAgentCUI` 页面和通讯录通过该 JSAPI 注册 `agentskills.agentUpdated`，SDK 通过 `broadcastWeAgentEvent` 触发对应回调并透传对应广播 payload。
 10. 通讯录：订阅端侧详情广播通知和删除广播通知；收到更新广播时刷新匹配助理条目，收到删除广播时移除匹配助理条目并处理当前详情展示状态。
@@ -685,7 +728,7 @@ flowchart TD
 ### 4.5 文档需要同步修改的内容
 
 1. `SkillClientSdkInterfaceV2.md`：补充 IM 广播透传服务端返回数据、服务端 IM 通知外层 `notify_module + notify_data` 结构、`notify_data` 解析后的 `action + weCrew + notifyWecodeId` 业务结构、更新广播补拉完整详情、`extraData.source` 和广播事件约定；IM 注册方法标记为外部 TODO。
-2. Android / iOS / HarmonyOS SDK 接口说明：补充服务端通知、本端更新、本端删除触发广播的时机；冷启动和离线恢复在线补偿刷新本阶段不纳入实现。
+2. Android / iOS / HarmonyOS SDK 接口说明：补充服务端通知、本端更新、本端删除和冷启动补偿触发广播的时机；网络从离线恢复在线补偿刷新本阶段不纳入实现。
 3. `ai-chat-viewer` 相关需求或设计文档：补充 `weAgentCUI` 页面通过 `HWH5EXT.registerEventListener` 消费 `agentskills.agentUpdated` 的处理规则。
 4. 助理详情页相关文档：补充专属助手详情页不显示编辑按钮，以及 6 月前历史版本屏蔽编辑按钮的规则。
 5. 通讯录接入文档：补充 `openAssistantEditPage`、`deleteWeAgent` 的调用规则，以及端侧详情广播通知、删除广播通知的订阅与消费规则。
@@ -694,8 +737,8 @@ flowchart TD
 
 1. 服务端主动更新通知在对外广播前会额外发起一次 `GET /v1/robot-partners/{partnerAccount}` 请求，用于获取完整助理详情作为最终广播数据。
 2. 服务端主动删除通知只处理本地缓存，不额外发起删除接口或详情接口请求。
-3. 冷启动和离线恢复在线补偿刷新本阶段不实现，因此不会新增批量详情补偿请求。
-4. 后续若补充补偿刷新，再评估批量接口与逐个请求的性能取舍。
+3. 冷启动新增一次批量详情补偿请求，仅在 `we_agent_details` 或 `current_we_agent_detail` 中存在有效 `partnerAccount` 时触发。
+4. 批量查询复用 `getWeAgentDetails` 对应的现有服务端接口，一次请求查询全部待补偿账号，避免逐个发起详情请求。
 5. 页面收到更新广播后直接使用广播中的完整助理详情刷新 UI，不需要再次调用 `getWeAgentDetails`，避免页面侧重复网络请求。
 6. SDK 本阶段不新增初始化时 IM 模块通知广播注册；注册由外部接入层 TODO，SDK 只处理外部透传进来的 payload。
 
@@ -704,7 +747,7 @@ flowchart TD
 1. 不新增轮询机制。
 2. 不新增独立长连接，复用 SDK 已接入的长连接或推送通道。
 3. 不新增后台常驻任务。
-4. 冷启动与离线恢复在线补偿刷新本阶段不实现。
+4. 冷启动补偿只在 SDK 冷启动初始化时触发一次批量请求；网络从离线恢复在线补偿刷新本阶段不实现。
 5. 页面侧只在收到广播后做轻量状态更新，不引入额外动画或频繁渲染。
 6. IM 通知注册由外部接入层 TODO；SDK 本阶段不额外维持新的后台连接。
 
@@ -727,7 +770,7 @@ flowchart TD
 
 ### 8.1 直接影响
 
-1. Android SDK、iOS SDK、HarmonyOS SDK 的助理详情更新、删除和服务端通知接收处理逻辑。
+1. Android SDK、iOS SDK、HarmonyOS SDK 的助理详情更新、删除、服务端通知接收和冷启动补偿处理逻辑。
 2. SDK 内部客户端广播封装与调用点。
 3. `ai-chat-viewer` 的 `weAgentCUI` 页面通过 `HWH5EXT.registerEventListener` 注册事件监听后的 UI 刷新、删除弹窗逻辑。
 4. 服务端下发助理更新和删除通知的数据结构。
@@ -740,7 +783,7 @@ flowchart TD
 
 1. 助理列表页或切换助理页可能读取到被同步更新后的列表缓存。
 2. 多端同时编辑或删除同一助理时，宿主页面对当前助理状态的感知更及时。
-3. 冷启动或离线恢复在线后的缓存补偿能力本阶段不变化。
+3. 冷启动后本地缓存可通过批量详情查询与服务端状态收敛；离线恢复在线后的缓存补偿能力本阶段不变化。
 4. 通讯录在旧版本宿主未订阅广播时仍可完成接口调用，但列表与详情的实时同步能力依赖广播接入。
 
 ### 8.3 不影响
@@ -762,7 +805,10 @@ flowchart TD
 6. IM 模块透传通知的 `notify_module` 不是 `welink-athena` 时，校验 SDK 忽略该通知，不进入缓存处理队列，不触发客户端广播。
 7. IM 模块透传通知的 `notify_data` 为空、非 JSON 字符串、解析后缺少 `action` 或缺少 `weCrew` 时，校验 SDK 记录日志并忽略该通知。
 8. 同一服务端删除通知重复透传给 SDK 时，校验缓存删除幂等，不报错，删除广播 payload 保持一致。
-9. 网络从离线恢复在线后补偿刷新本阶段不实现，仅校验不会因该场景新增批量详情请求或额外广播。
+9. 冷启动时 `we_agent_details` 或 `current_we_agent_detail` 存在有效 `partnerAccount`，校验 SDK 合并去重后按逗号拼接 `partnerAccounts`，并复用 `getWeAgentDetails` 对应服务端接口发起一次批量查询。
+10. 冷启动批量接口返回详情与本地缓存存在差异时，校验只覆盖已有 `we_agent_details` 条目；若命中 `current_we_agent_detail`，同步更新当前详情，并触发 `extraData.source = 'server'` 的更新广播。
+11. 冷启动批量接口未返回某个待查询 `partnerAccount` 时，校验对应详情缓存和列表缓存被删除；若命中当前详情则同步清除，并触发删除广播。
+12. 冷启动批量请求失败、超时或返回结构异常时，校验不修改任何缓存、不触发广播；网络从离线恢复在线场景不触发补偿请求。
 13. 本端 `updateWeAgent({ partnerAccount, name, icon, description })` 成功后，校验仅更新命中的当前详情或详情缓存、不新增详情缓存；完整详情补拉成功时触发 `agentskills.agentUpdated` 更新广播，payload.type 为 `update`，`extraData.source = 'local'`，补拉失败时不触发更新广播；缺少 `partnerAccount` 或 `partnerAccount` 为空时校验参数错误。
 14. 本端 `deleteWeAgent({ partnerAccount })` 删除非当前助理成功后，校验仅在本地已有列表缓存时更新列表缓存；若 `we_agent_details` 有对应助手详情缓存，则删除对应详情缓存；并触发 `agentskills.agentUpdated` 删除广播，payload.type 为 `delete`，`extraData.source = 'local'`；缺少 `partnerAccount` 或 `partnerAccount` 为空时校验参数错误。
 15. 本端 `deleteWeAgent({ partnerAccount })` 删除当前助理成功后，校验列表缓存移除目标助理，`current_we_agent_detail` 清除被删当前助理，`we_agent_details` 中被删助手详情缓存被删除；随后 SDK 调用 `getWeAgentUri` 获取跳转 URI，由 `getWeAgentUri` 内部判断有主助理时返回主助理 URI、无主助理时返回激活页面 URI；最后触发 `agentskills.agentUpdated` 删除广播，payload.type 为 `delete`，`extraData.source = 'local'`。
@@ -788,7 +834,7 @@ flowchart TD
 1. Android、iOS、HarmonyOS 三端通知解析、缓存更新和广播事件名保持一致。
 2. `notify_data` 解析后的 `weCrew` 只包含 `partnerAccount`、只包含 `robotId`、二者都包含时的处理行为。
 3. `notifyWecodeId` 为空数组、缺失、包含多个 wecode id 时，SDK 不因该字段异常影响缓存处理主流程。
-4. 更新广播补拉单个详情接口失败、超时、返回空列表、返回结构异常时的降级行为。
+4. 更新广播补拉单个详情及冷启动批量详情请求失败、超时、返回空列表、返回部分详情、返回结构异常时的降级行为。
 5. 旧版本宿主未订阅广播时，SDK 缓存处理不受影响。
 6. IM 模块通知广播注册失败、重复注册、销毁后重新初始化、切换账号后重新注册或过滤通知的行为由外部接入层后续补充，本阶段只验证 SDK 接收处理入口。
 7. 6 月前历史版本进入助理详情页时，校验编辑按钮被屏蔽；6 月及之后版本按既有规则展示编辑入口。
@@ -810,4 +856,4 @@ flowchart TD
 
 ## 10. 最终建议
 
-推荐优先落地“外部 IM 接入层透传服务端返回数据 + SDK 解析服务端主动通知 + SDK 缓存处理 + 统一广播封装”主链路，IM 通知注册方法和冷启动/离线恢复在线补偿刷新后续单独补齐。这样能先解决多端同时更新或删除助理时的实时同步问题，同时不改变现有公开接口语义，风险集中在透传载荷解析、内部同步流程和 `weAgentCUI` 页面事件消费上，便于三端按同一协议逐步实现和验证。
+推荐落地“外部 IM 接入层透传服务端返回数据 + SDK 解析服务端主动通知 + 冷启动批量补偿 + SDK 缓存处理 + 统一广播封装”主链路。冷启动批量查询复用 `getWeAgentDetails` 对应的现有服务端接口，不新增接口；本阶段不增加冷启动补偿的重复执行状态控制，也暂不实现网络从离线恢复在线后的补偿刷新。这样既能解决多端实时更新或删除同步，也能在冷启动时收敛本地缓存，同时保持三端协议和公开接口语义一致。

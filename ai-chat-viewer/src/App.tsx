@@ -10,7 +10,12 @@ import { useIosKeyboardLift } from './hooks/useIosKeyboardLift';
 import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
-import type { HistorySessionsListResult, SkillSession, WeAgentDetails } from './types/bridge';
+import type {
+  HistorySessionsListResult,
+  SkillSession,
+  WeAgentDetails,
+  WeAgentUpdatedEventPayload,
+} from './types/bridge';
 import type { HWH5UserInfo } from './types/bridge/hwext';
 import type { AppProps, HistorySessionsCache } from './types/components';
 import { buildCorpUserAvatar } from './utils/avatar';
@@ -20,6 +25,7 @@ import {
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
+  registerEventListener,
 } from './utils/hwext';
 import { WeLog } from './utils/logger';
 import {
@@ -183,6 +189,46 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantDetailRef.current = detail;
     return detail;
   }, []);
+
+  const handleWeAgentUpdated = useCallback((payload: WeAgentUpdatedEventPayload) => {
+    if (payload?.type !== 'update') {
+      return;
+    }
+
+    const updatedDetail = payload.data;
+    const currentAssistantAccount = assistantAccountRef.current.trim();
+    const updatedPartnerAccount = updatedDetail?.partnerAccount?.trim();
+    if (!updatedDetail || !currentAssistantAccount || updatedPartnerAccount !== currentAssistantAccount) {
+      return;
+    }
+
+    const currentDetail = assistantDetailRef.current;
+    const nextDetail = {
+      ...currentDetail,
+      ...updatedDetail,
+      desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    } as WeAgentDetails;
+
+    assistantDetailRef.current = nextDetail;
+    setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
+    setWeAgentAssistantDescription(
+      updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    );
+    setWeAgentAssistantAvatar(
+      resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
+    );
+  }, []);
+
+  useEffect(() => {
+    void registerEventListener({
+      type: 'agentskills.agentUpdated',
+      func: handleWeAgentUpdated,
+    }).catch((error) => {
+      WeLog(`App registerEventListener failed | extra=${JSON.stringify({
+        type: 'agentskills.agentUpdated',
+      })} | error=${JSON.stringify(error)}`);
+    });
+  }, [handleWeAgentUpdated]);
 
   const createSessionForAssistant = useCallback(async (
     currentAssistantAccount: string,

@@ -58,16 +58,16 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 - (void)getMyWeAgentWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)updateWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
-                                robotId:(nullable NSString *)robotId
+/// 使用 partnerAccount 定位助理并提交名称、头像和描述更新。
+- (void)updateWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                    name:(NSString *)name
                                    icon:(NSString *)icon
                             description:(NSString *)description
                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                 failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)deleteWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
-                                robotId:(nullable NSString *)robotId
+/// 使用唯一 partnerAccount 调用助理删除接口。
+- (void)deleteWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                 failure:(WLAgentSkillsHTTPFailureBlock)failure;
 

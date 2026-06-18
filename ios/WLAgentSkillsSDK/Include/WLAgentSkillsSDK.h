@@ -128,6 +128,10 @@ NS_ASSUME_NONNULL_BEGIN
               success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
               failure:(void (^)(NSError *error))failure;
 
+#pragma mark - WeAgent IM notify payload handling
+/// 接收宿主透传的 IM 原始载荷，校验模块并分发助理更新或删除同步。
+- (void)handleWeAgentImNotifyBroadcastPayload:(NSDictionary *)payload;
+
 #pragma mark - 23. setIsShowWeAgent
 - (void)setIsShowWeAgent:(WLAgentSkillsSetIsShowWeAgentParams *)params
                  success:(void (^)(WLAgentSkillsSetIsShowWeAgentResult *result))success
@@ -147,22 +151,17 @@ NS_ASSUME_NONNULL_BEGIN
                       success:(void (^)(WLAgentSkillsOpenAssistantEditPageResult *result))success
                       failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 27. notifyAssistantDetailUpdated
-- (void)notifyAssistantDetailUpdated:(WLAgentSkillsNotifyAssistantDetailUpdatedParams *)params
-                             success:(void (^)(WLAgentSkillsNotifyAssistantDetailUpdatedResult *result))success
-                             failure:(void (^)(NSError *error))failure;
-
-#pragma mark - 28. queryQrcodeInfo
+#pragma mark - 27. queryQrcodeInfo
 - (void)queryQrcodeInfo:(WLAgentSkillsQueryQrcodeInfoParams *)params
                 success:(void (^)(WLAgentSkillsQrcodeInfo *result))success
                 failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 29. updateQrcodeInfo
+#pragma mark - 28. updateQrcodeInfo
 - (void)updateQrcodeInfo:(WLAgentSkillsUpdateQrcodeInfoParams *)params
                  success:(void (^)(WLAgentSkillsUpdateQrcodeInfoResult *result))success
                  failure:(void (^)(NSError *error))failure;
 
-#pragma mark - 27. queryAssistantGraySingle
+#pragma mark - 29. queryAssistantGraySingle
 - (void)queryAssistantGraySingle:(WLAgentSkillsQueryAssistantGraySingleParams *)params
                          success:(void (^)(WLAgentSkillsQueryAssistantGraySingleResult *result))success
                          failure:(void (^)(NSError *error))failure;

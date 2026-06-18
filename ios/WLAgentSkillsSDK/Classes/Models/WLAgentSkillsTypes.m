@@ -193,18 +193,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @implementation WLAgentSkillsOpenAssistantEditPageParams
 @end
 
-@implementation WLAgentSkillsNotifyAssistantDetailUpdatedParams
-
-- (id)description {
-    return self.descriptionValue;
-}
-
-- (void)setDescription:(id)description {
-    self.descriptionValue = description;
-}
-
-@end
-
 @implementation WLAgentSkillsQueryQrcodeInfoParams
 @end
 
@@ -383,32 +371,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"weAgentUri" : self.weAgentUri ?: @"",
         @"assistantDetailUri" : self.assistantDetailUri ?: @"",
         @"switchAssistantUri" : self.switchAssistantUri ?: @""
-    };
-}
-
-@end
-
-@implementation WLAgentSkillsAssistantDetailUpdatedPayload
-
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
-        _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
-        _descriptionValue = WLAgentSkillsStringValue(dictionary[@"description"], @"");
-    }
-    return self;
-}
-
-- (NSString *)description {
-    return self.descriptionValue ?: @"";
-}
-
-- (NSDictionary *)toDictionary {
-    return @{
-        @"name" : self.name ?: @"",
-        @"icon" : self.icon ?: @"",
-        @"description" : self.descriptionValue ?: @""
     };
 }
 
@@ -1157,16 +1119,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsOpenAssistantEditPageResult
-
-- (NSDictionary *)toDictionary {
-    return @{
-        @"status" : self.status ?: @""
-    };
-}
-
-@end
-
-@implementation WLAgentSkillsNotifyAssistantDetailUpdatedResult
 
 - (NSDictionary *)toDictionary {
     return @{

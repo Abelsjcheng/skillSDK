@@ -12,7 +12,6 @@ const EditAssistant: React.FC = () => {
     ? 'assistantDetail'
     : 'external';
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount', location.search) ?? '', [location.search]);
-  const robotId = useMemo(() => getQueryParam('robotId', location.search) ?? '', [location.search]);
 
   return (
     <EditAssistantContent
@@ -20,7 +19,6 @@ const EditAssistant: React.FC = () => {
       source={source}
       initialDetail={routeState?.detail ?? null}
       partnerAccount={partnerAccount}
-      robotId={robotId}
       onClose={() => {
         window.HWH5.navigateBack();
       }}

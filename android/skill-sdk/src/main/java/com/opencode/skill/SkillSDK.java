@@ -7,15 +7,18 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.opencode.skill.callback.AssistantDetailUpdatedCallback;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SessionStatusCallback;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.callback.SkillWecodeStatusCallback;
-import com.opencode.skill.model.AssistantDetailUpdatedPayload;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.constant.SessionStatus;
 import com.opencode.skill.constant.SkillWecodeStatus;
+import com.opencode.skill.log.LoggerProvider;
+import com.opencode.skill.log.WeLinkLogger;
 import com.opencode.skill.model.AgentTypeListResult;
 import com.opencode.skill.model.CloseSkillResult;
 import com.opencode.skill.model.ControlSkillWeCodeParams;
@@ -31,8 +34,6 @@ import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.GetIsShowWeAgentResult;
 import com.opencode.skill.model.HistorySessionsParams;
-import com.opencode.skill.model.NotifyAssistantDetailUpdatedParams;
-import com.opencode.skill.model.NotifyAssistantDetailUpdatedResult;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OpenAssistantEditPageParams;
@@ -73,7 +74,6 @@ import com.opencode.skill.model.UpdateQrcodeInfoParams;
 import com.opencode.skill.model.UpdateQrcodeInfoResult;
 import com.opencode.skill.model.UpdateWeAgentParams;
 import com.opencode.skill.model.UpdateWeAgentResult;
-import com.opencode.skill.model.WeAgent;
 import com.opencode.skill.model.WeAgentDetailsArrayResult;
 import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentListResult;
@@ -86,13 +86,16 @@ import com.opencode.skill.util.WeAgentStorage;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Singleton SDK exposing public APIs from SkillClientSdkInterfaceV1.md.
@@ -101,15 +104,23 @@ public final class SkillSDK {
     private static volatile SkillSDK instance;
     private static final String ASSISTANT_H5_URI = "h5://S008623/index.html";
     private static final String WE_AGENT_CUI_APPID = "S008623";
-    private static final int DEFAULT_WE_AGENT_LIST_PAGE_SIZE = 100;
-    private static final int DEFAULT_WE_AGENT_LIST_PAGE_NUMBER = 1;
-
+    private static final String WE_AGENT_EVENT_NAME = "agentskills.agentUpdated";
+    private static final String IM_NOTIFY_MODULE = "welink-athena";
+    private static final String TAG = "SkillSDK";
+    @NonNull
+    private final WeLinkLogger logger = LoggerProvider.getLogger();
+    @NonNull
+    private final Gson gson = new Gson();
     @NonNull
     private final ApiClient apiClient = new ApiClient();
     @NonNull
     private final WebSocketManager webSocketManager = WebSocketManager.getInstance();
     @NonNull
     private final WeAgentStorage weAgentStorage = new WeAgentStorage();
+    @NonNull
+    private final ArrayDeque<WeAgentCacheMutation> weAgentCacheMutationQueue = new ArrayDeque<>();
+    private boolean processingWeAgentCacheMutation;
+    private int weAgentCacheMutationGeneration;
 
     @NonNull
     private final Map<String, SessionStatusCallback> sessionStatusCallbacks = new ConcurrentHashMap<>();
@@ -119,8 +130,6 @@ public final class SkillSDK {
     private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
     @NonNull
     private final Map<String, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
-    @NonNull
-    private final Map<String, AssistantDetailUpdatedCallback> assistantDetailUpdatedCallbacks = new ConcurrentHashMap<>();
     @NonNull
     private final Map<String, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
     @NonNull
@@ -169,6 +178,7 @@ public final class SkillSDK {
         weAgentStorage.configure(config.getContext());
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.addInternalListener(internalStreamListener);
+        refreshWeAgentsOnColdStart();
     }
 
     public boolean isInitialized() {
@@ -1099,10 +1109,11 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        if (partnerAccount == null && robotId == null) {
-            callback.onError(error(1000, "partnerAccount or robotId is required"));
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
             return;
         }
 
@@ -1118,15 +1129,48 @@ public final class SkillSDK {
             return;
         }
 
-        apiClient.updateWeAgent(partnerAccount, robotId, name, icon, description, new SkillCallback<UpdateWeAgentResult>() {
+        apiClient.updateWeAgent(partnerAccount, name, icon, description, new SkillCallback<UpdateWeAgentResult>() {
             @Override
             public void onSuccess(@Nullable UpdateWeAgentResult result) {
-                weAgentStorage.updateCachedWeAgentDetails(partnerAccount, robotId, name, icon, description);
-                callback.onSuccess(result);
+                logger.i(TAG, "updateWeAgent request succeeded, enqueue cache mutation, partnerAccount="
+                        + partnerAccount);
+                Map<String, Object> data = new HashMap<>();
+                data.put("partnerAccount", partnerAccount);
+                data.put("name", name);
+                data.put("icon", icon);
+                data.put("description", description);
+                enqueueWeAgentCacheMutation(completion -> {
+                    weAgentStorage.updateCachedWeAgentDetails(partnerAccount, name, icon, description);
+                    broadcastWeAgentEvent(
+                            WE_AGENT_EVENT_NAME,
+                            buildWeAgentPayload("update", data, "local"),
+                            new SkillCallback<Void>() {
+                                @Override
+                                public void onSuccess(@Nullable Void ignored) {
+                                    try {
+                                        callback.onSuccess(result);
+                                    } finally {
+                                        completion.onSuccess(null);
+                                    }
+                                }
+
+                                @Override
+                                public void onError(@NonNull Throwable error) {
+                                    try {
+                                        callback.onError(error);
+                                    } finally {
+                                        completion.onError(error);
+                                    }
+                                }
+                            }
+                    );
+                });
             }
 
             @Override
             public void onError(@NonNull Throwable error) {
+                logger.e(TAG, "updateWeAgent request failed, partnerAccount=" + partnerAccount
+                        + ", error=" + error.getMessage());
                 callback.onError(wrapError(error));
             }
         });
@@ -1144,36 +1188,56 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        if (partnerAccount == null && robotId == null) {
-            callback.onError(error(1000, "partnerAccount or robotId is required"));
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
             return;
         }
 
-        DeleteWeAgentContext context = buildDeleteWeAgentContext(partnerAccount, robotId);
-        prepareDeleteWeAgentContext(context, new SkillCallback<DeleteWeAgentContext>() {
+        DeleteWeAgentContext context = buildDeleteWeAgentContext(partnerAccount);
+        requestDeleteWeAgent(context, new SkillCallback<DeleteWeAgentResult>() {
             @Override
-            public void onSuccess(@Nullable DeleteWeAgentContext preparedContext) {
-                DeleteWeAgentContext resolvedContext = preparedContext == null ? context : preparedContext;
-                requestDeleteWeAgent(resolvedContext, new SkillCallback<DeleteWeAgentResult>() {
-                    @Override
-                    public void onSuccess(@Nullable DeleteWeAgentResult result) {
-                        handleDeleteWeAgentResult(resolvedContext, result, callback);
-                    }
-
-                    @Override
-                    public void onError(@NonNull Throwable error) {
-                        callback.onError(wrapError(error));
-                    }
-                });
+            public void onSuccess(@Nullable DeleteWeAgentResult result) {
+                logger.i(TAG, "deleteWeAgent request succeeded, enqueue cache mutation, partnerAccount="
+                        + partnerAccount);
+                enqueueWeAgentCacheMutation(
+                        completion -> handleDeleteWeAgentResult(context, result, callback, completion)
+                );
             }
 
             @Override
             public void onError(@NonNull Throwable error) {
+                logger.e(TAG, "deleteWeAgent request failed, partnerAccount=" + partnerAccount
+                        + ", error=" + error.getMessage());
                 callback.onError(wrapError(error));
             }
         });
+    }
+
+    /**
+     * 接收宿主透传的 IM 助理变更通知。
+     *
+     * <p>方法先校验通知模块是否为 {@code welink-athena}，再将 {@code notify_data}
+     * 转为业务对象；只有载荷合法时才继续分发更新或删除逻辑，异常和无关通知均直接忽略。</p>
+     */
+    public void handleWeAgentImNotifyBroadcast(@NonNull Map<String, Object> payload) {
+        if (payload == null) {
+            logger.e(TAG, "ignore we-agent IM notification: payload is null");
+            return;
+        }
+        if (!IM_NOTIFY_MODULE.equals(normalizeOptionalString(valueAsString(payload.get("notify_module"))))) {
+            logger.i(TAG, "ignore we-agent IM notification: notify_module does not match");
+            return;
+        }
+        Map<String, Object> notifyData = valueAsMap(payload.get("notify_data"));
+        if (notifyData == null) {
+            logger.e(TAG, "ignore we-agent IM notification: notify_data parse failed");
+            return;
+        }
+        logger.i(TAG, "we-agent IM notification parsed, enqueue server mutation");
+        enqueueWeAgentCacheMutation(completion -> handleWeAgentNotifyData(notifyData, "server", completion));
     }
 
     // 23. setIsShowWeAgent
@@ -1297,11 +1361,9 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        final String identityKey;
+        final String partnerAccount;
         try {
-            identityKey = resolveAssistantIdentityKey(partnerAccount, robotId);
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
         } catch (SkillSdkException e) {
             callback.onError(e);
             return;
@@ -1313,10 +1375,8 @@ public final class SkillSDK {
             return;
         }
 
-        assistantDetailUpdatedCallbacks.put(identityKey, params.getOnUpdated());
-
         try {
-            String uri = buildAssistantEditPageUri(partnerAccount, robotId);
+            String uri = buildAssistantEditPageUri(partnerAccount);
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
@@ -1326,53 +1386,7 @@ public final class SkillSDK {
         }
     }
 
-    // 24. notifyAssistantDetailUpdated
-    public void notifyAssistantDetailUpdated(@NonNull NotifyAssistantDetailUpdatedParams params,
-            @NonNull SkillCallback<NotifyAssistantDetailUpdatedResult> callback) {
-        if (!isInitialized()) {
-            callback.onError(error(5000, "SkillSDK is not initialized"));
-            return;
-        }
-        if (params == null) {
-            callback.onError(error(1000, "params is required"));
-            return;
-        }
-
-        final String name;
-        final String icon;
-        final String description;
-        try {
-            name = TypeConvertUtils.requireString(params.getName(), "name");
-            icon = TypeConvertUtils.requireString(params.getIcon(), "icon");
-            description = TypeConvertUtils.requireString(params.getDescription(), "description");
-        } catch (SkillSdkException e) {
-            callback.onError(e);
-            return;
-        }
-
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        final String identityKey;
-        try {
-            identityKey = resolveAssistantIdentityKey(partnerAccount, robotId);
-        } catch (SkillSdkException e) {
-            callback.onError(e);
-            return;
-        }
-
-        AssistantDetailUpdatedCallback listener = assistantDetailUpdatedCallbacks.get(identityKey);
-        if (listener != null) {
-            try {
-                listener.onUpdated(new AssistantDetailUpdatedPayload(name, icon, description));
-            } catch (Throwable throwable) {
-                callback.onError(wrapError(throwable));
-                return;
-            }
-        }
-        callback.onSuccess(new NotifyAssistantDetailUpdatedResult("success"));
-    }
-
-    // 28. queryQrcodeInfo
+    // 27. queryQrcodeInfo
     public void queryQrcodeInfo(@NonNull QueryQrcodeInfoParams params,
             @NonNull SkillCallback<QrcodeInfo> callback) {
         if (!isInitialized()) {
@@ -1405,7 +1419,7 @@ public final class SkillSDK {
         });
     }
 
-    // 29. updateQrcodeInfo
+    // 28. updateQrcodeInfo
     public void updateQrcodeInfo(@NonNull UpdateQrcodeInfoParams params,
             @NonNull SkillCallback<UpdateQrcodeInfoResult> callback) {
         if (!isInitialized()) {
@@ -1441,7 +1455,7 @@ public final class SkillSDK {
         });
     }
 
-    // 27. queryAssistantGraySingle
+    // 29. queryAssistantGraySingle
     public void queryAssistantGraySingle(@NonNull QueryAssistantGraySingleParams params,
             @NonNull SkillCallback<QueryAssistantGraySingleResult> callback) {
         if (!isInitialized()) {
@@ -1488,12 +1502,16 @@ public final class SkillSDK {
         webSocketManager.shutdown();
         apiClient.shutdown();
         listenerBindings.clear();
-        assistantDetailUpdatedCallbacks.clear();
         sessionStatusCallbacks.clear();
         lastSessionStatusBySession.clear();
         wecodeStatusCallbacks.clear();
         awaitingExecutingBySession.clear();
         stoppedHoldingBySession.clear();
+        synchronized (weAgentCacheMutationQueue) {
+            weAgentCacheMutationQueue.clear();
+            processingWeAgentCacheMutation = false;
+            weAgentCacheMutationGeneration++;
+        }
         config = null;
     }
 
@@ -1555,6 +1573,368 @@ public final class SkillSDK {
         });
     }
 
+    /**
+     * 在 SDK 冷启动时用服务端数据补偿本地助理缓存。
+     *
+     * <p>该方法合并详情缓存和当前助理中的账号后发起一次批量查询。服务端未返回的账号会从
+     * 统一删除流程清理缓存、处理当前助理后续 URI 并广播删除事件；返回且与本地有差异的
+     * 详情只覆盖已存在的缓存并广播更新事件。请求失败时保持本地状态不变。</p>
+     */
+    private void refreshWeAgentsOnColdStart() {
+        enqueueWeAgentCacheMutation(this::performColdStartWeAgentRefresh);
+    }
+
+    private void performColdStartWeAgentRefresh(@NonNull SkillCallback<Void> completion) {
+        List<String> partnerAccounts = weAgentStorage.getCachedWeAgentPartnerAccounts();
+        if (partnerAccounts.isEmpty()) {
+            logger.i(TAG, "cold-start we-agent refresh skipped: no cached partnerAccount");
+            completion.onSuccess(null);
+            return;
+        }
+        logger.i(TAG, "cold-start we-agent refresh started, accountCount=" + partnerAccounts.size());
+        Map<String, WeAgentDetails> cachedDetails = weAgentStorage.loadWeAgentDetailsCache();
+        WeAgentDetails currentDetail = weAgentStorage.getCurrentWeAgentDetail();
+        apiClient.getWeAgentDetails(String.join(",", partnerAccounts), new SkillCallback<WeAgentDetailsArrayResult>() {
+            @Override
+            public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
+                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
+                logger.i(TAG, "cold-start we-agent detail request succeeded, remoteCount="
+                        + resolved.getWeAgentDetailsArray().size());
+                Map<String, WeAgentDetails> remoteDetails = new HashMap<>();
+                for (WeAgentDetails detail : resolved.getWeAgentDetailsArray()) {
+                    String partnerAccount = normalizeOptionalString(detail.getPartnerAccount());
+                    if (partnerAccount != null) {
+                        remoteDetails.put(partnerAccount, detail);
+                    }
+                }
+                processColdStartWeAgentAccounts(
+                        partnerAccounts,
+                        remoteDetails,
+                        cachedDetails,
+                        currentDetail,
+                        0,
+                        completion
+                );
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                // Cold-start compensation failures do not change cache or emit broadcasts.
+                logger.e(TAG, "cold-start we-agent detail request failed, error=" + error.getMessage());
+                completion.onSuccess(null);
+            }
+        });
+    }
+
+    private void processColdStartWeAgentAccounts(
+            @NonNull List<String> partnerAccounts,
+            @NonNull Map<String, WeAgentDetails> remoteDetails,
+            @NonNull Map<String, WeAgentDetails> cachedDetails,
+            @Nullable WeAgentDetails currentDetail,
+            int index,
+            @NonNull SkillCallback<Void> completion
+    ) {
+        if (index >= partnerAccounts.size()) {
+            logger.i(TAG, "cold-start we-agent refresh completed, accountCount=" + partnerAccounts.size());
+            completion.onSuccess(null);
+            return;
+        }
+        String partnerAccount = partnerAccounts.get(index);
+        WeAgentDetails remoteDetail = remoteDetails.get(partnerAccount);
+        if (remoteDetail == null) {
+            logger.i(TAG, "cold-start detected deleted we-agent, partnerAccount=" + partnerAccount);
+            handleDeletedWeAgent(
+                    partnerAccount,
+                    buildWeAgentData(partnerAccount),
+                    "server",
+                    continueColdStartProcessing(
+                            partnerAccounts,
+                            remoteDetails,
+                            cachedDetails,
+                            currentDetail,
+                            index,
+                            completion
+                    )
+            );
+            return;
+        }
+        WeAgentDetails cachedDetail = cachedDetails.get(partnerAccount);
+        boolean currentMatches = matchesWeAgentDetails(currentDetail, partnerAccount);
+        boolean changed = cachedDetail != null && !detailsEqual(cachedDetail, remoteDetail);
+        changed = changed || currentMatches && !detailsEqual(currentDetail, remoteDetail);
+        if (changed) {
+            logger.i(TAG, "cold-start detected updated we-agent, partnerAccount=" + partnerAccount);
+            weAgentStorage.replaceCachedWeAgentDetailsIfPresent(partnerAccount, remoteDetail);
+            dispatchHostBroadcast(WE_AGENT_EVENT_NAME, buildResolvedUpdatePayload(remoteDetail, "server"));
+        }
+        processColdStartWeAgentAccounts(
+                partnerAccounts,
+                remoteDetails,
+                cachedDetails,
+                currentDetail,
+                index + 1,
+                completion
+        );
+    }
+
+    @NonNull
+    private SkillCallback<Void> continueColdStartProcessing(
+            @NonNull List<String> partnerAccounts,
+            @NonNull Map<String, WeAgentDetails> remoteDetails,
+            @NonNull Map<String, WeAgentDetails> cachedDetails,
+            @Nullable WeAgentDetails currentDetail,
+            int index,
+            @NonNull SkillCallback<Void> completion
+    ) {
+        return new SkillCallback<Void>() {
+            @Override
+            public void onSuccess(@Nullable Void ignored) {
+                processColdStartWeAgentAccounts(
+                        partnerAccounts,
+                        remoteDetails,
+                        cachedDetails,
+                        currentDetail,
+                        index + 1,
+                        completion
+                );
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                // A failed URI calculation must not block compensation for the remaining accounts.
+                onSuccess(null);
+            }
+        };
+    }
+
+    /**
+     * 比较两个助理详情对象的完整序列化内容是否一致，用于判断冷启动补偿是否需要写缓存和广播。
+     */
+    private boolean detailsEqual(@Nullable WeAgentDetails left, @Nullable WeAgentDetails right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return gson.toJsonTree(left).equals(gson.toJsonTree(right));
+    }
+
+    @NonNull
+    /**
+     * 将已补拉完成的完整助理详情转换为统一更新广播载荷。
+     *
+     * <p>详情对象先转换为通用 Map，再交给统一载荷构造方法补充事件类型和来源。</p>
+     */
+    private Map<String, Object> buildResolvedUpdatePayload(
+            @NonNull WeAgentDetails detail,
+            @NonNull String source
+    ) {
+        Map<String, Object> data = gson.fromJson(
+                gson.toJson(detail),
+                new TypeToken<Map<String, Object>>() {
+                }.getType()
+        );
+        return buildWeAgentPayload("update", data, source);
+    }
+
+    /**
+     * 解析并执行助理更新或删除通知。
+     *
+     * <p>更新通知仅修改本地已存在详情的基础字段，随后补拉完整详情再广播；删除通知复用
+     * 统一删除流程处理缓存、当前助理跳转和广播。缺少 action、weCrew 或必要账号时不继续处理。</p>
+     */
+    private void handleWeAgentNotifyData(
+            @NonNull Map<String, Object> notifyData,
+            @NonNull String source,
+            @NonNull SkillCallback<Void> completion
+    ) {
+        String action = normalizeOptionalString(valueAsString(notifyData.get("action")));
+        Map<String, Object> weCrew = valueAsMap(notifyData.get("weCrew"));
+        if (action == null || weCrew == null) {
+            logger.e(TAG, "ignore we-agent notification: action or weCrew is missing");
+            completion.onSuccess(null);
+            return;
+        }
+        String partnerAccount = normalizeOptionalString(valueAsString(weCrew.get("partnerAccount")));
+        if ("update".equalsIgnoreCase(action)) {
+            if (partnerAccount == null) {
+                logger.e(TAG, "ignore we-agent update notification: partnerAccount is missing");
+                completion.onSuccess(null);
+                return;
+            }
+            logger.i(TAG, "process server we-agent update, partnerAccount=" + partnerAccount);
+            updateCachedBasicFieldsIfPresent(partnerAccount, weCrew);
+            broadcastWeAgentEvent(
+                    WE_AGENT_EVENT_NAME,
+                    buildWeAgentPayload("update", weCrew, source),
+                    completion
+            );
+            return;
+        }
+        if ("delete".equalsIgnoreCase(action)) {
+            if (partnerAccount == null) {
+                logger.e(TAG, "ignore we-agent delete notification: partnerAccount is missing");
+                completion.onSuccess(null);
+                return;
+            }
+            logger.i(TAG, "process server we-agent delete, partnerAccount=" + partnerAccount);
+            handleDeletedWeAgent(partnerAccount, weCrew, source, completion);
+            return;
+        }
+        completion.onSuccess(null);
+    }
+
+    /**
+     * 使用通知中的名称、头像和描述更新已存在的助理缓存。
+     *
+     * <p>三个基础字段必须齐全；描述同时兼容 {@code description} 和 {@code desc}。
+     * 缓存层负责只更新命中的记录，不创建新的详情缓存。</p>
+     */
+    private void updateCachedBasicFieldsIfPresent(@NonNull String partnerAccount, @NonNull Map<String, Object> data) {
+        String name = normalizeOptionalString(valueAsString(data.get("name")));
+        String icon = normalizeOptionalString(valueAsString(data.get("icon")));
+        String description = normalizeOptionalString(valueAsString(data.get("description")));
+        if (description == null) {
+            description = normalizeOptionalString(valueAsString(data.get("desc")));
+        }
+        if (name == null || icon == null || description == null) {
+            return;
+        }
+        weAgentStorage.updateCachedWeAgentDetails(partnerAccount, name, icon, description);
+    }
+
+    @NonNull
+    private Map<String, Object> buildWeAgentData(@NonNull String partnerAccount) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("partnerAccount", partnerAccount);
+        return data;
+    }
+
+    @NonNull
+    /**
+     * 构造三端统一的助理广播结构：事件类型、业务数据和来源扩展信息。
+     */
+    private Map<String, Object> buildWeAgentPayload(
+            @NonNull String type,
+            @NonNull Map<String, Object> data,
+            @NonNull String source
+    ) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", type);
+        payload.put("data", data);
+        Map<String, Object> extraData = new HashMap<>();
+        extraData.put("source", source);
+        payload.put("extraData", extraData);
+        return payload;
+    }
+
+    /**
+     * 按方案规则发送助理事件。
+     *
+     * <p>更新事件必须先根据 partnerAccount 补拉完整详情，并以完整详情替换原始 data 后广播；
+     * 账号缺失、详情为空或请求失败均不广播。删除事件无需网络请求，直接交给宿主广播适配层。</p>
+     */
+    private void broadcastWeAgentEvent(
+            @NonNull String eventName,
+            @NonNull Map<String, Object> payload,
+            @NonNull SkillCallback<Void> completion
+    ) {
+        Object type = payload.get("type");
+        if ("update".equals(type)) {
+            Map<String, Object> data = valueAsMap(payload.get("data"));
+            String partnerAccount = data == null ? null : normalizeOptionalString(valueAsString(data.get("partnerAccount")));
+            if (partnerAccount == null) {
+                logger.e(TAG, "skip we-agent update broadcast: partnerAccount is missing");
+                completion.onSuccess(null);
+                return;
+            }
+            apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
+                @Override
+                public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
+                    WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
+                    if (resolved.getWeAgentDetailsArray().isEmpty()) {
+                        logger.e(TAG, "skip we-agent update broadcast: detail response is empty, partnerAccount="
+                                + partnerAccount);
+                        completion.onSuccess(null);
+                        return;
+                    }
+                    WeAgentDetails detail = resolved.getWeAgentDetailsArray().get(0);
+                    Map<String, Object> finalPayload = new HashMap<>(payload);
+                    finalPayload.put("data", gson.fromJson(gson.toJson(detail), new TypeToken<Map<String, Object>>() {
+                    }.getType()));
+                    dispatchHostBroadcast(eventName, finalPayload);
+                    logger.i(TAG, "we-agent update broadcast completed, partnerAccount=" + partnerAccount);
+                    completion.onSuccess(null);
+                }
+
+                @Override
+                public void onError(@NonNull Throwable error) {
+                    // Per plan: update broadcast detail fetch failures do not emit a broadcast.
+                    logger.e(TAG, "fetch detail before update broadcast failed, partnerAccount="
+                            + partnerAccount + ", error=" + error.getMessage());
+                    completion.onSuccess(null);
+                }
+            });
+            return;
+        }
+        dispatchHostBroadcast(eventName, payload);
+        logger.i(TAG, "we-agent delete broadcast completed");
+        completion.onSuccess(null);
+    }
+
+    /**
+     * 调用宿主广播能力的统一出口。
+     *
+     * <p>当前仅保留适配点，后续接入 WeBroadCast 时应在此处透传事件名和完整载荷。</p>
+     */
+    private void dispatchHostBroadcast(@NonNull String eventName, @NonNull Map<String, Object> payload) {
+        // TODO: call host WeBroadCast(eventName, payload) when the host broadcast adapter is wired.
+    }
+
+    @Nullable
+    /**
+     * 将通知字段安全转换为字符串；仅接受字符串、数字和布尔值，复杂类型返回 null。
+     */
+    private String valueAsString(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof Number || value instanceof Boolean) {
+            return String.valueOf(value);
+        }
+        return null;
+    }
+
+    @Nullable
+    /**
+     * 将通知字段安全转换为字符串键 Map。
+     *
+     * <p>输入可以是 Map 或 JSON 字符串；非法 JSON、数组及其他类型返回 null，避免异常通知
+     * 中断同步链路。</p>
+     */
+    private Map<String, Object> valueAsMap(@Nullable Object value) {
+        if (value instanceof Map) {
+            Map<?, ?> raw = (Map<?, ?>) value;
+            Map<String, Object> result = new HashMap<>();
+            for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                if (entry.getKey() instanceof String) {
+                    result.put((String) entry.getKey(), entry.getValue());
+                }
+            }
+            return result;
+        }
+        if (value instanceof String) {
+            try {
+                return gson.fromJson((String) value, new TypeToken<Map<String, Object>>() {
+                }.getType());
+            } catch (JsonSyntaxException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     @NonNull
     private WeAgentDetailsArrayResult wrapWeAgentDetail(@NonNull WeAgentDetails detail) {
         WeAgentDetailsArrayResult result = new WeAgentDetailsArrayResult();
@@ -1564,225 +1944,125 @@ public final class SkillSDK {
         return result;
     }
 
-    private void prepareDeleteWeAgentTransition(
-            @Nullable String partnerAccount,
-            @Nullable String robotId,
-            @NonNull SkillCallback<DeleteTransitionPlan> callback
-    ) {
-        List<WeAgent> cachedList = weAgentStorage.getWeAgentList();
-        if (!cachedList.isEmpty()) {
-            callback.onSuccess(buildDeleteTransitionPlan(cachedList, partnerAccount, robotId));
-            return;
-        }
-
-        apiClient.getWeAgentList(
-                DEFAULT_WE_AGENT_LIST_PAGE_SIZE,
-                DEFAULT_WE_AGENT_LIST_PAGE_NUMBER,
-                new SkillCallback<WeAgentListResult>() {
-                    @Override
-                    public void onSuccess(@Nullable WeAgentListResult result) {
-                        WeAgentListResult resolved = result == null ? new WeAgentListResult() : result;
-                        weAgentStorage.saveWeAgentList(resolved.getContent());
-                        callback.onSuccess(buildDeleteTransitionPlan(resolved.getContent(), partnerAccount, robotId));
-                    }
-
-                    @Override
-                    public void onError(@NonNull Throwable error) {
-                        callback.onError(error);
-                    }
-                }
-        );
-    }
-
     @NonNull
-    private DeleteTransitionPlan buildDeleteTransitionPlan(
-            @NonNull List<WeAgent> snapshot,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        List<WeAgent> updatedList = new ArrayList<>(snapshot);
-        int deletedIndex = findWeAgentIndex(updatedList, partnerAccount, robotId);
-        if (deletedIndex < 0) {
-            return new DeleteTransitionPlan(updatedList, null);
-        }
-
-        updatedList.remove(deletedIndex);
-        if (updatedList.isEmpty()) {
-            return new DeleteTransitionPlan(updatedList, null);
-        }
-
-        int nextIndex = deletedIndex < updatedList.size() ? deletedIndex : 0;
-        String nextPartnerAccount = normalizeOptionalString(updatedList.get(nextIndex).getPartnerAccount());
-        return new DeleteTransitionPlan(updatedList, nextPartnerAccount);
+    /**
+     * 创建删除请求上下文，统一保存服务端删除接口所需的 partnerAccount。
+     */
+    private DeleteWeAgentContext buildDeleteWeAgentContext(@NonNull String partnerAccount) {
+        return new DeleteWeAgentContext(partnerAccount);
     }
 
-    private int findWeAgentIndex(
-            @NonNull List<WeAgent> list,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        for (int i = 0; i < list.size(); i++) {
-            WeAgent item = list.get(i);
-            String itemPartnerAccount = normalizeOptionalString(item.getPartnerAccount());
-            if (partnerAccount != null && partnerAccount.equals(itemPartnerAccount)) {
-                return i;
-            }
-            if (partnerAccount == null) {
-                String itemRobotId = normalizeOptionalString(item.getRobotId());
-                if (robotId != null && robotId.equals(itemRobotId)) {
-                    return i;
-                }
-            }
-        }
-        return -1;
-    }
-
-    @NonNull
-    private DeleteWeAgentContext buildDeleteWeAgentContext(
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        return new DeleteWeAgentContext(
-                partnerAccount,
-                robotId,
-                isCurrentWeAgent(partnerAccount, robotId),
-                weAgentStorage.hasWeAgentListCache(),
-                null
-        );
-    }
-
+    /**
+     * 使用上下文中的 partnerAccount 调用服务端删除接口，并原样转发异步结果。
+     */
     private void requestDeleteWeAgent(
             @NonNull DeleteWeAgentContext context,
             @NonNull SkillCallback<DeleteWeAgentResult> callback
     ) {
-        apiClient.deleteWeAgent(context.partnerAccount, context.robotId, callback);
+        apiClient.deleteWeAgent(context.partnerAccount, callback);
     }
 
-    private void prepareDeleteWeAgentContext(
-            @NonNull DeleteWeAgentContext context,
-            @NonNull SkillCallback<DeleteWeAgentContext> callback
-    ) {
-        if (!context.deletingCurrentWeAgent) {
-            callback.onSuccess(context);
-            return;
-        }
-        prepareDeleteWeAgentTransition(context.partnerAccount, context.robotId, new SkillCallback<DeleteTransitionPlan>() {
-            @Override
-            public void onSuccess(@Nullable DeleteTransitionPlan plan) {
-                callback.onSuccess(context.withTransitionPlan(plan));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
-        });
-    }
-
+    /**
+     * 处理本端删除助理成功后的缓存、跳转和广播。
+     *
+     * <p>所有删除都会先移除列表与详情缓存；非当前助理随后直接广播并回调成功。删除当前助理
+     * 时还会清空当前详情并调用 getWeAgentUri 计算后续页面，成功后再发送删除广播。</p>
+     */
     private void handleDeleteWeAgentResult(
             @NonNull DeleteWeAgentContext context,
             @Nullable DeleteWeAgentResult result,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
+            @NonNull SkillCallback<DeleteWeAgentResult> callback,
+            @NonNull SkillCallback<Void> completion
     ) {
-        if (!context.deletingCurrentWeAgent) {
-            handleDeleteNonCurrentWeAgentSuccess(context, result, callback);
-            return;
-        }
-        DeleteTransitionPlan resolvedPlan = context.transitionPlan == null
-                ? new DeleteTransitionPlan(new ArrayList<>(), null)
-                : context.transitionPlan;
-        handleDeleteWeAgentSuccess(resolvedPlan, result, callback);
+        handleDeletedWeAgent(
+                context.partnerAccount,
+                buildWeAgentData(context.partnerAccount),
+                "local",
+                new SkillCallback<Void>() {
+                    @Override
+                    public void onSuccess(@Nullable Void ignored) {
+                        try {
+                            callback.onSuccess(result);
+                        } finally {
+                            completion.onSuccess(null);
+                        }
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable error) {
+                        try {
+                            callback.onError(error);
+                        } finally {
+                            completion.onError(error);
+                        }
+                    }
+                }
+        );
     }
 
-    private void handleDeleteWeAgentSuccess(
-            @NonNull DeleteTransitionPlan plan,
-            @Nullable DeleteWeAgentResult result,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
+    /**
+     * 统一处理冷启动补偿、服务端通知和本端接口触发的助理删除。
+     *
+     * <p>方法先判断目标是否为当前助理，再幂等清理列表和详情缓存。删除当前助理时还会清空
+     * 当前详情并调用 getWeAgentUri 计算后续页面；三种来源最终都使用传入数据和来源发送
+     * 相同结构的删除广播。</p>
+     */
+    private void handleDeletedWeAgent(
+            @NonNull String partnerAccount,
+            @NonNull Map<String, Object> data,
+            @NonNull String source,
+            @NonNull SkillCallback<Void> callback
     ) {
-        weAgentStorage.saveWeAgentList(plan.updatedList);
-        if (plan.nextPartnerAccount == null) {
-            weAgentStorage.saveCurrentWeAgentDetail(null);
-            callback.onSuccess(result);
+        boolean deletingCurrentWeAgent = isCurrentWeAgent(partnerAccount);
+        logger.i(TAG, "handle we-agent delete mutation, partnerAccount=" + partnerAccount
+                + ", source=" + source + ", deletingCurrent=" + deletingCurrentWeAgent);
+        weAgentStorage.removeWeAgentFromList(partnerAccount);
+        weAgentStorage.removeWeAgentDetails(partnerAccount);
+        if (!deletingCurrentWeAgent) {
+            broadcastWeAgentEvent(
+                    WE_AGENT_EVENT_NAME,
+                    buildWeAgentPayload("delete", data, source),
+                    callback
+            );
             return;
         }
-
-        WeAgentDetails cachedDetail = weAgentStorage.getWeAgentDetails(plan.nextPartnerAccount);
-        if (cachedDetail != null) {
-            finalizeDeleteWeAgentTransition(result, cachedDetail, callback);
-            return;
-        }
-
-        apiClient.getWeAgentDetails(plan.nextPartnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetailsArrayResult detailResult) {
-                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(detailResult);
-                cacheWeAgentDetailsResult(plan.nextPartnerAccount, resolved, false);
-                WeAgentDetails nextDetail = resolved.getWeAgentDetailsArray().isEmpty()
-                        ? null
-                        : resolved.getWeAgentDetailsArray().get(0);
-                finalizeDeleteWeAgentTransition(result, nextDetail, callback);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                finalizeDeleteWeAgentTransition(result, null, callback);
-            }
-        });
-    }
-
-    private void handleDeleteNonCurrentWeAgentSuccess(
-            @NonNull DeleteWeAgentContext context,
-            @Nullable DeleteWeAgentResult result,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        if (context.hasListCache) {
-            List<WeAgent> cachedList = weAgentStorage.getWeAgentList();
-            DeleteTransitionPlan plan = buildDeleteTransitionPlan(cachedList, context.partnerAccount, context.robotId);
-            weAgentStorage.saveWeAgentList(plan.updatedList);
-        }
-        callback.onSuccess(result);
-    }
-
-    private void finalizeDeleteWeAgentTransition(
-            @Nullable DeleteWeAgentResult result,
-            @Nullable WeAgentDetails nextDetail,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        if (nextDetail == null) {
-            weAgentStorage.saveCurrentWeAgentDetail(null);
-        } else {
-            weAgentStorage.saveCurrentWeAgentDetail(nextDetail);
-        }
-        buildWeAgentUriResult(nextDetail, new SkillCallback<WeAgentUriResult>() {
+        weAgentStorage.saveCurrentWeAgentDetail(null);
+        getWeAgentUri(new SkillCallback<WeAgentUriResult>() {
             @Override
             public void onSuccess(@Nullable WeAgentUriResult nextUris) {
+                logger.i(TAG, "resolved URI after deleting current we-agent, partnerAccount=" + partnerAccount);
                 // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
-                callback.onSuccess(result);
+                broadcastWeAgentEvent(
+                        WE_AGENT_EVENT_NAME,
+                        buildWeAgentPayload("delete", data, source),
+                        callback
+                );
             }
 
             @Override
             public void onError(@NonNull Throwable error) {
+                logger.e(TAG, "resolve URI after deleting current we-agent failed, partnerAccount="
+                        + partnerAccount + ", error=" + error.getMessage());
                 callback.onError(wrapError(error));
             }
         });
     }
 
-    private boolean isCurrentWeAgent(@Nullable String partnerAccount, @Nullable String robotId) {
-        return matchesWeAgentDetails(weAgentStorage.getCurrentWeAgentDetail(), partnerAccount, robotId);
+    /**
+     * 判断指定 partnerAccount 是否与当前助理详情中的账号一致。
+     */
+    private boolean isCurrentWeAgent(@NonNull String partnerAccount) {
+        return matchesWeAgentDetails(weAgentStorage.getCurrentWeAgentDetail(), partnerAccount);
     }
 
     private boolean matchesWeAgentDetails(
             @Nullable WeAgentDetails details,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
+            @NonNull String partnerAccount
     ) {
         if (details == null) {
             return false;
         }
-        if (partnerAccount != null) {
-            return partnerAccount.equals(normalizeOptionalString(details.getPartnerAccount()));
-        }
-        return robotId != null && robotId.equals(normalizeOptionalString(details.getId()));
+        return partnerAccount.equals(normalizeOptionalString(details.getPartnerAccount()));
     }
 
     private void buildWeAgentUriResult(
@@ -1905,51 +2185,82 @@ public final class SkillSDK {
         );
     }
 
-    private static final class DeleteTransitionPlan {
-        @NonNull
-        private final List<WeAgent> updatedList;
-        @Nullable
-        private final String nextPartnerAccount;
-
-        private DeleteTransitionPlan(@NonNull List<WeAgent> updatedList, @Nullable String nextPartnerAccount) {
-            this.updatedList = updatedList;
-            this.nextPartnerAccount = nextPartnerAccount;
+    /**
+     * 将缓存变更任务加入 FIFO 队列；当前任务完成缓存、网络和广播后才启动下一任务。
+     */
+    private void enqueueWeAgentCacheMutation(@NonNull WeAgentCacheMutation mutation) {
+        boolean shouldStart;
+        synchronized (weAgentCacheMutationQueue) {
+            weAgentCacheMutationQueue.offer(mutation);
+            logger.i(TAG, "we-agent cache mutation enqueued, queueSize=" + weAgentCacheMutationQueue.size());
+            shouldStart = !processingWeAgentCacheMutation;
+            if (shouldStart) {
+                processingWeAgentCacheMutation = true;
+            }
+        }
+        if (shouldStart) {
+            processNextWeAgentCacheMutation();
         }
     }
 
-    private static final class DeleteWeAgentContext {
-        @Nullable
-        private final String partnerAccount;
-        @Nullable
-        private final String robotId;
-        private final boolean deletingCurrentWeAgent;
-        private final boolean hasListCache;
-        @Nullable
-        private final DeleteTransitionPlan transitionPlan;
-
-        private DeleteWeAgentContext(
-                @Nullable String partnerAccount,
-                @Nullable String robotId,
-                boolean deletingCurrentWeAgent,
-                boolean hasListCache,
-                @Nullable DeleteTransitionPlan transitionPlan
-        ) {
-            this.partnerAccount = partnerAccount;
-            this.robotId = robotId;
-            this.deletingCurrentWeAgent = deletingCurrentWeAgent;
-            this.hasListCache = hasListCache;
-            this.transitionPlan = transitionPlan;
+    private void processNextWeAgentCacheMutation() {
+        WeAgentCacheMutation mutation;
+        int generation;
+        synchronized (weAgentCacheMutationQueue) {
+            mutation = weAgentCacheMutationQueue.peek();
+            if (mutation == null) {
+                processingWeAgentCacheMutation = false;
+                return;
+            }
+            generation = weAgentCacheMutationGeneration;
+            logger.i(TAG, "we-agent cache mutation started, queueSize=" + weAgentCacheMutationQueue.size());
         }
+        AtomicBoolean finished = new AtomicBoolean(false);
+        try {
+            mutation.execute(new SkillCallback<Void>() {
+                @Override
+                public void onSuccess(@Nullable Void ignored) {
+                    if (finished.compareAndSet(false, true)) {
+                        finishWeAgentCacheMutation(generation);
+                    }
+                }
 
+                @Override
+                public void onError(@NonNull Throwable error) {
+                    if (finished.compareAndSet(false, true)) {
+                        finishWeAgentCacheMutation(generation);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+            logger.e(TAG, "we-agent cache mutation threw unexpectedly, error=" + ignored.getMessage());
+            if (finished.compareAndSet(false, true)) {
+                finishWeAgentCacheMutation(generation);
+            }
+        }
+    }
+
+    private void finishWeAgentCacheMutation(int generation) {
+        synchronized (weAgentCacheMutationQueue) {
+            if (generation != weAgentCacheMutationGeneration) {
+                return;
+            }
+            weAgentCacheMutationQueue.poll();
+            logger.i(TAG, "we-agent cache mutation completed, remaining=" + weAgentCacheMutationQueue.size());
+        }
+        processNextWeAgentCacheMutation();
+    }
+
+    private interface WeAgentCacheMutation {
+        void execute(@NonNull SkillCallback<Void> completion);
+    }
+
+    private static final class DeleteWeAgentContext {
         @NonNull
-        private DeleteWeAgentContext withTransitionPlan(@Nullable DeleteTransitionPlan transitionPlan) {
-            return new DeleteWeAgentContext(
-                    partnerAccount,
-                    robotId,
-                    deletingCurrentWeAgent,
-                    hasListCache,
-                    transitionPlan
-            );
+        private final String partnerAccount;
+
+        private DeleteWeAgentContext(@NonNull String partnerAccount) {
+            this.partnerAccount = partnerAccount;
         }
     }
 
@@ -2224,20 +2535,16 @@ public final class SkillSDK {
     }
 
     @NonNull
-    private String buildAssistantEditPageUri(@Nullable String partnerAccount, @Nullable String robotId) {
+    /**
+     * 构造助理编辑页 URI，仅使用必填 partnerAccount 作为定位参数。
+     */
+    private String buildAssistantEditPageUri(@NonNull String partnerAccount) {
         String uri = appendHashFragment(ASSISTANT_H5_URI, "editAssistant");
-        if (!isBlank(partnerAccount)) {
-            String withPartnerAccount = appendQueryParameter(uri, "partnerAccount", partnerAccount.trim());
-            if (withPartnerAccount == null) {
-                throw error(5000, "Failed to build assistant edit page uri");
-            }
-            return withPartnerAccount;
-        }
-        String withRobotId = appendQueryParameter(uri, "robotId", robotId == null ? "" : robotId.trim());
-        if (withRobotId == null) {
+        String withPartnerAccount = appendQueryParameter(uri, "partnerAccount", partnerAccount.trim());
+        if (withPartnerAccount == null) {
             throw error(5000, "Failed to build assistant edit page uri");
         }
-        return withRobotId;
+        return withPartnerAccount;
     }
 
     private static int clamp(int value, int min, int max) {

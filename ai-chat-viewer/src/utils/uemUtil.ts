@@ -474,7 +474,6 @@ export async function trackApiUpdateWeAgent(
     void reportApiSuccess('api_update_weagent', '更新助理接口', {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
         name: params.name,
         descriptionLength: params.description.length,
       },
@@ -487,7 +486,6 @@ export async function trackApiUpdateWeAgent(
     void reportApiError('api_update_weagent', '更新助理接口', error, {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
         name: params.name,
         descriptionLength: params.description.length,
       },
@@ -505,7 +503,6 @@ export async function trackApiDeleteWeAgent(
     void reportApiSuccess('api_delete_weagent', '删除助理接口', {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
       },
       response: {
         deleteResult: result.deleteResult,
@@ -516,7 +513,6 @@ export async function trackApiDeleteWeAgent(
     void reportApiError('api_delete_weagent', '删除助理接口', error, {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
       },
     });
     throw error;

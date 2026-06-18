@@ -236,28 +236,25 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
   const handleConfirmDelete = useCallback(async () => {
     const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount ?? '').trim();
-    const targetRobotId = (detail?.id ?? '').trim();
 
-    if (!targetPartnerAccount && !targetRobotId) {
+    if (!targetPartnerAccount) {
       showToast(t('assistantDetail.deleteFailed'));
       return;
     }
 
     try {
       await deleteWeAgent({
-        ...(targetPartnerAccount ? { partnerAccount: targetPartnerAccount } : {}),
-        ...(targetRobotId ? { robotId: targetRobotId } : {}),
+        partnerAccount: targetPartnerAccount,
       });
       setOverlay('none');
       window.HWH5.close();
     } catch (error) {
       WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
         partnerAccount: targetPartnerAccount,
-        robotId: targetRobotId,
       })} | error=${JSON.stringify(error)}`);
       showToast(t('assistantDetail.deleteFailed'));
     }
-  }, [detail?.id, detail?.partnerAccount, partnerAccount, t]);
+  }, [detail?.partnerAccount, partnerAccount, t]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {

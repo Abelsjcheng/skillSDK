@@ -466,8 +466,7 @@ export interface QueryWeAgentParams {
 }
 
 export interface UpdateWeAgentParams {
-  partnerAccount?: string;
-  robotId?: string;
+  partnerAccount: string;
   name: string;
   icon: string;
   description: string;
@@ -478,8 +477,7 @@ export interface UpdateWeAgentResult {
 }
 
 export interface DeleteWeAgentParams {
-  partnerAccount?: string;
-  robotId?: string;
+  partnerAccount: string;
 }
 
 export interface DeleteWeAgentResult {
@@ -506,31 +504,11 @@ export interface OpenWeAgentResult {
   status: string;
 }
 
-export interface AssistantDetailUpdatedPayload {
-  name: string;
-  icon: string;
-  description: string;
-}
-
 export interface OpenAssistantEditPageParams {
-  partnerAccount?: string;
-  robotId?: string;
-  onUpdated: (payload: AssistantDetailUpdatedPayload) => void;
+  partnerAccount: string;
 }
 
 export interface OpenAssistantEditPageResult {
-  status: string;
-}
-
-export interface NotifyAssistantDetailUpdatedParams {
-  name: string;
-  icon: string;
-  description: string;
-  partnerAccount?: string;
-  robotId?: string;
-}
-
-export interface NotifyAssistantDetailUpdatedResult {
   status: string;
 }
 

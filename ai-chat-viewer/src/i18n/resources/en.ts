@@ -114,7 +114,6 @@ export const en = {
   'editAssistant.title': 'Edit Personal Agent',
   'editAssistant.loadFailed': 'Failed to load agent details',
   'editAssistant.updateFailed': 'Failed to update agent',
-  'editAssistant.notifyFailed': 'Failed to sync agent update',
   'editAssistant.invalidTarget': 'Agent identifier is missing',
   'assistantDetail.loadFailed': 'Failed to load assagentistant details',
   'assistantDetail.copyFailed': 'Copy failed',

@@ -36,7 +36,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getWeAgentDetails](#13-getweagentdetails) | 获取并按需持久化助理详情 |
 | [updateWeAgent](#131-updateweagent) | 更新个人助理信息 |
 | [deleteWeAgent](#132-deleteweagent) | 删除个人助理 |
-| [notifyAssistantDetailUpdated](#133-notifyassistantdetailupdated) | 通知助理详情已更新 |
+| [getAssistantDetails](#133-getassistantdetails) | 获取指定助理缓存详情 |
 | [queryQrcodeInfo](#134-queryqrcodeinfo) | 查询二维码信息 |
 | [updateQrcodeInfo](#135-updateqrcodeinfo) | 更新二维码信息 |
 | [createNewSession](#14-createnewsession) | 创建新会话 |
@@ -1338,8 +1338,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk', {
 更新个人助理信息。
 
 说明：
-- `partnerAccount` 与 `robotId` 至少传一个。
-- 若两者同时传入，JSAPI 按原样将两个参数都透传给 SDK。
+- 仅支持通过 `partnerAccount` 定位助理。
+- `partnerAccount`、`name`、`icon`、`description` 均需为非空有效字符串。
 
 ### 调用方式
 
@@ -1357,8 +1357,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateWeAg
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| partnerAccount | string | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
-| robotId | string | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
+| partnerAccount | string | 是 | 助理账号 ID；仅支持通过 `partnerAccount` 定位助理 |
 | name | string | 是 | 助理名称 |
 | icon | string | 是 | 助理头像地址 |
 | description | string | 是 | 助理简介 |
@@ -1375,8 +1374,18 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateWeAg
 
 1. JSAPI 调用 SDK `updateWeAgent` 接口。
 2. SDK 调用服务端 `PUT /v4-1/we-crew`。
-3. SDK 透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`。
-4. SDK 从服务端响应中提取 `message`，并映射为 `updateResult` 返回。
+3. SDK 校验 `partnerAccount`、`name`、`icon`、`description` 均为非空有效字符串，并仅向服务端透传这些字段。
+4. 服务端返回 `code = 200` 时，SDK 返回 `{ updateResult: 'success' }`；否则抛出异常，并透传服务端 `code` 与 `message`。
+5. 更新成功后，SDK 仅更新本地已存在且 `partnerAccount` 匹配的 `current_we_agent_detail` 和 `we_agent_details` 缓存，不新增未命中的缓存。
+6. 更新成功后，SDK 通过 `GET /v1/robot-partners/{partnerAccount}` 补拉完整助理详情，并触发 `agentskills.agentUpdated` 更新广播；补拉失败时不触发更新广播。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `partnerAccount`、`name`、`icon` 或 `description` 缺失或格式错误 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 服务端 code | 服务端 message | 服务端返回 `code` 不为 `200` |
 
 ### 调用示例
 
@@ -1402,8 +1411,8 @@ window.HWH5EXT.updateWeAgent({
 删除个人助理。
 
 说明：
-- `partnerAccount` 与 `robotId` 至少传一个。
-- 若两者同时传入，JSAPI 按原样将两个参数都透传给 SDK。
+- 仅支持通过 `partnerAccount` 定位助理。
+- `partnerAccount` 需为非空有效字符串。
 
 ### 调用方式
 
@@ -1421,8 +1430,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'deleteWeAg
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| partnerAccount | string | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
-| robotId | string | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
+| partnerAccount | string | 是 | 助理账号 ID；仅支持通过 `partnerAccount` 定位助理 |
 
 ### 返回值
 
@@ -1435,9 +1443,20 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'deleteWeAg
 ### 行为说明
 
 1. JSAPI 调用 SDK `deleteWeAgent` 接口。
-2. SDK 调用服务端 `DELETE /v4-1/we-crew`。
-3. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传删除标识参数。
-4. SDK 从服务端响应中提取 `message`，并映射为 `deleteResult` 返回。
+2. SDK 校验 `partnerAccount` 为非空有效字符串，并在请求前根据 `current_we_agent_detail` 判断删除目标是否为当前助理。
+3. SDK 调用服务端 `DELETE /v4-1/we-crew`，并仅透传 `partnerAccount`。
+4. 服务端返回 `code = 200` 时，SDK 返回 `{ deleteResult: 'success' }`；否则抛出异常，并透传服务端 `code` 与 `message`。
+5. 删除非当前助理成功后，SDK 从已有的 `we_agent_list_cache` 和 `we_agent_details` 中移除目标助理；不修改 `current_we_agent_detail`，也不触发当前助理切换。
+6. 删除当前助理成功后，SDK 清理列表、当前详情和详情缓存中的目标助理，并调用 `getWeAgentUri` 获取删除后的目标 URI 后执行跳转。
+7. 删除成功后，SDK 触发 `agentskills.agentUpdated` 删除广播，payload 为 `{ type: 'delete', data: { partnerAccount }, extraData: { source: 'local' } }`。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 服务端 code | 服务端 message | 服务端返回 `code` 不为 `200` |
 
 ### 调用示例
 
@@ -1453,65 +1472,75 @@ window.HWH5EXT.deleteWeAgent({
 
 ---
 
-## 13.3. notifyAssistantDetailUpdated
+## 13.3. getAssistantDetails
 
 ### 接口说明
 
-通知当前助理详情已更新，并触发已注册的详情更新回调。
+根据 `partnerAccount` 获取指定助理的详情缓存。
 
 说明：
-- 该接口为本地扩展接口，无对应服务端接口。
-- `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
+- 若本地已存在对应 `partnerAccount` 的助理详情缓存，SDK 先直接返回缓存内容。
+- 在返回缓存后，SDK 异步调用服务端接口 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情，并更新本地缓存。
+- 若本地不存在对应缓存，SDK 调用服务端接口获取详情，返回结果并写入本地缓存。
+- 缓存存储方式与 `getWeAgentDetails` 一致，需按 `userId` 隔离。
 
 ### 调用方式
 
 ```javascript
-window.HWH5EXT.notifyAssistantDetailUpdated(params)
+window.HWH5EXT.getAssistantDetails(params)
 ```
 
 ### PC端调用方式
 
 ```javascript
-window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'notifyAssistantDetailUpdated', params})
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getAssistantDetails', params})
 ```
 
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| name | string | 是 | 助理名称 |
-| icon | string | 是 | 助理头像地址 |
-| description | string | 是 | 助理简介 |
-| partnerAccount | string | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
-| robotId | string | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| partnerAccount | string | 是 | 助理账号 ID |
 
 ### 返回值
 
-返回 Promise，resolve 数据：`NotifyAssistantDetailUpdatedResult`
+返回 Promise，resolve 数据：`WeAgentDetailsArray`
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| status | string | 固定返回 `success` |
+| weAgentDetailsArray | Array<WeAgentDetails> | 助理详情数组 |
+
+`WeAgentDetails` 对象字段定义与 `getWeAgentDetails` 返回保持一致。
 
 ### 行为说明
 
-1. JSAPI 调用 SDK `notifyAssistantDetailUpdated` 接口。
-2. SDK 根据与 `openAssistantEditPage` 一致的唯一 ID 规则定位已注册监听：优先使用 `partnerAccount`，否则使用 `robotId`。
-3. SDK 触发对应的 `onUpdated` 回调，并传出 `{ name, icon, description }`。
-4. SDK 返回 `{ status: 'success' }`。
+1. JSAPI 调用 SDK `getAssistantDetails` 接口。
+2. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`，并从中按 `partnerAccount` 读取对应助理详情对象缓存。
+3. 若读取到对应缓存，则 SDK 将该对象组装为 `weAgentDetailsArray` 返回。
+4. 在返回缓存后，SDK 异步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情；若返回结果非空，则取首个助理详情对象写回 `we_agent_details[partnerAccount]`。
+5. 若未读取到缓存，则 SDK 同步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；若返回结果非空，则取首个助理详情对象写入 `we_agent_details[partnerAccount]`，并将完整结果组装为 `weAgentDetailsArray` 返回。
+6. 若服务端返回的助理详情为空，则 SDK 不设置新缓存，也不删除旧缓存。
+7. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
 
 ### 调用示例
 
 ```javascript
-window.HWH5EXT.notifyAssistantDetailUpdated({
-  name: '更新名称',
-  icon: '/mocloud/xxx',
-  description: '更新简介',
+window.HWH5EXT.getAssistantDetails({
   partnerAccount: 'x00_1'
 }).then((result) => {
-  console.log('通知结果:', result.status);
+  result.weAgentDetailsArray.forEach((detail) => {
+    console.log('助理缓存详情:', detail.name, detail.weCodeUrl);
+  });
 }).catch((error) => {
-  console.error('通知助理详情更新失败:', error.errorCode, error.errorMessage);
+  console.error('获取助理缓存详情失败:', error.errorCode, error.errorMessage);
 });
 ```
 

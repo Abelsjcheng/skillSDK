@@ -85,7 +85,6 @@ export interface EditAssistantContentProps {
   source?: 'assistantDetail' | 'external';
   initialDetail?: WeAgentDetails | null;
   partnerAccount?: string;
-  robotId?: string;
   onClose: () => void;
   onSuccess?: (payload: DigitalTwinBasicInfoPayload) => void;
 }

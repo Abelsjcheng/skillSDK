@@ -2,43 +2,23 @@ package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
-import com.opencode.skill.callback.AssistantDetailUpdatedCallback;
 
 import java.util.Objects;
 
 @Keep
 public class OpenAssistantEditPageParams {
-    @Nullable
-    private final String partnerAccount;
-    @Nullable
-    private final String robotId;
     @NonNull
-    private final AssistantDetailUpdatedCallback onUpdated;
+    private final String partnerAccount;
 
-    public OpenAssistantEditPageParams(
-            @Nullable String partnerAccount,
-            @Nullable String robotId,
-            @NonNull AssistantDetailUpdatedCallback onUpdated
-    ) {
-        this.partnerAccount = partnerAccount;
-        this.robotId = robotId;
-        this.onUpdated = Objects.requireNonNull(onUpdated, "onUpdated == null");
+    /**
+     * 创建编辑页参数，编辑页仅通过 partnerAccount 定位目标助理。
+     */
+    public OpenAssistantEditPageParams(@NonNull String partnerAccount) {
+        this.partnerAccount = Objects.requireNonNull(partnerAccount, "partnerAccount == null");
     }
 
-    @Nullable
+    @NonNull
     public String getPartnerAccount() {
         return partnerAccount;
-    }
-
-    @Nullable
-    public String getRobotId() {
-        return robotId;
-    }
-
-    @NonNull
-    public AssistantDetailUpdatedCallback getOnUpdated() {
-        return onUpdated;
     }
 }

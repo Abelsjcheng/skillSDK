@@ -59,25 +59,24 @@ describe('EditAssistant', () => {
     jest.resetAllMocks();
   });
 
-  it('loads details by partnerAccount and notifies after external update', async () => {
-    const getWeAgentDetails = jest.fn(async () => ({
+  it('loads details by partnerAccount and updates without notify callback', async () => {
+    const getAssistantDetails = jest.fn(async () => ({
       weAgentDetailsArray: [mockDetail],
     }));
     const updateWeAgent = jest.fn(async () => ({ updateResult: 'success' }));
-    const notifyAssistantDetailUpdated = jest.fn(async () => ({ status: 'success' }));
     const navigateBack = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails,
+        getAssistantDetails,
         updateWeAgent,
-        notifyAssistantDetailUpdated,
       },
       configurable: true,
       writable: true,
     });
     Object.defineProperty(window, 'HWH5', {
       value: {
+        addEventListener: jest.fn(),
         navigateBack,
       },
       configurable: true,
@@ -90,6 +89,7 @@ describe('EditAssistant', () => {
     });
 
     expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
+    expect(getAssistantDetails).toHaveBeenCalledWith({ partnerAccount: 'x00_1' });
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: i18n.t('createAssistant.confirm') }));
@@ -101,33 +101,28 @@ describe('EditAssistant', () => {
         icon: '',
         description: 'Assistant description',
       });
-      expect(notifyAssistantDetailUpdated).toHaveBeenCalledWith({
-        partnerAccount: 'x00_1',
-        name: 'AssistantA',
-        icon: '',
-        description: 'Assistant description',
-      });
       expect(navigateBack).toHaveBeenCalled();
     });
   });
 
-  it('uses route state detail and skips notify when opened from assistant detail', async () => {
-    const getWeAgentDetails = jest.fn();
+  it('uses getAssistantDetails when opened from assistant detail', async () => {
+    const getAssistantDetails = jest.fn(async () => ({
+      weAgentDetailsArray: [mockDetail],
+    }));
     const updateWeAgent = jest.fn(async () => ({ updateResult: 'success' }));
-    const notifyAssistantDetailUpdated = jest.fn(async () => ({ status: 'success' }));
     const navigateBack = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails,
+        getAssistantDetails,
         updateWeAgent,
-        notifyAssistantDetailUpdated,
       },
       configurable: true,
       writable: true,
     });
     Object.defineProperty(window, 'HWH5', {
       value: {
+        addEventListener: jest.fn(),
         navigateBack,
       },
       configurable: true,
@@ -144,7 +139,7 @@ describe('EditAssistant', () => {
     });
 
     expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
-    expect(getWeAgentDetails).not.toHaveBeenCalled();
+    expect(getAssistantDetails).toHaveBeenCalledWith({ partnerAccount: 'x00_1' });
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: i18n.t('createAssistant.confirm') }));
@@ -156,7 +151,6 @@ describe('EditAssistant', () => {
         icon: '',
         description: 'Assistant description',
       });
-      expect(notifyAssistantDetailUpdated).not.toHaveBeenCalled();
       expect(navigateBack).toHaveBeenCalled();
     });
   });

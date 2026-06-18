@@ -101,7 +101,6 @@ export const zh = {
   'editAssistant.title': '编辑个人助手',
   'editAssistant.loadFailed': '获取助手详情失败',
   'editAssistant.updateFailed': '更新助手失败',
-  'editAssistant.notifyFailed': '同步助手更新失败',
   'editAssistant.invalidTarget': '缺少助手标识',
   'assistantDetail.loadFailed': '获取助手详情失败',
   'assistantDetail.copyFailed': '复制失败',
