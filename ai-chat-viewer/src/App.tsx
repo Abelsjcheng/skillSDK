@@ -17,6 +17,7 @@ import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import {
   createNewSession,
+  getDeviceInfo,
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
@@ -124,6 +125,18 @@ function updateSessionActivityInCache(
   return changed ? { ...cache, content: sortSessionsByUpdatedAt(nextContent) } : cache;
 }
 
+interface HarmonySplitLayoutState {
+  enabled: boolean;
+  statusBarHeight: number;
+  safeAreaInsetBottom: number;
+}
+
+const DEFAULT_HARMONY_SPLIT_LAYOUT: HarmonySplitLayoutState = {
+  enabled: false,
+  statusBarHeight: 0,
+  safeAreaInsetBottom: 0,
+};
+
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
   const { keyboardContainerStyle } = useIosKeyboardLift({ viewportOffset: 49 });
@@ -140,6 +153,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantName, setWeAgentAssistantName] = useState('');
   const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
+  const [harmonySplitLayout, setHarmonySplitLayout] = useState<HarmonySplitLayoutState>(DEFAULT_HARMONY_SPLIT_LAYOUT);
 
   const assistantAccountRef = useRef(assistantAccount);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
@@ -165,6 +179,45 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccount: assistantAccountRef.current,
     welinkSessionId: welinkSessionId ?? undefined,
   })), [welinkSessionId]);
+
+  useEffect(() => {
+    if (isPc) {
+      setHarmonySplitLayout(DEFAULT_HARMONY_SPLIT_LAYOUT);
+      return;
+    }
+
+    let disposed = false;
+
+    const resolveHarmonySplitLayout = async () => {
+      try {
+        const deviceInfo = await getDeviceInfo();
+        console.log(777, deviceInfo)
+        if (disposed) {
+          return;
+        }
+
+        const isHarmonySplit = deviceInfo.osType === 'Harmony' && deviceInfo.isFullScreen === 0;
+        setHarmonySplitLayout(isHarmonySplit
+          ? {
+            enabled: true,
+            statusBarHeight: deviceInfo.statusBarHeight,
+            safeAreaInsetBottom: deviceInfo.safeAreaInsetBottom,
+          }
+          : DEFAULT_HARMONY_SPLIT_LAYOUT);
+      } catch (err) {
+        WeLog(`App getDeviceInfo failed | error=${JSON.stringify(err)}`);
+        if (!disposed) {
+          setHarmonySplitLayout(DEFAULT_HARMONY_SPLIT_LAYOUT);
+        }
+      }
+    };
+
+    void resolveHarmonySplitLayout();
+
+    return () => {
+      disposed = true;
+    };
+  }, [isPc]);
 
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
@@ -316,18 +369,36 @@ function App({ assistantAccount = '' }: AppProps) {
     setWelinkSessionId(normalizedSessionId);
   }, [session, welinkSessionId]);
 
+  const harmonySplitStyle = harmonySplitLayout.enabled
+    ? {
+      '--we-agent-cui-status-bar-height': `${harmonySplitLayout.statusBarHeight}px`,
+      '--we-agent-cui-safe-area-bottom': `${harmonySplitLayout.safeAreaInsetBottom}px`,
+      '--we-agent-cui-title-bar-height': '44px',
+    } as React.CSSProperties
+    : {};
+
   return (
     <div
       className={[
         'app-container',
         isPc ? 'pc-mode' : '',
         'app-container--we-agent-cui',
+        harmonySplitLayout.enabled ? 'is-harmony-split' : '',
         isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
       ].filter(Boolean).join(' ')}
-      style={keyboardContainerStyle}
+      style={{
+        ...keyboardContainerStyle,
+        ...harmonySplitStyle,
+      }}
     >
       <div className="we-agent-cui-main">
         <div className="we-agent-cui-chat-panel">
+          {harmonySplitLayout.enabled ? (
+            <div className="we-agent-cui-titlebar" role="heading" aria-level={1}>
+              <div className="we-agent-cui-titlebar__title">{weAgentAssistantName}</div>
+            </div>
+          ) : null}
+
           <div className="content-wrapper">
             <Content
               messages={session.messages}

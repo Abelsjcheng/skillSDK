@@ -402,6 +402,7 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   return {
     ...deviceInfo,
     statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
+    safeAreaInsetBottom: toPositiveNumber(deviceInfo.safeAreaInsetBottom),
   };
 }
 
