@@ -32,7 +32,7 @@
 3. 标题栏顶部避让 `deviceInfo.statusBarHeight`，避免被系统状态栏图标覆盖。
 4. 标题栏固定在页面顶部，消息区滚动时标题栏不随消息滚走。
 5. 底部输入区避让 `deviceInfo.safeAreaInsetBottom`，避免被底部安全区遮挡。
-6. 标题栏内容高度为 `44px`，总占位高度为 `44px + deviceInfo.statusBarHeight`；标题文字样式为 `font-size: 16px`、`font-weight: 500`、亮色模式 `color: #333`。
+6. 标题栏内容高度为 `44px`，由于 `.app-container--we-agent-cui` 已有 `padding: 8px 16px 12px`，顶部有效避让高度为 `max(deviceInfo.statusBarHeight - 8px, 0px)`，总占位高度为 `44px + 顶部有效避让高度`；标题文字样式为 `font-size: 16px`、`font-weight: 500`、亮色模式 `color: #333`。
 7. 标题栏和安全区背景色与 `weAgentCUI` 页面背景保持一致，并覆盖亮色与暗黑模式。
 8. PC、Android、iOS、非分栏鸿蒙、非 `weAgentCUI` 页面均不改变现有表现。
 
@@ -181,16 +181,16 @@ style={{
 标题栏样式推荐：
 
 1. 使用 `position: fixed` 固定在视口顶部。
-2. `top: 0`，内部使用 `padding-top: var(--we-agent-cui-status-bar-height)` 避让状态栏。
-3. 标题栏内容高度固定为 `44px`，总高度使用 `calc(var(--we-agent-cui-status-bar-height) + 44px)`，或通过 `--we-agent-cui-title-bar-height: 44px` 变量表达。
+2. `top: 0`，内部使用 `padding-top: var(--we-agent-cui-effective-status-bar-height)` 避让状态栏；`--we-agent-cui-effective-status-bar-height` 取 `max(calc(var(--we-agent-cui-status-bar-height) - 8px), 0px)`，扣除容器已有顶部 padding。
+3. 标题栏内容高度固定为 `44px`，总高度使用 `calc(var(--we-agent-cui-effective-status-bar-height) + 44px)`，或通过 `--we-agent-cui-title-bar-height: 44px` 变量表达。
 4. `z-index` 高于消息区和底部区域，但低于移动端历史侧边栏遮罩或弹层。
 5. 标题文字单行省略，居中显示；亮色模式样式为 `font-size: 16px`、`font-weight: 500`、`color: #333`。
 6. 背景色亮色下与 `weAgentCUI` 背景协调；暗黑下使用 `var(--ai-dark-page-bg)`。
 
 消息区和底部避让推荐：
 
-1. `.content-wrapper` 在鸿蒙分栏下增加 `padding-top: calc(var(--we-agent-cui-status-bar-height) + var(--we-agent-cui-title-bar-height))`，避免首条消息被固定标题栏覆盖。
-2. `.we-agent-cui-bottom` 在鸿蒙分栏下增加 `padding-bottom: var(--we-agent-cui-safe-area-bottom)`，或将该值叠加到现有底部 padding。
+1. `.content-wrapper` 在鸿蒙分栏下增加 `padding-top: calc(var(--we-agent-cui-effective-status-bar-height) + var(--we-agent-cui-title-bar-height))`，避免首条消息被固定标题栏覆盖，同时扣除容器已有 `8px` 顶部 padding。
+2. `.we-agent-cui-bottom` 在鸿蒙分栏下增加 `padding-bottom: var(--we-agent-cui-effective-safe-area-bottom)`；`--we-agent-cui-effective-safe-area-bottom` 取 `max(calc(var(--we-agent-cui-safe-area-bottom) - 12px), 0px)`，扣除容器已有 `12px` 底部 padding。
 3. 固定标题栏不放入可滚动消息容器，确保消息滚动时标题栏不被顶走。
 
 ### 4.3 兼容与边界
@@ -274,10 +274,10 @@ style={{
 
 ### 9.1 功能测试
 
-1. 鸿蒙移动端分栏打开 `weAgentCUI`，确认顶部出现固定标题栏，标题为当前助手名称且居中显示；标题栏内容高度为 `44px`，顶部额外避让 `deviceInfo.statusBarHeight`。
+1. 鸿蒙移动端分栏打开 `weAgentCUI`，确认顶部出现固定标题栏，标题为当前助手名称且居中显示；标题栏内容高度为 `44px`，顶部额外避让 `max(deviceInfo.statusBarHeight - 8px, 0px)`。
 2. 鸿蒙移动端分栏下滚动长消息列表，确认标题栏固定在顶部，不随消息滚动消失。
 3. 鸿蒙移动端分栏下首条消息、欢迎区、加载更多区域不被标题栏遮挡。
-4. 鸿蒙移动端分栏下底部输入框、发送按钮、停止按钮不被底部安全区遮挡。
+4. 鸿蒙移动端分栏下底部输入框、发送按钮、停止按钮不被底部安全区遮挡，底部额外避让为 `max(deviceInfo.safeAreaInsetBottom - 12px, 0px)`。
 5. 鸿蒙移动端分栏下切换历史会话、新建会话、发送消息、停止生成流程正常。
 6. 助手名称异步加载前后，标题栏文案能从空态更新为当前助手名称。
 7. 亮色模式确认标题文字为 `font-size: 16px`、`font-weight: 500`、`color: #333`。

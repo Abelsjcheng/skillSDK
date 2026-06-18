@@ -323,6 +323,8 @@
   --we-agent-cui-status-bar-height: 0px;
   --we-agent-cui-safe-area-bottom: 0px;
   --we-agent-cui-title-bar-height: 44px;
+  --we-agent-cui-effective-status-bar-height: max(calc(var(--we-agent-cui-status-bar-height) - 8px), 0px);
+  --we-agent-cui-effective-safe-area-bottom: max(calc(var(--we-agent-cui-safe-area-bottom) - 12px), 0px);
 
   .we-agent-cui-titlebar {
     position: fixed;
@@ -333,8 +335,8 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    height: calc(var(--we-agent-cui-status-bar-height) + var(--we-agent-cui-title-bar-height));
-    padding-top: var(--we-agent-cui-status-bar-height);
+    height: calc(var(--we-agent-cui-effective-status-bar-height) + var(--we-agent-cui-title-bar-height));
+    padding-top: var(--we-agent-cui-effective-status-bar-height);
     background: url('../imgs/assistant-cui-bg.png');
     background-size: cover;
     background-position: top center;
@@ -363,11 +365,11 @@
   }
 
   .content-wrapper {
-    padding-top: calc(var(--we-agent-cui-status-bar-height) + var(--we-agent-cui-title-bar-height));
+    padding-top: calc(var(--we-agent-cui-effective-status-bar-height) + var(--we-agent-cui-title-bar-height));
   }
 
   .we-agent-cui-bottom {
-    padding-bottom: var(--we-agent-cui-safe-area-bottom);
+    padding-bottom: var(--we-agent-cui-effective-safe-area-bottom);
   }
 }
 
