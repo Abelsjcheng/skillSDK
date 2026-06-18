@@ -191,7 +191,6 @@ function App({ assistantAccount = '' }: AppProps) {
     const resolveHarmonySplitLayout = async () => {
       try {
         const deviceInfo = await getDeviceInfo();
-        console.log(777, deviceInfo)
         if (disposed) {
           return;
         }
