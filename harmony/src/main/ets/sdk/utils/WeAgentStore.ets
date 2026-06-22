@@ -17,7 +17,7 @@ export class WeAgentStore {
   private readonly userId: string;
   private context: common.UIAbilityContext | undefined;
   private prefInstance: preferences.Preferences | null = null;
-  private readonly fallback: Record<string, string> = {};
+  private readonly fallback: Map<string, string> = new Map();
 
   constructor(context?: common.UIAbilityContext, userId?: string) {
     this.userId = userId ?? MOCK_USER_ID;
@@ -165,8 +165,13 @@ export class WeAgentStore {
     if (cache[normalized] === undefined) {
       return;
     }
-    delete cache[normalized];
-    this.putJson(KEY_DETAILS_CACHE, cache);
+    const nextCache: Record<string, WeAgentDetails> = {};
+    Object.keys(cache).forEach((key: string) => {
+      if (key !== normalized) {
+        nextCache[key] = cache[key];
+      }
+    });
+    this.putJson(KEY_DETAILS_CACHE, nextCache);
   }
 
   /**
@@ -215,7 +220,7 @@ export class WeAgentStore {
         // Fall back to in-memory cache.
       }
     }
-    this.fallback[key] = encoded;
+    this.fallback.set(key, encoded);
   }
 
   private removeValue(key: string): void {
@@ -228,7 +233,7 @@ export class WeAgentStore {
         // Fall back to in-memory cache.
       }
     }
-    delete this.fallback[key];
+    this.fallback.delete(key);
   }
 
   private getString(key: string): string | null {
@@ -246,7 +251,7 @@ export class WeAgentStore {
         // Ignore and use fallback.
       }
     }
-    return this.fallback[key] ?? null;
+    return this.fallback.get(key) ?? null;
   }
 
   /**

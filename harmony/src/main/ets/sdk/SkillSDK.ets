@@ -779,7 +779,7 @@ export class SkillSDK {
         updateResult: 'success'
       };
     } catch (error) {
-      this.logger.error('updateWeAgent failed', error as Object);
+      this.logger.error(`updateWeAgent failed, error=${JSON.stringify(error)}`);
       throw this.normalizeError('updateWeAgent', error);
     }
   }
@@ -798,7 +798,7 @@ export class SkillSDK {
       );
       return { deleteResult: 'success' };
     } catch (error) {
-      this.logger.error('deleteWeAgent failed', error as Object);
+      this.logger.error(`deleteWeAgent failed, error=${JSON.stringify(error)}`);
       throw this.normalizeError('deleteWeAgent', error);
     }
   }
@@ -806,7 +806,7 @@ export class SkillSDK {
   /**
    * 接收宿主透传的 IM 助理变更通知。
    *
-   * 先校验通知模块为 welink-athena，再把 notify_data 转成业务对象；
+   * 先校验通知模块为 welink-athena，再把 notifyData 转成业务对象；
    * 无关模块、缺失字段或无法解析的载荷会被安全忽略。
    */
   handleWeAgentImNotifyBroadcast(payload: Record<string, Object>): void {
@@ -814,20 +814,20 @@ export class SkillSDK {
       this.logger.error('ignore we-agent IM notification: payload is empty');
       return;
     }
-    const notifyModule = this.safeOptionalString(payload.notify_module, 'notify_module');
+    const notifyModule = this.safeOptionalString(payload.notifyModuleId, 'notifyModuleId');
     if (notifyModule !== SkillSDK.IM_NOTIFY_MODULE) {
-      this.logger.info('ignore we-agent IM notification: notify_module does not match');
       return;
     }
-    const notifyData = this.toRecord(payload.notify_data);
+    this.logger.info('ignore we-agent IM notification: notify_module match');
+    const notifyData = this.toRecord(payload.notifyData);
     if (notifyData === undefined) {
-      this.logger.error('ignore we-agent IM notification: notify_data parse failed');
+      this.logger.error('ignore we-agent IM notification: notifyData parse failed');
       return;
     }
     this.logger.info('we-agent IM notification parsed, enqueue server mutation');
     void this.enqueueWeAgentCacheMutation(async (): Promise<void> => {
       await this.handleWeAgentNotifyData(notifyData, 'server');
-    }).catch((error) => this.logger.error('handle server we-agent notification failed', error as Object));
+    }).catch((error) => this.logger.error(`handle server we-agent notification failed, error=${JSON.stringify(error)}`));
   }
 
   // 23. setIsShowWeAgent
@@ -1123,7 +1123,7 @@ export class SkillSDK {
               'server'
             );
           } catch (_error) {
-            this.logger.error('cold-start we-agent delete compensation failed', _error as Object);
+            this.logger.error(`cold-start we-agent delete compensation failed, error=${JSON.stringify(_error)}`);
           }
           continue;
         }
@@ -1148,7 +1148,7 @@ export class SkillSDK {
       }
       this.logger.info(`cold-start we-agent refresh completed, accountCount=${partnerAccounts.length}`);
     } catch (_error) {
-      this.logger.error('cold-start we-agent compensation failed', _error as Object);
+      this.logger.error(`cold-start we-agent compensation failed, error=${JSON.stringify(_error)}`);
     }
   }
 
@@ -1265,8 +1265,8 @@ export class SkillSDK {
         this.logger.info(`we-agent update broadcast completed, partnerAccount=${partnerAccount}`);
       } catch (_error) {
         // Per plan: update broadcast detail fetch failures do not emit a broadcast.
-        this.logger.error(`fetch detail before update broadcast failed, partnerAccount=${partnerAccount}`,
-          _error as Object);
+        this.logger.error(`fetch detail before update broadcast failed, partnerAccount=${partnerAccount}, `
+          + `error=${JSON.stringify(_error)}`);
       }
       return;
     }
@@ -1330,15 +1330,12 @@ export class SkillSDK {
     this.logger.info('we-agent cache mutation enqueued');
     const execution = this.weAgentCacheMutationTail.then(async (): Promise<void> => {
       this.logger.info('we-agent cache mutation started');
-      try {
-        await task();
-        this.logger.info('we-agent cache mutation completed');
-      } catch (error) {
-        this.logger.error('we-agent cache mutation failed', error as Object);
-        throw error;
-      }
+      await task();
+      this.logger.info('we-agent cache mutation completed');
     });
-    this.weAgentCacheMutationTail = execution.catch((_error) => undefined);
+    this.weAgentCacheMutationTail = execution.catch((_error: object) => {
+      this.logger.error(`we-agent cache mutation failed, error=${JSON.stringify(_error)}`);
+    });
     return execution;
   }
 
@@ -1445,16 +1442,9 @@ export class SkillSDK {
       return;
     }
     this.weAgentStore.clearCurrentDetail();
-    let nextUris: WeAgentUriResult;
-    try {
-      nextUris = await this.getWeAgentUri();
-      this.logger.info(`resolved URI after deleting current we-agent, partnerAccount=${partnerAccount}`);
-    } catch (error) {
-      this.logger.error(`resolve URI after deleting current we-agent failed, partnerAccount=${partnerAccount}`,
-        error as Object);
-      throw error;
-    }
-    void nextUris;
+    let nextUris: WeAgentUriResult = await this.getWeAgentUri();
+    this.logger.info(`resolved URI after deleting current we-agent, partnerAccount=${partnerAccount}`);
+
     // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
     await this.broadcastWeAgentEvent(
       SkillSDK.WE_AGENT_EVENT_NAME,
@@ -1743,34 +1733,6 @@ export class SkillSDK {
     return (this.normalizeOptionalString(detail.bizRobotTag) ?? '').toLowerCase() === 'myagent';
   }
 
-
-  private resolveAssistantIdentityKey(partnerAccount?: string, robotId?: string): string {
-    if (partnerAccount !== undefined) {
-      return partnerAccount;
-    }
-    if (robotId !== undefined) {
-      return robotId;
-    }
-    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
-  }
-
-  private resolveAssistantIdentityQuery(
-    partnerAccount?: string,
-    robotId?: string
-  ): Record<string, string> {
-    const query: Record<string, string> = {};
-    if (partnerAccount !== undefined) {
-      query.partnerAccount = partnerAccount;
-    }
-    if (robotId !== undefined) {
-      query.robotId = robotId;
-    }
-    if (Object.keys(query).length > 0) {
-      return query;
-    }
-    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
-  }
-
   /**
    * 构造助理编辑页 URI，仅使用必填 partnerAccount 定位助理。
    */
@@ -1946,7 +1908,7 @@ export class SkillSDK {
       }
       return new SkillSdkException(5000, error.message);
     }
-    this.logger.warn(`${method} failed with unexpected error`, error);
+    this.logger.warn(`${method} failed with unexpected error: ${JSON.stringify(error)}`);
     return new SkillSdkException(5000, 'Unexpected SDK error');
   }
 }

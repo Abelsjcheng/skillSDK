@@ -1549,23 +1549,6 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     return trimmed != nil && trimmed.length > 0 ? trimmed : nil;
 }
 
-- (nullable NSString *)assistantIdentityKeyWithPartnerAccount:(nullable NSString *)partnerAccount
-                                                      robotId:(nullable NSString *)robotId
-                                                 errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
-    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
-    if (normalizedPartnerAccount != nil) {
-        return normalizedPartnerAccount;
-    }
-    NSString *normalizedRobotId = [self normalizedOptionalString:robotId];
-    if (normalizedRobotId != nil) {
-        return normalizedRobotId;
-    }
-    if (errorMessage != NULL) {
-        *errorMessage = @"partnerAccount or robotId is required.";
-    }
-    return nil;
-}
-
 /// 构造助理编辑页 URI，仅使用必填 partnerAccount 作为目标助理定位参数。
 - (nullable NSString *)assistantEditPageUriWithPartnerAccount:(NSString *)partnerAccount {
     NSString *baseUri = [self appendHashToUri:WLAgentSkillsAssistantH5URI hash:@"editAssistant"];
