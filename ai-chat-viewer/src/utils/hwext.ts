@@ -18,7 +18,6 @@ import type {
   CreateNewSessionParams,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
-  GetAssistantDetailsParams,
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
@@ -162,7 +161,6 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getAgentType: () => assistantCall<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => assistantCall<WeAgentListResult>('getWeAgentList', params),
     getWeAgentDetails: (params) => assistantCall<WeAgentDetailsArrayResult>('getWeAgentDetails', params),
-    getAssistantDetails: (params) => assistantCall<WeAgentDetailsArrayResult>('getAssistantDetails', params),
     updateWeAgent: (params) => assistantCall<UpdateWeAgentResult>('updateWeAgent', params),
     deleteWeAgent: (params) => assistantCall<DeleteWeAgentResult>('deleteWeAgent', params),
     queryQrcodeInfo: (params) => assistantCall<QueryQrcodeInfoResult>('queryQrcodeInfo', params),
@@ -628,10 +626,6 @@ export async function getWeAgentDetails(params: GetWeAgentDetailsParams): Promis
     normalizedParams,
     Promise.resolve(getJsApiOrThrow().getWeAgentDetails(normalizedParams)),
   );
-}
-
-export async function getAssistantDetails(params: GetAssistantDetailsParams): Promise<WeAgentDetailsArrayResult> {
-  return trackApiGetWeAgentDetails(params, Promise.resolve(getJsApiOrThrow().getAssistantDetails(params)));
 }
 
 export async function updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {

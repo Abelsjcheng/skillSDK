@@ -32,6 +32,7 @@ export interface StepBasicInfoProps {
   initialValue?: DigitalTwinBasicInfoPayload | null;
   className?: string;
   showHeader?: boolean;
+  pcTitle?: string;
   expired?: boolean;
   expiredImageSrc?: string;
   expiredMessage?: string;

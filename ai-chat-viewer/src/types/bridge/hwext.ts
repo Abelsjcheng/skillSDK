@@ -181,10 +181,6 @@ export interface GetWeAgentDetailsPcParams {
 
 export type GetWeAgentDetailsParams = GetWeAgentDetailsMobileParams | GetWeAgentDetailsPcParams;
 
-export interface GetAssistantDetailsParams {
-  partnerAccount: string;
-}
-
 export interface UpdateWeAgentParams {
   partnerAccount: string;
   name: string;
@@ -327,6 +323,12 @@ export interface FetchFullOptions {
   headers: Record<string, string>;
 }
 
+export interface HWH5FetchOptions {
+  method?: string;
+  body?: string;
+  headers?: Record<string, string>;
+}
+
 export interface FetchFullResponse<T = unknown> {
   json: () => Promise<T>;
 }
@@ -355,7 +357,6 @@ export interface HWH5EXT {
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
   getWeAgentDetails(params: GetWeAgentDetailsParams): Promise<WeAgentDetailsArrayResult> | WeAgentDetailsArrayResult;
-  getAssistantDetails(params: GetAssistantDetailsParams): Promise<WeAgentDetailsArrayResult> | WeAgentDetailsArrayResult;
   updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> | UpdateWeAgentResult;
   deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> | DeleteWeAgentResult;
   queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> | QueryQrcodeInfoResult;
@@ -393,6 +394,10 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  fetch?: <T = unknown>(
+    url: string,
+    options: HWH5FetchOptions,
+  ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,
@@ -427,3 +432,7 @@ export interface HWH5UserInfo {
   corpUserId: string;
   [key: string]: unknown;
 }
+
+export type AssistantDetailsFetchResult = {
+  data?: WeAgentDetails[];
+};

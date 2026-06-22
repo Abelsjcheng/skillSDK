@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import CreateAssistantBasicPage from '../pages/createAssistantBasic';
 import SelectBrainAssistantPage from '../pages/selectBrainAssistant';
+import EditAssistant from '../pages/editAssistant';
 import { isPcMiniApp } from '../constants';
 import { getQueryParam } from '../utils/hwext';
 
@@ -34,6 +35,14 @@ export const CreateAssistantPageRouter: React.FC = () => (
       element={(
         <div style={FULL_PAGE_ROUTE_STYLE}>
           <SelectBrainAssistantPage />
+        </div>
+      )}
+    />
+    <Route
+      path="/editAssistant"
+      element={(
+        <div style={FULL_PAGE_ROUTE_STYLE}>
+          <EditAssistant />
         </div>
       )}
     />

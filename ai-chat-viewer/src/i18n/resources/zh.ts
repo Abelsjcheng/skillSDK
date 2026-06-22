@@ -98,7 +98,7 @@ export const zh = {
   'createAssistant.illustrationAlt': '个人助手插画',
   'createAssistant.avatarTooLarge': '图片大小需小于2MB',
   'createAssistant.invalidAvatarFormat': '仅支持JPG/PNG格式',
-  'editAssistant.title': '编辑个人助手',
+  'editAssistant.title': '修改助手信息',
   'editAssistant.loadFailed': '获取助手详情失败',
   'editAssistant.updateFailed': '更新助手失败',
   'editAssistant.invalidTarget': '缺少助手标识',

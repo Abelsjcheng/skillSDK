@@ -11,7 +11,6 @@ import type {
   CreateDigitalTwinResult,
   CreateNewSessionParams,
   DeleteWeAgentResult,
-  GetAssistantDetailsParams,
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
@@ -756,13 +755,6 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         .map(() => assistantDetail);
       return {
         weAgentDetailsArray: details.length > 0 ? details : [assistantDetail],
-      };
-    },
-
-    async getAssistantDetails(params: GetAssistantDetailsParams): Promise<WeAgentDetailsArrayResult> {
-      const details = params.partnerAccount === config.assistantAccount ? [assistantDetail] : [];
-      return {
-        weAgentDetailsArray: details,
       };
     },
 

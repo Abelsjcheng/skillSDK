@@ -50,6 +50,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   initialValue,
   className,
   showHeader = true,
+  pcTitle,
   expired = false,
   expiredImageSrc,
   expiredMessage,
@@ -189,6 +190,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           isPcMiniApp={isPcMiniApp}
           onClose={onClose}
           onMobileBack={onMobileBack}
+          pcTitle={pcTitle}
         />
       ) : null}
 

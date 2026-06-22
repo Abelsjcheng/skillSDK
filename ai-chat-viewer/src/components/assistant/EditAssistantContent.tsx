@@ -4,12 +4,13 @@ import AssistantPageHeader from './AssistantPageHeader';
 import { StepBasicInfo } from '../createAssistant/StepBasicInfo';
 import { DEFAULT_AVATARS, resolveAssistantIconUrl } from '../createAssistant/constants';
 import { ensureLanguageInitialized } from '../../i18n/config';
-import type { WeAgentDetails } from '../../types/bridge';
+import type { AssistantDetailsFetchResult, WeAgentDetails } from '../../types/bridge';
 import type { EditAssistantContentProps } from '../../types/components';
 import type { DigitalTwinBasicInfoPayload } from '../../types/digitalTwin';
+import { HOST } from '../../constants';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
-  getAssistantDetails,
+  getWeAgentDetails,
   openH5Webview,
   updateWeAgent,
 } from '../../utils/hwext';
@@ -32,6 +33,22 @@ function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayloa
 
 const noop = () => {};
 
+async function fetchMobileAssistantDetails(partnerAccount: string): Promise<WeAgentDetails[]> {
+  if (typeof window.HWH5?.fetch !== 'function') {
+    throw new Error('HWH5.fetch is not available.');
+  }
+
+  const response = await window.HWH5.fetch<AssistantDetailsFetchResult>(
+    `${HOST()}/v1/robot-partners/${encodeURIComponent(partnerAccount)}`,
+    {
+      method: 'GET',
+      headers: {},
+    },
+  );
+  const result = await response.json();
+  return result.data ?? [];
+}
+
 const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
   isPcMiniApp = false,
   source = 'external',
@@ -42,6 +59,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
 }) => {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<WeAgentDetails | null>(initialDetail);
+  const useCreateAssistantLayout = isPcMiniApp && source === 'external';
 
   const handleServiceClick = useCallback(() => {
     openH5Webview({
@@ -64,13 +82,18 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
 
     const fetchAssistantDetail = async () => {
       try {
-        const result = await getAssistantDetails({ partnerAccount: normalizedPartnerAccount });
-        const nextDetail = result?.weAgentDetailsArray?.[0] ?? null;
+        const details = isPcMiniApp
+          ? (await getWeAgentDetails({ partnerAccount: normalizedPartnerAccount })).weAgentDetailsArray
+          : await fetchMobileAssistantDetails(normalizedPartnerAccount);
+        const nextDetail = details?.[0] ?? null;
         if (!cancelled) {
           setDetail(nextDetail);
         }
       } catch (error) {
-        WeLog(`EditAssistantContent getAssistantDetails failed | extra=${JSON.stringify({ partnerAccount: normalizedPartnerAccount })} | error=${JSON.stringify(error)}`);
+        WeLog(`EditAssistantContent load details failed | extra=${JSON.stringify({
+          partnerAccount: normalizedPartnerAccount,
+          isPcMiniApp,
+        })} | error=${JSON.stringify(error)}`);
         showToast(t('editAssistant.loadFailed'));
         if (!cancelled) {
           setDetail(initialDetail);
@@ -83,7 +106,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [initialDetail, partnerAccount, t]);
+  }, [initialDetail, isPcMiniApp, partnerAccount, t]);
 
   const initialValue = useMemo(() => (detail ? resolveInitialValue(detail) : null), [detail]);
 
@@ -119,20 +142,27 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
 
   return (
     <div
-      className={`digital-twin-creator digital-twin-creator--assistant-edit${isPcMiniApp ? ' is-pc' : ' is-mobile'}`.trim()}
+      className={
+        useCreateAssistantLayout
+          ? 'digital-twin-creator is-pc'
+          : `digital-twin-creator digital-twin-creator--assistant-edit${isPcMiniApp ? ' is-pc' : ' is-mobile'}`.trim()
+      }
     >
-      <AssistantPageHeader
-        title={isPcMiniApp ? '' : t('editAssistant.title')}
-        isPcMiniApp={isPcMiniApp}
-        onClose={onClose}
-        onService={handleServiceClick}
-      />
+      {!useCreateAssistantLayout ? (
+        <AssistantPageHeader
+          title={isPcMiniApp ? '' : t('editAssistant.title')}
+          isPcMiniApp={isPcMiniApp}
+          onClose={onClose}
+          onService={handleServiceClick}
+        />
+      ) : null}
       <StepBasicInfo
-        isPcMiniApp={false}
-        className="digital-twin--assistant-edit"
+        isPcMiniApp={useCreateAssistantLayout}
+        className={useCreateAssistantLayout ? undefined : 'digital-twin--assistant-edit'}
         defaultAvatars={DEFAULT_AVATARS}
         initialValue={initialValue}
-        showHeader={false}
+        showHeader={useCreateAssistantLayout}
+        pcTitle={useCreateAssistantLayout ? t('editAssistant.title') : undefined}
         onClose={onClose}
         onNext={handleSubmit}
         submitLabel={t('createAssistant.confirm')}
