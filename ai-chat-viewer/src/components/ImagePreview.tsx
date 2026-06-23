@@ -7,11 +7,6 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  TransformComponent,
-  TransformWrapper,
-  type ReactZoomPanPinchContentRef,
-} from 'react-zoom-pan-pinch';
 import '../styles/ImagePreview.less';
 
 export interface ImagePreviewProps {
@@ -25,7 +20,54 @@ export interface ImagePreviewProps {
   onSourceError?: (error: unknown) => void;
 }
 
+type PreviewTransform = {
+  scale: number;
+  translateX: number;
+  translateY: number;
+};
+
+type DragGesture = {
+  type: 'mouse' | 'touch';
+  lastX: number;
+  lastY: number;
+};
+
+type PinchGesture = {
+  type: 'pinch';
+  lastDistance: number;
+  lastCenterX: number;
+  lastCenterY: number;
+};
+
+type PreviewGesture = DragGesture | PinchGesture | null;
 type PreviewIconType = 'zoomIn' | 'zoomOut' | 'close';
+
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 6;
+const ZOOM_STEP = 1.2;
+
+const DEFAULT_TRANSFORM: PreviewTransform = {
+  scale: 1,
+  translateX: 0,
+  translateY: 0,
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getTouchDistance(touchA: Touch, touchB: Touch): number {
+  const deltaX = touchB.clientX - touchA.clientX;
+  const deltaY = touchB.clientY - touchA.clientY;
+  return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+function getTouchCenter(touchA: Touch, touchB: Touch): { clientX: number; clientY: number } {
+  return {
+    clientX: (touchA.clientX + touchB.clientX) / 2,
+    clientY: (touchA.clientY + touchB.clientY) / 2,
+  };
+}
 
 function revokeObjectUrl(url: string): void {
   if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
@@ -80,9 +122,71 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   const [svgUrl, setSvgUrl] = useState('');
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const transformRef = useRef<PreviewTransform>({ ...DEFAULT_TRANSFORM });
+  const gestureRef = useRef<PreviewGesture>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
-  const supportsResizeObserver = typeof window !== 'undefined' && 'ResizeObserver' in window;
+
+  const applyTransform = useCallback(() => {
+    const content = contentRef.current;
+    if (!content) {
+      return;
+    }
+    const { scale, translateX, translateY } = transformRef.current;
+    content.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+  }, []);
+
+  const setTransform = useCallback((nextTransform: PreviewTransform) => {
+    transformRef.current = {
+      scale: clamp(nextTransform.scale, MIN_SCALE, MAX_SCALE),
+      translateX: nextTransform.translateX,
+      translateY: nextTransform.translateY,
+    };
+    applyTransform();
+  }, [applyTransform]);
+
+  const resetTransform = useCallback(() => {
+    transformRef.current = { ...DEFAULT_TRANSFORM };
+    applyTransform();
+  }, [applyTransform]);
+
+  const getFocalPoint = useCallback((clientX: number, clientY: number) => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return { x: 0, y: 0 };
+    }
+    const rect = stage.getBoundingClientRect();
+    return {
+      x: clientX - rect.left - rect.width / 2,
+      y: clientY - rect.top - rect.height / 2,
+    };
+  }, []);
+
+  const zoomAt = useCallback((clientX: number, clientY: number, nextScale: number) => {
+    const current = transformRef.current;
+    const nextClampedScale = clamp(nextScale, MIN_SCALE, MAX_SCALE);
+    if (nextClampedScale === current.scale) {
+      return;
+    }
+
+    const focal = getFocalPoint(clientX, clientY);
+    const ratio = nextClampedScale / current.scale;
+    setTransform({
+      scale: nextClampedScale,
+      translateX: focal.x - (focal.x - current.translateX) * ratio,
+      translateY: focal.y - (focal.y - current.translateY) * ratio,
+    });
+  }, [getFocalPoint, setTransform]);
+
+  const zoomFromStageCenter = useCallback((factor: number) => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return;
+    }
+    const rect = stage.getBoundingClientRect();
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, transformRef.current.scale * factor);
+  }, [zoomAt]);
 
   useEffect(() => {
     if (!svgSource) {
@@ -98,6 +202,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
       onSourceError?.(error);
       return undefined;
     }
+
     setSvgUrl(url);
     return () => {
       revokeObjectUrl(url);
@@ -112,11 +217,12 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   }, [src, svgSource, svgUrl]);
 
   const closePreview = useCallback(() => {
+    gestureRef.current = null;
     setOpen(false);
   }, []);
 
   const openPreview = useCallback(() => {
-    if (!imageSrc || disabled) {
+    if (!imageSrc || disabled || typeof document === 'undefined') {
       return;
     }
     restoreFocusRef.current = document.activeElement instanceof HTMLElement
@@ -125,22 +231,82 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
     setOpen(true);
   }, [disabled, imageSrc]);
 
+  const startMouseDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    gestureRef.current = {
+      type: 'mouse',
+      lastX: event.clientX,
+      lastY: event.clientY,
+    };
+  }, []);
+
   useEffect(() => {
     if (!open || typeof document === 'undefined') {
       return undefined;
     }
 
     const body = document.body;
-    const previousOverflow = body.style.overflow;
+    const html = document.documentElement;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = html.style.overflow;
     body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    resetTransform();
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     return () => {
-      body.style.overflow = previousOverflow;
+      body.style.overflow = previousBodyOverflow;
+      html.style.overflow = previousHtmlOverflow;
       restoreFocusRef.current?.focus();
       restoreFocusRef.current = null;
+      gestureRef.current = null;
     };
-  }, [open]);
+  }, [open, resetTransform]);
+
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const gesture = gestureRef.current;
+      if (!gesture || gesture.type !== 'mouse') {
+        return;
+      }
+      event.preventDefault();
+      const deltaX = event.clientX - gesture.lastX;
+      const deltaY = event.clientY - gesture.lastY;
+      gestureRef.current = {
+        ...gesture,
+        lastX: event.clientX,
+        lastY: event.clientY,
+      };
+      const current = transformRef.current;
+      setTransform({
+        ...current,
+        translateX: current.translateX + deltaX,
+        translateY: current.translateY + deltaY,
+      });
+    };
+
+    const stopMouseDrag = () => {
+      if (gestureRef.current?.type === 'mouse') {
+        gestureRef.current = null;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', stopMouseDrag);
+    window.addEventListener('blur', stopMouseDrag);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', stopMouseDrag);
+      window.removeEventListener('blur', stopMouseDrag);
+    };
+  }, [open, setTransform]);
 
   useEffect(() => {
     if (!open || typeof document === 'undefined') {
@@ -151,17 +317,6 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
       if (event.key === 'Escape') {
         event.preventDefault();
         closePreview();
-        return;
-      }
-      if (event.key === '+' || event.key === '=') {
-        event.preventDefault();
-        transformRef.current?.zoomIn(0.25, 180);
-        return;
-      }
-      if (event.key === '-') {
-        event.preventDefault();
-        transformRef.current?.zoomOut(0.25, 180);
-        return;
       }
     };
 
@@ -170,6 +325,148 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [closePreview, open]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const stage = stageRef.current;
+    if (!stage) {
+      return undefined;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      zoomAt(event.clientX, event.clientY, transformRef.current.scale * factor);
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length >= 2) {
+        event.preventDefault();
+        const touchA = event.touches[0];
+        const touchB = event.touches[1];
+        const center = getTouchCenter(touchA, touchB);
+        gestureRef.current = {
+          type: 'pinch',
+          lastDistance: getTouchDistance(touchA, touchB),
+          lastCenterX: center.clientX,
+          lastCenterY: center.clientY,
+        };
+        return;
+      }
+
+      if (event.touches.length === 1) {
+        event.preventDefault();
+        const touch = event.touches[0];
+        gestureRef.current = {
+          type: 'touch',
+          lastX: touch.clientX,
+          lastY: touch.clientY,
+        };
+      }
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const gesture = gestureRef.current;
+      if (!gesture) {
+        return;
+      }
+
+      if (gesture.type === 'pinch' && event.touches.length >= 2) {
+        event.preventDefault();
+        const touchA = event.touches[0];
+        const touchB = event.touches[1];
+        const nextDistance = getTouchDistance(touchA, touchB);
+        if (gesture.lastDistance <= 0 || nextDistance <= 0) {
+          return;
+        }
+
+        const center = getTouchCenter(touchA, touchB);
+        const current = transformRef.current;
+        const nextScale = clamp(current.scale * (nextDistance / gesture.lastDistance), MIN_SCALE, MAX_SCALE);
+        const focal = getFocalPoint(center.clientX, center.clientY);
+        const ratio = nextScale / current.scale;
+        const centerDeltaX = center.clientX - gesture.lastCenterX;
+        const centerDeltaY = center.clientY - gesture.lastCenterY;
+
+        setTransform({
+          scale: nextScale,
+          translateX: focal.x - (focal.x - current.translateX) * ratio + centerDeltaX,
+          translateY: focal.y - (focal.y - current.translateY) * ratio + centerDeltaY,
+        });
+
+        gestureRef.current = {
+          type: 'pinch',
+          lastDistance: nextDistance,
+          lastCenterX: center.clientX,
+          lastCenterY: center.clientY,
+        };
+        return;
+      }
+
+      if (gesture.type === 'touch' && event.touches.length === 1) {
+        event.preventDefault();
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - gesture.lastX;
+        const deltaY = touch.clientY - gesture.lastY;
+        gestureRef.current = {
+          type: 'touch',
+          lastX: touch.clientX,
+          lastY: touch.clientY,
+        };
+        const current = transformRef.current;
+        setTransform({
+          ...current,
+          translateX: current.translateX + deltaX,
+          translateY: current.translateY + deltaY,
+        });
+      }
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length >= 2) {
+        const touchA = event.touches[0];
+        const touchB = event.touches[1];
+        const center = getTouchCenter(touchA, touchB);
+        gestureRef.current = {
+          type: 'pinch',
+          lastDistance: getTouchDistance(touchA, touchB),
+          lastCenterX: center.clientX,
+          lastCenterY: center.clientY,
+        };
+        return;
+      }
+
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        gestureRef.current = {
+          type: 'touch',
+          lastX: touch.clientX,
+          lastY: touch.clientY,
+        };
+        return;
+      }
+
+      gestureRef.current = null;
+    };
+
+    const listenerOptions = { passive: false };
+    stage.addEventListener('wheel', handleWheel, listenerOptions);
+    stage.addEventListener('touchstart', handleTouchStart, listenerOptions);
+    stage.addEventListener('touchmove', handleTouchMove, listenerOptions);
+    stage.addEventListener('touchend', handleTouchEnd);
+    stage.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      stage.removeEventListener('wheel', handleWheel);
+      stage.removeEventListener('touchstart', handleTouchStart);
+      stage.removeEventListener('touchmove', handleTouchMove);
+      stage.removeEventListener('touchend', handleTouchEnd);
+      stage.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [getFocalPoint, open, setTransform, zoomAt]);
 
   if (!imageSrc) {
     return null;
@@ -197,11 +494,6 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={title || alt || t('imagePreview.dialogTitle')}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            closePreview();
-          }
-        }}
       >
         <div className="image-preview__toolbar" aria-label={t('imagePreview.toolbar')}>
           <button
@@ -209,7 +501,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
             type="button"
             aria-label={t('imagePreview.zoomIn')}
             title={t('imagePreview.zoomIn')}
-            onClick={() => transformRef.current?.zoomIn(0.25, 180)}
+            onClick={() => zoomFromStageCenter(ZOOM_STEP)}
           >
             <PreviewIcon type="zoomIn" />
           </button>
@@ -218,7 +510,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
             type="button"
             aria-label={t('imagePreview.zoomOut')}
             title={t('imagePreview.zoomOut')}
-            onClick={() => transformRef.current?.zoomOut(0.25, 180)}
+            onClick={() => zoomFromStageCenter(1 / ZOOM_STEP)}
           >
             <PreviewIcon type="zoomOut" />
           </button>
@@ -233,32 +525,19 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
             <PreviewIcon type="close" />
           </button>
         </div>
-        <div className="image-preview__stage">
-          <TransformWrapper
-            ref={transformRef}
-            minScale={0.5}
-            maxScale={6}
-            initialScale={1}
-            centerOnInit={supportsResizeObserver}
-            centerZoomedOut
-            limitToBounds={false}
-            wheel={{ step: 0.18 }}
-            pinch={{ step: 6 }}
-            panning={{ allowLeftClickPan: true, velocityDisabled: true }}
-            doubleClick={{ mode: 'toggle', step: 1.2 }}
-          >
-            <TransformComponent
-              wrapperClass="image-preview__transform-wrapper"
-              contentClass="image-preview__transform-content"
-            >
-              <img
-                className="image-preview__modal-image"
-                src={imageSrc}
-                alt={alt}
-                draggable="false"
-              />
-            </TransformComponent>
-          </TransformWrapper>
+        <div
+          ref={stageRef}
+          className="image-preview__stage"
+          onMouseDown={startMouseDrag}
+        >
+          <div ref={contentRef} className="image-preview__transform-content">
+            <img
+              className="image-preview__modal-image"
+              src={imageSrc}
+              alt={alt}
+              draggable="false"
+            />
+          </div>
         </div>
       </div>,
       document.body,
