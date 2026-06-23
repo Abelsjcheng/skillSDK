@@ -22,7 +22,6 @@ import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
-  getAssistantMessageCopyText,
   normalizeRole,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
@@ -100,7 +99,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
   const isPlainVariant = variant === 'plain';
   const canRenderActions = showActions && !isUser;
-  const copyText = useMemo(() => getAssistantMessageCopyText(message), [message]);
+  const copyContent = message.content.trim();
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -207,16 +206,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleCopy = () => {
-    if (!copyText) {
+    if (!copyContent) {
       return;
     }
 
     if (onCopy) {
-      void onCopy(copyText);
+      void onCopy(copyContent);
       return;
     }
 
-    void copyTextToClipboard(copyText)
+    void copyTextToClipboard(copyContent)
       .then(() => {
         showToast(t('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
       })
@@ -231,7 +230,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderWeAgentActions = () => {
-    if (!canRenderActions || !copyText || !onCopy) {
+    if (!canRenderActions || message.isStreaming || !copyContent || !onCopy) {
       return null;
     }
 
@@ -250,13 +249,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderPlainActions = () => {
-    if (!canRenderActions || (!copyText && !message.content) || (!onCopy && !onSendToIM)) {
+    if (!canRenderActions || message.isStreaming || !copyContent || (!onCopy && !onSendToIM)) {
       return null;
     }
 
     return (
       <div className="message-actions message-actions--plain">
-        {onCopy && copyText ? (
+        {onCopy ? (
           <button
             type="button"
             className="action-btn copy-btn"

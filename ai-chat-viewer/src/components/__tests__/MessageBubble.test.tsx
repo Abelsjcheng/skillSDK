@@ -165,10 +165,10 @@ describe('MessageBubble', () => {
     expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
   });
 
-  it('renders weAgent copy action below assistant content and copies text parts', () => {
+  it('renders weAgent copy action below assistant content and copies message content', () => {
     const onCopy = jest.fn();
     const message = createCompletedAssistantMessage({
-      content: '',
+      content: '完整回复正文',
       parts: [
         {
           partId: 'text-1',
@@ -203,7 +203,7 @@ describe('MessageBubble', () => {
 
     fireEvent.click(copyButton!);
 
-    expect(onCopy).toHaveBeenCalledWith('第一段\n\n第二段');
+    expect(onCopy).toHaveBeenCalledWith('完整回复正文');
   });
 
   it('renders weAgent copy action as icon-only without skillCUI send action', () => {
@@ -248,7 +248,7 @@ describe('MessageBubble', () => {
     expect(container.querySelector('.send-btn .action-btn__text')).toHaveTextContent('发送');
   });
 
-  it('does not show skillCUI send action for parts-only messages without message content', () => {
+  it('does not show skillCUI actions for parts-only messages without message content', () => {
     const message = createCompletedAssistantMessage({
       content: '',
       parts: [
@@ -272,7 +272,7 @@ describe('MessageBubble', () => {
       />,
     );
 
-    expect(container.querySelector('.copy-btn')).toBeInTheDocument();
+    expect(container.querySelector('.copy-btn')).not.toBeInTheDocument();
     expect(container.querySelector('.send-btn')).not.toBeInTheDocument();
   });
 
