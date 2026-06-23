@@ -42,7 +42,7 @@ flowchart TD
 
     B --> C["选择/切换助手<br/>已埋码：点击、列表/详情接口<br/>已补齐：打开 WeAgentCUI 失败"]
     B --> D["WeAgentCUI 初始化<br/>已埋码：详情/历史/创建会话接口<br/>已补齐：初始化编排失败、缺 assistantAccount"]
-    B --> E["会话收发消息<br/>已埋码：发送点击、发送/停止/历史接口、onMessage 错误<br/>未埋码：首 token、完成耗时、停止点击"]
+    B --> E["会话收发消息<br/>已埋码：发送点击、发送/停止/历史接口、onMessage 错误"]
     B --> F["创建助手<br/>已埋码：二维码/创建接口<br/>已补齐：结果缺 partnerAccount、创建后打开 IM/CUI 失败"]
     B --> G["编辑/删除助手<br/>已埋码：详情/更新/删除接口<br/>已补齐：缺目标标识、通知宿主失败"]
     B --> H["浏览器运行时<br/>已埋码：browser_js_error"]
@@ -111,7 +111,6 @@ sequenceDiagram
     Hook->>SDK: sendMessage
     SDK->>Uem: api_send_message 成功/失败 已埋码
     Listener-->>Hook: message.user / text.delta / text.done
-    Note over Hook: 未埋码：首 token、流式完成耗时
     alt session.error 或 error
         Listener-->>Hook: session.error / error
         Hook->>Telemetry: flow_onmessage_error 已埋码
@@ -233,8 +232,6 @@ sequenceDiagram
 
 现有点击和异常埋码均为 fire-and-forget，不阻塞页面流程。接口类埋码在 wrapper 的 try/catch 中触发，上报 promise 不 await，因此不会延长接口返回链路。`getTelemetryBase()` 做 promise 级缓存，避免每次埋码重复调用 `getDeviceInfo` 和 `getAppInfo`。
 
-后续若新增流式性能埋码，应只在首 token、完成、错误等关键节点上报，不应在每个 `text.delta` 分片上报。
-
 ## 6. 功耗
 
 不涉及新增轮询、长连接、后台任务或动画。现有 `browser_js_error` 为事件监听，且对同指纹错误做 3 秒节流。后续新增流程异常埋码仅在异常分支触发，对功耗影响可忽略。
@@ -249,7 +246,6 @@ sequenceDiagram
 | 接口埋码 | SDK API 成功/失败结果 | `hwext.ts` -> `trackApi*` -> `reportApiSuccess/reportApiError` | 已覆盖接口异常，带 `errorCode`、`errorMessage` |
 | 流程异常埋码 | 非单一接口失败的业务流程错误 | `reportFlowTelemetry` | 已覆盖 `flow_onmessage_error`，核心流程仍缺口较多 |
 | 浏览器异常埋码 | 前端运行时 JS 错误 | `installBrowserJsErrorTelemetry` | 已覆盖 `window.error`，未覆盖 promise rejection |
-| 性能埋码 | 流式首 token、完成、初始化耗时等 | 待接入 | 未实现 |
 | 本地日志 | 仅用于端侧日志排查 | `WeLog` -> `HWH5.log` | 不进入 UEM 聚合分析 |
 
 ### 7.2 已实现与未实现埋码总表
@@ -291,12 +287,6 @@ sequenceDiagram
 | 流程异常 | `flow_delete_assistant_error` | 删除助手 | 已实现 | 缺目标或删除流程失败。接口失败仍由 `api_delete_weagent` 覆盖。 |
 | 流程异常 | `flow_skillcui_missing_param_error` | SkillCUI 入口 | 已实现 | 缺少 `welinkSessionId` 的入口异常。 |
 | 流程异常 | `flow_host_bridge_error` | 宿主桥接 | 已实现 | 当前覆盖创建助手后 `openIMChat` / PC 创建后宿主处理失败，后续可扩展到更多桥接方法。 |
-| 性能 | `perf_stream_first_token` | 流式会话 | 未实现 | 用户发送后首次可展示内容耗时。 |
-| 性能 | `perf_stream_complete` | 流式会话 | 未实现 | 首 token 后生成耗时和端到端完成耗时。 |
-| 性能 | `perf_stream_error` | 流式会话 | 未实现 | 流式错误前耗时，补充 `flow_onmessage_error` 的性能维度。 |
-| 性能 | `perf_history_load` | 历史会话/历史消息 | 未实现 | 历史列表或历史消息加载耗时。 |
-| 性能 | `perf_weagent_init` | WeAgentCUI 初始化 | 未实现 | 初始化成功耗时。 |
-
 ### 7.3 异常和错误埋码重点说明
 
 1. 已实现接口错误：所有通过 `hwext.ts` 包装的 `api_*` 方法，失败时都会调用 `reportApiError`，字段包含 `type: 'error'`、`request`、`errorCode`、`errorMessage`。
@@ -345,20 +335,13 @@ sequenceDiagram
 | 流程异常 | `flow_delete_assistant_error` | 已实现 | 看板观察 | P2 | 删除流程低频，建议只在错误突增时临时关注。 |
 | 流程异常 | `flow_skillcui_missing_param_error` | 已实现 | 突增告警 | P2 | SkillCUI 缺 `welinkSessionId` 会导致页面不可用，但通常是入口集成问题，适合按版本突增告警。 |
 | 流程异常 | `flow_host_bridge_error` | 已实现 | 阈值告警 | P1/P2 | 宿主桥接失败可能导致打开 CUI、打开 IM、通知更新失败；需按 `bridgeMethod` 区分告警级别。 |
-| 性能 | `perf_stream_first_token` | 未实现 | 性能阈值告警 | P2 | 首 token P95/P99 超阈值会显著影响体验，但不属于错误告警。 |
-| 性能 | `perf_stream_complete` | 未实现 | 性能阈值告警 | P2 | 端到端生成耗时可用于体验 SLA，建议按页面、版本、模型/场景聚合。 |
-| 性能 | `perf_stream_error` | 未实现 | 合并告警 | P1/P2 | 不单独告警，建议与 `flow_onmessage_error` 合并，用于判断错误发生前等待时长。 |
-| 性能 | `perf_history_load` | 未实现 | 性能阈值告警 | P3 | 历史加载慢影响体验但通常不阻塞发送，低优先级。 |
-| 性能 | `perf_weagent_init` | 未实现 | 性能阈值告警 | P2 | 初始化慢会影响进入体验，建议与 `flow_weagent_init_error` 一起观察。 |
-
 ### 7.5 告警触发规则建议
 
 1. P1 稳定性告警：5 分钟窗口内错误率 > 5%，且样本数 > 50；或 10 分钟内同一 `eventId + errorCode + versionName + clientType` 错误数 > 20。
 2. P2 体验/转化告警：15 分钟窗口内错误率 > 8%，且样本数 > 80；或新版本错误率超过全量基线 2 倍。
 3. 突增告警：同一入口、同一版本、同一错误指纹较过去 1 小时基线突增 3 倍以上时触发。
-4. 性能告警：使用 P95/P99，而不是平均值；首 token 和初始化耗时需要按页面、客户端类型、版本分组。
-5. 去噪规则：二维码过期、用户主动取消、参数为空导致按钮禁用、单用户重复触发、`browser_js_error` 同指纹 3 秒内重复事件，不应直接触发告警。
-6. 告警路由：P1 进入实时值班；P2 进入工作时间告警或群通知；P3 只进看板和周报。
+4. 去噪规则：二维码过期、用户主动取消、参数为空导致按钮禁用、单用户重复触发、`browser_js_error` 同指纹 3 秒内重复事件，不应直接触发告警。
+5. 告警路由：P1 进入实时值班；P2 进入工作时间告警或群通知；P3 只进看板和周报。
 
 ## 8. 影响范围
 
@@ -372,7 +355,6 @@ sequenceDiagram
 
 1. 数据分析侧需要按 `type`、`eventId`、`page`、`stage` 区分接口错误和流程错误。
 2. PC 端当前不上报 UEM，补齐 PC bridge 后同一套事件会扩大数据量。
-3. 若新增性能埋码，需要明确采样或关键节点触发策略，避免流式高频事件。
 
 ### 8.3 不影响
 
@@ -405,6 +387,6 @@ sequenceDiagram
 
 ## 10. 最终建议
 
-最终结论：推荐保留现有三层收口方式，即点击类继续走 `uemUtil.ts`，接口类继续走 `hwext.ts` + `trackApi*`，流程异常和浏览器异常继续走 `telemetry.ts`。当前已补齐 `flow_weagent_init_error`、`flow_open_weagent_error`、`flow_create_assistant_error`、`flow_host_bridge_error`、`flow_skillcui_missing_param_error` 等核心流程异常；中期继续补充 `unhandledrejection` 和流式性能埋码；PC 端待 bridge 支持后再统一开启 UEM 上报。
+最终结论：推荐保留现有三层收口方式，即点击类继续走 `uemUtil.ts`，接口类继续走 `hwext.ts` + `trackApi*`，流程异常和浏览器异常继续走 `telemetry.ts`。当前已补齐 `flow_weagent_init_error`、`flow_open_weagent_error`、`flow_create_assistant_error`、`flow_host_bridge_error`、`flow_skillcui_missing_param_error` 等核心流程异常；PC 端待 bridge 支持后再统一开启 UEM 上报。
 
 取舍原因：接口错误已覆盖较完整，不需要重复建设；当前最大观测盲区在“接口成功但业务流程失败”和“非接口桥接失败”，这些问题最容易造成用户不可用但数据侧不可见。告警层面不建议所有异常事件直接告警，推荐只对 `api_create_new_session`、`api_send_message`、`api_create_digital_twin`、`api_get_weagent_details`、`flow_onmessage_error`、`browser_js_error` 以及补齐后的核心 `flow_*_error` 配置阈值告警；点击类、低频管理类、预期业务校验失败进入看板观察。后续动作建议先实现统一 `reportCoreFlowError` helper，再按核心页面失败分支逐步接入，并在埋码平台验证字段完整性和告警阈值后更新已实现总表。
