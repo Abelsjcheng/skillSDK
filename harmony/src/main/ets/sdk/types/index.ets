@@ -551,6 +551,8 @@ export interface WeAgent {
   bizRobotName: string;
   bizRobotNameEn: string;
   bizRobotTag: string;
+  tagName: string;
+  tagNameEn: string;
   robotId: string;
 }
 
@@ -582,6 +584,8 @@ export interface WeAgentDetails {
   bizRobotNameEn: string;
   bizRobotTag: string;
   bizRobotId: string;
+  tagName: string;
+  tagNameEn: string;
   weCodeUrl: string;
 }
 

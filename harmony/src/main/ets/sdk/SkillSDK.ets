@@ -737,6 +737,34 @@ export class SkillSDK {
     }
   }
 
+  /**
+   * 读取当前助理完整详情。
+   *
+   * 方法只读取 current_we_agent_detail，不触发网络请求或缓存写入；返回值会复制缓存中的全部字段，
+   * 并仅对缺失的 tagName、tagNameEn 分别使用“助手”和“Agent”兜底。
+   */
+  async getWeAgentInfo(): Promise<WeAgentDetails> {
+    try {
+      const cachedDetail = this.weAgentStore.loadCurrentDetail();
+      const detailPayload = cachedDetail === null
+        ? {}
+        : this.toRecord(cachedDetail as Object) ?? {};
+      const detail = this.normalizeWeAgentDetails(detailPayload);
+      detail.tagName = this.normalizeOptionalString(detail.tagName) ?? '助手';
+      detail.tagNameEn = this.normalizeOptionalString(detail.tagNameEn) ?? 'Agent';
+      this.logger.info(
+        `getWeAgentInfo succeeded, partnerAccount=${detail.partnerAccount}, tagName=${detail.tagName}, tagNameEn=${detail.tagNameEn}`
+      );
+      return detail;
+    } catch (error) {
+      this.logger.error(`getWeAgentInfo cache read failed, error=${JSON.stringify(error)}`);
+      const fallback = this.normalizeWeAgentDetails({});
+      fallback.tagName = '助手';
+      fallback.tagNameEn = 'Agent';
+      return fallback;
+    }
+  }
+
   // 20. getWeAgentUri
   async getWeAgentUri(): Promise<WeAgentUriResult> {
     try {
@@ -1672,6 +1700,8 @@ export class SkillSDK {
         bizRobotName: TypeConverter.toOptionalString(row.bizRobotName, 'bizRobotName') ?? '',
         bizRobotNameEn: TypeConverter.toOptionalString(row.bizRobotNameEn, 'bizRobotNameEn') ?? '',
         bizRobotTag: TypeConverter.toOptionalString(row.bizRobotTag, 'bizRobotTag') ?? '',
+        tagName: TypeConverter.toOptionalString(row.tagName, 'tagName') ?? '',
+        tagNameEn: TypeConverter.toOptionalString(row.tagNameEn, 'tagNameEn') ?? '',
         robotId: TypeConverter.toOptionalString(row.robotId, 'robotId') ?? ''
       });
     }
@@ -1722,6 +1752,8 @@ export class SkillSDK {
       bizRobotNameEn: TypeConverter.toOptionalString(payload.bizRobotNameEn, 'bizRobotNameEn') ?? '',
       bizRobotTag: TypeConverter.toOptionalString(payload.bizRobotTag, 'bizRobotTag') ?? '',
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
+      tagName: TypeConverter.toOptionalString(payload.tagName, 'tagName') ?? '',
+      tagNameEn: TypeConverter.toOptionalString(payload.tagNameEn, 'tagNameEn') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };
   }

@@ -1082,6 +1082,36 @@ public final class SkillSDK {
         });
     }
 
+    /**
+     * 读取当前助理完整详情。
+     *
+     * <p>方法仅访问本地 current_we_agent_detail 缓存，不发起网络请求或回写缓存。返回前复制缓存对象，
+     * 并仅对缺失的 tagName、tagNameEn 分别使用“助手”和“Agent”兜底。</p>
+     */
+    public void getWeAgentInfo(@NonNull SkillCallback<WeAgentDetails> callback) {
+        if (callback == null) {
+            throw new IllegalArgumentException("callback == null");
+        }
+        WeAgentDetails cachedDetail = weAgentStorage.getCurrentWeAgentDetail();
+        WeAgentDetails result = cachedDetail == null
+                ? new WeAgentDetails()
+                : gson.fromJson(gson.toJson(cachedDetail), WeAgentDetails.class);
+        if (result == null) {
+            result = new WeAgentDetails();
+        }
+        if (normalizeOptionalString(result.getTagName()) == null) {
+            result.setTagName("助手");
+        }
+        if (normalizeOptionalString(result.getTagNameEn()) == null) {
+            result.setTagNameEn("Agent");
+        }
+        WeLinkLogger.i(TAG, "getWeAgentInfo succeeded, partnerAccount="
+                + result.getPartnerAccount()
+                + ", tagName=" + result.getTagName()
+                + ", tagNameEn=" + result.getTagNameEn());
+        callback.onSuccess(result);
+    }
+
     // 20. getWeAgentUri
     public void getWeAgentUri(@NonNull SkillCallback<WeAgentUriResult> callback) {
         if (callback == null) {

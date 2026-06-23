@@ -280,6 +280,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
         _bizRobotTag = WLAgentSkillsStringValue(dictionary[@"bizRobotTag"], @"");
+        _tagName = WLAgentSkillsStringValue(dictionary[@"tagName"], @"");
+        _tagNameEn = WLAgentSkillsStringValue(dictionary[@"tagNameEn"], @"");
         _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
     }
     return self;
@@ -294,6 +296,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"bizRobotName" : self.bizRobotName ?: @"",
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
         @"bizRobotTag" : self.bizRobotTag ?: @"",
+        @"tagName" : self.tagName ?: @"",
+        @"tagNameEn" : self.tagNameEn ?: @"",
         @"robotId" : self.robotId ?: @""
     };
 }
@@ -328,6 +332,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
         _bizRobotTag = WLAgentSkillsStringValue(dictionary[@"bizRobotTag"], @"");
         _bizRobotId = WLAgentSkillsStringValue(dictionary[@"bizRobotId"], @"");
+        _tagName = WLAgentSkillsStringValue(dictionary[@"tagName"], @"");
+        _tagNameEn = WLAgentSkillsStringValue(dictionary[@"tagNameEn"], @"");
         _weCodeUrl = WLAgentSkillsStringValue(dictionary[@"weCodeUrl"], @"");
     }
     return self;
@@ -358,6 +364,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
         @"bizRobotTag" : self.bizRobotTag ?: @"",
         @"bizRobotId" : self.bizRobotId ?: @"",
+        @"tagName" : self.tagName ?: @"",
+        @"tagNameEn" : self.tagNameEn ?: @"",
         @"weCodeUrl" : self.weCodeUrl ?: @""
     };
 }

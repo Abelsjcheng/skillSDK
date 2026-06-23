@@ -944,6 +944,31 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     }];
 }
 
+#pragma mark - 19.2. getWeAgentInfo
+
+/// 复制当前详情缓存生成返回对象，保留全部详情字段且不回写标签兜底值。
+- (void)getWeAgentInfo:(void (^)(WLAgentSkillsWeAgentDetails *result))success {
+    NSDictionary *cachedDictionary = [[WLAgentSkillsWeAgentStore sharedStore]
+        loadCurrentWeAgentDetailDictionary];
+    WLAgentSkillsWeAgentDetails *result =
+        [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:
+            [cachedDictionary isKindOfClass:[NSDictionary class]] ? cachedDictionary : @{}];
+    if ([self normalizedOptionalString:result.tagName] == nil) {
+        result.tagName = @"助手";
+    }
+    if ([self normalizedOptionalString:result.tagNameEn] == nil) {
+        result.tagNameEn = @"Agent";
+    }
+    WKFLogInfo(WLAS_BUNDLE_NAME,
+               @"getWeAgentInfo succeeded, partnerAccount=%@, tagName=%@, tagNameEn=%@",
+               result.partnerAccount ?: @"",
+               result.tagName ?: @"",
+               result.tagNameEn ?: @"");
+    if (success) {
+        success(result);
+    }
+}
+
 #pragma mark - 20. getWeAgentUri
 
 - (void)getWeAgentUri:(void (^)(WLAgentSkillsWeAgentUriResult *result))success
