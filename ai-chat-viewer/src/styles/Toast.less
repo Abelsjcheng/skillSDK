@@ -70,12 +70,51 @@
   white-space: nowrap;
 }
 
-.toast--message-copy.toast--mobile,
-.toast--message-copy.toast--pc {
+.toast--message-copy.toast--mobile {
   top: auto;
-  bottom: 20px;
+  bottom: 28px;
   left: 50%;
   transform: translateX(-50%);
+  min-height: auto;
+  min-width: 144px;
+  border-radius: 20px;
+  padding: 8px 16px;
+  background: #666666;
+  box-shadow: 0 10px 50px 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast--message-copy.toast--pc {
+  top: 50%;
+  bottom: auto;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-height: auto;
+  min-width: 144px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  border-radius: 20px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast--message-copy.toast--pc .toast__icon {
+  display: none;
+}
+
+.toast--message-copy.toast--pc .toast__text,
+.toast--message-copy.toast--mobile .toast__text {
+  color: #ffffff;
+  text-align: center;
+  white-space: normal;
 }
 
 .toast-hide {
