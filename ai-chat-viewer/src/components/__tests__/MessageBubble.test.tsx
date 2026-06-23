@@ -206,6 +206,76 @@ describe('MessageBubble', () => {
     expect(onCopy).toHaveBeenCalledWith('第一段\n\n第二段');
   });
 
+  it('renders weAgent copy action as icon-only without skillCUI send action', () => {
+    const message = createCompletedAssistantMessage({
+      content: '可复制正文',
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="weAgent"
+        showActions
+        onCopy={jest.fn()}
+        onSendToIM={jest.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.message-actions--we-agent')).toBeInTheDocument();
+    expect(container.querySelector('.copy-btn .action-btn__text')).not.toBeInTheDocument();
+    expect(container.querySelector('.send-btn')).not.toBeInTheDocument();
+  });
+
+  it('keeps skillCUI plain actions separate with text copy and send buttons', () => {
+    const message = createCompletedAssistantMessage({
+      content: '可发送正文',
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="plain"
+        showActions
+        onCopy={jest.fn()}
+        onSendToIM={jest.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.message-actions--plain')).toBeInTheDocument();
+    expect(container.querySelector('.copy-btn .action-btn__text')).toHaveTextContent('复制');
+    expect(container.querySelector('.send-btn .action-btn__text')).toHaveTextContent('发送');
+  });
+
+  it('does not show skillCUI send action for parts-only messages without message content', () => {
+    const message = createCompletedAssistantMessage({
+      content: '',
+      parts: [
+        {
+          partId: 'text-1',
+          type: 'text',
+          content: 'parts 正文',
+          isStreaming: false,
+        },
+      ],
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="plain"
+        showActions
+        onCopy={jest.fn()}
+        onSendToIM={jest.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.copy-btn')).toBeInTheDocument();
+    expect(container.querySelector('.send-btn')).not.toBeInTheDocument();
+  });
+
   it('does not render copy action for streaming assistant messages or user messages', () => {
     const onCopy = jest.fn();
     const streamingAssistant = createCompletedAssistantMessage({

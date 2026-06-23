@@ -230,14 +230,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     void onSendToIM?.(message.content);
   };
 
-  const renderActions = () => {
-    if (!canRenderActions || !copyText) {
+  const renderWeAgentActions = () => {
+    if (!canRenderActions || !copyText || !onCopy) {
       return null;
     }
 
     return (
-      <div className="message-actions">
-        {onCopy ? (
+      <div className="message-actions message-actions--we-agent">
+        <button
+          type="button"
+          className="action-btn copy-btn"
+          onClick={handleCopy}
+          title={t('common.copyContent')}
+        >
+          <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderPlainActions = () => {
+    if (!canRenderActions || (!copyText && !message.content) || (!onCopy && !onSendToIM)) {
+      return null;
+    }
+
+    return (
+      <div className="message-actions message-actions--plain">
+        {onCopy && copyText ? (
           <button
             type="button"
             className="action-btn copy-btn"
@@ -245,9 +264,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             title={t('common.copyContent')}
           >
             <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
+            <span className="action-btn__text">{t('common.copy')}</span>
           </button>
         ) : null}
-        {onSendToIM ? (
+        {onSendToIM && message.content ? (
           <button
             type="button"
             className="action-btn send-btn"
@@ -275,7 +295,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <div className={`message-block ${isUser ? 'message-user' : 'message-assistant'}`}>
         <div className="message-content">{messageContent}</div>
-        {renderActions()}
+        {renderPlainActions()}
       </div>
     );
   }
@@ -314,7 +334,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ].filter(Boolean).join(' ')}
         >
           <div className="message-content">{messageContent}</div>
-          {renderActions()}
+          {renderWeAgentActions()}
         </div>
       </div>
     </div>
