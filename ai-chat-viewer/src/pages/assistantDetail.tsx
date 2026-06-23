@@ -291,20 +291,25 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   }, []);
 
   const pcLeftActions = useMemo<AssistantPageHeaderAction[]>(
-    () => [
-      {
+    () => {
+      const actions: AssistantPageHeaderAction[] = [{
         label: t('common.service'),
         icon: customerIcon,
         onClick: handleServiceClick,
-      },
-      {
-        label: t('assistantDetail.editAction'),
-        icon: moreIcon,
-        onClick: handleTogglePcMenu,
-        buttonRef: moreButtonRef,
-      },
-    ],
-    [handleServiceClick, handleTogglePcMenu, t],
+      }];
+
+      if (!isExclusiveAssistant) {
+        actions.push({
+          label: t('assistantDetail.editAction'),
+          icon: moreIcon,
+          onClick: handleTogglePcMenu,
+          buttonRef: moreButtonRef,
+        });
+      }
+
+      return actions;
+    },
+    [handleServiceClick, handleTogglePcMenu, isExclusiveAssistant, t],
   );
 
   const pcRightActions = useMemo<AssistantPageHeaderAction[]>(
@@ -407,8 +412,8 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         title={t('assistantDetail.title')}
         isPcMiniApp={isPc}
         onService={handleServiceClick}
-        mobileRightActionIcon={!isPc ? editIcon : undefined}
-        mobileRightActionLabel={!isPc ? t('assistantDetail.editAction') : undefined}
+        mobileRightActionIcon={!isPc && !isExclusiveAssistant ? editIcon : undefined}
+        mobileRightActionLabel={!isPc && !isExclusiveAssistant ? t('assistantDetail.editAction') : undefined}
         onMobileRightAction={handleOpenActionSheet}
         pcLeftActions={isPc ? pcLeftActions : undefined}
         pcRightActions={isPc ? pcRightActions : undefined}
@@ -461,7 +466,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         ) : null}
       </main>
 
-      {isPc ? (
+      {isPc && !isExclusiveAssistant ? (
         <AssistantDetailPcMenu
           open={isPcMenuOpen}
           top={pcMenuPosition.top}
@@ -472,7 +477,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           editLabel={t('assistantDetail.editInfo')}
           deleteLabel={t('assistantDetail.deleteAssistant')}
         />
-      ) : (
+      ) : !isPc && !isExclusiveAssistant ? (
         <>
           <AssistantDetailActionSheet
             open={overlay === 'action-sheet'}
@@ -487,7 +492,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
             onConfirm={handleConfirmDelete}
           />
         </>
-      )}
+      ) : null}
     </div>
   );
 };
