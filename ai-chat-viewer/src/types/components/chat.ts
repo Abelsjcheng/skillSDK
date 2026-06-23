@@ -5,6 +5,12 @@ export interface AppProps {
   assistantAccount?: string;
 }
 
+export interface HarmonySplitLayoutState {
+  enabled: boolean;
+  statusBarHeight: number;
+  safeAreaInsetBottom: number;
+}
+
 export interface ContentProps {
   messages: Message[];
   pendingAssistantPreview: PendingAssistantPreview;

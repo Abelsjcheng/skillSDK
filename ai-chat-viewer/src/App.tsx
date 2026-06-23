@@ -12,7 +12,7 @@ import './styles/App.less';
 import './styles/WeAgentCUI.less';
 import type { HistorySessionsListResult, SkillSession, WeAgentDetails } from './types/bridge';
 import type { HWH5UserInfo } from './types/bridge/hwext';
-import type { AppProps, HistorySessionsCache } from './types/components';
+import type { AppProps, HarmonySplitLayoutState, HistorySessionsCache } from './types/components';
 import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import {
@@ -32,6 +32,7 @@ import {
 import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
+import { canIUse } from './utils/versionCheck';
 
 function sortSessionsByUpdatedAt(sessions: SkillSession[]): SkillSession[] {
   return [...sessions].sort(
@@ -125,12 +126,6 @@ function updateSessionActivityInCache(
   return changed ? { ...cache, content: sortSessionsByUpdatedAt(nextContent) } : cache;
 }
 
-interface HarmonySplitLayoutState {
-  enabled: boolean;
-  statusBarHeight: number;
-  safeAreaInsetBottom: number;
-}
-
 const DEFAULT_HARMONY_SPLIT_LAYOUT: HarmonySplitLayoutState = {
   enabled: false,
   statusBarHeight: 0,
@@ -196,7 +191,12 @@ function App({ assistantAccount = '' }: AppProps) {
         }
 
         const isHarmonySplit = deviceInfo.osType === 'Harmony' && deviceInfo.isFullScreen === 0;
-        setHarmonySplitLayout(isHarmonySplit
+        const isHarmonySplitLayoutSupported = isHarmonySplit && await canIUse.harmonySplitLayout();
+        if (disposed) {
+          return;
+        }
+
+        setHarmonySplitLayout(isHarmonySplit && isHarmonySplitLayoutSupported
           ? {
             enabled: true,
             statusBarHeight: deviceInfo.statusBarHeight,
@@ -370,9 +370,13 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const harmonySplitStyle = harmonySplitLayout.enabled
     ? {
-      '--we-agent-cui-status-bar-height': `${harmonySplitLayout.statusBarHeight}px`,
-      '--we-agent-cui-safe-area-bottom': `${harmonySplitLayout.safeAreaInsetBottom}px`,
       '--we-agent-cui-title-bar-height': '44px',
+      ...(harmonySplitLayout.statusBarHeight > 0
+        ? { '--we-agent-cui-status-bar-height': `${harmonySplitLayout.statusBarHeight}px` }
+        : {}),
+      ...(harmonySplitLayout.safeAreaInsetBottom > 0
+        ? { '--we-agent-cui-safe-area-bottom': `${harmonySplitLayout.safeAreaInsetBottom}px` }
+        : {}),
     } as React.CSSProperties
     : {};
 

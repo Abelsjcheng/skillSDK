@@ -15,6 +15,10 @@ const QRCODE_CREATE_ASSISTANT_MIN_VERSION: MinVersionMap = {
   harmony: '1.29.0',
 };
 
+const HARMONY_SPLIT_LAYOUT_MIN_VERSION: MinVersionMap = {
+  harmony: '1.30.0',
+};
+
 export function compareVersion(newVersion: string, oldVersion: string): number {
   const v1 = newVersion.split('.');
   const v2 = oldVersion.split('.');
@@ -83,5 +87,6 @@ async function canUseByMinVersion(minVersion: MinVersionMap): Promise<boolean> {
 }
 
 export const canIUse = {
+  harmonySplitLayout: () => canUseByMinVersion(HARMONY_SPLIT_LAYOUT_MIN_VERSION),
   qrcodeCreateAssistant: () => canUseByMinVersion(QRCODE_CREATE_ASSISTANT_MIN_VERSION),
 };
