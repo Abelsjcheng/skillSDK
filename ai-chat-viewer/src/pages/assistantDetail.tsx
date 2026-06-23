@@ -43,6 +43,7 @@ import {
   EXCLUSIVE_ASSISTANT_BIZ_TAG,
   resolveAssistantTag,
 } from '../utils/assistantTag';
+import { reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
@@ -98,6 +99,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         }
       } catch (error) {
         WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ resolvedPartnerAccount })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_edit_assistant_error', '编辑助手流程失败', error, {
+          page: 'assistantDetail',
+          stage: 'getWeAgentDetails',
+          partnerAccount: resolvedPartnerAccount,
+          isPc,
+        });
         showToast(t('assistantDetail.loadFailed'));
         if (!cancelled) {
           setDetail(null);
@@ -110,7 +117,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
     return () => {
       cancelled = true;
     };
-  }, [resolvedPartnerAccount, t]);
+  }, [isPc, resolvedPartnerAccount, t]);
 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
@@ -239,6 +246,18 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
     const targetRobotId = (detail?.id ?? '').trim();
 
     if (!targetPartnerAccount && !targetRobotId) {
+      void reportCoreFlowError(
+        'flow_delete_assistant_error',
+        '删除助手流程失败',
+        new Error('missing delete target'),
+        {
+          page: 'assistantDetail',
+          stage: 'missingTarget',
+          partnerAccount: targetPartnerAccount,
+          robotId: targetRobotId,
+          isPc,
+        },
+      );
       showToast(t('assistantDetail.deleteFailed'));
       return;
     }
@@ -255,9 +274,16 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         partnerAccount: targetPartnerAccount,
         robotId: targetRobotId,
       })} | error=${JSON.stringify(error)}`);
+      void reportCoreFlowError('flow_delete_assistant_error', '删除助手流程失败', error, {
+        page: 'assistantDetail',
+        stage: 'deleteWeAgent',
+        partnerAccount: targetPartnerAccount,
+        robotId: targetRobotId,
+        isPc,
+      });
       showToast(t('assistantDetail.deleteFailed'));
     }
-  }, [detail?.id, detail?.partnerAccount, partnerAccount, t]);
+  }, [detail?.id, detail?.partnerAccount, isPc, partnerAccount, t]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {

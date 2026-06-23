@@ -14,6 +14,7 @@ import {
 } from '../utils/hwext';
 import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
+import { reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import { canIUse } from '../utils/versionCheck';
 import '../styles/DigitalTwinCreator.less';
@@ -102,6 +103,13 @@ const CreateAssistantBasicPage: React.FC = () => {
         }
       } catch (error) {
         WeLog(`CreateAssistantBasicPage queryQrcodeInfo failed | extra=${JSON.stringify({ qrcode })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
+          page: 'createAssistant',
+          stage: 'queryQrcodeInfo',
+          from,
+          qrcode,
+          isPc,
+        });
         if (!cancelled) {
           shouldUpdateQrcodeStatusRef.current = false;
           setQrcodeExpired(false);
@@ -117,7 +125,7 @@ const CreateAssistantBasicPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isQrcodeScene, qrcode, showQrcodeExpired, t, updateQrcodeStatusSafely]);
+  }, [from, isPc, isQrcodeScene, qrcode, showQrcodeExpired, t, updateQrcodeStatusSafely]);
 
   useEffect(() => {
     if (isPc || !isQrcodeScene || !qrcode) {
@@ -176,6 +184,13 @@ const CreateAssistantBasicPage: React.FC = () => {
       WeLog(`CreateAssistantBasicPage queryQrcodeInfo before create failed | extra=${JSON.stringify({
         qrcode,
       })} | error=${JSON.stringify(error)}`);
+      void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
+        page: 'createAssistant',
+        stage: 'validateQrcodeBeforeCreate',
+        from,
+        qrcode,
+        isPc,
+      });
       showToast(t('createAssistant.queryQrcodeInfoFailed'));
       return;
     }
@@ -195,6 +210,18 @@ const CreateAssistantBasicPage: React.FC = () => {
         WeLog(`CreateAssistantBasicPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
           createResult,
         })}`);
+        void reportCoreFlowError(
+          'flow_create_assistant_error',
+          '创建助手流程失败',
+          new Error('createDigitalTwin returned missing partnerAccount'),
+          {
+            page: 'createAssistant',
+            stage: 'missingPartnerAccount',
+            from,
+            qrcode,
+            isPc,
+          },
+        );
         showToast(t('createAssistant.createFailed'));
         return;
       }
@@ -206,9 +233,16 @@ const CreateAssistantBasicPage: React.FC = () => {
         from,
         qrcode,
       })} | error=${JSON.stringify(error)}`);
+      void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
+        page: 'createAssistant',
+        stage: 'createDigitalTwinOrOpenHost',
+        from,
+        qrcode,
+        isPc,
+      });
       showToast(t('createAssistant.createFailed'));
     }
-  }, [from, isQrcodeScene, location.search, navigate, qrcode, showQrcodeExpired, t]);
+  }, [from, isPc, isQrcodeScene, location.search, navigate, qrcode, showQrcodeExpired, t]);
 
   if (isQrcodeScene && !qrcodeLoaded) {
     return <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()} />;

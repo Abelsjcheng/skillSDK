@@ -169,6 +169,20 @@ export async function reportFlowTelemetry(
   }
 }
 
+export function reportCoreFlowError(
+  eventId: string,
+  eventTitle: string,
+  error: unknown,
+  payload: Omit<FlowTelemetryPayload, 'type' | 'errorCode' | 'errorMessage'> = {},
+): Promise<void> {
+  return reportFlowTelemetry(eventId, eventTitle, {
+    type: 'error',
+    ...payload,
+    errorCode: resolveErrorCode(error),
+    errorMessage: resolveErrorMessage(error),
+  });
+}
+
 export async function reportBrowserJsError(
   payload: BrowserErrorTelemetryPayload,
 ): Promise<void> {

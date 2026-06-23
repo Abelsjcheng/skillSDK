@@ -15,6 +15,7 @@ import {
   updateWeAgent,
 } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
+import { reportCoreFlowError } from '../../utils/telemetry';
 import { showToast } from '../../utils/toast';
 import '../../styles/DigitalTwinCreator.less';
 
@@ -78,6 +79,13 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
         }
       } catch (error) {
         WeLog(`EditAssistantContent getWeAgentDetails failed | extra=${JSON.stringify({ partnerAccount: normalizedPartnerAccount })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_edit_assistant_error', '编辑助手流程失败', error, {
+          page: 'editAssistant',
+          stage: 'getWeAgentDetails',
+          source,
+          partnerAccount: normalizedPartnerAccount,
+          isPc: isPcMiniApp,
+        });
         showToast(t('editAssistant.loadFailed'));
         if (!cancelled) {
           setDetail(initialDetail);
@@ -90,7 +98,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [initialDetail, partnerAccount, source, t]);
+  }, [initialDetail, isPcMiniApp, partnerAccount, source, t]);
 
   const initialValue = useMemo(() => (detail ? resolveInitialValue(detail) : null), [detail]);
 
@@ -99,6 +107,19 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
       const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount).trim();
       const targetRobotId = robotId.trim();
       if (!targetPartnerAccount && !targetRobotId) {
+        void reportCoreFlowError(
+          'flow_edit_assistant_error',
+          '编辑助手流程失败',
+          new Error('missing edit target'),
+          {
+            page: 'editAssistant',
+            stage: 'missingTarget',
+            source,
+            partnerAccount: targetPartnerAccount,
+            robotId: targetRobotId,
+            isPc: isPcMiniApp,
+          },
+        );
         showToast(t('editAssistant.invalidTarget'));
         return;
       }
@@ -117,6 +138,14 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
           robotId: targetRobotId,
           source,
         })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_edit_assistant_error', '编辑助手流程失败', error, {
+          page: 'editAssistant',
+          stage: 'updateWeAgent',
+          source,
+          partnerAccount: targetPartnerAccount,
+          robotId: targetRobotId,
+          isPc: isPcMiniApp,
+        });
         showToast(t('editAssistant.updateFailed'));
         return;
       }
@@ -135,6 +164,14 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
             partnerAccount: targetPartnerAccount,
             robotId: targetRobotId,
           })} | error=${JSON.stringify(error)}`);
+          void reportCoreFlowError('flow_edit_assistant_error', '编辑助手流程失败', error, {
+            page: 'editAssistant',
+            stage: 'notifyAssistantDetailUpdated',
+            source,
+            partnerAccount: targetPartnerAccount,
+            robotId: targetRobotId,
+            isPc: isPcMiniApp,
+          });
           showToast(t('editAssistant.notifyFailed'));
           return;
         }
@@ -143,7 +180,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
       onSuccess(payload);
       onClose();
     },
-    [detail?.partnerAccount, onClose, onSuccess, partnerAccount, robotId, source, t],
+    [detail?.partnerAccount, isPcMiniApp, onClose, onSuccess, partnerAccount, robotId, source, t],
   );
 
   return (

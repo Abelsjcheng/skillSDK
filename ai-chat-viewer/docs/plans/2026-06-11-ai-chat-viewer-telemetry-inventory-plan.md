@@ -40,11 +40,11 @@
 flowchart TD
     A["用户进入 ai-chat-viewer"] --> B{"业务场景"}
 
-    B --> C["选择/切换助手<br/>已埋码：点击、列表/详情接口<br/>未埋码：打开 WeAgentCUI 失败"]
-    B --> D["WeAgentCUI 初始化<br/>已埋码：详情/历史/创建会话接口<br/>未埋码：初始化编排失败、缺 assistantAccount"]
+    B --> C["选择/切换助手<br/>已埋码：点击、列表/详情接口<br/>已补齐：打开 WeAgentCUI 失败"]
+    B --> D["WeAgentCUI 初始化<br/>已埋码：详情/历史/创建会话接口<br/>已补齐：初始化编排失败、缺 assistantAccount"]
     B --> E["会话收发消息<br/>已埋码：发送点击、发送/停止/历史接口、onMessage 错误<br/>未埋码：首 token、完成耗时、停止点击"]
-    B --> F["创建助手<br/>已埋码：二维码/创建接口<br/>未埋码：结果缺 partnerAccount、创建后打开 IM/CUI 失败"]
-    B --> G["编辑/删除助手<br/>已埋码：详情/更新/删除接口<br/>未埋码：缺目标标识、通知宿主失败"]
+    B --> F["创建助手<br/>已埋码：二维码/创建接口<br/>已补齐：结果缺 partnerAccount、创建后打开 IM/CUI 失败"]
+    B --> G["编辑/删除助手<br/>已埋码：详情/更新/删除接口<br/>已补齐：缺目标标识、通知宿主失败"]
     B --> H["浏览器运行时<br/>已埋码：browser_js_error"]
 
     C --> I["reportUemEvent / reportApiTelemetry / reportFlowTelemetry"]
@@ -88,7 +88,7 @@ sequenceDiagram
     Uem->>Host: reportUemEvent
     alt 初始化编排失败
         App->>App: WeLog + toast
-        Note over App: 未埋码：flow_weagent_init_error
+        Note over App: 已埋码：flow_weagent_init_error
     else 用户主动新建会话
         User->>App: 点击新建会话
         App->>Uem: weagent_create_session_click 已埋码
@@ -146,10 +146,10 @@ sequenceDiagram
     SDK->>Uem: api_create_digital_twin 成功/失败 已埋码
     alt 创建结果缺 partnerAccount
         Brain->>Brain: WeLog + toast
-        Note over Brain: 未埋码：flow_create_assistant_error
+        Note over Brain: 已埋码：flow_create_assistant_error
     else 创建后打开 IM 或 WeAgentCUI
         Brain->>Host: openIMChat / openWeAgentCUI / close
-        Note over Host: 未埋码：宿主桥接失败
+        Note over Host: 已埋码：flow_host_bridge_error
     end
 ```
 
@@ -170,10 +170,10 @@ sequenceDiagram
     alt 打开 WeAgentCUI 或通知宿主失败
         Page->>Host: openWeAgentCUI / notifyAssistantDetailUpdated / close
         Page->>Page: WeLog + toast
-        Note over Page: 未埋码：flow_open_weagent_error/flow_edit_assistant_error
+        Note over Page: 已埋码：flow_open_weagent_error/flow_edit_assistant_error
     else 删除缺少 partnerAccount 和 robotId
         Page->>Page: toast
-        Note over Page: 未埋码：flow_delete_assistant_error
+        Note over Page: 已埋码：flow_delete_assistant_error
     end
 ```
 
@@ -283,14 +283,14 @@ sequenceDiagram
 | 接口 | `api_delete_weagent` | 删除助手 | 已实现 | 删除助手成功/失败。 |
 | 流程异常 | `flow_onmessage_error` | 流式会话 `useChatSession.ts` | 已实现 | 收到 `session.error`、`error` 或 listener `onError` 时上报。 |
 | 浏览器异常 | `browser_js_error` | `App.tsx`、`skillCUI.tsx` | 已实现 | 浏览器 JS 运行时错误，带页面、会话、文件、行列、堆栈。 |
-| 流程异常 | `flow_weagent_init_error` | WeAgentCUI 初始化 `App.tsx` | 未实现 | 初始化编排失败，当前仅 `WeLog` + toast。 |
-| 流程异常 | `flow_weagent_missing_param_error` | WeAgentCUI 入口 `App.tsx` | 未实现 | 缺少 `assistantAccount`，当前仅 `WeLog`。 |
-| 流程异常 | `flow_open_weagent_error` | 选择/切换助手 | 未实现 | `openAssistantByPartnerAccount` 失败或未打开，当前仅 `WeLog` + toast。 |
-| 流程异常 | `flow_create_assistant_error` | 创建助手 | 未实现 | 创建结果异常、创建后打开 IM/CUI 失败等流程级失败。 |
-| 流程异常 | `flow_edit_assistant_error` | 编辑助手 | 未实现 | 缺目标、加载失败、更新失败、通知宿主失败等流程级失败。 |
-| 流程异常 | `flow_delete_assistant_error` | 删除助手 | 未实现 | 缺目标或删除流程失败。接口失败已有 `api_delete_weagent`。 |
-| 流程异常 | `flow_skillcui_missing_param_error` | SkillCUI 入口 | 未实现 | 缺少 `welinkSessionId` 的入口异常。 |
-| 流程异常 | `flow_host_bridge_error` | 宿主桥接 | 未实现 | `openIMChat`、`close`、`notifyAssistantDetailUpdated` 等桥接失败。 |
+| 流程异常 | `flow_weagent_init_error` | WeAgentCUI 初始化 `App.tsx` | 已实现 | 初始化编排失败，上报 `page`、`stage`、`assistantAccount`、`isPc` 和错误信息。 |
+| 流程异常 | `flow_weagent_missing_param_error` | WeAgentCUI 入口 `App.tsx` | 已实现 | 缺少 `assistantAccount`，上报入口缺参异常。 |
+| 流程异常 | `flow_open_weagent_error` | 选择/切换助手 | 已实现 | `openAssistantByPartnerAccount` 失败或未打开，上报选择/切换入口断链。 |
+| 流程异常 | `flow_create_assistant_error` | 创建助手 | 已实现 | 创建结果异常、二维码校验失败、创建后打开 IM/CUI 失败等流程级失败。 |
+| 流程异常 | `flow_edit_assistant_error` | 编辑助手 | 已实现 | 缺目标、加载失败、更新失败、通知宿主失败等流程级失败。 |
+| 流程异常 | `flow_delete_assistant_error` | 删除助手 | 已实现 | 缺目标或删除流程失败。接口失败仍由 `api_delete_weagent` 覆盖。 |
+| 流程异常 | `flow_skillcui_missing_param_error` | SkillCUI 入口 | 已实现 | 缺少 `welinkSessionId` 的入口异常。 |
+| 流程异常 | `flow_host_bridge_error` | 宿主桥接 | 已实现 | 当前覆盖创建助手后 `openIMChat` / PC 创建后宿主处理失败，后续可扩展到更多桥接方法。 |
 | 性能 | `perf_stream_first_token` | 流式会话 | 未实现 | 用户发送后首次可展示内容耗时。 |
 | 性能 | `perf_stream_complete` | 流式会话 | 未实现 | 首 token 后生成耗时和端到端完成耗时。 |
 | 性能 | `perf_stream_error` | 流式会话 | 未实现 | 流式错误前耗时，补充 `flow_onmessage_error` 的性能维度。 |
@@ -337,14 +337,14 @@ sequenceDiagram
 | 接口 | `api_delete_weagent` | 已实现 | 看板观察 | P2 | 删除失败影响管理流程，频率较低，建议看板观察。 |
 | 流程异常 | `flow_onmessage_error` | 已实现 | 阈值告警 | P1 | 流式错误直接影响 AI 回复生成，是当前最关键的已实现流程异常告警。 |
 | 浏览器异常 | `browser_js_error` | 已实现 | 阈值告警 | P1/P2 | 若同版本、同页面 JS 错误突增可能导致页面不可用；需按 `filename`、`message`、`versionName` 聚合并去重。 |
-| 流程异常 | `flow_weagent_init_error` | 未实现 | 阈值告警 | P1 | 初始化失败会导致用户无法进入会话，建议补齐后纳入核心告警。 |
-| 流程异常 | `flow_weagent_missing_param_error` | 未实现 | 突增告警 | P2 | 缺 `assistantAccount` 多为入口拼参或宿主集成问题，按版本/入口突增告警。 |
-| 流程异常 | `flow_open_weagent_error` | 未实现 | 阈值告警 | P1 | 选择/切换助手后打不开 CUI，属于入口断链。 |
-| 流程异常 | `flow_create_assistant_error` | 未实现 | 阈值告警 | P1 | 覆盖接口成功但后续打开 IM/CUI 失败等转化断点，建议补齐后告警。 |
-| 流程异常 | `flow_edit_assistant_error` | 未实现 | 看板观察 | P2 | 编辑流程重要但不是主会话链路，先用于排查和趋势观察。 |
-| 流程异常 | `flow_delete_assistant_error` | 未实现 | 看板观察 | P2 | 删除流程低频，建议只在错误突增时临时关注。 |
-| 流程异常 | `flow_skillcui_missing_param_error` | 未实现 | 突增告警 | P2 | SkillCUI 缺 `welinkSessionId` 会导致页面不可用，但通常是入口集成问题，适合按版本突增告警。 |
-| 流程异常 | `flow_host_bridge_error` | 未实现 | 阈值告警 | P1/P2 | 宿主桥接失败可能导致打开 CUI、打开 IM、通知更新失败；需按 `bridgeMethod` 区分告警级别。 |
+| 流程异常 | `flow_weagent_init_error` | 已实现 | 阈值告警 | P1 | 初始化失败会导致用户无法进入会话，建议纳入核心告警。 |
+| 流程异常 | `flow_weagent_missing_param_error` | 已实现 | 突增告警 | P2 | 缺 `assistantAccount` 多为入口拼参或宿主集成问题，按版本/入口突增告警。 |
+| 流程异常 | `flow_open_weagent_error` | 已实现 | 阈值告警 | P1 | 选择/切换助手后打不开 CUI，属于入口断链。 |
+| 流程异常 | `flow_create_assistant_error` | 已实现 | 阈值告警 | P1 | 覆盖接口成功但后续打开 IM/CUI 失败等转化断点，建议告警。 |
+| 流程异常 | `flow_edit_assistant_error` | 已实现 | 看板观察 | P2 | 编辑流程重要但不是主会话链路，先用于排查和趋势观察。 |
+| 流程异常 | `flow_delete_assistant_error` | 已实现 | 看板观察 | P2 | 删除流程低频，建议只在错误突增时临时关注。 |
+| 流程异常 | `flow_skillcui_missing_param_error` | 已实现 | 突增告警 | P2 | SkillCUI 缺 `welinkSessionId` 会导致页面不可用，但通常是入口集成问题，适合按版本突增告警。 |
+| 流程异常 | `flow_host_bridge_error` | 已实现 | 阈值告警 | P1/P2 | 宿主桥接失败可能导致打开 CUI、打开 IM、通知更新失败；需按 `bridgeMethod` 区分告警级别。 |
 | 性能 | `perf_stream_first_token` | 未实现 | 性能阈值告警 | P2 | 首 token P95/P99 超阈值会显著影响体验，但不属于错误告警。 |
 | 性能 | `perf_stream_complete` | 未实现 | 性能阈值告警 | P2 | 端到端生成耗时可用于体验 SLA，建议按页面、版本、模型/场景聚合。 |
 | 性能 | `perf_stream_error` | 未实现 | 合并告警 | P1/P2 | 不单独告警，建议与 `flow_onmessage_error` 合并，用于判断错误发生前等待时长。 |
@@ -405,6 +405,6 @@ sequenceDiagram
 
 ## 10. 最终建议
 
-最终结论：推荐保留现有三层收口方式，即点击类继续走 `uemUtil.ts`，接口类继续走 `hwext.ts` + `trackApi*`，流程异常和浏览器异常继续走 `telemetry.ts`。短期优先补齐 `flow_weagent_init_error`、`flow_open_weagent_error`、`flow_create_assistant_error`、`flow_host_bridge_error`、`flow_skillcui_missing_param_error` 这五类核心流程异常；中期补充 `unhandledrejection` 和流式性能埋码；PC 端待 bridge 支持后再统一开启 UEM 上报。
+最终结论：推荐保留现有三层收口方式，即点击类继续走 `uemUtil.ts`，接口类继续走 `hwext.ts` + `trackApi*`，流程异常和浏览器异常继续走 `telemetry.ts`。当前已补齐 `flow_weagent_init_error`、`flow_open_weagent_error`、`flow_create_assistant_error`、`flow_host_bridge_error`、`flow_skillcui_missing_param_error` 等核心流程异常；中期继续补充 `unhandledrejection` 和流式性能埋码；PC 端待 bridge 支持后再统一开启 UEM 上报。
 
 取舍原因：接口错误已覆盖较完整，不需要重复建设；当前最大观测盲区在“接口成功但业务流程失败”和“非接口桥接失败”，这些问题最容易造成用户不可用但数据侧不可见。告警层面不建议所有异常事件直接告警，推荐只对 `api_create_new_session`、`api_send_message`、`api_create_digital_twin`、`api_get_weagent_details`、`flow_onmessage_error`、`browser_js_error` 以及补齐后的核心 `flow_*_error` 配置阈值告警；点击类、低频管理类、预期业务校验失败进入看板观察。后续动作建议先实现统一 `reportCoreFlowError` helper，再按核心页面失败分支逐步接入，并在埋码平台验证字段完整性和告警阈值后更新已实现总表。

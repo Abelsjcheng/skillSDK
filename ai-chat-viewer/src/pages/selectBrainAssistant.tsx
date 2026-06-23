@@ -20,6 +20,7 @@ import {
 } from '../utils/hwext';
 import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
+import { reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import '../styles/DigitalTwinCreator.less';
 
@@ -93,6 +94,7 @@ const SelectBrainAssistantPage: React.FC = () => {
         params.bizRobotId = payload.bizRobotId;
       }
 
+      let stage = 'createDigitalTwin';
       try {
         const createResult = await createDigitalTwin(params);
         const partnerAccount = resolvePartnerAccount(createResult);
@@ -101,19 +103,48 @@ const SelectBrainAssistantPage: React.FC = () => {
           WeLog(`SelectBrainAssistantPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
             createResult,
           })}`);
+          void reportCoreFlowError(
+            'flow_create_assistant_error',
+            '创建助手流程失败',
+            new Error('createDigitalTwin returned missing partnerAccount'),
+            {
+              page: 'selectBrainAssistant',
+              stage: 'missingPartnerAccount',
+              from,
+              weCrewType: params.weCrewType,
+              bizRobotId: params.bizRobotId,
+              isPc,
+            },
+          );
           showToast(t('createAssistant.createFailed'));
           return;
         }
         createResult.weCrewType = payload.digitalTwintype === 'internal' ? 1 : 0;
         if (from !== 'weAgent') {
+          stage = 'handleCreateForOtherScene';
           await handleCreateForOtherScene(createResult);
-          return
+          return;
         }
 
+        stage = 'getWeAgentDetailsAfterCreate';
         const detailResult = await getWeAgentDetails({ partnerAccount });
         const detail = detailResult?.weAgentDetailsArray?.[0];
         if (!detail) {
           console.warn('getWeAgentDetails did not return detail for partnerAccount:', partnerAccount);
+          void reportCoreFlowError(
+            'flow_create_assistant_error',
+            '创建助手流程失败',
+            new Error('missing assistant detail after create'),
+            {
+              page: 'selectBrainAssistant',
+              stage: 'missingAssistantDetailAfterCreate',
+              from,
+              partnerAccount,
+              weCrewType: params.weCrewType,
+              bizRobotId: params.bizRobotId,
+              isPc,
+            },
+          );
           return;
         }
 
@@ -128,6 +159,7 @@ const SelectBrainAssistantPage: React.FC = () => {
           bizRobotTag: detail.bizRobotTag,
         });
 
+        stage = 'openWeAgentCUIAfterCreate';
         await openWeAgentCUI(openParams);
 
         if (!isPc) {
@@ -135,6 +167,14 @@ const SelectBrainAssistantPage: React.FC = () => {
         }
       } catch (error) {
         WeLog(`SelectBrainAssistantPage confirmCreateAssistant failed | extra=${JSON.stringify({ from })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
+          page: 'selectBrainAssistant',
+          stage,
+          from,
+          weCrewType: params.weCrewType,
+          bizRobotId: params.bizRobotId,
+          isPc,
+        });
         showToast(t('createAssistant.createFailed'));
       }
     },

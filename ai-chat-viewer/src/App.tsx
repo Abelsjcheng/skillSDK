@@ -28,7 +28,7 @@ import {
   getSessionUpdatedAtTimestamp,
   HISTORY_SESSIONS_PAGE_SIZE,
 } from './utils/session';
-import { installBrowserJsErrorTelemetry } from './utils/telemetry';
+import { installBrowserJsErrorTelemetry, reportCoreFlowError } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
 
@@ -223,6 +223,16 @@ function App({ assistantAccount = '' }: AppProps) {
     const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
       WeLog('App missing assistantAccount');
+      void reportCoreFlowError(
+        'flow_weagent_missing_param_error',
+        'WeAgentCUI 缺少入口参数',
+        new Error('missing assistantAccount'),
+        {
+          page: 'weAgentCUI',
+          stage: 'missingAssistantAccount',
+          isPc,
+        },
+      );
       return;
     }
 
@@ -262,6 +272,12 @@ function App({ assistantAccount = '' }: AppProps) {
         setWelinkSessionId(nextSession.welinkSessionId);
       } catch (err) {
         WeLog(`App initializeWeAgentSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
+        void reportCoreFlowError('flow_weagent_init_error', 'WeAgentCUI 初始化失败', err, {
+          page: 'weAgentCUI',
+          stage: 'initializeWeAgentSession',
+          assistantAccount: currentAssistantAccount,
+          isPc,
+        });
         if (!disposed) {
           showToast(initSessionFailedTextRef.current);
         }
@@ -273,7 +289,7 @@ function App({ assistantAccount = '' }: AppProps) {
     return () => {
       disposed = true;
     };
-  }, [assistantAccount, createSessionForAssistant, resolveAssistantDetail, updateWeAgentUserName]);
+  }, [assistantAccount, createSessionForAssistant, isPc, resolveAssistantDetail, updateWeAgentUserName]);
 
   const handleCreateSession = useCallback(async () => {
     const currentAssistantAccount = assistantAccountRef.current;
