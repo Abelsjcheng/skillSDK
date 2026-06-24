@@ -3,7 +3,7 @@ import type {
   PlantUmlRenderResponse,
 } from '../types/plantUml';
 
-export const PLANTUML_RENDER_PATH = '/api/skill/plantuml/render';
+export const PLANTUML_RENDER_PATH = '/skill/api/api/content/convert/text';
 
 function isEnglishLanguage(): boolean {
   const language = (

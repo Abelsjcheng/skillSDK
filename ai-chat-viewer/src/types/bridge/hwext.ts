@@ -10,7 +10,6 @@ import type {
   StreamMessage,
 } from '../index';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../digitalTwin';
-import type { PlantUmlRenderParams, PlantUmlRenderResult } from '../plantUml';
 
 export interface HWH5EXTError {
   code?: string;
@@ -309,6 +308,7 @@ export interface HWH5AddEventListenerParams {
 export interface FetchFullOptions {
   method: string;
   headers: Record<string, string>;
+  body?: string;
 }
 
 export interface FetchFullResponse<T = unknown> {
@@ -333,7 +333,6 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
-  renderPlantUml(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> | PlantUmlRenderResult;
   createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
   createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> | CreateDigitalTwinResult;
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;

@@ -55,7 +55,7 @@ export function createMarkdownComponents(includeCodeBlock = false): Components {
           if (match) {
             const language = match[1].toLowerCase();
             if (language === 'plantuml' || language === 'puml') {
-              return <PlantUmlBlock code={codeString} />;
+              return <PlantUmlBlock code={codeString} language={match[1]} />;
             }
             return <CodeBlock code={codeString} language={match[1]} />;
           }

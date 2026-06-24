@@ -1,6 +1,6 @@
 export interface PlantUmlRenderParams {
   content: string;
-  convertType: 'svg' | 'png';
+  contentType: 'svg' | 'png';
   fileType: 'puml';
 }
 
@@ -31,7 +31,7 @@ export type PlantUmlFailureStage =
 
 export interface PlantUmlFailureTelemetryPayload {
   page?: 'weAgentCUI' | 'skillCUI' | string;
-  convertType: 'svg' | 'png';
+  contentType: 'svg' | 'png';
   diagramHash: string;
   contentLength: number;
   failureStage: PlantUmlFailureStage;

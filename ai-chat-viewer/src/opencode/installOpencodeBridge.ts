@@ -72,6 +72,7 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
 
   if (!window.HWH5) {
     window.HWH5 = {
+      addEventListener: async () => undefined,
       close: () => undefined,
       fetchFull: async <T>() => ({
         json: async () => ({
@@ -86,6 +87,7 @@ function installMockHwh5Shell(config: ReturnType<typeof resolveOpenCodeBridgeCon
       openWebview: ({ uri }) => {
         window.open(uri, '_blank', 'noopener,noreferrer');
       },
+      openIMChat: async () => undefined,
       navigateBack: () => window.history.back(),
       onCheckForUpdate: async () => undefined,
       onUpdateReady: async () => undefined,

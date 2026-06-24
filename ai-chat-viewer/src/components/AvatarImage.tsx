@@ -43,7 +43,7 @@ const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) 
     };
   }, [src, fallbackSrc]);
 
-  return <img {...rest} src={resolvedSrc} draggable="false" />;
+  return <img {...rest} src={resolvedSrc ?? undefined} draggable="false" />;
 };
 
 export default AvatarImage;

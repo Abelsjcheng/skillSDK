@@ -2432,12 +2432,6 @@ function buildMockApi(): HWH5EXT {
       return cloneSession(nextSession);
     },
 
-    renderPlantUml: async (params) => ({
-      image: params.convertType === 'png'
-        ? 'iVBORw0KGgo='
-        : '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><text x="12" y="44">PlantUML preview</text></svg>',
-    }),
-
     createDigitalTwin: async (params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> => {
       const partnerAccount = nextId('mock_assistant');
       const bizRobotId = params.weCrewType === 1 ? (params.bizRobotId ?? nextId('biz_robot')) : '';

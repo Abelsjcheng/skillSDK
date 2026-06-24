@@ -39,12 +39,8 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import type { CreateDigitalTwinParams, InternalAssistantOption } from '../types/digitalTwin';
-import type { PlantUmlRenderParams, PlantUmlRenderResponse, PlantUmlRenderResult } from '../types/plantUml';
-import {
-  normalizePlantUmlRenderResult,
-  pickPlantUmlServerMessage,
-  PLANTUML_RENDER_PATH,
-} from '../utils/plantUmlRenderer';
+import type { PlantUmlRenderResponse } from '../types/plantUml';
+import { pickPlantUmlServerMessage } from '../utils/plantUmlRenderer';
 
 interface OpenCodeBridgeConfig {
   apiBaseUrl: string;
@@ -718,22 +714,6 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         },
       );
       return normalizeSession(session);
-    },
-
-    async renderPlantUml(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> {
-      const result = await requestJson<PlantUmlRenderResult>(
-        config,
-        PLANTUML_RENDER_PATH,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            content: params.content,
-            convertType: params.convertType,
-            fileType: 'puml',
-          }),
-        },
-      );
-      return normalizePlantUmlRenderResult(result);
     },
 
     async createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> {

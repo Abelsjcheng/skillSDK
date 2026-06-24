@@ -53,7 +53,6 @@ export const zh = {
   'plantuml.expand': '展开图表',
   'plantuml.collapse': '折叠图表',
   'plantuml.rendering': '图表生成中...',
-  'plantuml.renderFailed': '图表生成有问题，请重新提问试试',
   'plantuml.previewImage': '预览图表',
   'plantuml.exportImage': '导出图片',
   'plantuml.exportFailed': '导出图片失败',

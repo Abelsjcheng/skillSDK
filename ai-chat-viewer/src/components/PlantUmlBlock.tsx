@@ -8,10 +8,10 @@ import React, {
 import { useTranslation } from 'react-i18next';
 import arrowUpIcon from '../imgs/arrow_up_icon.svg';
 import downloadIcon from '../imgs/icon-download.svg';
-import plantUmlErrorIcon from '../imgs/plantuml-error.svg';
 import '../styles/PlantUmlBlock.less';
 import { MarkdownRuntimeConfigContext } from './MarkdownRuntimeConfigContext';
 import { ImagePreview } from './ImagePreview';
+import { CodeBlock } from './CodeBlock';
 import type { PlantUmlFailureStage } from '../types/plantUml';
 import { downloadPlantUmlImage } from '../utils/plantUmlDownload';
 import {
@@ -20,12 +20,14 @@ import {
 } from '../utils/uemUtil';
 import { renderPlantUml } from '../utils/hwext';
 import { isPcMiniApp } from '../constants';
+import { WeLog } from '../utils/logger';
 
 const MAX_CACHE_SIZE = 50;
 const renderCache = new Map<string, string>();
 
 interface PlantUmlBlockProps {
   code: string;
+  language?: string;
 }
 
 type PreviewStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -39,12 +41,12 @@ function hashString(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
-function getCacheKey(content: string, convertType: 'svg' | 'png'): string {
-  return `puml:${convertType}:${content.length}:${hashString(content)}`;
+function getCacheKey(content: string, contentType: 'svg' | 'png'): string {
+  return `puml:${contentType}:${content.length}:${hashString(content)}`;
 }
 
-function getCachedImage(content: string, convertType: 'svg' | 'png'): string | undefined {
-  const key = getCacheKey(content, convertType);
+function getCachedImage(content: string, contentType: 'svg' | 'png'): string | undefined {
+  const key = getCacheKey(content, contentType);
   const image = renderCache.get(key);
   if (image === undefined) {
     return undefined;
@@ -54,8 +56,8 @@ function getCachedImage(content: string, convertType: 'svg' | 'png'): string | u
   return image;
 }
 
-function setCachedImage(content: string, convertType: 'svg' | 'png', image: string): void {
-  const key = getCacheKey(content, convertType);
+function setCachedImage(content: string, contentType: 'svg' | 'png', image: string): void {
+  const key = getCacheKey(content, contentType);
   renderCache.delete(key);
   renderCache.set(key, image);
   while (renderCache.size > MAX_CACHE_SIZE) {
@@ -116,7 +118,7 @@ function base64ToBlob(image: string): Blob {
   return new Blob([bytes], { type: 'image/png' });
 }
 
-export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code }) => {
+export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code, language = 'plantuml' }) => {
   const { t } = useTranslation();
   const {
     isStreaming = false,
@@ -131,21 +133,26 @@ export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code }) => {
   const isPc = isPcMiniApp();
 
   const reportRenderFailure = useCallback((failureStage: PlantUmlFailureStage, error?: unknown) => {
-    reportPlantUmlRenderFailed({
+    const errorCode = getErrorCode(error);
+    const errorMessage = getErrorMessage(error);
+    const payload = {
       page,
-      convertType: 'svg',
+      contentType: 'svg',
       diagramHash,
       contentLength: code.length,
       failureStage,
-      errorCode: getErrorCode(error),
-      errorMessage: getErrorMessage(error),
-    });
+      errorCode,
+      errorMessage,
+    } as const;
+
+    WeLog(`PlantUmlBlock render failed | extra=${JSON.stringify(payload)}`);
+    reportPlantUmlRenderFailed(payload);
   }, [code.length, diagramHash, page]);
 
   const reportExportFailure = useCallback((failureStage: PlantUmlFailureStage, error?: unknown) => {
     reportPlantUmlExportFailed({
       page,
-      convertType: 'png',
+      contentType: 'png',
       diagramHash,
       contentLength: code.length,
       failureStage,
@@ -178,7 +185,7 @@ export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code }) => {
 
     void renderPlantUml({
       content: code,
-      convertType: 'svg',
+      contentType: 'svg',
       fileType: 'puml',
     }, { signal: controller.signal })
       .then((result) => {
@@ -220,7 +227,7 @@ export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code }) => {
       if (image === undefined) {
         const result = await renderPlantUml({
           content: code,
-          convertType: 'png',
+          contentType: 'png',
           fileType: 'puml',
         }, { signal: controller.signal });
         image = result.image;
@@ -258,6 +265,10 @@ export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code }) => {
       setIsExporting(false);
     }
   }, [code, diagramId, isExporting, reportExportFailure]);
+
+  if (previewStatus === 'error') {
+    return <CodeBlock code={code} language={language} />;
+  }
 
   const canExport = isPc && previewStatus === 'success' && !collapsed;
 
@@ -319,18 +330,6 @@ export const PlantUmlBlock: React.FC<PlantUmlBlockProps> = ({ code }) => {
             <div className="plantuml-block__status">
               <span>{t('plantuml.rendering')}</span>
               <span className="plantuml-block__dots" aria-hidden="true">...</span>
-            </div>
-          ) : null}
-          {previewStatus === 'error' ? (
-            <div className="plantuml-block__status plantuml-block__status--error">
-              <img
-                className="plantuml-block__error-illustration"
-                src={plantUmlErrorIcon}
-                alt=""
-                aria-hidden="true"
-                draggable="false"
-              />
-              <span>{t('plantuml.renderFailed')}</span>
             </div>
           ) : null}
         </div>

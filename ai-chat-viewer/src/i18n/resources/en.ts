@@ -55,7 +55,6 @@ export const en = {
   'plantuml.expand': 'Expand diagram',
   'plantuml.collapse': 'Collapse diagram',
   'plantuml.rendering': 'Generating diagram...',
-  'plantuml.renderFailed': 'The diagram could not be generated. Please try asking again',
   'plantuml.previewImage': 'Preview diagram',
   'plantuml.exportImage': 'Export image',
   'plantuml.exportFailed': 'Failed to export image',

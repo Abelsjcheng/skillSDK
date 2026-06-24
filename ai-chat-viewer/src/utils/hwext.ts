@@ -8,7 +8,7 @@ import type {
   RegenerateAnswerResponse,
   ControlSkillWeCodeResponse,
 } from '../types';
-import type { PlantUmlRenderParams, PlantUmlRenderResult } from '../types/plantUml';
+import type { PlantUmlRenderParams, PlantUmlRenderResponse, PlantUmlRenderResult } from '../types/plantUml';
 import type { CreateDigitalTwinParams, GetFilePathResult, InternalAssistantOption, UploadTinyImageResult } from '../types/digitalTwin';
 import type {
   AgentTypeListResult,
@@ -25,6 +25,7 @@ import type {
   GetWeAgentDetailsParams,
   GetWeAgentListParams,
   HWH5AppInfo,
+  HWH5Bridge,
   HWH5DeviceInfo,
   HWH5EXT,
   HWH5UserInfo,
@@ -74,14 +75,32 @@ import {
   trackApiUpdateWeAgent,
   trackApiUpdateQrcodeInfo,
 } from './uemUtil';
-import { normalizePlantUmlRenderResult } from './plantUmlRenderer';
+import {
+  normalizePlantUmlRenderResult,
+  PLANTUML_RENDER_PATH,
+} from './plantUmlRenderer';
 
 const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
+const COMMON_REQUEST_V2_METHOD = 'method://agentSkills/commonRequestV2';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
 const CREATE_ASSISTANT_WHITELIST_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
+const PLANTUML_REQUEST_HEADERS = {
+  'Content-Type': 'application/json',
+};
+
+interface CommonRequestV2Payload {
+  request: {
+    url: string;
+    method: 'POST' | 'GET';
+    body?: string;
+    header?: Record<string, string>;
+    entry?: string;
+  };
+  message?: string;
+}
 
 function tryGetPedestal(): Pedestal | null {
   if (typeof window === 'undefined') return null;
@@ -159,7 +178,6 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       return call<ControlSkillWeCodeResponse>('controlSkillWeCode', params);
     },
     createNewSession: (params) => call<SkillSession>('createNewSession', params),
-    renderPlantUml: (params) => call<PlantUmlRenderResult>('renderPlantUml', params).then(normalizePlantUmlRenderResult),
     createDigitalTwin: (params) => assistantCall<CreateDigitalTwinResult>('createDigitalTwin', params),
     getAgentType: () => assistantCall<AgentTypeListResult>('getAgentType', {}),
     getWeAgentList: (params) => assistantCall<WeAgentListResult>('getWeAgentList', params),
@@ -198,16 +216,74 @@ function getJsApiOrThrow(): HWH5EXT {
   return getHWH5EXT();
 }
 
-function createMissingRendererError(message: string): Error & { code: 'missing_renderer' } {
-  return Object.assign(new Error(message), { code: 'missing_renderer' as const });
+function getHWH5BridgeOrThrow(): HWH5Bridge {
+  if (typeof window !== 'undefined' && window.HWH5 && typeof window.HWH5.fetchFull === 'function') {
+    return window.HWH5;
+  }
+  throw new Error('HWH5.fetchFull is not available. This code must run in WeLink miniapp environment.');
 }
 
-function getPlantUmlRendererOrThrow(): HWH5EXT['renderPlantUml'] {
-  const jsApi = resolveJsApi();
-  if (!jsApi || typeof jsApi.renderPlantUml !== 'function') {
-    throw createMissingRendererError('PlantUML renderer is not available.');
+function buildPlantUmlRenderUrl(): string {
+  return `${HOST().replace(/\/+$/, '')}${PLANTUML_RENDER_PATH}`;
+}
+
+function buildPlantUmlRenderBody(params: PlantUmlRenderParams): string {
+  return JSON.stringify({
+    content: params.content,
+    contentType: params.contentType,
+    fileType: 'puml',
+  });
+}
+
+function parseMaybeJsonString(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
   }
-  return jsApi.renderPlantUml.bind(jsApi);
+
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return value;
+  }
+}
+
+function isJsonResponseLike(value: unknown): value is { json: () => Promise<unknown> | unknown } {
+  return Boolean(value && typeof value === 'object' && typeof (value as { json?: unknown }).json === 'function');
+}
+
+async function normalizePlantUmlBridgeResponse(response: unknown): Promise<PlantUmlRenderResult> {
+  const payload = isJsonResponseLike(response)
+    ? await Promise.resolve(response.json())
+    : response;
+  return normalizePlantUmlRenderResult(
+    parseMaybeJsonString(payload) as Partial<PlantUmlRenderResponse> | PlantUmlRenderResult,
+  );
+}
+
+async function requestPlantUmlByPedestal(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> {
+  const payload: CommonRequestV2Payload = {
+    request: {
+      url: buildPlantUmlRenderUrl(),
+      method: 'POST',
+      body: buildPlantUmlRenderBody(params),
+      header: { ...PLANTUML_REQUEST_HEADERS },
+    },
+    message: 'PlantUML render',
+  };
+  const result = await Promise.resolve(getPedestalOrThrow().callMethod(COMMON_REQUEST_V2_METHOD, payload));
+  return normalizePlantUmlBridgeResponse(result);
+}
+
+async function requestPlantUmlByFetchFull(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> {
+  const result = await Promise.resolve(getHWH5BridgeOrThrow().fetchFull(
+    buildPlantUmlRenderUrl(),
+    {
+      method: 'POST',
+      headers: { ...PLANTUML_REQUEST_HEADERS },
+      body: buildPlantUmlRenderBody(params),
+    },
+  ));
+  return normalizePlantUmlBridgeResponse(result);
 }
 
 function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetWeAgentDetailsParams {
@@ -620,10 +696,10 @@ export async function renderPlantUml(
   params: PlantUmlRenderParams,
   _options?: { signal?: AbortSignal },
 ): Promise<PlantUmlRenderResult> {
-  const renderer = getPlantUmlRendererOrThrow();
-  return normalizePlantUmlRenderResult(
-    await Promise.resolve(renderer(params)),
-  );
+  if (isPcMiniApp()) {
+    return requestPlantUmlByPedestal(params);
+  }
+  return requestPlantUmlByFetchFull(params);
 }
 
 export async function getAccountInfoUid(): Promise<string> {
