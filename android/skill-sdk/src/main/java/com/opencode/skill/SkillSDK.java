@@ -1093,10 +1093,7 @@ public final class SkillSDK {
         WeAgentDetails cachedDetail = weAgentStorage.getCurrentWeAgentDetail();
         WeAgentDetails result = cachedDetail == null
                 ? new WeAgentDetails()
-                : gson.fromJson(gson.toJson(cachedDetail), WeAgentDetails.class);
-        if (result == null) {
-            result = new WeAgentDetails();
-        }
+                : cachedDetail;
         if (normalizeOptionalString(result.getTagName()) == null) {
             result.setTagName("助手");
         }
