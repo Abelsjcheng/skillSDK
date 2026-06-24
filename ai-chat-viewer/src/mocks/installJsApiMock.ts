@@ -206,6 +206,7 @@ const SUBAGENT_BASIC_PREFIX = 'subagent_basic';
 const SUBAGENT_QUESTION_PREFIX = 'subagent_question';
 const SUBAGENT_PERMISSION_PREFIX = 'subagent_permission';
 const DEFAULT_SKILL_CUI_WELINK_SESSION_ID = 'mock_skill_cui_session_001';
+const DEFAULT_SKILL_CUI_REPLAY_SESSION_ID = 'mock_skill_cui_replay_session_001';
 
 let idCounter = 0;
 let currentAssistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
@@ -1979,8 +1980,6 @@ function seedAdditionalHistorySessions(
       nextMessageSeq: 1,
       nextStreamSeq: 0,
       timerIds: [],
-      continuationScheduled: false,
-      activeReplayDraft: null,
     });
   }
 }
@@ -2067,7 +2066,7 @@ function seedMockData(): void {
   const firstUserMessage = createMessage(
     seedSession.welinkSessionId,
     'user',
-    'Please explain what this page can do.',
+    '请帮我把这段技能输出整理成可发送给聊天窗口的摘要。',
     seedRecord.nextMessageSeq,
   );
   seedRecord.nextMessageSeq += 1;
@@ -2076,7 +2075,13 @@ function seedMockData(): void {
   const firstAssistantMessage = createMessage(
     seedSession.welinkSessionId,
     'assistant',
-    'This page hosts WeAgentCUI chat, including session init, message send, and history display.',
+    [
+      '这是 SkillCUI 的本地 mock 会话。',
+      '',
+      '- 顶部支持最小化和关闭技能窗口。',
+      '- 回复下方会显示复制、发送到聊天按钮。',
+      '- 底部输入框可以继续发送要求，mock 会返回流式回复。',
+    ].join('\n'),
     seedRecord.nextMessageSeq,
     nextId('part_seed'),
   );
@@ -2084,6 +2089,50 @@ function seedMockData(): void {
   upsertSessionRecord(seedRecord, firstAssistantMessage);
 
   sessionStore.set(seedSession.welinkSessionId, seedRecord);
+
+  const replaySession = createFixedSession({
+    ak: internalAssistant.appKey,
+    title: 'mock-skill-cui-replay-session',
+    businessSessionDomain: 'miniapp',
+    businessSessionType: 'direct',
+    assistantAccount: internalAssistant.partnerAccount,
+    businessSessionId: MOCK_UID,
+  }, DEFAULT_SKILL_CUI_REPLAY_SESSION_ID);
+
+  const replayRecord: SessionRecord = {
+    session: replaySession,
+    messages: [],
+    nextMessageSeq: 1,
+    nextStreamSeq: 0,
+    timerIds: [],
+  };
+
+  const replayUserMessage = createMessage(
+    replaySession.welinkSessionId,
+    'user',
+    'mock replay: 请生成一段可以回放展示的 SkillCUI 历史消息。',
+    replayRecord.nextMessageSeq,
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayUserMessage);
+
+  const replayAssistantMessage = createMessage(
+    replaySession.welinkSessionId,
+    'assistant',
+    [
+      '这是 `mock_skill_cui_replay_session_001` 的历史消息回放内容。',
+      '',
+      '页面加载时会通过 `getSessionMessageHistory` 拉取这段记录，用于验证 SkillCUI 的历史消息渲染、复制和发送按钮。',
+      '',
+      '你也可以在底部输入框继续发送内容，mock 会模拟技能回复。',
+    ].join('\n'),
+    replayRecord.nextMessageSeq,
+    nextId('part_skill_cui_replay'),
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayAssistantMessage);
+
+  sessionStore.set(replaySession.welinkSessionId, replayRecord);
   seedAdditionalHistorySessions(internalAssistant, sessionStore.size);
   defaultSkillCUIWelinkSessionId = seedSession.welinkSessionId;
 }
@@ -2604,14 +2653,14 @@ export function installJsApiMock(): void {
       return;
     }
 
-    if (window.HWH5EXT && !window.__AI_CHAT_VIEWER_JSAPI_MOCK__) {
+    if (window.HWH5EXT && !window.__AI_CHAT_VIEWER_JSAPI_MOCK__ && !enableFromQuery) {
       return;
     }
 
     seedMockData();
     ensureMockHWH5Bridge();
 
-    if (!window.HWH5EXT) {
+    if (!window.HWH5EXT || enableFromQuery) {
       window.HWH5EXT = buildMockApi();
     }
 

@@ -1,4 +1,4 @@
-export function WeLog(message: string): void {
+export function WeLog(message: string, type?: string): void {
   if (typeof window === 'undefined' || typeof window.HWH5?.log !== 'function') {
     return;
   }
