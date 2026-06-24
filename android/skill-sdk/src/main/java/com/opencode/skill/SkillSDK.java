@@ -1088,10 +1088,8 @@ public final class SkillSDK {
      * <p>方法仅访问本地 current_we_agent_detail 缓存，不发起网络请求或回写缓存。返回前复制缓存对象，
      * 并仅对缺失的 tagName、tagNameEn 分别使用“助手”和“Agent”兜底。</p>
      */
-    public void getWeAgentInfo(@NonNull SkillCallback<WeAgentDetails> callback) {
-        if (callback == null) {
-            throw new IllegalArgumentException("callback == null");
-        }
+    @NonNull
+    public WeAgentDetails getWeAgentInfo() {
         WeAgentDetails cachedDetail = weAgentStorage.getCurrentWeAgentDetail();
         WeAgentDetails result = cachedDetail == null
                 ? new WeAgentDetails()
@@ -1109,7 +1107,7 @@ public final class SkillSDK {
                 + result.getPartnerAccount()
                 + ", tagName=" + result.getTagName()
                 + ", tagNameEn=" + result.getTagNameEn());
-        callback.onSuccess(result);
+        return result;
     }
 
     // 20. getWeAgentUri

@@ -743,7 +743,7 @@ export class SkillSDK {
    * 方法只读取 current_we_agent_detail，不触发网络请求或缓存写入；返回值会复制缓存中的全部字段，
    * 并仅对缺失的 tagName、tagNameEn 分别使用“助手”和“Agent”兜底。
    */
-  async getWeAgentInfo(): Promise<WeAgentDetails> {
+  getWeAgentInfo(): WeAgentDetails {
     try {
       const cachedDetail = this.weAgentStore.loadCurrentDetail();
       const detailPayload = cachedDetail === null
