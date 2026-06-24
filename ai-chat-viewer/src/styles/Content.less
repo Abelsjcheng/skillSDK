@@ -480,10 +480,30 @@
     font-size: 13px;
     line-height: 20px;
     color: #666;
-    max-height: 400px;
+    max-height: 200px;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(221, 221, 221, 1) transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(221, 221, 221, 1);
+      border-radius: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: rgba(196, 196, 196, 1);
+    }
   }
 
   // QuestionCard
@@ -1054,6 +1074,22 @@
     .permission-card__info {
       border-top-color: var(--ai-dark-border-soft);
       background: transparent;
+    }
+
+    .thinking-block__content {
+      scrollbar-color: rgba(88, 92, 94, 0.9) transparent;
+
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(88, 92, 94, 0.9);
+      }
+
+      &::-webkit-scrollbar-thumb:hover {
+        background: rgba(112, 116, 118, 0.95);
+      }
     }
 
     .tool-card__code {

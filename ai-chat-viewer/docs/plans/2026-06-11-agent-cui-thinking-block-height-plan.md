@@ -1,4 +1,4 @@
-# `AgentCUI活跃思考内容默认展开与20行限高方案`
+# `AgentCUI活跃思考内容默认展开与10行限高方案`
 
 - 方案日期：`2026-06-12`
 - 目标工程：`ai-chat-viewer`
@@ -21,8 +21,8 @@
 
 1. 正在对话的当前 message 中，单个思考文本块默认展开。
 2. 过去 session 会话中的 `thinking` 默认不展开，包括从其他会话切换过来、打开历史会话、恢复历史消息等场景。
-3. 单个思考文本块最大高度约 20 行。
-4. 超出 20 行后在思考文本块内部使用滚动条。
+3. 单个思考文本块最大高度约 10 行。
+4. 超出 10 行后在思考文本块内部使用滚动条。
 5. 保留用户点击标题折叠和再次展开的能力。
 
 ### 1.3 非目标
@@ -42,12 +42,12 @@ flowchart TD
     B -- "否: 历史/切换会话" --> D["ThinkingBlock 初始折叠"]
     C --> E["展示 thinking-block__content"]
     E --> F["CSS 设置 line-height 与 max-height"]
-    F --> G["内容超过约20行时内部滚动"]
+    F --> G["内容超过约10行时内部滚动"]
 ```
 
 ### 2.2 方案核心
 
-由 `MessageBubble` 根据消息上下文判断 `thinking` 是否应默认展开：当前正在对话的 message 默认展开，历史 session message 默认折叠；同时在 `.thinking-block__content` 上增加约 20 行高度上限和纵向滚动。
+由 `MessageBubble` 根据消息上下文判断 `thinking` 是否应默认展开：当前正在对话的 message 默认展开，历史 session message 默认折叠；同时在 `.thinking-block__content` 上增加约 10 行高度上限和纵向滚动。
 
 ## 3. 时序图
 
@@ -82,7 +82,7 @@ sequenceDiagram
     Bubble->>Thinking: 渲染 thinking part 并传入默认折叠
     Thinking-->>User: 仅展示思考块标题
     User->>Thinking: 点击标题
-    Thinking-->>User: 展开后显示内容，超出20行时内部滚动
+    Thinking-->>User: 展开后显示内容，超出10行时内部滚动
 ```
 
 ## 4. 技术细节
@@ -104,7 +104,7 @@ sequenceDiagram
 
 ```less
 line-height: 20px;
-max-height: 400px;
+max-height: 200px;
 overflow-y: auto;
 overflow-x: hidden;
 box-sizing: border-box;
@@ -113,7 +113,7 @@ box-sizing: border-box;
 
 ### 4.2 核心实现方式
 
-推荐将默认展开逻辑上移到 `MessageBubble`，因为它能同时拿到 `message.isHistory`、`message.isStreaming` 与 `part` 信息；`ThinkingBlock` 只负责根据 `defaultExpanded` 初始化折叠态并处理用户点击。高度控制继续用固定行高计算 20 行高度：`line-height: 20px`，`max-height: 400px`。这样“约 20 行”的展示效果更可预期，避免浏览器默认 `line-height: normal` 带来的差异。
+推荐将默认展开逻辑上移到 `MessageBubble`，因为它能同时拿到 `message.isHistory`、`message.isStreaming` 与 `part` 信息；`ThinkingBlock` 只负责根据 `defaultExpanded` 初始化折叠态并处理用户点击。高度控制继续用固定行高计算 10 行高度：`line-height: 20px`，`max-height: 200px`。这样“约 10 行”的展示效果更可预期，避免浏览器默认 `line-height: normal` 带来的差异。
 
 ### 4.3 兼容与边界
 
@@ -135,13 +135,13 @@ box-sizing: border-box;
 
 ### 4.5 文档需要同步修改的内容
 
-1. 本方案文档记录“当前对话 thinking 默认展开，历史 session thinking 默认折叠，展开后超过约 20 行内部滚动”。
+1. 本方案文档记录“当前对话 thinking 默认展开，历史 session thinking 默认折叠，展开后超过约 10 行内部滚动”。
 2. 如项目存在产品交互说明或验收用例，需同步当前/历史会话的差异化默认展示规则。
 3. 其他文档不涉及。
 
 ## 5. 性能
 
-不新增请求，不改变数据结构。历史 session thinking 保持默认折叠，可避免历史长思考内容在切换会话或打开历史会话时立即参与大面积布局。当前正在对话的 thinking 默认展开，影响范围集中在当前生成消息；通过 20 行限高可以控制单个思考块对页面高度的影响。
+不新增请求，不改变数据结构。历史 session thinking 保持默认折叠，可避免历史长思考内容在切换会话或打开历史会话时立即参与大面积布局。当前正在对话的 thinking 默认展开，影响范围集中在当前生成消息；通过 10 行限高可以控制单个思考块对页面高度的影响。
 
 ## 6. 功耗
 
@@ -182,7 +182,7 @@ box-sizing: border-box;
 2. 从其他会话切换到过去 session 后，历史 `thinking` 默认折叠。
 3. 直接打开过去对话或历史回放时，历史 `thinking` 默认折叠。
 4. 点击思考块标题后可折叠，再次点击可展开。
-5. 超过 20 行的思考内容在展开后出现内部滚动条。
+5. 超过 10 行的思考内容在展开后出现内部滚动条。
 
 ### 9.2 兼容测试
 
@@ -193,8 +193,8 @@ box-sizing: border-box;
 ### 9.3 文档一致性检查
 
 1. 交互描述与当前/历史会话差异化默认展开行为一致。
-2. “约 20 行”与 CSS `line-height: 20px; max-height: 400px;` 一致。
+2. “约 10 行”与 CSS `line-height: 20px; max-height: 200px;` 一致。
 
 ## 10. 最终建议
 
-最终结论：推荐采用“`MessageBubble` 判断消息上下文 + `ThinkingBlock` 接收 `defaultExpanded` + `.thinking-block__content` 设置 `line-height: 20px; max-height: 400px; overflow-y: auto;`”的方案。该方案能准确满足当前对话默认展开、历史 session 默认折叠、长文本不撑满页面三个目标；后续动作是更新实现中无条件默认展开的逻辑，并补充当前会话展开、历史会话折叠、长文本滚动三类测试。
+最终结论：推荐采用“`MessageBubble` 判断消息上下文 + `ThinkingBlock` 接收 `defaultExpanded` + `.thinking-block__content` 设置 `line-height: 20px; max-height: 200px; overflow-y: auto;`”的方案。该方案能准确满足当前对话默认展开、历史 session 默认折叠、长文本不撑满页面三个目标；后续动作是更新实现中无条件默认展开的逻辑，并补充当前会话展开、历史会话折叠、长文本滚动三类测试。
