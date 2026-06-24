@@ -96,7 +96,6 @@ export function useChatSession({
   const onSessionActivityRef = useRef(onSessionActivity);
   const onSessionDeletedRef = useRef(onSessionDeleted);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
-  const agentOfflineTextRef = useRef('agent已离线');
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
   onSessionActivityRef.current = onSessionActivity;
@@ -329,10 +328,10 @@ export function useChatSession({
       welinkSessionId,
       content: content.trim(),
       ...(toolCallId ? { toolCallId } : {}),
-      ...(questionId ? { questionId } : {}),
       ...(subagentSessionId ? { subagentSessionId } : {}),
       ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
     });
+
     // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
     onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
 
@@ -414,6 +413,7 @@ export function useChatSession({
       if (
         (msg.type === 'question' || msg.type === 'tool.update')
         && (msg.status === 'completed' || msg.status === 'error')
+        && latestStreamingMsgIdRef.current != msg?.messageId
       ) {
         const partType = msg.type === 'question' ? 'question' : 'tool';
         const hasMatchingPart = messagesRef.current.some((message) =>
@@ -421,7 +421,7 @@ export function useChatSession({
             part.type === partType
             && (
               (msg.partId != null && part.partId === msg.partId)
-              || (msg.toolCallId != null && part.toolCallId === msg.toolCallId)
+              && ((msg.toolCallId != null && part.toolCallId === msg.toolCallId) || (msg.questionId != null && part.questionId === msg.questionId))
             )
           )),
         );
@@ -432,14 +432,14 @@ export function useChatSession({
             partType,
             (part) => (
               (msg.partId != null && part.partId === msg.partId)
-              || (msg.toolCallId != null && part.toolCallId === msg.toolCallId)
+              && ((msg.toolCallId != null && part.toolCallId === msg.toolCallId) || (msg.questionId != null && part.questionId === msg.questionId))
             ),
             (part) => ({
               ...part,
               // 对 question 标记为已回答
               ...(partType === 'question' ? { answered: true } : {}),
               output: msg.output ?? part.output,
-              status: msg.status === 'completed' || msg.status === 'error' ? msg.status : part.status,
+              status: (msg.status === 'completed' || msg.status === 'error') ? msg.status : part.status,
               isStreaming: false,
             }),
           ));
@@ -487,7 +487,7 @@ export function useChatSession({
               welinkSessionId: activeWelinkSessionId,
               messageId,
               content: (currentText || msg.content || '')?.slice(-50),
-            })}`);
+            })}`, 'info');
           }
           break;
         }
@@ -497,6 +497,7 @@ export function useChatSession({
             break;
           }
 
+          finalizeStreamingMessage();
           setSessionStatus('busy');
           setMessages((prev) => {
             if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
@@ -593,13 +594,12 @@ export function useChatSession({
           }
           agentOfflineHandledRef.current = true;
           setSessionStatus('idle');
-          appendAssistantErrorBlock(agentOfflineTextRef.current, agentOfflineTextRef.current);
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
             finalizeStreamingMessageById(latestStreamingMsgIdRef.current);
             setSessionStatus('idle');
-            hidePendingAssistantPreview();
+            finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
@@ -791,7 +791,6 @@ export function useChatSession({
 
     try {
       await sendMessageToIM({ welinkSessionId, content });
-      showToast('已发送到IM');
     } catch (err) {
       WeLog(`useChatSession sendMessageToIM failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
     }
@@ -800,10 +799,14 @@ export function useChatSession({
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
-      showToast(tRef.current('common.copySuccess'));
+      if (mode !== 'skillCUI') {
+        showToast(tRef.current('common.copySuccess'));
+      }
     } catch (err) {
       WeLog(`useChatSession copy failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(tRef.current('assistantDetail.copyFailed'));
+      if (mode !== 'skillCUI') {
+        showToast(tRef.current('assistantDetail.copyFailed'));
+      }
     }
   }, [mode, welinkSessionId]);
 

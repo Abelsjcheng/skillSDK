@@ -3,16 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import ResponsiveConfirmModal from '../system/ResponsiveConfirmModal';
 import { isPcMiniApp } from '../../constants';
-import closeIcon from '../../imgs/close_icon.svg';
+import historySession from '../../imgs/historySession.svg';
+import closeIcon from '../../imgs/slider_close_icon.png';
+import iconWeAgentHistory from '../../imgs/no-history_icon.png';
 import deleteIcon from '../../imgs/delete_icon.png';
 import editIcon from '../../imgs/edit_icon.png';
-import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
 import type { SkillSession } from '../../types/bridge';
 import type {
   HistorySessionGroup,
   HistorySessionGroupKey,
-  HistorySessionsCache,
   WeAgentHistorySidebarProps,
+  HistorySessionsCache,
 } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { deleteHistorySession, getHistorySessionsList } from '../../utils/hwext';
@@ -633,7 +634,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       >
         <img
           className="we-agent-cui-actions__icon"
-          src={iconWeAgentHistory}
+          src={historySession}
           alt=""
           draggable="false"
         />

@@ -44,6 +44,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getWeAgentUri](#16-getweagenturi) | 获取当前助理相关页面 URI |
 | [openWeAgentCUI](#17-openweagentcui) | 打开助理 CUI |
 | [onTabForUpdate](#18-ontabforupdate) | 监听小程序更新事件 |
+| [querySlashCommands](#19-queryslashcommands) | 通过 WebSocket 查询 Slash Commands |
 
 ---
 
@@ -547,6 +548,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | searchResults | object[] \| null | `search_result` 事件搜索结果列表 |
 | references | object[] \| null | `reference` 事件引用列表 |
 | askMoreQuestions | string[] \| null | `ask_more` 事件追问建议列表 |
+| slashCommands | Array<{ command: string; description?: string \| null }> \| null | `slash_commands_result` 事件返回的 Slash Commands 列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照 |
 | parts | array \| null | `streaming` 携带的进行中消息部件 |
 | subagentSessionId | string \| null | 子 agent 的真实会话 ID，仅出现在 Part 级事件及恢复态 part 中 |
@@ -554,12 +556,13 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 
 ### 事件类型
 
-`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
+`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more` / `slash_commands_result`
 
 恢复态说明：
 - 重连恢复时，服务端会先推送 `snapshot`，再推送 `streaming`。
 - 当 `streaming.sessionStatus = idle` 时，客户端应将当前所有 streaming part 视为已完成，避免残留流式展示状态。
 - `search_result` 的字段名严格是 `searchResults`，`ask_more` 的字段名严格是 `askMoreQuestions`。
+- `slash_commands_result` 的字段名严格是 `slashCommands`，该事件用于 Slash Commands 查询结果，不参与 `SessionMessage` 聚合。
 
 ### 行为说明
 
@@ -1951,6 +1954,137 @@ window.HWH5EXT.onTabForUpdate(() => {
 
 ---
 
+## 19. querySlashCommands
+
+### 接口说明
+
+通过 Skill WebSocket 长连接查询当前会话可用的 Slash Commands。
+
+该接口不是 REST 查询接口。调用成功只表示 SDK 已向 WebSocket 发送查询命令，真实命令列表通过 `registerSessionListener` 的 `onMessage` 接收 `slash_commands_result` 事件。
+
+SDK 发送的 WebSocket 命令：
+
+```json
+{
+  "action": "query_slash_commands",
+  "welinkSessionId": "{string}"
+}
+```
+
+服务端推送的结果事件：
+
+```json
+{
+  "type": "slash_commands_result",
+  "seq": 135,
+  "emittedAt": "2026-06-15T00:00:00Z",
+  "messageId": "{string}",
+  "messageSeq": 6,
+  "role": "assistant",
+  "sourceMessageId": "{string}",
+  "partId": "{string}",
+  "partSeq": 4,
+  "status": "running",
+  "sessionID": "{string}",
+  "welinkSessionId": "{string}",
+  "slashCommands": [
+    {
+      "command": "/new",
+      "description": "新建会话"
+    },
+    {
+      "command": "/delete",
+      "description": "删除"
+    }
+  ]
+}
+```
+
+说明：
+- SDK 对外主会话字段统一使用 `welinkSessionId`。
+- 若服务端同时返回 `sessionID`，SDK 可保留在 `raw` 中；端侧业务不应依赖该字段作为主会话 ID。
+- `slash_commands_result` 不参与 `getSessionMessage` / `getSessionMessageHistory` 的消息聚合。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.querySlashCommands(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'querySlashCommands', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### 返回值
+
+返回 Promise，resolve 数据：
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定为 `success`，表示查询命令已发送 |
+
+### 结果事件字段
+
+`slash_commands_result` 事件沿用 `StreamMessage` 结构，并额外关注以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定为 `slash_commands_result` |
+| welinkSessionId | string | 所属会话 ID |
+| slashCommands | Array<SlashCommand> | Slash Commands 列表，可能为空数组 |
+| slashCommands[].command | string | Slash 命令，如 `/new` |
+| slashCommands[].description | string \| null | 命令描述 |
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+| 5000 | SDK 未初始化 | SDK 尚未完成初始化 |
+| 6000 | 网络错误 | WebSocket 连接或发送失败 |
+| 7000 | 服务端错误 | 服务端返回错误事件或无法处理查询命令 |
+
+### 实现方法
+
+1. 调用方先通过 `registerSessionListener` 注册当前 `welinkSessionId` 的消息监听。
+2. 调用 `querySlashCommands({ welinkSessionId })`。
+3. SDK 校验参数并确保 WebSocket 已连接。
+4. SDK 通过 `WebSocketManager` 发送 `query_slash_commands` 命令。
+5. 服务端异步推送 `slash_commands_result`。
+6. SDK 按 `welinkSessionId` 将事件分发给对应监听器。
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.registerSessionListener({
+  welinkSessionId: '42',
+  onMessage: (message) => {
+    if (message.type !== 'slash_commands_result') {
+      return;
+    }
+    console.log('Slash Commands:', message.slashCommands || []);
+  }
+});
+
+window.HWH5EXT.querySlashCommands({
+  welinkSessionId: '42'
+}).then((result) => {
+  console.log('查询命令已发送:', result.status);
+}).catch((error) => {
+  console.error('查询 Slash Commands 失败:', error.errorCode, error.errorMessage);
+});
+```
+
+---
+
 ## 错误码说明
 
 | 错误码 | 说明 |
@@ -1966,6 +2100,7 @@ window.HWH5EXT.onTabForUpdate(() => {
 | 4008 | 权限请求已过期 |
 | 4009 | 小程序不存在 |
 | 4010 | 操作失败 |
+| 5000 | SDK 未初始化 |
 | 6000 | 网络错误 |
 | 7000 | 服务端错误 |
 | 7001 | AI 网关错误 |

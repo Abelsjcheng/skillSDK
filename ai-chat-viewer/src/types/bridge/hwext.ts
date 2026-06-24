@@ -279,8 +279,8 @@ export interface OpenWeAgentCUIParams {
 }
 
 export interface OpenIMChatParams {
-  chatID?: string,
-  chatType?: string
+  chatID?: string;
+  chatType?: string;
 }
 
 export interface BuildOpenWeAgentCUIOptions {
@@ -300,7 +300,7 @@ export interface OpenWeAgentCUIResult {
 }
 
 export interface UploadFileParams {
-  serverlUrl: string;
+  serverUrl: string;
   filePath: string;
   name: string;
   formData: object;
@@ -352,7 +352,7 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
-  createNewSession(params: CreateNewSessionParams): Promise<SkillSession> | SkillSession;
+  createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
   createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> | CreateDigitalTwinResult;
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
@@ -379,7 +379,7 @@ export interface HWH5Bridge {
   uem?: (
     eventName: string,
     payload: {
-      type: 'info';
+      type: 'INFO' | 'ERROR';
       code: string;
       name: string;
       result: boolean;
@@ -390,7 +390,7 @@ export interface HWH5Bridge {
   ) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
-  addEventListener?: (params: HWH5AddEventListenerParams) => Promise<unknown> | unknown;
+  addEventListener: (params: HWH5AddEventListenerParams) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
@@ -410,7 +410,7 @@ export interface HWH5Bridge {
   disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;
   navigateBack: () => void;
   close: () => void;
-  openIMChat?: (params: OpenIMChatParams) => Promise<unknown> | unknown;
+  openIMChat: (params: OpenIMChatParams) => Promise<unknown> | unknown;
   onCheckForUpdate: () => Promise<unknown>;
   onUpdateReady: (listener: Function) => Promise<unknown>
 }
