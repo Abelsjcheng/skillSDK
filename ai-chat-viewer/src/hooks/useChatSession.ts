@@ -17,6 +17,7 @@ import {
   messageOperationToMessage,
   normalizeRole,
   sessionMessageToMessage,
+  serializeQuestionAnswerContent,
   snapshotMessageToMessage,
   updateLatestPart,
 } from '../utils/message';
@@ -33,13 +34,99 @@ import { WeLog } from '../utils/logger';
 import { hasMoreHistoryByCursor } from '../utils/session';
 import { reportFlowTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
-import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
+import type {
+  HiddenQuestionAnswerUserMessage,
+  SendUserMessageOptions,
+  UseChatSessionOptions,
+  UseChatSessionResult,
+} from '../types/components';
 import { reportSendMessageClick } from '../utils/uemUtil';
 
 const HISTORY_PAGE_SIZE = 20;
 
 function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
   return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
+}
+
+function collectKnownUserMessageIds(messages: Message[], suppressedMessageIds: Set<string>): Set<string> {
+  const ids = collectUserMessageIds(messages);
+  suppressedMessageIds.forEach((id) => ids.add(id));
+  return ids;
+}
+
+function collectQuestionAnswerOutputs(message: Message): Set<string> {
+  const outputs = new Set<string>();
+  if (normalizeRole(message.role) !== 'assistant') {
+    return outputs;
+  }
+
+  message.parts?.forEach((part) => {
+    if (part.type !== 'question') {
+      return;
+    }
+
+    const output = part.output?.trim();
+    if (output) {
+      outputs.add(output);
+    }
+  });
+
+  return outputs;
+}
+
+function filterQuestionAnswerUserMessages(messages: Message[]): {
+  messages: Message[];
+  hiddenUserMessageIds: Set<string>;
+} {
+  const hiddenUserMessageIds = new Set<string>();
+  const visibleMessages: Message[] = [];
+  let pendingQuestionAnswerOutputs = new Set<string>();
+
+  messages.forEach((message) => {
+    const role = normalizeRole(message.role);
+    const content = message.content.trim();
+
+    if (role === 'user' && content && pendingQuestionAnswerOutputs.has(content)) {
+      hiddenUserMessageIds.add(message.id);
+      pendingQuestionAnswerOutputs.delete(content);
+      return;
+    }
+
+    visibleMessages.push(message);
+
+    if (role === 'assistant') {
+      pendingQuestionAnswerOutputs = collectQuestionAnswerOutputs(message);
+      return;
+    }
+
+    pendingQuestionAnswerOutputs = new Set<string>();
+  });
+
+  return {
+    messages: visibleMessages,
+    hiddenUserMessageIds,
+  };
+}
+
+function optionalIdMatches(expected: string | undefined, actual: string | null | undefined): boolean {
+  return !expected || !actual || expected === actual;
+}
+
+function findHiddenQuestionAnswerUserMessageIndex(
+  messages: HiddenQuestionAnswerUserMessage[],
+  msg: StreamMessage,
+): number {
+  const content = (msg.content ?? '').trim();
+  if (!content) {
+    return -1;
+  }
+
+  return messages.findIndex((message) => (
+    message.content === content
+    && optionalIdMatches(message.toolCallId, msg.toolCallId)
+    && optionalIdMatches(message.questionId, msg.questionId)
+    && optionalIdMatches(message.subagentSessionId, msg.subagentSessionId)
+  ));
 }
 
 function buildUserMessage(msg: StreamMessage): Message | null {
@@ -85,6 +172,8 @@ export function useChatSession({
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const knownUserMessageIdsRef = useRef(new Set<string>());
+  const suppressedUserMessageIdsRef = useRef(new Set<string>());
+  const pendingHiddenQuestionAnswerUserMessagesRef = useRef<HiddenQuestionAnswerUserMessage[]>([]);
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
@@ -122,6 +211,8 @@ export function useChatSession({
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
+    suppressedUserMessageIdsRef.current.clear();
+    pendingHiddenQuestionAnswerUserMessagesRef.current = [];
     nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
@@ -291,8 +382,10 @@ export function useChatSession({
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
       if (olderMessages.length > 0) {
         setMessages((prev) => {
-          const next = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
-          knownUserMessageIdsRef.current = collectUserMessageIds(next);
+          const combined = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
+          const { messages: next, hiddenUserMessageIds } = filterQuestionAnswerUserMessages(combined);
+          hiddenUserMessageIds.forEach((id) => suppressedUserMessageIdsRef.current.add(id));
+          knownUserMessageIdsRef.current = collectKnownUserMessageIds(next, suppressedUserMessageIdsRef.current);
           return next;
         });
       }
@@ -315,38 +408,76 @@ export function useChatSession({
     toolCallId?: string,
     questionId?: string,
     subagentSessionId?: string,
+    displayContent?: string,
+    options: SendUserMessageOptions = {},
   ) => {
     if (!welinkSessionId) {
       showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
-    const result = await sendMessageApi({
-      welinkSessionId,
-      content: content.trim(),
-      ...(toolCallId ? { toolCallId } : {}),
-      ...(subagentSessionId ? { subagentSessionId } : {}),
-      ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
-    });
-
-    // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
-    onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
-
-    const userMessage = messageOperationToMessage(result);
-    setMessages((prev) => {
-      if (prev.some((message) => message.id === userMessage.id)) {
-        return prev;
+    const trimmedContent = content.trim();
+    const hiddenQuestionAnswerUserMessage = options.suppressUserBubble
+      ? {
+        content: trimmedContent,
+        toolCallId,
+        questionId,
+        subagentSessionId,
       }
-      const next = [...prev, userMessage];
-      knownUserMessageIdsRef.current = collectUserMessageIds(next);
-      return next;
-    });
-    setScrollToBottomSignal((prev) => prev + 1);
-    return result;
-  }, [mode, welinkSessionId]);
+      : null;
+
+    if (hiddenQuestionAnswerUserMessage) {
+      pendingHiddenQuestionAnswerUserMessagesRef.current.push(hiddenQuestionAnswerUserMessage);
+    }
+
+    try {
+      const result = await sendMessageApi({
+        welinkSessionId,
+        content: trimmedContent,
+        ...(toolCallId ? { toolCallId } : {}),
+        ...(subagentSessionId ? { subagentSessionId } : {}),
+        ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
+      });
+
+      // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
+      onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
+
+      const userMessage = {
+        ...messageOperationToMessage(result),
+        ...(displayContent ? { content: displayContent } : {}),
+      };
+
+      if (options.suppressUserBubble) {
+        suppressedUserMessageIdsRef.current.add(userMessage.id);
+        knownUserMessageIdsRef.current.add(userMessage.id);
+        showPendingAssistantPreview(welinkSessionId);
+        setScrollToBottomSignal((prev) => prev + 1);
+        return result;
+      }
+
+      setMessages((prev) => {
+        if (prev.some((message) => message.id === userMessage.id)) {
+          return prev;
+        }
+        const next = [...prev, userMessage];
+        knownUserMessageIdsRef.current = collectKnownUserMessageIds(next, suppressedUserMessageIdsRef.current);
+        return next;
+      });
+      setScrollToBottomSignal((prev) => prev + 1);
+      return result;
+    } finally {
+      if (hiddenQuestionAnswerUserMessage) {
+        const index = pendingHiddenQuestionAnswerUserMessagesRef.current.indexOf(hiddenQuestionAnswerUserMessage);
+        if (index >= 0) {
+          pendingHiddenQuestionAnswerUserMessagesRef.current.splice(index, 1);
+        }
+      }
+    }
+  }, [mode, showPendingAssistantPreview, welinkSessionId]);
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
+    displayContent,
     messageId,
     toolCallId,
     questionId,
@@ -355,7 +486,14 @@ export function useChatSession({
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
+      await sendUserMessage(
+        serializeQuestionAnswerContent(answer),
+        toolCallId,
+        questionId,
+        subagentSessionId,
+        displayContent,
+        { suppressUserBubble: true },
+      );
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, messageId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
@@ -374,7 +512,7 @@ export function useChatSession({
       knownUserMessageIdsRef.current.clear();
       return;
     }
-    knownUserMessageIdsRef.current = collectUserMessageIds(messages);
+    knownUserMessageIdsRef.current = collectKnownUserMessageIds(messages, suppressedUserMessageIdsRef.current);
   }, [messages, welinkSessionId]);
 
   useEffect(() => {
@@ -481,10 +619,31 @@ export function useChatSession({
             break;
           }
 
+          const hiddenQuestionAnswerIndex = findHiddenQuestionAnswerUserMessageIndex(
+            pendingHiddenQuestionAnswerUserMessagesRef.current,
+            msg,
+          );
+          const shouldSuppressUserMessage = hiddenQuestionAnswerIndex >= 0
+            || suppressedUserMessageIdsRef.current.has(nextMessage.id);
+
           finalizeStreamingMessage();
           setSessionStatus('busy');
+
+          if (shouldSuppressUserMessage) {
+            if (hiddenQuestionAnswerIndex >= 0) {
+              pendingHiddenQuestionAnswerUserMessagesRef.current.splice(hiddenQuestionAnswerIndex, 1);
+            }
+            suppressedUserMessageIdsRef.current.add(nextMessage.id);
+            knownUserMessageIdsRef.current.add(nextMessage.id);
+            showPendingAssistantPreview(activeWelinkSessionIdRef.current);
+            break;
+          }
+
           setMessages((prev) => {
-            if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
+            if (
+              knownUserMessageIdsRef.current.has(nextMessage.id)
+              || suppressedUserMessageIdsRef.current.has(nextMessage.id)
+            ) {
               return prev;
             }
 
@@ -691,8 +850,10 @@ export function useChatSession({
           ...sessionMessageToMessage(message),
           isHistory: true,
         }));
-        setMessages(mapped);
-        knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
+        const { messages: visibleMessages, hiddenUserMessageIds } = filterQuestionAnswerUserMessages(mapped);
+        hiddenUserMessageIds.forEach((id) => suppressedUserMessageIdsRef.current.add(id));
+        setMessages(visibleMessages);
+        knownUserMessageIdsRef.current = collectKnownUserMessageIds(visibleMessages, suppressedUserMessageIdsRef.current);
         nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
         const nextHasMoreHistory = hasMoreHistoryByCursor(result);
         hasMoreHistoryRef.current = nextHasMoreHistory;
