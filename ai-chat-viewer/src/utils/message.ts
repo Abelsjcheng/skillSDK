@@ -13,38 +13,19 @@ import type {
   SessionMessageSnapshot,
   SubagentStatus,
 } from '../types';
+import type {
+  LegacyQuestionAnswerTranscriptItem,
+  MapRawPartOptions,
+  QuestionAnswerDisplayLabels,
+  QuestionFieldSource,
+} from '../types/components';
 
 export type RawMessagePart = SessionMessagePart | MessagePartSnapshot;
+export type { LegacyQuestionAnswerTranscriptItem } from '../types/components';
 
 const MESSAGE_PART_STATUS = new Set(['pending', 'running', 'completed', 'error']);
 
 let nextMsgId = 1;
-
-interface QuestionFieldSource {
-  header?: unknown;
-  question?: unknown;
-  options?: unknown;
-  multiSelect?: unknown;
-  questions?: unknown;
-  content?: unknown;
-}
-
-interface MapRawPartOptions {
-  allowInputQuestionsFallback?: boolean;
-}
-
-interface QuestionAnswerDisplayLabels {
-  unanswered?: string;
-  questionPrefix?: string;
-  answerSeparator?: string;
-  questionTitle?: (index: number) => string;
-  showQuestionTitle?: boolean;
-}
-
-export interface LegacyQuestionAnswerTranscriptItem {
-  question: string;
-  answer: string;
-}
 
 export function genMessageId(prefix = 'msg'): string {
   return `${prefix}_${Date.now()}_${nextMsgId++}`;

@@ -34,21 +34,15 @@ import { WeLog } from '../utils/logger';
 import { hasMoreHistoryByCursor } from '../utils/session';
 import { reportFlowTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
-import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
+import type {
+  HiddenQuestionAnswerUserMessage,
+  SendUserMessageOptions,
+  UseChatSessionOptions,
+  UseChatSessionResult,
+} from '../types/components';
 import { reportSendMessageClick } from '../utils/uemUtil';
 
 const HISTORY_PAGE_SIZE = 20;
-
-interface HiddenQuestionAnswerUserMessage {
-  content: string;
-  toolCallId?: string;
-  questionId?: string;
-  subagentSessionId?: string;
-}
-
-interface SendUserMessageOptions {
-  suppressUserBubble?: boolean;
-}
 
 function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
   return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
