@@ -91,14 +91,16 @@ const PLANTUML_REQUEST_HEADERS = {
   'Content-Type': 'application/json',
 };
 
-interface CommonRequestV2Payload {
-  request: {
-    url: string;
-    method: 'POST' | 'GET';
-    body?: string;
-    header?: Record<string, string>;
-    entry?: string;
-  };
+export interface PcCommonRequestV2Request {
+  url: string;
+  method: 'POST' | 'GET';
+  body?: string;
+  header?: Record<string, unknown>;
+  entry?: string;
+}
+
+export interface PcCommonRequestV2Payload {
+  request: PcCommonRequestV2Request;
   message?: string;
 }
 
@@ -114,6 +116,14 @@ function getPedestalOrThrow(): Pedestal {
   const pedestal = tryGetPedestal();
   if (pedestal) return pedestal;
   throw new Error('Pedestal.callMethod is not available. This code must run in PC miniapp environment.');
+}
+
+export async function callPcCommonRequestV2<T = unknown>(payload: PcCommonRequestV2Payload): Promise<T> {
+  const result = await Promise.resolve(getPedestalOrThrow().callMethod(COMMON_REQUEST_V2_METHOD, payload));
+  if (result && typeof result === 'object' && (result as { errorMessage?: unknown }).errorMessage) {
+    return Promise.reject(result);
+  }
+  return result as T;
 }
 
 let listenerParams: RegisterSessionListenerParams;
@@ -261,7 +271,7 @@ async function normalizePlantUmlBridgeResponse(response: unknown): Promise<Plant
 }
 
 async function requestPlantUmlByPedestal(params: PlantUmlRenderParams): Promise<PlantUmlRenderResult> {
-  const payload: CommonRequestV2Payload = {
+  const result = await callPcCommonRequestV2({
     request: {
       url: buildPlantUmlRenderUrl(),
       method: 'POST',
@@ -269,8 +279,7 @@ async function requestPlantUmlByPedestal(params: PlantUmlRenderParams): Promise<
       header: { ...PLANTUML_REQUEST_HEADERS },
     },
     message: 'PlantUML render',
-  };
-  const result = await Promise.resolve(getPedestalOrThrow().callMethod(COMMON_REQUEST_V2_METHOD, payload));
+  });
   return normalizePlantUmlBridgeResponse(result);
 }
 
