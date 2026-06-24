@@ -2262,7 +2262,8 @@ function ensureMockHWH5Bridge(): void {
   if (typeof hwh5.fetch !== 'function') {
     hwh5.fetch = async <T = unknown>(url: string, options: { method: string }) => {
       const method = options.method.toLowerCase();
-      const matchedDeleteSession = url.match(/^\/api\/skill\/sessions\/([^/?#]+)$/);
+      const parsedUrl = new URL(url, 'https://ai-chat-viewer.mock.local');
+      const matchedDeleteSession = parsedUrl.pathname.match(/^\/(?:mag\/)?api\/skill\/sessions\/([^/?#]+)$/);
       if (method === 'delete' && matchedDeleteSession) {
         const sessionId = decodeURIComponent(matchedDeleteSession[1]);
         const existed = emitSessionDeleted(sessionId);

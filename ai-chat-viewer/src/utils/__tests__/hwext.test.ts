@@ -22,7 +22,7 @@ describe('deleteHistorySession', () => {
     });
 
     expect(window.HWH5.fetch).toHaveBeenCalledWith(
-      '/api/skill/sessions/session%2F1',
+      'https://www.example.com/mag/api/skill/sessions/session%2F1',
       {
         method: 'delete',
         headers: {

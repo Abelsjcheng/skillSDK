@@ -238,7 +238,12 @@ sequenceDiagram
 1. `deleteHistorySession`
    - 状态：新增 HTTP 接口封装。
    - 调用方式：通过 `HWH5.fetch` 发起请求；业务层只调用统一的 `deleteHistorySession(params)`。
-   - URL：`/api/skill/sessions/{sessionId}`。
+   - URL 统一由 `src/utils/apiEndpoints.ts` 管理，后续域名、文根或 path 调整只改该文件。
+   - 环境根地址：
+     - UAT：`https://www.example-beta.com/mag`
+     - 生产：`https://www.example.com/mag`
+   - 接口 path：`/api/skill/sessions/{sessionId}`。
+   - 最终请求 URL：`${环境根地址}/api/skill/sessions/{sessionId}`。
    - Method：`delete`。
    - Request：无 body。
    - Response：
@@ -257,7 +262,7 @@ sequenceDiagram
    - `HWH5.fetch` 调用示例：
 
 ```typescript
-const url = `/api/skill/sessions/${encodeURIComponent(sessionId)}`;
+const url = buildDeleteHistorySessionUrl(sessionId);
 const headers = {
   'Content-Type': 'application/json',
 };

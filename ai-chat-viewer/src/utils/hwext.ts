@@ -58,6 +58,7 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import { APP_ID, isPcMiniApp } from '../constants';
+import { buildDeleteHistorySessionUrl } from './apiEndpoints';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -620,19 +621,15 @@ export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<Delete
   return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
 }
 
-export async function deleteHistorySession(
-  params: DeleteHistorySessionParams,
+async function deleteHistorySessionWithHWH5Fetch(
+  sessionId: string,
 ): Promise<DeleteHistorySessionResult> {
-  const sessionId = params.welinkSessionId.trim();
-  if (!sessionId) {
-    throw new Error('welinkSessionId is required.');
-  }
   if (typeof window === 'undefined' || typeof window.HWH5?.fetch !== 'function') {
     throw new Error('HWH5.fetch is not available.');
   }
 
   const response = await Promise.resolve(window.HWH5.fetch<DeleteHistorySessionResponse>(
-    `/api/skill/sessions/${encodeURIComponent(sessionId)}`,
+    buildDeleteHistorySessionUrl(sessionId),
     {
       method: 'delete',
       headers: {
@@ -645,6 +642,28 @@ export async function deleteHistorySession(
     throw reply;
   }
   return reply.data;
+}
+
+async function deleteHistorySessionWithPcBridge(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  // PC 端删除会话后续如需切换桥接方法，只需要替换这个函数内部实现。
+  return deleteHistorySessionWithHWH5Fetch(sessionId);
+}
+
+export async function deleteHistorySession(
+  params: DeleteHistorySessionParams,
+): Promise<DeleteHistorySessionResult> {
+  const sessionId = params.welinkSessionId.trim();
+  if (!sessionId) {
+    throw new Error('welinkSessionId is required.');
+  }
+
+  if (isPcMiniApp()) {
+    return deleteHistorySessionWithPcBridge(sessionId);
+  }
+
+  return deleteHistorySessionWithHWH5Fetch(sessionId);
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
