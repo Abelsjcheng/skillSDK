@@ -116,7 +116,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 19.2. getWeAgentInfo
 /// 读取当前助理完整详情；仅从本地缓存取值，并对缺失的 tagName、tagNameEn 应用固定兜底。
-- (void)getWeAgentInfo:(void (^)(WLAgentSkillsWeAgentDetails *result))success;
+- (WLAgentSkillsWeAgentDetails *)getWeAgentInfo;
 
 #pragma mark - 20. getWeAgentUri
 - (void)getWeAgentUri:(void (^)(WLAgentSkillsWeAgentUriResult *result))success

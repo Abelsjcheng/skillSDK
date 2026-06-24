@@ -947,7 +947,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 #pragma mark - 19.2. getWeAgentInfo
 
 /// 复制当前详情缓存生成返回对象，保留全部详情字段且不回写标签兜底值。
-- (void)getWeAgentInfo:(void (^)(WLAgentSkillsWeAgentDetails *result))success {
+- (WLAgentSkillsWeAgentDetails *)getWeAgentInfo {
     NSDictionary *cachedDictionary = [[WLAgentSkillsWeAgentStore sharedStore]
         loadCurrentWeAgentDetailDictionary];
     WLAgentSkillsWeAgentDetails *result =
@@ -964,9 +964,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
                result.partnerAccount ?: @"",
                result.tagName ?: @"",
                result.tagNameEn ?: @"");
-    if (success) {
-        success(result);
-    }
+    return result;
 }
 
 #pragma mark - 20. getWeAgentUri
