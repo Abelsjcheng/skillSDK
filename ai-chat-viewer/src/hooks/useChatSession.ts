@@ -58,6 +58,32 @@ function buildUserMessage(msg: StreamMessage): Message | null {
   };
 }
 
+function resolveDeletedSessionId(msg: StreamMessage): string {
+  const directSessionId = String(msg.sessionId ?? msg.welinkSessionId ?? '').trim();
+  if (directSessionId) {
+    return directSessionId;
+  }
+
+  if (typeof msg.content === 'string') {
+    try {
+      const parsedContent = JSON.parse(msg.content) as { welinkSessionId?: unknown; sessionId?: unknown };
+      return String(parsedContent.welinkSessionId ?? parsedContent.sessionId ?? '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  if (typeof msg.content === 'object' && msg.content !== null) {
+    return String(
+      (msg.content as { welinkSessionId?: unknown; sessionId?: unknown }).welinkSessionId
+        ?? (msg.content as { welinkSessionId?: unknown; sessionId?: unknown }).sessionId
+        ?? '',
+    ).trim();
+  }
+
+  return '';
+}
+
 export function useChatSession({
   mode,
   welinkSessionId,
@@ -392,13 +418,7 @@ export function useChatSession({
     const onMessage = (msg: StreamMessage) => {
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
       if (msg.type === 'session.deleted') {
-        const deletedSessionId = String(
-          msg.sessionId
-            ?? (typeof msg.content === 'object' && msg.content !== null
-              ? (msg.content as { welinkSessionId?: unknown }).welinkSessionId
-              : '')
-            ?? '',
-        ).trim();
+        const deletedSessionId = resolveDeletedSessionId(msg);
         if (deletedSessionId && deletedSessionId === activeWelinkSessionId) {
           onSessionDeletedRef.current?.(deletedSessionId);
         }
