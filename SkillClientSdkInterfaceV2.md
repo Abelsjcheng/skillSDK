@@ -495,7 +495,7 @@ getAssistantDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 ### 接口名
 
 ```typescript
-getWeAgentInfo(): Promise<WeAgentDetails>
+getWeAgentInfo(): WeAgentDetails
 ```
 
 ### 入参

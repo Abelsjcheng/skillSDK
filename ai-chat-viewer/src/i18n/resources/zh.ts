@@ -123,7 +123,7 @@ export const zh = {
   'assistantDetail.deleteAssistant': '删除助手',
   'assistantDetail.cancelAction': '取消',
   'assistantDetail.confirmDeleteTitle': '确认删除个人助手"{{name}}"吗？',
-  'assistantDetail.confirmDeleteDescription': '删除后，该助手将从消息列表、群组及 WeAgent 菜单中同步移除，且不可恢复，请谨慎操作！',
+  'assistantDetail.confirmDeleteDescription': '删除后，该助手将从消息列表、群组及 "助手" 菜单中同步移除，且不可恢复，请谨慎操作！',
   'selectAssistant.loadFailed': '获取助手列表失败',
   'selectAssistant.openFailed': '打开助手失败',
   'selectAssistant.title': '选择助手',

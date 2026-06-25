@@ -255,7 +255,7 @@ type WeAgent = {
 新增接口：
 
 ```typescript
-getWeAgentInfo(): Promise<WeAgentDetails>
+getWeAgentInfo(): WeAgentDetails
 ```
 
 入参：无。
@@ -293,9 +293,9 @@ getWeAgentInfo(): Promise<WeAgentDetails>
 7. 接口必须使用 `try/catch` 包裹缓存读取和字段兜底逻辑：
 
 ```typescript
-async function getWeAgentInfo(): Promise<WeAgentDetails> {
+function getWeAgentInfo(): WeAgentDetails {
   try {
-    const detail = await readCurrentWeAgentDetail() ?? createEmptyWeAgentDetails()
+    const detail = readCurrentWeAgentDetail() ?? createEmptyWeAgentDetails()
     return {
       ...detail,
       tagName: detail?.tagName || '助手',
