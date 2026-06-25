@@ -1450,7 +1450,7 @@ export class SkillSDK {
    * 统一处理冷启动补偿、服务端通知和本端接口触发的助理删除。
    *
    * 先判断目标是否为当前助理，再幂等清理列表和详情缓存。删除当前助理时会清空当前详情，
-   * 调用 getWeAgentUri 计算后续页面；三种来源最终均发送相同结构的删除广播。
+   * 调用 getWeAgentUri 计算后续页面；无论 URI 计算成功或失败，三种来源最终均发送相同结构的删除广播。
    */
   private async handleDeletedWeAgent(
     partnerAccount: string,
@@ -1470,10 +1470,16 @@ export class SkillSDK {
       return;
     }
     this.weAgentStore.clearCurrentDetail();
-    let nextUris: WeAgentUriResult = await this.getWeAgentUri();
-    this.logger.info(`resolved URI after deleting current we-agent, partnerAccount=${partnerAccount}`);
+    try {
+      const nextUris: WeAgentUriResult = await this.getWeAgentUri();
+      void nextUris;
+      this.logger.info(`resolved URI after deleting current we-agent, partnerAccount=${partnerAccount}`);
+    } catch (error) {
+      this.logger.error(`resolve URI after deleting current we-agent failed, partnerAccount=${partnerAccount}, `
+        + `error=${JSON.stringify(error)}`);
+    }
 
-    // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
+    // TODO: call openWeAgentCUI with resolved URIs when navigation wiring is available.
     await this.broadcastWeAgentEvent(
       SkillSDK.WE_AGENT_EVENT_NAME,
       this.buildWeAgentPayload('delete', data, source)

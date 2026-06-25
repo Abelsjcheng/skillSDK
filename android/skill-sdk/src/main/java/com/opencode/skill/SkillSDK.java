@@ -2026,8 +2026,8 @@ public final class SkillSDK {
      * 统一处理冷启动补偿、服务端通知和本端接口触发的助理删除。
      *
      * <p>方法先判断目标是否为当前助理，再幂等清理列表和详情缓存。删除当前助理时还会清空
-     * 当前详情并调用 getWeAgentUri 计算后续页面；三种来源最终都使用传入数据和来源发送
-     * 相同结构的删除广播。</p>
+     * 当前详情并调用 getWeAgentUri 计算后续页面；无论 URI 计算成功或失败，三种来源最终
+     * 都使用传入数据和来源发送相同结构的删除广播。</p>
      */
     private void handleDeletedWeAgent(
             @NonNull String partnerAccount,
@@ -2065,7 +2065,11 @@ public final class SkillSDK {
             public void onError(@NonNull Throwable error) {
                 WeLinkLogger.e(TAG, "resolve URI after deleting current we-agent failed, partnerAccount="
                         + partnerAccount + ", error=" + error.getMessage());
-                callback.onError(wrapError(error));
+                broadcastWeAgentEvent(
+                        WE_AGENT_EVENT_NAME,
+                        buildWeAgentPayload("delete", data, source),
+                        callback
+                );
             }
         });
     }

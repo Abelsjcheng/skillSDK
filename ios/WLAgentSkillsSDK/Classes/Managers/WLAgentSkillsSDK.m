@@ -1925,10 +1925,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
                                                 data:weCrew
                                              source:source
                                              success:completion
-                                             failure:^(NSError *error) {
-            (void)error;
-            completion();
-        }];
+                                             failure:nil];
         return;
     }
     completion();
@@ -1944,6 +1941,13 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         description = [WLAgentSkillsTypeConverter optionalStringFromValue:data[@"desc"]];
     }
     if (name.length == 0 || icon.length == 0 || description.length == 0) {
+        WKFLogInfo(WLAS_BUNDLE_NAME,
+                   @"skip cached basic fields update, partnerAccount=%@, "
+                   @"missingName=%@, missingIcon=%@, missingDescription=%@",
+                   partnerAccount ?: @"",
+                   name.length == 0 ? @"YES" : @"NO",
+                   icon.length == 0 ? @"YES" : @"NO",
+                   description.length == 0 ? @"YES" : @"NO");
         return;
     }
     [[WLAgentSkillsWeAgentStore sharedStore] updateCachedWeAgentDetailsWithPartnerAccount:partnerAccount
@@ -2115,12 +2119,13 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 
 /// 统一处理冷启动补偿、服务端通知和本端接口触发的助理删除。
 /// 方法先判断目标是否为当前助理，再幂等清理列表和详情缓存；删除当前助理时还会清空当前
-/// 详情并调用 getWeAgentUri 计算后续页面，最后使用传入数据和来源发送统一删除广播。
+/// 详情并调用 getWeAgentUri 计算后续页面；无论 URI 计算成功或失败，最后都发送统一删除广播。
 - (void)handleDeletedWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                           data:(NSDictionary *)data
                                         source:(NSString *)source
                                        success:(void (^ _Nullable)(void))success
                                        failure:(void (^ _Nullable)(NSError *error))failure {
+    (void)failure;
     BOOL deletingCurrentWeAgent = [self isCurrentWeAgentWithPartnerAccount:partnerAccount];
     WKFLogInfo(WLAS_BUNDLE_NAME,
                @"handle we-agent delete mutation, partnerAccount=%@, source=%@, deletingCurrent=%@",
@@ -2147,9 +2152,9 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         WKFLogError(WLAS_BUNDLE_NAME,
                     @"resolve URI after deleting current we-agent failed, partnerAccount=%@, error=%@",
                     partnerAccount, error.localizedDescription);
-        if (failure) {
-            failure(error);
-        }
+        [self broadcastWeAgentEvent:WLAgentSkillsWeAgentEventName
+                             payload:[self weAgentPayloadWithType:@"delete" data:data source:source]
+                          completion:success ?: ^{}];
     }];
 }
 
