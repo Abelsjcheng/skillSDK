@@ -147,7 +147,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
   const bizRobotTag = detail?.bizRobotTag?.trim() ?? '';
-  const displayTag = resolveAssistantTag(detail);
+  const displayTag = resolveAssistantTag(detail, i18n.resolvedLanguage ?? i18n.language);
   const displayDescription = detail?.desc ?? '';
   const creatorDisplayName = (i18n.resolvedLanguage ?? i18n.language) === 'en'
     ? detail?.creatorNameEn

@@ -165,6 +165,8 @@ export interface WeAgentListItem {
   icon: string;
   description: string;
   partnerAccount: string;
+  tagName?: string;
+  tagNameEn?: string;
   bizRobotName: string;
   bizRobotNameEn: string;
   bizRobotTag: string;
@@ -247,6 +249,8 @@ export interface WeAgentDetails {
   id: string;
   bizRobotId: string;
   bizRobotTag: string;
+  tagName?: string;
+  tagNameEn?: string;
   bizRobotName?: string;
   bizRobotNameEn?: string;
   weCodeUrl: string;
