@@ -405,6 +405,7 @@ function App({ assistantAccount = '' }: AppProps) {
     if (refreshAfterDelete) {
       try {
         await refreshHistorySessionsFirstPage();
+        setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
       } catch (error) {
         WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
       }
