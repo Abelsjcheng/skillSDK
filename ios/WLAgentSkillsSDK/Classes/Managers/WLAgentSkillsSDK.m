@@ -1101,15 +1101,6 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
                 } @finally {
                     completion();
                 }
-            }
-                                                     failure:^(NSError *error) {
-                @try {
-                    if (failure) {
-                        failure(error);
-                    }
-                } @finally {
-                    completion();
-                }
             }];
         }];
     }
@@ -1856,11 +1847,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         [self handleDeletedWeAgentWithPartnerAccount:partnerAccount
                                                 data:@{ @"partnerAccount" : partnerAccount }
                                               source:@"server"
-                                             success:continueProcessing
-                                             failure:^(NSError *error) {
-            (void)error;
-            continueProcessing();
-        }];
+                                             success:continueProcessing];
         return;
     }
 
@@ -1924,8 +1911,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         [self handleDeletedWeAgentWithPartnerAccount:partnerAccount
                                                 data:weCrew
                                              source:source
-                                             success:completion
-                                             failure:nil];
+                                             success:completion];
         return;
     }
     completion();
@@ -2104,8 +2090,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 /// getWeAgentUri 计算后续页面，完成后再广播删除事件。
 - (void)handleDeleteWeAgentResultWithContext:(WLAgentSkillsDeleteWeAgentContext *)context
                                 deleteResult:(WLAgentSkillsDeleteWeAgentResult *)deleteResult
-                                     success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success
-                                     failure:(void (^)(NSError *error))failure {
+                                     success:(void (^)(WLAgentSkillsDeleteWeAgentResult *result))success {
     [self handleDeletedWeAgentWithPartnerAccount:context.partnerAccount
                                             data:@{ @"partnerAccount" : context.partnerAccount ?: @"" }
                                           source:@"local"
@@ -2113,8 +2098,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         if (success) {
             success(deleteResult);
         }
-    }
-                                         failure:failure];
+    }];
 }
 
 /// 统一处理冷启动补偿、服务端通知和本端接口触发的助理删除。
@@ -2123,9 +2107,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)handleDeletedWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                           data:(NSDictionary *)data
                                         source:(NSString *)source
-                                       success:(void (^ _Nullable)(void))success
-                                       failure:(void (^ _Nullable)(NSError *error))failure {
-    (void)failure;
+                                       success:(void (^ _Nullable)(void))success {
     BOOL deletingCurrentWeAgent = [self isCurrentWeAgentWithPartnerAccount:partnerAccount];
     WKFLogInfo(WLAS_BUNDLE_NAME,
                @"handle we-agent delete mutation, partnerAccount=%@, source=%@, deletingCurrent=%@",
