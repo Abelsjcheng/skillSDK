@@ -25,6 +25,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   onClose,
   onPrev,
   onConfirm,
+  submitting = false,
 }) => {
   const { t, i18n } = useTranslation();
   const resolvedLanguage = i18n.resolvedLanguage ?? i18n.language;
@@ -68,12 +69,13 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
   );
 
   const handleConfirm = useCallback(() => {
+    if (submitting) return;
     if (!confirmEnabled) return;
     onConfirm({
       digitalTwintype: 'internal',
       bizRobotId: selectedBizRobotId,
     });
-  }, [confirmEnabled, onConfirm, selectedBizRobotId]);
+  }, [confirmEnabled, onConfirm, selectedBizRobotId, submitting]);
 
   return (
     <section className={getStepClassName(isPcMiniApp)}>
@@ -155,7 +157,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
             label: t("createAssistant.confirm"),
             onClick: handleConfirm,
             variant: "confirm",
-            enabled: confirmEnabled,
+            enabled: !submitting && confirmEnabled,
             withStateClass: true,
           },
         ]}
@@ -163,7 +165,7 @@ export const StepBrainSelect: React.FC<StepBrainSelectProps> = ({
           label: t("createAssistant.confirm"),
           onClick: handleConfirm,
           variant: "confirm",
-          enabled: confirmEnabled,
+          enabled: !submitting && confirmEnabled,
           withStateClass: true,
         }}
       />

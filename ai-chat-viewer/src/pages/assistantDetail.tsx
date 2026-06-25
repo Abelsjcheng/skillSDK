@@ -46,6 +46,7 @@ import {
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
+import { canIUse } from '../utils/versionCheck';
 
 const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueNode }) => (
   <div className='assistant-detail__info-row'>
@@ -69,6 +70,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const [overlay, setOverlay] = useState<AssistantDetailOverlay>('none');
   const [pcView, setPcView] = useState<AssistantDetailPcView>('detail');
   const [isPcMenuOpen, setIsPcMenuOpen] = useState<boolean>(false);
+  const [assistantEditSupported, setAssistantEditSupported] = useState<boolean>(isPc);
   const [pcMenuPosition, setPcMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const pageRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -80,6 +82,36 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   useEffect(() => {
     void ensureLanguageInitialized();
   }, []);
+
+  useEffect(() => {
+    if (isPc) {
+      setAssistantEditSupported(true);
+      return;
+    }
+
+    let cancelled = false;
+    setAssistantEditSupported(false);
+
+    const checkAssistantEditSupported = async () => {
+      try {
+        const supported = await canIUse.assistantEdit();
+        if (!cancelled) {
+          setAssistantEditSupported(supported);
+        }
+      } catch (error) {
+        WeLog(`AssistantDetail assistantEdit version check failed | error=${JSON.stringify(error)}`);
+        if (!cancelled) {
+          setAssistantEditSupported(false);
+        }
+      }
+    };
+
+    void checkAssistantEditSupported();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPc]);
 
   useEffect(() => {
     if (!resolvedPartnerAccount) {
@@ -298,7 +330,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         onClick: handleServiceClick,
       }];
 
-      if (!isExclusiveAssistant) {
+      if (detail && !isExclusiveAssistant) {
         actions.push({
           label: t('assistantDetail.editAction'),
           icon: moreIcon,
@@ -309,7 +341,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
       return actions;
     },
-    [handleServiceClick, handleTogglePcMenu, isExclusiveAssistant, t],
+    [detail, handleServiceClick, handleTogglePcMenu, isExclusiveAssistant, t],
   );
 
   const pcRightActions = useMemo<AssistantPageHeaderAction[]>(
@@ -412,8 +444,8 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         title={t('assistantDetail.title')}
         isPcMiniApp={isPc}
         onService={handleServiceClick}
-        mobileRightActionIcon={!isPc && !isExclusiveAssistant ? editIcon : undefined}
-        mobileRightActionLabel={!isPc && !isExclusiveAssistant ? t('assistantDetail.editAction') : undefined}
+        mobileRightActionIcon={!isPc && assistantEditSupported && detail && !isExclusiveAssistant ? editIcon : undefined}
+        mobileRightActionLabel={!isPc && assistantEditSupported && detail && !isExclusiveAssistant ? t('assistantDetail.editAction') : undefined}
         onMobileRightAction={handleOpenActionSheet}
         pcLeftActions={isPc ? pcLeftActions : undefined}
         pcRightActions={isPc ? pcRightActions : undefined}
@@ -466,7 +498,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         ) : null}
       </main>
 
-      {isPc && !isExclusiveAssistant ? (
+      {isPc && detail && !isExclusiveAssistant ? (
         <AssistantDetailPcMenu
           open={isPcMenuOpen}
           top={pcMenuPosition.top}
@@ -477,7 +509,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           editLabel={t('assistantDetail.editInfo')}
           deleteLabel={t('assistantDetail.deleteAssistant')}
         />
-      ) : !isPc && !isExclusiveAssistant ? (
+      ) : !isPc && assistantEditSupported && detail && !isExclusiveAssistant ? (
         <>
           <AssistantDetailActionSheet
             open={overlay === 'action-sheet'}

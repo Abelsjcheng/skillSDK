@@ -16,6 +16,7 @@ import {
 } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
+import { useSubmitLock } from '../../hooks/useSubmitLock';
 import '../../styles/DigitalTwinCreator.less';
 
 function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayload {
@@ -59,6 +60,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
 }) => {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<WeAgentDetails | null>(initialDetail);
+  const { submitting, runWithSubmitLock } = useSubmitLock();
   const useCreateAssistantLayout = isPcMiniApp && source === 'external';
 
   const handleServiceClick = useCallback(() => {
@@ -118,26 +120,28 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
         return;
       }
 
-      try {
-        await updateWeAgent({
-          partnerAccount: targetPartnerAccount,
-          name: payload.name,
-          icon: payload.icon,
-          description: payload.description,
-        });
-      } catch (error) {
-        WeLog(`EditAssistantContent update failed | extra=${JSON.stringify({
-          partnerAccount: targetPartnerAccount,
-          source,
-        })} | error=${JSON.stringify(error)}`);
-        showToast(t('editAssistant.updateFailed'));
-        return;
-      }
+      await runWithSubmitLock(async () => {
+        try {
+          await updateWeAgent({
+            partnerAccount: targetPartnerAccount,
+            name: payload.name,
+            icon: payload.icon,
+            description: payload.description,
+          });
+        } catch (error) {
+          WeLog(`EditAssistantContent update failed | extra=${JSON.stringify({
+            partnerAccount: targetPartnerAccount,
+            source,
+          })} | error=${JSON.stringify(error)}`);
+          showToast(t('editAssistant.updateFailed'));
+          return;
+        }
 
-      onSuccess(payload);
-      onClose();
+        onSuccess(payload);
+        onClose();
+      });
     },
-    [detail, onClose, onSuccess, partnerAccount, source, t],
+    [detail, onClose, onSuccess, partnerAccount, runWithSubmitLock, source, t],
   );
 
   return (
@@ -165,6 +169,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
         pcTitle={useCreateAssistantLayout ? t('editAssistant.title') : undefined}
         onClose={onClose}
         onNext={handleSubmit}
+        submitting={submitting}
         submitLabel={t('createAssistant.confirm')}
       />
     </div>

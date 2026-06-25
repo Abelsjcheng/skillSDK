@@ -21,6 +21,7 @@ import {
 import { closeCreateAssistantWindow, handleCreateForOtherScene, resolvePartnerAccount } from '../utils/createAssistantFlow';
 import { WeLog } from '../utils/logger';
 import { showToast } from '../utils/toast';
+import { useSubmitLock } from '../hooks/useSubmitLock';
 import '../styles/DigitalTwinCreator.less';
 
 const SelectBrainAssistantPage: React.FC = () => {
@@ -32,6 +33,7 @@ const SelectBrainAssistantPage: React.FC = () => {
   const draft = useMemo<DigitalTwinBasicInfoPayload | null>(() => routeState?.draft ?? null, [routeState]);
   const draftExists = Boolean(draft);
   const from = useMemo(() => getQueryParam('from', location.search) ?? '', [location.search]);
+  const { submitting, runWithSubmitLock } = useSubmitLock();
 
 
   const handleClose = useCallback(() => {
@@ -76,52 +78,54 @@ const SelectBrainAssistantPage: React.FC = () => {
         params.bizRobotId = payload.bizRobotId;
       }
 
-      try {
-        const createResult = await createDigitalTwin(params);
-        const partnerAccount = resolvePartnerAccount(createResult);
+      await runWithSubmitLock(async () => {
+        try {
+          const createResult = await createDigitalTwin(params);
+          const partnerAccount = resolvePartnerAccount(createResult);
 
-        if (!partnerAccount) {
-          WeLog(`SelectBrainAssistantPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
-            createResult,
-          })}`);
+          if (!partnerAccount) {
+            WeLog(`SelectBrainAssistantPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
+              createResult,
+            })}`);
+            showToast(t('createAssistant.createFailed'));
+            return;
+          }
+          createResult.weCrewType = payload.digitalTwintype === 'internal' ? 1 : 0;
+          if (from !== 'weAgent') {
+            await handleCreateForOtherScene(createResult);
+            return;
+          }
+
+          const detailResult = await getWeAgentDetails({ partnerAccount });
+          const detail = detailResult?.weAgentDetailsArray?.[0];
+          if (!detail) {
+            console.warn('getWeAgentDetails did not return detail for partnerAccount:', partnerAccount);
+            return;
+          }
+
+          const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
+          const robotId = resolveRobotIdForOpenWeAgentCUI({
+            detailId: detail.id,
+            createRobotId: createResult.robotId,
+          });
+          const openParams = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
+            bizRobotId: detail.bizRobotId,
+            robotId,
+            bizRobotTag: detail.bizRobotTag,
+          });
+
+          await openWeAgentCUI(openParams);
+
+          if (!isPc) {
+            window.HWH5.close();
+          }
+        } catch (error) {
+          WeLog(`SelectBrainAssistantPage confirmCreateAssistant failed | extra=${JSON.stringify({ from })} | error=${JSON.stringify(error)}`);
           showToast(t('createAssistant.createFailed'));
-          return;
         }
-        createResult.weCrewType = payload.digitalTwintype === 'internal' ? 1 : 0;
-        if (from !== 'weAgent') {
-          await handleCreateForOtherScene(createResult);
-          return
-        }
-
-        const detailResult = await getWeAgentDetails({ partnerAccount });
-        const detail = detailResult?.weAgentDetailsArray?.[0];
-        if (!detail) {
-          console.warn('getWeAgentDetails did not return detail for partnerAccount:', partnerAccount);
-          return;
-        }
-
-        const weCodeUrl = resolveWeCodeUrlForOpenWeAgentCUI(detail, partnerAccount);
-        const robotId = resolveRobotIdForOpenWeAgentCUI({
-          detailId: detail.id,
-          createRobotId: createResult.robotId,
-        });
-        const openParams = buildOpenWeAgentCUIParams(weCodeUrl, partnerAccount, {
-          bizRobotId: detail.bizRobotId,
-          robotId,
-          bizRobotTag: detail.bizRobotTag,
-        });
-
-        await openWeAgentCUI(openParams);
-
-        if (!isPc) {
-          window.HWH5.close();
-        }
-      } catch (error) {
-        WeLog(`SelectBrainAssistantPage confirmCreateAssistant failed | extra=${JSON.stringify({ from })} | error=${JSON.stringify(error)}`);
-        showToast(t('createAssistant.createFailed'));
-      }
+      });
     },
-    [draft, from, isPc, location.search, navigate, t],
+    [draft, from, isPc, location.search, navigate, runWithSubmitLock, t],
   );
   
   useEffect(() => {
@@ -149,6 +153,7 @@ const SelectBrainAssistantPage: React.FC = () => {
         onClose={handleClose}
         onPrev={handlePrev}
         onConfirm={handleConfirm}
+        submitting={submitting}
       />
     </div>
   );

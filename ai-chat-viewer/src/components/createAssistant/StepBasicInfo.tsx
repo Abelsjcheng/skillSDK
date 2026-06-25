@@ -58,6 +58,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   onClose,
   onMobileBack,
   onNext,
+  submitting = false,
   submitLabel,
 }) => {
   const { t } = useTranslation();
@@ -172,6 +173,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   );
 
   const handleNext = useCallback(() => {
+    if (submitting) return;
     setSubmitAttempted(true);
     if (!canNext) return;
     onNext({
@@ -181,7 +183,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
       icon: currentAvatarSrc ?? '',
       description,
     });
-  }, [avatarId, avatarType, canNext, currentAvatarSrc, description, name, onNext]);
+  }, [avatarId, avatarType, canNext, currentAvatarSrc, description, name, onNext, submitting]);
 
   return (
     <section className={`${getStepClassName(isPcMiniApp)} ${className ?? ''}`.trim()}>
@@ -353,7 +355,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
                 label: resolvedSubmitLabel,
                 onClick: handleNext,
                 variant: 'next',
-                enabled: allowDarkModeValidateClick || canNext,
+                enabled: !submitting && (allowDarkModeValidateClick || canNext),
                 withStateClass: true,
               },
             ]}
@@ -361,7 +363,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
               label: resolvedSubmitLabel,
               onClick: handleNext,
               variant: 'next',
-              enabled: allowDarkModeValidateClick || canNext,
+              enabled: !submitting && (allowDarkModeValidateClick || canNext),
               withStateClass: true,
             }}
           />
