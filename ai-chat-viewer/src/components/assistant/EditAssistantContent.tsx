@@ -39,11 +39,11 @@ function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayloa
 const noop = () => {};
 
 async function fetchMobileAssistantDetails(partnerAccount: string): Promise<WeAgentDetails[]> {
-  if (typeof window.HWH5?.fetch !== 'function') {
-    throw new Error('HWH5.fetch is not available.');
+  if (typeof window.HWH5?.fetchFull !== 'function') {
+    throw new Error('HWH5.fetchFull is not available.');
   }
 
-  const response = await window.HWH5.fetch<AssistantDetailsFetchResult>(
+  const response = await window.HWH5.fetchFull<AssistantDetailsFetchResult>(
     `${HOST()}/v1/robot-partners/${encodeURIComponent(partnerAccount)}`,
     {
       method: 'GET',

@@ -319,14 +319,9 @@ export interface HWH5AddEventListenerParams {
 }
 
 export interface FetchFullOptions {
-  method: string;
-  headers: Record<string, string>;
-}
-
-export interface HWH5FetchOptions {
   method?: string;
   body?: string;
-  headers?: Record<string, string>;
+  headers: Record<string, string>;
 }
 
 export interface FetchFullResponse<T = unknown> {
@@ -394,10 +389,6 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
-  fetch?: <T = unknown>(
-    url: string,
-    options: HWH5FetchOptions,
-  ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,
