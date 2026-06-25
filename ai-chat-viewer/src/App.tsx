@@ -148,7 +148,6 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const assistantAccountRef = useRef(assistantAccount);
   const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);
-  const welinkSessionIdRef = useRef<string | null>(null);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
@@ -181,10 +180,6 @@ function App({ assistantAccount = '' }: AppProps) {
   useEffect(() => {
     historySessionsCacheRef.current = historySessionsCache;
   }, [historySessionsCache]);
-
-  useEffect(() => {
-    welinkSessionIdRef.current = welinkSessionId;
-  }, [welinkSessionId]);
 
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
@@ -377,7 +372,7 @@ function App({ assistantAccount = '' }: AppProps) {
     }
 
     const previousCache = historySessionsCacheRef.current;
-    const isDeletingCurrentSession = welinkSessionIdRef.current === normalizedDeletedSessionId;
+    const isDeletingCurrentSession = welinkSessionId === normalizedDeletedSessionId;
     const nextSession = previousCache
       ? resolveNextSessionAfterDelete(previousCache.content, normalizedDeletedSessionId)
       : null;
@@ -410,7 +405,7 @@ function App({ assistantAccount = '' }: AppProps) {
         WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
       }
     }
-  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
+  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t, welinkSessionId]);
 
   const handleSessionDeletedFromAction = useCallback((deletedSessionId: string) => (
     handleSessionDeleted(deletedSessionId, false)

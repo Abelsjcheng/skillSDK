@@ -63,7 +63,7 @@ interface MockHWH5Bridge {
   fetch?: <T = unknown>(
     url: string,
     options: { method: string; headers: Record<string, string>; body?: string },
-  ) => Promise<{ json: () => Promise<T> }> | { json: () => Promise<T> };
+  ) => Promise<{ json: () => Promise<T> }>;
 }
 
 interface SessionRecord {

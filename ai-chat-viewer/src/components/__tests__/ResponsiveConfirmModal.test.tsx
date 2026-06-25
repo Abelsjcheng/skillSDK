@@ -24,7 +24,7 @@ describe('ResponsiveConfirmModal', () => {
       <ResponsiveConfirmModal
         open
         title="确认删除对话吗？"
-        description="删除对话后不可回复"
+        description="删除对话后不可恢复"
         confirmText="删除"
         confirmBackgroundColor="#f36f64"
         onClose={onClose}

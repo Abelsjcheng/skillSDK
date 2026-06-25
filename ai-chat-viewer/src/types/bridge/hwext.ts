@@ -404,7 +404,7 @@ export interface HWH5Bridge {
   fetch?: <T = unknown>(
     url: string,
     options: HWH5FetchOptions,
-  ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
+  ) => Promise<FetchFullResponse<T>>;
   onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
   offKeyboardHeightChange?: () => void;
   disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;

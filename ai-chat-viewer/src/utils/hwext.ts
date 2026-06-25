@@ -644,7 +644,7 @@ async function deleteHistorySessionWithHWH5Fetch(
     throw new Error('HWH5.fetch is not available.');
   }
 
-  const response = await Promise.resolve(window.HWH5.fetch<DeleteHistorySessionResponse>(
+  const response = await window.HWH5.fetch<DeleteHistorySessionResponse>(
     buildDeleteHistorySessionUrl(sessionId),
     {
       method: 'delete',
@@ -652,7 +652,7 @@ async function deleteHistorySessionWithHWH5Fetch(
         'Content-Type': 'application/json',
       },
     },
-  ));
+  );
   const reply = await response.json();
   if (reply?.code !== 0 || !reply.data) {
     throw reply;
@@ -670,7 +670,7 @@ async function deleteHistorySessionWithPcBridge(
 export async function deleteHistorySession(
   params: DeleteHistorySessionParams,
 ): Promise<DeleteHistorySessionResult> {
-  const sessionId = params.welinkSessionId.trim();
+  const sessionId = String(params?.welinkSessionId ?? '').trim();
   if (!sessionId) {
     throw new Error('welinkSessionId is required.');
   }

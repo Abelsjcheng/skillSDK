@@ -31,6 +31,20 @@ describe('deleteHistorySession', () => {
       },
     );
   });
+
+  it('throws a clear error when welinkSessionId is undefined', async () => {
+    await expect(deleteHistorySession({ welinkSessionId: undefined } as any)).rejects.toThrow(
+      'welinkSessionId is required.',
+    );
+    expect(window.HWH5.fetch).not.toHaveBeenCalled();
+  });
+
+  it('throws a clear error when welinkSessionId is null', async () => {
+    await expect(deleteHistorySession({ welinkSessionId: null } as any)).rejects.toThrow(
+      'welinkSessionId is required.',
+    );
+    expect(window.HWH5.fetch).not.toHaveBeenCalled();
+  });
 });
 
 describe('buildOpenWeAgentCUIParams', () => {
