@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StepBasicInfo } from '../components/createAssistant/StepBasicInfo';
-import { DEFAULT_AVATARS } from '../components/createAssistant/constants';
+import { DEFAULT_NEW_AVATARS } from '../components/createAssistant/constants';
 import { isPcMiniApp } from '../constants';
 import qrcodeExpiredNotice from '../imgs/qrcode_expired_notice.png';
 import type { CreateAssistantRouteState, CreateDigitalTwinParams, DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
@@ -222,7 +222,7 @@ const CreateAssistantBasicPage: React.FC = () => {
     <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>
       <StepBasicInfo
         isPcMiniApp={isPc}
-        defaultAvatars={DEFAULT_AVATARS}
+        defaultAvatars={DEFAULT_NEW_AVATARS}
         initialValue={initialValue}
         expired={qrcodeExpired}
         expiredImageSrc={qrcodeExpiredNotice}

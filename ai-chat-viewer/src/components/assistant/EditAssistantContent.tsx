@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AssistantPageHeader from './AssistantPageHeader';
 import { StepBasicInfo } from '../createAssistant/StepBasicInfo';
-import { DEFAULT_AVATARS, resolveAssistantIconUrl } from '../createAssistant/constants';
+import {
+  DEFAULT_NEW_AVATARS,
+  resolveAssistantIconUrl,
+  resolveDefaultAvatarIdByIcon,
+} from '../createAssistant/constants';
 import { ensureLanguageInitialized } from '../../i18n/config';
 import type { AssistantDetailsFetchResult, WeAgentDetails } from '../../types/bridge';
 import type { EditAssistantContentProps } from '../../types/components';
@@ -21,11 +25,11 @@ import '../../styles/DigitalTwinCreator.less';
 
 function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayload {
   const icon = resolveAssistantIconUrl(detail.icon);
-  const matchedDefaultAvatar = DEFAULT_AVATARS.find((avatar) => avatar.image === detail.icon);
+  const avatarId = resolveDefaultAvatarIdByIcon(detail.icon);
 
   return {
-    avatarType: matchedDefaultAvatar ? 'default' : 'custom',
-    avatarId: matchedDefaultAvatar?.id,
+    avatarType: avatarId ? 'default' : 'custom',
+    avatarId,
     name: detail.name ?? '',
     icon,
     description: detail.desc ?? '',
@@ -163,7 +167,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
       <StepBasicInfo
         isPcMiniApp={useCreateAssistantLayout}
         className={useCreateAssistantLayout ? undefined : 'digital-twin--assistant-edit'}
-        defaultAvatars={DEFAULT_AVATARS}
+        defaultAvatars={DEFAULT_NEW_AVATARS}
         initialValue={initialValue}
         showHeader={useCreateAssistantLayout}
         pcTitle={useCreateAssistantLayout ? t('editAssistant.title') : undefined}
