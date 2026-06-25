@@ -324,12 +324,6 @@ export interface FetchFullOptions {
   headers: Record<string, string>;
 }
 
-export interface HWH5FetchOptions {
-  method: string;
-  headers: Record<string, string>;
-  body?: string;
-}
-
 export interface FetchFullResponse<T = unknown> {
   json: () => Promise<T>;
 }
@@ -401,10 +395,6 @@ export interface HWH5Bridge {
     url: string,
     options: FetchFullOptions,
   ) => Promise<FetchFullResponse<T>> | FetchFullResponse<T>;
-  fetch?: <T = unknown>(
-    url: string,
-    options: HWH5FetchOptions,
-  ) => Promise<FetchFullResponse<T>>;
   onKeyboardHeightChange?: (listener: (res: { height: number }) => void) => void;
   offKeyboardHeightChange?: () => void;
   disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;

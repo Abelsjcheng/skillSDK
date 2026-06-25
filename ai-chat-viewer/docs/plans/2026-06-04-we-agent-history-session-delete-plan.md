@@ -11,7 +11,7 @@
 
 `weAgentCUI` 已支持历史会话列表、默认选中最近会话、新建会话、分页加载、标题更新和发送消息后的排序更新。当前历史列表只支持选择会话，不支持删除会话。移动端用户需要在历史对话列表内通过长按会话项触发删除入口，PC 用户需要通过右键会话项展示删除按钮，并在确认后删除指定会话。
 
-现有历史列表由 `App` 维护 `HistorySessionsCache`，`WeAgentHistorySidebar` 消费缓存并在手动打开时静默刷新第一页。删除能力应继续复用这套缓存模型，避免侧边栏和主页面出现两份不一致状态。删除会话通过 `HWH5.fetch` 桥接方法调用服务端 DELETE 接口，服务端删除成功后会通过现有 websocket 链路推送 `session.deleted` 事件，多端同步复用现有 `registerSessionListener` 能力。
+现有历史列表由 `App` 维护 `HistorySessionsCache`，`WeAgentHistorySidebar` 消费缓存并在手动打开时静默刷新第一页。删除能力应继续复用这套缓存模型，避免侧边栏和主页面出现两份不一致状态。删除会话通过 `HWH5.fetchFull` 桥接方法调用服务端 DELETE 接口，服务端删除成功后会通过现有 websocket 链路推送 `session.deleted` 事件，多端同步复用现有 `registerSessionListener` 能力。
 
 ### 1.2 需求目标
 
@@ -44,7 +44,7 @@ flowchart TD
     F --> G["展示确认会话框"]
     G --> H{"用户选择"}
     H -->|"取消"| I["关闭确认框，列表不变"]
-    H -->|"确认"| J["通过 HWH5.fetch 调用 DELETE /api/skill/sessions/{sessionId}"]
+    H -->|"确认"| J["通过 HWH5.fetchFull 调用 DELETE /api/skill/sessions/{sessionId}"]
     J --> K{"删除结果"}
     K -->|"成功"| L["本地缓存移除会话"]
     L --> M["若删除当前选中会话，按后一条/前一条/新会话切换"]
@@ -54,7 +54,7 @@ flowchart TD
 
 ### 2.2 方案核心
 
-删除成功后以 `HistorySessionsCache` 为唯一前端数据源：前端通过 `HWH5.fetch` 调用 `DELETE /api/skill/sessions/{sessionId}`，接口成功后立即移除被删除会话；服务端随后通过现有 websocket 推送 `session.deleted`，已注册监听的会话收到事件后刷新历史会话列表，完成多端校准。删除当前选中会话时，前端按「后一条、前一条、新会话」顺序完成会话切换。
+删除成功后以 `HistorySessionsCache` 为唯一前端数据源：前端通过 `HWH5.fetchFull` 调用 `DELETE /api/skill/sessions/{sessionId}`，接口成功后立即移除被删除会话；服务端随后通过现有 websocket 推送 `session.deleted`，已注册监听的会话收到事件后刷新历史会话列表，完成多端校准。删除当前选中会话时，前端按「后一条、前一条、新会话」顺序完成会话切换。
 
 ### 2.3 历史会话刷新时机
 
@@ -95,7 +95,7 @@ sequenceDiagram
     participant User as 用户
     participant Sidebar as WeAgentHistorySidebar
     participant App as App
-    participant API as HWH5.fetch
+    participant API as HWH5.fetchFull
     participant Server as 服务端
 
     alt 移动端
@@ -113,7 +113,7 @@ sequenceDiagram
         Sidebar->>Sidebar: 关闭确认框，清理 deleteTargetSession
     else 用户确认
         User->>Sidebar: 点击确认
-        Sidebar->>API: HWH5.fetch("/api/skill/sessions/{sessionId}", { method: "delete" })
+        Sidebar->>API: HWH5.fetchFull("/api/skill/sessions/{sessionId}", { method: "delete" })
         API->>Server: DELETE /api/skill/sessions/{sessionId}
         Server-->>API: { code: 0, data: { status: "deleted", welinkSessionId } }
         alt 删除成功
@@ -137,7 +137,7 @@ sequenceDiagram
     participant Sidebar as WeAgentHistorySidebar
     participant App as App
     participant Chat as useChatSession
-    participant API as HWH5.fetch
+    participant API as HWH5.fetchFull
     participant SDK as HWH5EXT（现有接口）
 
     User->>Sidebar: 确认删除当前选中会话
@@ -185,7 +185,7 @@ sequenceDiagram
     participant DeviceAListener as 设备 A registerSessionListener
     participant DeviceBListener as 设备 B registerSessionListener
 
-    DeviceA->>Server: HWH5.fetch DELETE /api/skill/sessions/{sessionId}
+    DeviceA->>Server: HWH5.fetchFull DELETE /api/skill/sessions/{sessionId}
     Server-->>DeviceA: { code: 0, data: { status: "deleted", welinkSessionId } }
     DeviceA->>DeviceA: 本地移除会话
 
@@ -213,7 +213,7 @@ sequenceDiagram
 
 1. `WeAgentHistorySidebar`：新增移动端长按入口、PC 右键入口、删除按钮、确认弹窗和删除中态。
 2. `App`：新增 `onSessionDeleted` 处理，统一维护 `HistorySessionsCache`、当前会话切换和无可用会话兜底创建。
-3. `deleteHistorySession`：新增统一删除封装，底层按宿主桥接规范走 `HWH5.fetch`。
+3. `deleteHistorySession`：新增统一删除封装，底层按宿主桥接规范走 `HWH5.fetchFull`。
 4. `registerSessionListener` 消息处理：识别 `session.deleted` 类型，收到后刷新历史会话列表；如果被删会话是当前会话，则复用当前会话删除后的切换逻辑。
 5. i18n：新增删除按钮、确认弹窗、删除成功和删除失败文案。
 
@@ -237,7 +237,7 @@ sequenceDiagram
 
 1. `deleteHistorySession`
    - 状态：新增 HTTP 接口封装。
-   - 调用方式：通过 `HWH5.fetch` 发起请求；业务层只调用统一的 `deleteHistorySession(params)`。
+   - 调用方式：通过 `HWH5.fetchFull` 发起请求；业务层只调用统一的 `deleteHistorySession(params)`。
    - URL 统一由 `src/utils/apiEndpoints.ts` 管理，后续域名、文根或 path 调整只改该文件。
    - 环境根地址：
      - UAT：`https://www.example-beta.com/mag`
@@ -259,7 +259,7 @@ sequenceDiagram
 ```
 
    - Errors：`400` 表示无效 ID；`403` 表示无权限。
-   - `HWH5.fetch` 调用示例：
+   - `HWH5.fetchFull` 调用示例：
 
 ```typescript
 const url = buildDeleteHistorySessionUrl(sessionId);
@@ -267,7 +267,7 @@ const headers = {
   'Content-Type': 'application/json',
 };
 
-HWH5.fetch(url, { method: 'delete', headers })
+HWH5.fetchFull(url, { method: 'delete', headers })
   .then((res) => res.json())
   .then((reply) => {
     console.log('服务端返回：', reply);
@@ -355,7 +355,7 @@ HWH5.fetch(url, { method: 'delete', headers })
 
 1. `WeAgentHistorySidebar` 的移动端会话项交互、PC 会话项交互、长按态、右键操作态和弹窗展示。
 2. `App` 内 `HistorySessionsCache` 的删除、刷新和当前会话兜底切换逻辑。
-3. `deleteHistorySession` 统一 HTTP 封装和 `HWH5.fetch` 桥接适配。
+3. `deleteHistorySession` 统一 HTTP 封装和 `HWH5.fetchFull` 桥接适配。
 4. 暗黑模式样式、i18n 文案和相关单元测试。
 
 ### 8.2 间接影响
@@ -404,7 +404,7 @@ HWH5.fetch(url, { method: 'delete', headers })
 
 ### 9.3 文档一致性检查
 
-1. 检查 `deleteHistorySession` HTTP 封装、`HWH5.fetch` 调用方式与服务端接口文档命名一致。
+1. 检查 `deleteHistorySession` HTTP 封装、`HWH5.fetchFull` 调用方式与服务端接口文档命名一致。
 2. 检查 i18n key 与 `src/i18n/resources/zh.ts`、`src/i18n/resources/en.ts` 命名一致。
 3. 检查确认框文案、toast 文案和测试断言一致。
 4. 检查暗黑模式样式是否沿用 `theme.less` 变量和现有 `@media (prefers-color-scheme: dark)` 规则。
@@ -413,4 +413,4 @@ HWH5.fetch(url, { method: 'delete', headers })
 
 ## 10. 最终建议
 
-推荐采用「移动端长按入口 + PC 右键入口 + 确认框 + `HWH5.fetch` 删除接口 + 删除成功本地移除 + `session.deleted` 推送刷新列表」方案。该方案复用现有 `HistorySessionsCache`、历史列表刷新机制和 `registerSessionListener` websocket 能力，不新增推送通道；删除当前选中会话时按后一条、前一条、新会话顺序兜底。改动范围集中在侧边栏交互、`App` 缓存维护、当前会话删除切换、`deleteHistorySession` HTTP 封装和 `session.deleted` 事件处理。后续动作是进入实现阶段，并在实现时补齐 `HWH5.fetch` 桥接异常、`400/403` 错误提示和多端同步测试。
+推荐采用「移动端长按入口 + PC 右键入口 + 确认框 + `HWH5.fetchFull` 删除接口 + 删除成功本地移除 + `session.deleted` 推送刷新列表」方案。该方案复用现有 `HistorySessionsCache`、历史列表刷新机制和 `registerSessionListener` websocket 能力，不新增推送通道；删除当前选中会话时按后一条、前一条、新会话顺序兜底。改动范围集中在侧边栏交互、`App` 缓存维护、当前会话删除切换、`deleteHistorySession` HTTP 封装和 `session.deleted` 事件处理。后续动作是进入实现阶段，并在实现时补齐 `HWH5.fetchFull` 桥接异常、`400/403` 错误提示和多端同步测试。

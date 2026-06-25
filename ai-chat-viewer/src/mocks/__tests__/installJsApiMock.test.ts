@@ -9,7 +9,7 @@ describe('installJsApiMock session deletion helpers', () => {
     delete (window as any).__AI_CHAT_VIEWER_MOCK__;
   });
 
-  it('deletes a mock session through HWH5.fetch and emits session.deleted', async () => {
+  it('deletes a mock session through HWH5.fetchFull and emits session.deleted', async () => {
     const { installJsApiMock } = await import('../installJsApiMock');
     installJsApiMock();
 
@@ -20,7 +20,7 @@ describe('installJsApiMock session deletion helpers', () => {
       onMessage,
     });
 
-    const response = await window.HWH5.fetch?.(
+    const response = await window.HWH5.fetchFull(
       `/api/skill/sessions/${encodeURIComponent(sessionId)}`,
       {
         method: 'delete',

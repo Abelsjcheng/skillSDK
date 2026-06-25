@@ -60,10 +60,10 @@ interface MockHWH5Bridge {
   getAccountInfo?: () => Promise<string>;
   navigateBack: () => void;
   close: () => void;
-  fetch?: <T = unknown>(
+  fetchFull?: <T = unknown>(
     url: string,
-    options: { method: string; headers: Record<string, string>; body?: string },
-  ) => Promise<{ json: () => Promise<T> }>;
+    options: { method: string; headers: Record<string, string> },
+  ) => Promise<{ json: () => Promise<T> }> | { json: () => Promise<T> };
 }
 
 interface SessionRecord {
@@ -2308,8 +2308,8 @@ function ensureMockHWH5Bridge(): void {
     };
   }
 
-  if (typeof hwh5.fetch !== 'function') {
-    hwh5.fetch = async <T = unknown>(url: string, options: { method: string }) => {
+  if (typeof hwh5.fetchFull !== 'function') {
+    hwh5.fetchFull = async <T = unknown>(url: string, options: { method: string }) => {
       const method = options.method.toLowerCase();
       const parsedUrl = new URL(url, 'https://ai-chat-viewer.mock.local');
       const matchedDeleteSession = parsedUrl.pathname.match(/^\/(?:mag\/)?api\/skill\/sessions\/([^/?#]+)$/);
@@ -2334,7 +2334,7 @@ function ensureMockHWH5Bridge(): void {
         };
       }
 
-      throw new Error(`mock HWH5.fetch unsupported request: ${method.toUpperCase()} ${url}`);
+      throw new Error(`mock HWH5.fetchFull unsupported request: ${method.toUpperCase()} ${url}`);
     };
   }
 

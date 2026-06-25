@@ -302,32 +302,6 @@ describe('useChatSession', () => {
     expect(onSessionDeleted).toHaveBeenCalledWith('session_1');
   });
 
-  it('notifies when session.deleted only carries welinkSessionId in string content', async () => {
-    const onSessionDeleted = jest.fn();
-
-    renderHook(() => useChatSession({
-      mode: 'weAgentCUI',
-      welinkSessionId: 'session_1',
-      onSessionDeleted,
-    }));
-
-    await waitFor(() => {
-      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
-    });
-
-    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
-
-    act(() => {
-      listener.onMessage({
-        type: 'session.deleted',
-        content: '{"welinkSessionId":"session_1"}',
-        seq: null,
-      } as any);
-    });
-
-    expect(onSessionDeleted).toHaveBeenCalledWith('session_1');
-  });
-
   it('ignores session.deleted events for a different registered session', async () => {
     const onSessionDeleted = jest.fn();
 

@@ -637,14 +637,14 @@ export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<Delete
   return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
 }
 
-async function deleteHistorySessionWithHWH5Fetch(
+async function deleteHistorySessionWithHWH5FetchFull(
   sessionId: string,
 ): Promise<DeleteHistorySessionResult> {
-  if (typeof window === 'undefined' || typeof window.HWH5?.fetch !== 'function') {
-    throw new Error('HWH5.fetch is not available.');
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    throw new Error('HWH5.fetchFull is not available.');
   }
 
-  const response = await window.HWH5.fetch<DeleteHistorySessionResponse>(
+  const response = await window.HWH5.fetchFull<DeleteHistorySessionResponse>(
     buildDeleteHistorySessionUrl(sessionId),
     {
       method: 'delete',
@@ -664,7 +664,7 @@ async function deleteHistorySessionWithPcBridge(
   sessionId: string,
 ): Promise<DeleteHistorySessionResult> {
   // PC 端删除会话后续如需切换桥接方法，只需要替换这个函数内部实现。
-  return deleteHistorySessionWithHWH5Fetch(sessionId);
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
 }
 
 export async function deleteHistorySession(
@@ -679,7 +679,7 @@ export async function deleteHistorySession(
     return deleteHistorySessionWithPcBridge(sessionId);
   }
 
-  return deleteHistorySessionWithHWH5Fetch(sessionId);
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
