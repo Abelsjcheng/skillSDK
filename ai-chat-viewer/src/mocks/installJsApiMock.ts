@@ -2398,9 +2398,16 @@ function buildMockApi(): HWH5EXT {
     sendWebSocketMessage: async (
       params: SendWebSocketMessageParams,
     ): Promise<SendWebSocketMessageResult> => {
-      const action = params.message.action;
-      const welinkSessionId = typeof params.message.welinkSessionId === 'string'
-        ? params.message.welinkSessionId
+      let message: Record<string, unknown> = {};
+      try {
+        const parsedMessage = JSON.parse(params.message);
+        message = parsedMessage && typeof parsedMessage === 'object' ? parsedMessage : {};
+      } catch (_error) {
+        message = {};
+      }
+      const action = message.action;
+      const welinkSessionId = typeof message.welinkSessionId === 'string'
+        ? message.welinkSessionId
         : '';
       if (action === 'query_slash_commands' && welinkSessionId) {
         emit(welinkSessionId, {

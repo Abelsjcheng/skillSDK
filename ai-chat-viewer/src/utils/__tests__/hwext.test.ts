@@ -37,17 +37,17 @@ describe('sendWebSocketMessage', () => {
     };
 
     await expect(sendWebSocketMessage({
-      message: {
+      message: JSON.stringify({
         action: 'query_slash_commands',
         welinkSessionId: '42',
-      },
+      }),
     })).resolves.toEqual(bridgeResult);
 
     expect(bridgeSendWebSocketMessage).toHaveBeenCalledWith({
-      message: {
+      message: JSON.stringify({
         action: 'query_slash_commands',
         welinkSessionId: '42',
-      },
+      }),
     });
   });
 });

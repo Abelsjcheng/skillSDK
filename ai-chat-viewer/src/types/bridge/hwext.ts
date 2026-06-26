@@ -39,7 +39,7 @@ export interface SendMessageParams {
 }
 
 export interface SendWebSocketMessageParams {
-  message: Record<string, object | string | number | boolean | null>;
+  message: string;
 }
 
 export interface SendWebSocketMessageResult {

@@ -279,10 +279,10 @@ describe('useChatSession', () => {
     });
 
     expect(mockSendWebSocketMessage).toHaveBeenCalledWith({
-      message: {
+      message: JSON.stringify({
         action: 'query_slash_commands',
         welinkSessionId: 'session_1',
-      },
+      }),
     });
 
     const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;

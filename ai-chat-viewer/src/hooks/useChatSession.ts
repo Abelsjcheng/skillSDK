@@ -793,10 +793,10 @@ export function useChatSession({
 
     try {
       await sendWebSocketMessage({
-        message: {
+        message: JSON.stringify({
           action: 'query_slash_commands',
           welinkSessionId,
-        },
+        }),
       });
     } catch (err) {
       WeLog(`useChatSession sendWebSocketMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, action: 'query_slash_commands' })} | error=${JSON.stringify(err)}`);
