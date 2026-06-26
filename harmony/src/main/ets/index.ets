@@ -57,7 +57,6 @@ export {
   SessionStatusResult,
   SkillSDKConfig,
   SkillSdkException,
-  SlashCommand,
   Session,
   SkillWecodeStatus,
   SkillWecodeStatusResult,

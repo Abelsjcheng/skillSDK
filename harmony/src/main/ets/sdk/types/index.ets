@@ -32,7 +32,7 @@ export type BusinessSessionDomain = string;
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
 
-export type StreamMessageType =
+export type KnownStreamMessageType =
   | 'text.delta'
   | 'text.done'
   | 'thinking.delta'
@@ -51,8 +51,9 @@ export type StreamMessageType =
   | 'agent.offline'
   | 'error'
   | 'snapshot'
-  | 'streaming'
-  | 'slash_commands_result';
+  | 'streaming';
+
+export type StreamMessageType = KnownStreamMessageType | (string & {});
 
 // ---------------------------
 // SDK Config and Error
@@ -214,11 +215,6 @@ export interface StreamingPart {
   fileMime?: string;
 }
 
-export interface SlashCommand {
-  command: string;
-  description: string;
-}
-
 export interface StreamMessage {
   type: StreamMessageType;
   seq?: number | null;
@@ -269,7 +265,6 @@ export interface StreamMessage {
   subagentName?: string;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
-  slashCommands?: SlashCommand[];
 }
 
 export interface SessionError {

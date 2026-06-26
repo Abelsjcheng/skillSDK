@@ -550,13 +550,12 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | askMoreQuestions | string[] \| null | `ask_more` 事件追问建议列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照 |
 | parts | array \| null | `streaming` 携带的进行中消息部件 |
-| slashCommands | Array<{ command: string; description: string }> \| null | `slash_commands_result` 携带的 slash 命令列表 |
 | subagentSessionId | string \| null | 子 agent 的真实会话 ID，仅出现在 Part 级事件及恢复态 part 中 |
 | subagentName | string \| null | 子 agent 显示名，仅用于展示 |
 
 ### 事件类型
 
-`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more` / `slash_commands_result`
+`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
 
 恢复态说明：
 - 重连恢复时，服务端会先推送 `snapshot`，再推送 `streaming`。
@@ -623,9 +622,6 @@ const onMessage = (message) => {
       break;
     case 'ask_more':
       console.log('追问建议:', message.askMoreQuestions);
-      break;
-    case 'slash_commands_result':
-      console.log('Slash 命令列表:', message.slashCommands);
       break;
     case 'agent.online':
     case 'agent.offline':
@@ -706,7 +702,7 @@ window.HWH5EXT.unregisterSessionListener({
 
 通过既有 WebSocket 长连接发送通用 message 字符串。调用方负责将业务 JSON 序列化为字符串；SDK 不解析或校验 `action` 等业务字段。该接口不是 REST 查询接口；Promise resolve 只表示 message 已发送成功或已被 SDK 接受发送，不同 `action` 的业务结果仍通过 `registerSessionListener` 的 `onMessage` 回调返回。
 
-例如发送 `{ "action": "query_slash_commands", "welinkSessionId": "42" }` 后，命令列表结果通过 `slash_commands_result` 事件返回。建议页面先调用 `registerSessionListener`，再调用 `sendWebSocketMessage`。
+例如发送 `{ "action": "custom_action", "welinkSessionId": "42" }` 后，业务结果通过服务端约定的 WebSocket 事件返回。建议页面先调用 `registerSessionListener`，再调用 `sendWebSocketMessage`。
 
 ### 调用方式
 
@@ -736,7 +732,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendWebSoc
 
 ```json
 {
-  "action": "query_slash_commands",
+  "action": "custom_action",
   "welinkSessionId": "42"
 }
 ```
@@ -745,19 +741,12 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendWebSoc
 
 ```json
 {
-  "type": "slash_commands_result",
+  "type": "custom_result",
   "seq": 135,
   "welinkSessionId": "42",
-  "slashCommands": [
-    {
-      "command": "/new",
-      "description": "新建会话"
-    },
-    {
-      "command": "/delete",
-      "description": "删除"
-    }
-  ]
+  "data": {
+    "status": "ok"
+  }
 }
 ```
 
@@ -776,15 +765,15 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendWebSoc
 window.HWH5EXT.registerSessionListener({
   welinkSessionId: '42',
   onMessage: (message) => {
-    if (message.type === 'slash_commands_result') {
-      console.log('slash commands:', message.slashCommands);
+    if (message.type === 'custom_result') {
+      console.log('WebSocket result:', message.raw || message);
     }
   }
 });
 
 window.HWH5EXT.sendWebSocketMessage({
   message: JSON.stringify({
-    action: 'query_slash_commands',
+    action: 'custom_action',
     welinkSessionId: '42'
   })
 }).then((result) => {

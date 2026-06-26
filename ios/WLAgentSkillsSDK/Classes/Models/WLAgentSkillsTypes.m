@@ -783,26 +783,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
-@implementation WLAgentSkillsSlashCommand
-
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _command = WLAgentSkillsStringValue(dictionary[@"command"], @"");
-        _commandDescription = WLAgentSkillsStringValue(dictionary[@"description"], @"");
-    }
-    return self;
-}
-
-- (NSDictionary *)toDictionary {
-    return @{
-        @"command" : self.command ?: @"",
-        @"description" : self.commandDescription ?: @""
-    };
-}
-
-@end
-
 @implementation WLAgentSkillsStreamMessage
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
@@ -861,18 +841,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _subagentName = WLAgentSkillsStringValue(dictionary[@"subagentName"], nil);
     _messages = [dictionary[@"messages"] isKindOfClass:[NSArray class]] ? dictionary[@"messages"] : nil;
     _parts = [dictionary[@"parts"] isKindOfClass:[NSArray class]] ? dictionary[@"parts"] : nil;
-    NSMutableArray<WLAgentSkillsSlashCommand *> *commands = [NSMutableArray array];
-    for (NSDictionary *command in WLAgentSkillsArrayValue(dictionary[@"slashCommands"])) {
-        if (![command isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-        WLAgentSkillsSlashCommand *item = [[WLAgentSkillsSlashCommand alloc] initWithDictionary:command];
-        if (item.command.length == 0) {
-            continue;
-        }
-        [commands addObject:item];
-    }
-    _slashCommands = [commands copy];
     }
     return self;
 }
@@ -916,8 +884,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"subagentSessionId" : WLAgentSkillsNullObject(self.subagentSessionId),
         @"subagentName" : WLAgentSkillsNullObject(self.subagentName),
         @"messages" : WLAgentSkillsNullObject(self.messages),
-        @"parts" : WLAgentSkillsNullObject(self.parts),
-        @"slashCommands" : WLAgentSkillsSerializeModelArray(self.slashCommands)
+        @"parts" : WLAgentSkillsNullObject(self.parts)
     };
 }
 

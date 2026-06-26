@@ -31,7 +31,6 @@ typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeAction) {
 @class WLAgentSkillsSessionStatusResult;
 @class WLAgentSkillsStreamMessage;
 @class WLAgentSkillsAssistantDetailUpdatedPayload;
-@class WLAgentSkillsSlashCommand;
 
 #pragma mark - Callback Typedefs
 
@@ -417,14 +416,6 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 - (NSDictionary *)toDictionary;
 @end
 
-@interface WLAgentSkillsSlashCommand : NSObject
-@property (nonatomic, copy) NSString *command;
-@property (nonatomic, copy) NSString *commandDescription;
-
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
-- (NSDictionary *)toDictionary;
-@end
-
 @interface WLAgentSkillsStreamMessage : NSObject
 @property (nonatomic, copy) NSString *type;
 @property (nonatomic, strong) NSNumber *seq;
@@ -467,7 +458,6 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *subagentName;
 @property (nonatomic, strong, nullable) NSArray *messages;
 @property (nonatomic, strong, nullable) NSArray *parts;
-@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsSlashCommand *> *slashCommands;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;

@@ -31,7 +31,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
-| `sendWebSocketMessage` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送通用 message 字符串；`query_slash_commands` 等 action 的结果由对应 WebSocket 事件返回 |
+| `sendWebSocketMessage` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送通用 message 字符串；业务结果由对应 WebSocket 事件返回 |
 | `onSessionStatusChange` / `onSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
 
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
@@ -1039,7 +1039,6 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - 会话状态：`session.status` / `session.title` / `session.error`
 - 断线恢复：`snapshot` / `streaming`
 - 云端扩展：`planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
-- 辅助查询结果：`slash_commands_result`
 - 系统事件：`agent.online` / `agent.offline` / `error`
 
 #### 字段对齐说明（重要）
@@ -1055,7 +1054,6 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
 - `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
 - `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
-- `slash_commands_result` 使用字段 `slashCommands`，用于返回当前会话可用 slash 命令列表
 - `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
 
 ### 接口名
@@ -1177,9 +1175,6 @@ try {
       case "ask_more":
         console.log("追问建议:", message.askMoreQuestions);
         break;
-      case "slash_commands_result":
-        console.log("Slash命令列表:", message.slashCommands);
-        break;
       case "agent.online":
       case "agent.offline":
         console.log("Agent状态事件:", message.type);
@@ -1284,7 +1279,7 @@ we码调用
 
 通过既有 WebSocket 长连接发送通用 message 字符串。调用方负责将业务 JSON 序列化为字符串；SDK 不解析或校验 `action` 等业务字段。该接口只表示 message 已成功发送或已被 SDK 接受发送；不同 `action` 的业务结果仍通过 `registerSessionListener` 注册的 `onMessage` 回调接收。
 
-例如发送 `{ "action": "query_slash_commands", "welinkSessionId": "42" }` 后，命令列表结果通过 `slash_commands_result` 事件返回。建议页面先注册 `registerSessionListener`，再调用 `sendWebSocketMessage`，避免服务端结果事件先于页面监听到达。
+例如发送 `{ "action": "custom_action", "welinkSessionId": "42" }` 后，业务结果通过服务端约定的 WebSocket 事件返回。建议页面先注册 `registerSessionListener`，再调用 `sendWebSocketMessage`，避免服务端结果事件先于页面监听到达。
 
 ### 接口名
 
@@ -1308,30 +1303,23 @@ sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketM
 
 ```json
 {
-  "action": "query_slash_commands",
+  "action": "custom_action",
   "welinkSessionId": "42"
 }
 ```
 
 ### WebSocket 结果事件
 
-服务端通过 `slash_commands_result` 推送命令列表：
+服务端通过业务约定的事件推送结果：
 
 ```json
 {
-  "type": "slash_commands_result",
+  "type": "custom_result",
   "seq": 135,
   "welinkSessionId": "42",
-  "slashCommands": [
-    {
-      "command": "/new",
-      "description": "新建会话"
-    },
-    {
-      "command": "/delete",
-      "description": "删除"
-    }
-  ]
+  "data": {
+    "status": "ok"
+  }
 }
 ```
 
@@ -1350,15 +1338,15 @@ sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketM
 registerSessionListener({
   welinkSessionId: "42",
   onMessage: (message) => {
-    if (message.type === "slash_commands_result") {
-      console.log("Slash commands:", message.slashCommands);
+    if (message.type === "custom_result") {
+      console.log("WebSocket result:", message.raw ?? message);
     }
   }
 });
 
 await sendWebSocketMessage({
   message: JSON.stringify({
-    action: "query_slash_commands",
+    action: "custom_action",
     welinkSessionId: "42"
   })
 });
@@ -2300,7 +2288,6 @@ try {
 | `search_result` | 搜索结果（云端扩展） | `searchResults` |
 | `reference` | 引用列表（云端扩展） | `references` |
 | `ask_more` | 追问建议（云端扩展） | `askMoreQuestions` |
-| `slash_commands_result` | Slash 命令查询结果 | `slashCommands` |
 
 #### Subagent 事件处理约定
 
@@ -2375,7 +2362,6 @@ try {
 | response | string \| null | 权限回复值：`once` / `always` / `reject` |
 | messages | array \| null | `snapshot` 携带的已完成消息快照，元素结构见上文 `snapshot` 事件字段 |
 | parts | array \| null | `streaming` 携带的进行中消息部件，元素结构见上文 `streaming` 事件字段 |
-| slashCommands | Array<{ command: string; description: string }> \| null | `slash_commands_result` 携带的 slash 命令列表 |
 
 ### SendMessageResult
 

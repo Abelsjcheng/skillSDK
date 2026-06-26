@@ -25,7 +25,7 @@
 1. SDK 新增面向 JSAPI bridge 的通用发送方法，调用后通过 WebSocket 发送调用方传入的完整 message 字符串。
 2. 请求参数为 `message: string`，调用方负责序列化业务 JSON；SDK 只校验字符串非空、连接可用性与发送失败处理，不解析 `action`。
 3. `query_slash_commands` 是该通用方法的首个使用场景，服务端通过 `slash_commands_result` 事件推送 slash 命令列表，端侧通过现有 session listener 或 JSAPI 回调接收。
-4. `slash_commands_result` 事件纳入 `StreamMessage` 协议扩展，至少包含 `slashCommands` 与 `welinkSessionId` 字段。
+4. `slash_commands_result` 作为业务事件透传给 `registerSessionListener`，SDK 不新增 slash command 专用强类型模型。
 5. 保持 Android、iOS、HarmonyOS 公共 API 语义一致，同时符合各平台异步风格。
 6. 文档先明确推荐方案、备选方案、边界与测试范围；本阶段不实施源码变更。
 
@@ -130,12 +130,8 @@ sequenceDiagram
 3. `WebSocketManager` 增加通用发送方法：
    - 推荐内部通用方法：`sendMessage(message)` 或平台等价实现。
    - 不为 `query_slash_commands` 单独新增底层业务方法，避免后续新增 action 时继续修改 SDK。
-4. `StreamMessage` 协议新增 `slash_commands_result` 事件类型。
-5. `StreamMessage` 类型新增 slash command 相关字段：
-   - `slashCommands: SlashCommand[] | null`
-   - `SlashCommand.command: string`
-   - `SlashCommand.description: string`
-6. 事件分发沿用现有 `welinkSessionId` 路由；页面需先注册或保持 `registerSessionListener`，再调用 `sendWebSocketMessage`。
+4. `StreamMessage` 保持通用事件模型，不为 `slash_commands_result` 增加专用 `SlashCommand` / `slashCommands` 字段。
+5. 事件分发沿用现有 `welinkSessionId` 路由；页面需先注册或保持 `registerSessionListener`，再调用 `sendWebSocketMessage`。
 
 ### 4.2 核心实现方式
 
@@ -187,7 +183,7 @@ sequenceDiagram
 }
 ```
 
-SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话监听器。页面通过 `message.type === "slash_commands_result"` 判断并读取 `message.slashCommands`。
+SDK 解析为通用 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话监听器。页面可通过 `message.type === "slash_commands_result"` 判断业务事件，并从原始事件数据中读取业务字段；SDK 不提供 slash 专用访问器。
 
 #### 4.2.1 可行方案对比
 
@@ -205,12 +201,12 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 4. 若页面未注册 `registerSessionListener` 就调用通用发送方法，SDK 可以成功发送指令，但页面可能收不到结果。文档应明确建议先注册监听器。
 5. 若 WebSocket 未连接，SDK 应尝试连接后发送；若连接失败，则 `sendWebSocketMessage` reject。
 6. 若 WebSocket 当前正在重连，推荐将发送动作等待连接回调后执行，或返回连接不可用错误，具体按现有平台 WebSocket 连接模型选择。
-7. `slashCommands` 为空数组表示当前会话无可用命令；字段缺失或非数组按协议异常处理，页面侧建议降级为不展示面板。
+7. `slashCommands` 属于业务事件字段，字段为空、缺失或格式异常时由页面侧按业务策略降级处理。
 8. 重复调用不由 SDK 去重；是否限流、缓存或复用 in-flight 由页面或业务层处理。
 
 ### 4.4 相关接口联动
 
-1. `registerSessionListener`：新增事件通过该接口回调，文档需补充 `slash_commands_result`。
+1. `registerSessionListener`：业务事件通过该接口回调，SDK 不需要为每类业务事件新增专用类型。
 2. `unregisterSessionListener`：移除监听后不再收到查询结果。
 3. `executeSkill` / `sendMessage`：不需要修改，但页面通常在已有会话中调用通用发送方法。
 4. `getSessionMessage` / `getSessionMessageHistory`：不应返回 `slash_commands_result`。
@@ -218,7 +214,7 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 
 ### 4.5 文档需要同步修改的内容
 
-1. `SkillClientSdkInterfaceV1.md`：新增 SDK 接口、事件类型、`StreamMessage.slashCommands` 字段。
+1. `SkillClientSdkInterfaceV1.md`：新增 SDK 通用发送接口，明确业务事件由监听器透传。
 2. `小程序JSAPI接口文档.md`：接口列表新增 `sendWebSocketMessage`，补充移动端和 PC 调用方式。
 3. `SkillClientSdkInterfaceV4_V5_ChangeLog.md`：如本能力进入 V5 或后续版本，需记录新增接口与事件。
 4. `Skill_SDK_接口文档.md`：若仍作为 HarmonyOS 或总览文档使用，需同步接口和数据结构。
@@ -272,8 +268,8 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 
 1. 已连接 WebSocket 时调用 `sendWebSocketMessage`，确认发送文本帧为 `{"action":"query_slash_commands","welinkSessionId":"..."}`。
 2. 未连接 WebSocket 时调用，确认 SDK 先连接再发送，成功后 resolve。
-3. 服务端推送 `slash_commands_result`，确认 session listener 收到完整 `StreamMessage`。
-4. `slashCommands` 为空数组时，页面不展示命令面板但不报错。
+3. 服务端推送业务结果事件，确认 session listener 收到完整 `StreamMessage`。
+4. 业务结果字段为空或缺失时，页面按业务策略降级且 SDK 不报错。
 5. 缺少 `message` 或 `message` 为空字符串时返回参数错误。
 6. WebSocket 未配置、连接失败、send 失败时返回明确错误。
 
@@ -281,7 +277,7 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 
 1. Android、iOS、HarmonyOS 方法名、入参、返回语义一致。
 2. 移动端 `HWH5EXT` 与 PC `Pedestal.callMethod` 调用方式一致。
-3. 旧版本 SDK 收到未知 `slash_commands_result` 时不会崩溃；若模型未显式字段，至少可通过 raw 或扩展字段安全忽略。
+3. SDK 收到未知业务事件时不会崩溃；若模型未显式字段，至少可通过 raw 或扩展字段安全忽略。
 4. 现有事件 `text.delta`、`question`、`permission.ask` 等仍正常分发。
 5. `unregisterSessionListener` 后不再收到查询结果。
 
@@ -289,9 +285,8 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 
 1. SDK 接口文档、JSAPI 文档、三端公开类型文档中的方法名统一为 `sendWebSocketMessage`。
 2. slash commands 查询场景的 WebSocket action 统一为 `query_slash_commands`。
-3. 事件类型统一为 `slash_commands_result`。
+3. 业务结果事件类型由服务端和页面约定，SDK 不新增专用事件枚举。
 4. 会话字段统一使用 `welinkSessionId`。
-5. 命令列表字段统一使用 `slashCommands`，元素字段为 `command` 和 `description`。
 
 ## 10. 最终建议
 
@@ -301,5 +296,5 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 
 1. 先确认服务端事件字段是否可以固定返回 `welinkSessionId`，并避免只返回 `sessionID`。
 2. 将本方案同步到 `SkillClientSdkInterfaceV1.md` 与 `小程序JSAPI接口文档.md`，作为正式接口契约。
-3. 三端分别补充 `sendWebSocketMessage` 通用发送接口与 `StreamMessage.slashCommands` 类型。
+3. 三端分别补充 `sendWebSocketMessage` 通用发送接口，不新增 slash command 专用模型。
 4. 页面层调整 slash list 获取路径，从此前 `HWH5.fetch` 方案迁移到 `sendWebSocketMessage` + `registerSessionListener`。
