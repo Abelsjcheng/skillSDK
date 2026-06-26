@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import AvatarImage from '../components/AvatarImage';
 import AssistantDetailActionSheet from '../components/assistant/AssistantDetailActionSheet';
 import AssistantDetailDeleteModal from '../components/assistant/AssistantDetailDeleteModal';
@@ -64,6 +65,7 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
 
 const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
   const [isSecretVisible, setIsSecretVisible] = useState<boolean>(false);
@@ -239,21 +241,24 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const handleEditAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
 
-    const targetPartnerAccount = (detail?.partnerAccount ?? resolvedPartnerAccount).trim();
-
     if (isPc) {
       setPcView('edit');
       return;
     }
 
     setOverlay('none');
-    const nextSearch = new URLSearchParams();
-    if (targetPartnerAccount) {
-      nextSearch.set('partnerAccount', targetPartnerAccount);
-    }
-    nextSearch.set('source', 'assistantDetail');
-    window.location.hash = nextSearch.toString() ? `#/editAssistant?${nextSearch.toString()}` : '#/editAssistant';
-  }, [detail, isPc, resolvedPartnerAccount]);
+    navigate(
+      {
+        pathname: '/editAssistant',
+      },
+      {
+        state: {
+          source: 'assistantDetail',
+          detail,
+        },
+      },
+    );
+  }, [detail, isPc, navigate]);
 
   const handleRequestDeleteAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
