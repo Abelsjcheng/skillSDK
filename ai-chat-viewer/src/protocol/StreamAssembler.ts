@@ -1,5 +1,4 @@
 import type { StreamMessage, MessagePart, MessagePartSnapshot } from '../types';
-import type { MapRawPartOptions } from '../types/components';
 import { mapRawPartToMessagePart, normalizeQuestionItems, normalizeQuestionOptions } from '../utils/message';
 
 export class StreamAssembler {
@@ -264,13 +263,13 @@ export class StreamAssembler {
     this.partIdCounter = 0;
   }
 
-  initializeFromSnapshot(partSnapshots: MessagePartSnapshot[], options: MapRawPartOptions = {}): void {
+  initializeFromSnapshot(partSnapshots: MessagePartSnapshot[]): void {
     if (this.completed) return;
     this.parts.clear();
     this.partOrder = [];
     partSnapshots.forEach((partSnapshot) => {
       const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);
-      const part = mapRawPartToMessagePart({ ...partSnapshot, partId }, true, options);
+      const part = mapRawPartToMessagePart({ ...partSnapshot, partId }, true);
       if (!this.parts.has(partId)) {
         this.partOrder.push(partId);
       }

@@ -892,8 +892,8 @@
    - 用户回答后的 AI 后续回复继续按现有流式链路渲染为后续独立 AI 消息块，不并入原 `QuestionCard`；
    - 问题回答不生成可见用户消息排序节点；发送成功后仅保持原 `QuestionCard` 已回答态，并拉起后续 AI 回复占位；
    - 若后续收到 `question completed/error` 事件时，原 question 所在助手消息已经结束流式态，则只更新原 `QuestionCard` 的回答状态与结果，不重新创建新的 question 助手消息块；
-   - `question` 渲染默认只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段；仅历史消息和 session recovery 的 `snapshot / streaming` part snapshot 在顶层 `questions` 缺失时允许从 `input.questions` 兜底取题目数组，普通实时 question event、发送返回消息不从 `input` 中解析题目和选项数据；
-   - session recovery 写回消息列表时，如果恢复 part 只剩旧单题字段，而当前列表中同 `messageId + partId` 的 question part 已经是多题或多选结构，则不得覆盖降级已有的 `questions`、首题兼容字段和 `multiSelect`；
+   - `question` 渲染默认只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段；仅历史消息在顶层 `questions` 缺失时允许从 question part 自身 `input.questions` 兜底取题目数组，普通实时 question event、snapshot、发送返回消息不从 question part 自身 `input` 中解析题目和选项数据；
+   - WS `type=streaming` 恢复消息中，若 question part 自身缺少有效 `questions`，可从同一 `parts` 数组中前置 `type=tool && toolName=question` 的 tool part `input.questions` 补齐题目数组，并同步首题兼容字段；该补齐不跨 message、不跨事件缓存，且不覆盖 question part 自身已有的有效 `questions`；
    - 历史消息的已回答展示只读取最外层 `output`：`string[][]` JSON 按题目顺序映射，旧多题问答 transcript 普通字符串按多条问答展示，其他普通字符串只作为第一题答案展示，忽略 `questions` item 内的 `output` 字段；
    - 历史消息若仍包含问题回答 user message，仅当该 user message 紧跟在已回答 question 后且 `content` 与该 question 的最外层 `output` 完全一致时，才隐藏该 user message；
    - 为兼容历史数据或简化结构，若后端仅返回字符串数组，也需按 `label` 兜底渲染。

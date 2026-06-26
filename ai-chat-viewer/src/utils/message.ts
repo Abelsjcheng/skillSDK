@@ -448,6 +448,49 @@ export function mapRawParts(
   return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming, options));
 }
 
+export function hydrateStreamingQuestionPartsFromToolInput(
+  partSnapshots: MessagePartSnapshot[],
+): MessagePartSnapshot[] {
+  let pendingQuestionToolQuestions: QuestionItem[] | undefined;
+  let changed = false;
+
+  const hydratedParts = partSnapshots.map((part) => {
+    if (part.type === 'tool' && part.toolName === 'question') {
+      pendingQuestionToolQuestions = normalizeQuestionItems({
+        questions: getInputQuestions(part.input),
+      });
+      return part;
+    }
+
+    if (part.type !== 'question') {
+      return part;
+    }
+
+    const currentQuestions = normalizeQuestionItems({
+      questions: part.questions,
+    });
+    const fallbackQuestions = pendingQuestionToolQuestions;
+    pendingQuestionToolQuestions = undefined;
+
+    if (currentQuestions || !fallbackQuestions) {
+      return part;
+    }
+
+    const firstQuestion = fallbackQuestions[0];
+    changed = true;
+    return {
+      ...part,
+      header: firstQuestion.header ?? part.header,
+      question: firstQuestion.question,
+      options: firstQuestion.options.length > 0 ? firstQuestion.options : part.options,
+      multiSelect: firstQuestion.multiSelect,
+      questions: fallbackQuestions,
+    };
+  });
+
+  return changed ? hydratedParts : partSnapshots;
+}
+
 export function shouldRenderMessagePart(part: MessagePart): boolean {
   switch (part.type) {
     case 'text':
@@ -527,10 +570,7 @@ export function messageOperationToMessage(
   };
 }
 
-export function snapshotMessageToMessage(
-  snapshot: SessionMessageSnapshot,
-  options: MapRawPartOptions = {},
-): Message {
+export function snapshotMessageToMessage(snapshot: SessionMessageSnapshot): Message {
   return {
     id: snapshot.id,
     role: normalizeRole(snapshot.role),
@@ -538,7 +578,7 @@ export function snapshotMessageToMessage(
     contentType: snapshot.contentType ?? 'plain',
     timestamp: snapshot.createdAt ? new Date(snapshot.createdAt).getTime() : Date.now(),
     isStreaming: false,
-    parts: mapRawParts(snapshot.parts, false, options),
+    parts: mapRawParts(snapshot.parts, false),
   };
 }
 

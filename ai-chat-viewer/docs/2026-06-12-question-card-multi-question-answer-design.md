@@ -48,7 +48,7 @@ flowchart TD
     A["服务端 question part"] --> B["消息解析层"]
     B --> C{"是否存在 questions[]"}
     C -- "是" --> D["逐项归一化为 QuestionItem[]"]
-    C -- "否" --> E{"历史或恢复路径且存在 input.questions?"}
+    C -- "否" --> E{"历史 input.questions 或 streaming 前置 tool.input.questions?"}
     E -- "是" --> D
     E -- "否" --> F["旧字段补成单题 QuestionItem[]"]
     D --> M["消息 part 写入 part.questions"]
@@ -157,7 +157,7 @@ sequenceDiagram
 
 1. 类型层新增 `QuestionItem` 和 `QuestionAnswerMatrix = string[][]`，并将 `QuestionAnswerSubmission.answer` 从单字符串升级为二维答案矩阵。
 2. 消息工具层新增 question 归一化、答案矩阵序列化、安全解析、展示摘要格式化能力。
-3. 历史解析、实时解析和恢复解析统一使用同一套题目归一化规则；普通实时 question event 不从 `input` 恢复 question，但历史消息与 session recovery 的 `snapshot / streaming` part snapshot 在顶层 `questions` 缺失时允许从 `input.questions` 兜底。
+3. 历史解析、实时解析和恢复解析统一使用同一套题目归一化规则；普通实时 question event 和 snapshot 不从 question part 自身 `input` 恢复 question。历史消息仍可在顶层 `questions` 缺失时从 question part 的 `input.questions` 兜底；`type=streaming` 恢复消息仅可从同一 `parts` 数组中前置 `toolName=question` 的 tool part `input.questions` 补齐后续 question part。
 4. `QuestionCard` 状态从单答案模型升级为 `currentQuestionIndex`、`selectedAnswers`、`customInputs`、`answered`、`submitting`。
 5. `QuestionAnswerSubmission` 除答案矩阵外携带 `partId`、`messageId`、`toolCallId`、`questionId`、`subagentSessionId`，便于上层定位原 assistant question part。
 6. `useChatSession` 在问题回答场景内把答案矩阵转成发送字符串，单题单答案复用旧答案字符串，其他场景使用 JSON 字符串，再复用现有发送接口；同时本地预更新原 question part 的 `answered` 与 `output`。
@@ -177,8 +177,9 @@ sequenceDiagram
 3. `multiSelect` 只读取正式字段 `multiSelect`，默认值为 `false`。
 4. `options` 同时兼容字符串数组和对象数组，最终统一为 `{ label, description? }[]`。
 5. question 渲染默认不从 `input` 字段读取题目、选项、多选状态或问题数组；`input` 只允许作为原始 part 字段透传给其他场景。
-6. 历史消息与 session recovery 存在兼容例外：`sessionMessageToMessage()`、`snapshotMessageToMessage()` 处理的恢复消息，以及 `streaming` 事件中的 part snapshot，在顶层 `questions` 缺失时允许读取 `input.questions` 作为题目数组兜底；普通实时 question event、发送返回消息仍不读取 `input.questions`。
-7. 为兼容现有渲染入口，归一化后同步保留首题的旧字段值：`header`、`question`、`options`、`multiSelect`。
+6. 历史消息存在兼容例外：`sessionMessageToMessage()` 处理的历史 question part，在顶层 `questions` 缺失时允许读取该 question part 的 `input.questions` 作为题目数组兜底；普通实时 question event、snapshot、发送返回消息仍不读取 question part 自身的 `input.questions`。
+7. `type=streaming` 恢复消息存在单独兼容规则：当同一个 `parts` 数组中前置 `type=tool && toolName=question` 的 tool part 在 `input.questions` 中携带有效题目数组，且后续 question part 自身缺少有效 `questions` 时，可用该数组补齐 question part，并同步首题兼容字段 `header`、`question`、`options`、`multiSelect`。
+8. 为兼容现有渲染入口，归一化后同步保留首题的旧字段值：`header`、`question`、`options`、`multiSelect`。
 
 #### 4.2.2 答案矩阵
 
@@ -293,8 +294,8 @@ type QuestionAnswerMatrix = string[][];
 
 1. 没有 `questions` 字段时，按旧单题单选逻辑补齐题目数组。
 2. 历史消息存在顶层 `questions[]` 时，答案仍只读取最外层 `part.output`；题目项内即使存在 `output` 也忽略。
-3. 历史消息和 session recovery 的 `snapshot / streaming` part snapshot 不存在顶层 `questions[]` 但存在 `input.questions` 时，使用该题目数组兜底；普通实时 question event 和发送返回路径不启用该兜底。
-4. session recovery 写回消息列表时，如果恢复 part 只剩旧单题字段，而当前列表中同 `messageId + partId` 的 question part 已经是多题或多选结构，则保留当前的 `questions`、首题兼容字段和 `multiSelect`，避免恢复事件把未回答问题卡片降级为单题单选。
+3. 历史消息不存在顶层 `questions[]` 但存在 question part 自身 `input.questions` 时，使用该题目数组兜底；普通实时 question event、snapshot 和发送返回路径不启用该兜底。
+4. `type=streaming` 恢复消息中，若 question part 自身缺少有效 `questions`，可从同一 `parts` 数组中前置 `type=tool && toolName=question` 的 tool part `input.questions` 补齐；该补齐不跨 message、不跨事件缓存，且 question part 自身已有有效 `questions` 时优先使用自身字段。
 5. `part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵并按题目顺序展示；若不是 JSON，则先保守识别旧多题问答 transcript，识别成功按多条问答展示，识别失败再按旧单答案字符串兼容为第一题答案。
 6. 用户普通聊天内容即使是合法 `string[][]` JSON 字符串，也不能仅凭 JSON 形状被隐藏或改写；只有紧邻已回答 question 且内容等于该 question `output` 的历史 user message 才允许隐藏。
 7. 多题提交不强制所有题目必答，未回答题目保留为空数组。
@@ -396,8 +397,8 @@ type QuestionAnswerMatrix = string[][];
 3. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为二维数组 JSON 字符串时，按顺序展示每题答案。
 4. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为旧多题问答 transcript 普通字符串时，按 transcript 中的多条问答展示。
 5. 普通实时 question event 只有 `input.questions` 时，不从 `input` 恢复为 question 内容。
-6. session recovery 的 `snapshot / streaming` part snapshot 只有 `input.questions` 时，可恢复为多题 question 内容。
-7. 多题未回答时切到其他历史 session 再切回，恢复事件不得把原 question card 降级为单题；若第一题是多选，切回后仍保持复选框视觉。
+6. snapshot 的 question part 只有自身 `input.questions` 时，不从该 input 恢复为多题 question 内容。
+7. `type=streaming` 恢复消息中，前置 `type=tool && toolName=question` 的 tool part 存在 `input.questions`，且后续 question part 缺少 `questions` 时，可恢复为多题 question 内容；若第一题是多选，切回后仍保持复选框视觉。
 8. `options` 为字符串数组时，仍按 `label` 渲染。
 9. `options` 为对象数组时，保留 `description` 展示。
 10. 只有自定义输入、没有 option 的问题仍可提交。
