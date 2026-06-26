@@ -48,6 +48,7 @@ import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
 import { canIUse } from '../utils/versionCheck';
+import { useSubmitLock } from '../hooks/useSubmitLock';
 
 const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueNode }) => (
   <div className='assistant-detail__info-row'>
@@ -74,6 +75,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const [isPcMenuOpen, setIsPcMenuOpen] = useState<boolean>(false);
   const [assistantEditSupported, setAssistantEditSupported] = useState<boolean>(isPc);
   const [pcMenuPosition, setPcMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const { submitting: deleteSubmitting, runWithSubmitLock: runDeleteWithSubmitLock } = useSubmitLock();
   const pageRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -279,19 +281,21 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
       return;
     }
 
-    try {
-      await deleteWeAgent({
-        partnerAccount: targetPartnerAccount,
-      });
-      setOverlay('none');
-      window.HWH5.close();
-    } catch (error) {
-      WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
-        partnerAccount: targetPartnerAccount,
-      })} | error=${JSON.stringify(error)}`);
-      showToast(t('assistantDetail.deleteFailed'));
-    }
-  }, [detail?.partnerAccount, partnerAccount, t]);
+    await runDeleteWithSubmitLock(async () => {
+      try {
+        await deleteWeAgent({
+          partnerAccount: targetPartnerAccount,
+        });
+        setOverlay('none');
+        window.HWH5.close();
+      } catch (error) {
+        WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
+          partnerAccount: targetPartnerAccount,
+        })} | error=${JSON.stringify(error)}`);
+        showToast(t('assistantDetail.deleteFailed'));
+      }
+    });
+  }, [detail?.partnerAccount, partnerAccount, runDeleteWithSubmitLock, t]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {
@@ -525,6 +529,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           <AssistantDetailDeleteModal
             open={overlay === 'delete-modal'}
             assistantName={displayName}
+            submitting={deleteSubmitting}
             onClose={handleCloseOverlay}
             onConfirm={handleConfirmDelete}
           />

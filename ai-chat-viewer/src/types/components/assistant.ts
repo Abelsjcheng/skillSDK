@@ -6,6 +6,7 @@ import type { DigitalTwinBasicInfoPayload } from '../digitalTwin';
 export interface AssistantDetailDeleteModalProps {
   open: boolean;
   assistantName: string;
+  submitting?: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -19,6 +20,7 @@ export interface ConfirmModalProps {
   onClose: () => void;
   onConfirm: () => void;
   confirmTextColor?: string;
+  confirmDisabled?: boolean;
 }
 
 export interface AssistantDetailActionSheetProps {
