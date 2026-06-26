@@ -31,7 +31,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
-| `sendWebSocketMessage` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送通用 JSON message；`query_slash_commands` 等 action 的结果由对应 WebSocket 事件返回 |
+| `sendWebSocketMessage` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送通用 message 字符串；`query_slash_commands` 等 action 的结果由对应 WebSocket 事件返回 |
 | `onSessionStatusChange` / `onSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
 
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
@@ -1282,7 +1282,7 @@ we码调用
 
 ### 接口说明
 
-通过既有 WebSocket 长连接发送通用 JSON message。该接口只表示 message 已成功发送或已被 SDK 接受发送；不同 `action` 的业务结果仍通过 `registerSessionListener` 注册的 `onMessage` 回调接收。
+通过既有 WebSocket 长连接发送通用 message 字符串。调用方负责将业务 JSON 序列化为字符串；SDK 不解析或校验 `action` 等业务字段。该接口只表示 message 已成功发送或已被 SDK 接受发送；不同 `action` 的业务结果仍通过 `registerSessionListener` 注册的 `onMessage` 回调接收。
 
 例如发送 `{ "action": "query_slash_commands", "welinkSessionId": "42" }` 后，命令列表结果通过 `slash_commands_result` 事件返回。建议页面先注册 `registerSessionListener`，再调用 `sendWebSocketMessage`，避免服务端结果事件先于页面监听到达。
 
@@ -1296,7 +1296,7 @@ sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketM
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| message | object | 是 | 要通过 WebSocket 发送的完整 JSON message；必须包含非空 `action` 字段 |
+| message | string | 是 | 要通过 WebSocket 发送的完整 message 字符串，通常为已序列化的 JSON |
 
 ### 出参
 
@@ -1339,7 +1339,7 @@ sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketM
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
-| 1000 | 无效的参数 | 缺少 `message` 或 `message.action` |
+| 1000 | 无效的参数 | 缺少 `message` 或 `message` 为空字符串 |
 | 5000 | SDK 未初始化 | SDK 尚未初始化或 WebSocket 未配置 |
 | 6000 | WebSocket 连接失败 | 无法建立 WebSocket 连接 |
 | 6001 | WebSocket message 发送失败 | WebSocket message 发送失败 |
@@ -1357,10 +1357,10 @@ registerSessionListener({
 });
 
 await sendWebSocketMessage({
-  message: {
+  message: JSON.stringify({
     action: "query_slash_commands",
     welinkSessionId: "42"
-  }
+  })
 });
 ```
 

@@ -120,7 +120,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsSendWebSocketMessageParams : NSObject
-@property (nonatomic, strong) NSDictionary *message;
+@property (nonatomic, copy) NSString *message;
 @end
 
 @interface WLAgentSkillsSendMessageParams : NSObject

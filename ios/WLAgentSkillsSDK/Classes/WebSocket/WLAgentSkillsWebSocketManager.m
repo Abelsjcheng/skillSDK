@@ -169,19 +169,16 @@
     }
 }
 
-- (BOOL)sendMessagePayload:(NSDictionary *)payload {
-    if (![payload isKindOfClass:[NSDictionary class]] || payload.count == 0) {
-    return NO;
+- (BOOL)sendMessageString:(NSString *)message {
+    if (![message isKindOfClass:[NSString class]]) {
+        return NO;
     }
-    NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
-    if (data == nil) {
-    return NO;
+    NSString *trimmedMessage =
+        [message stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmedMessage.length == 0) {
+        return NO;
     }
-    NSString *jsonString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    if (jsonString == nil || jsonString.length == 0) {
-    return NO;
-    }
-    return [self sendCommandString:jsonString];
+    return [self sendCommandString:message];
 }
 
 - (BOOL)sendCommandString:(NSString *)jsonString {

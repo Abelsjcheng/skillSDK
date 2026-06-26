@@ -395,7 +395,7 @@ export interface UnregisterSessionListenerResult {
 }
 
 export interface SendWebSocketMessageParams {
-  message: Record<string, Object | string | number | boolean | null>;
+  message: string;
 }
 
 export interface SendWebSocketMessageResult {

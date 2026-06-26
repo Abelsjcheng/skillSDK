@@ -503,17 +503,18 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
 - (void)sendWebSocketMessage:(WLAgentSkillsSendWebSocketMessageParams *)params
                      success:(void (^)(WLAgentSkillsSendWebSocketMessageResult *result))success
                      failure:(void (^)(NSError *error))failure {
-    if (params == nil || ![params.message isKindOfClass:[NSDictionary class]] || params.message.count == 0) {
+    if (params == nil || ![params.message isKindOfClass:[NSString class]]) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: message is required."];
         return;
     }
-    id action = params.message[@"action"];
-    if (![action isKindOfClass:[NSString class]] || [(NSString *)action length] == 0) {
-        [self dispatchFailure:failure code:1000 message:@"Invalid params: message.action is required."];
+    NSString *trimmedMessage =
+        [params.message stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmedMessage.length == 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: message is required."];
         return;
     }
 
-    BOOL accepted = [[WLAgentSkillsWebSocketManager sharedManager] sendMessagePayload:params.message];
+    BOOL accepted = [[WLAgentSkillsWebSocketManager sharedManager] sendMessageString:params.message];
     if (!accepted) {
         [self dispatchFailure:failure code:6001 message:@"Failed to send websocket message."];
         return;

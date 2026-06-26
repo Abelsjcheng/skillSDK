@@ -7,8 +7,6 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.opencode.skill.callback.AssistantDetailUpdatedCallback;
 import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SessionStatusCallback;
@@ -672,8 +670,8 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (params.getMessage().size() == 0 || isBlank(getJsonString(params.getMessage(), "action"))) {
-            callback.onError(error(1000, "message.action is required"));
+        if (isBlank(params.getMessage())) {
+            callback.onError(error(1000, "message is required"));
             return;
         }
 
@@ -2238,15 +2236,6 @@ public final class SkillSDK {
 
     private static boolean isPermissionResponseValid(@NonNull String value) {
         return "once".equalsIgnoreCase(value) || "always".equalsIgnoreCase(value) || "reject".equalsIgnoreCase(value);
-    }
-
-    @Nullable
-    private static String getJsonString(@NonNull JsonObject json, @NonNull String key) {
-        JsonElement value = json.get(key);
-        if (value == null || value.isJsonNull() || !value.isJsonPrimitive()) {
-            return null;
-        }
-        return value.getAsString();
     }
 
     private static boolean isSessionRecordStatusValid(@NonNull String value) {

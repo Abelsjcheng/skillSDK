@@ -22,8 +22,8 @@
 
 ### 1.2 需求目标
 
-1. SDK 新增面向 JSAPI bridge 的通用发送方法，调用后通过 WebSocket 发送调用方传入的完整 JSON message。
-2. 请求参数为 `message: object`，SDK 负责校验 `message.action`、连接可用性与发送失败处理。
+1. SDK 新增面向 JSAPI bridge 的通用发送方法，调用后通过 WebSocket 发送调用方传入的完整 message 字符串。
+2. 请求参数为 `message: string`，调用方负责序列化业务 JSON；SDK 只校验字符串非空、连接可用性与发送失败处理，不解析 `action`。
 3. `query_slash_commands` 是该通用方法的首个使用场景，服务端通过 `slash_commands_result` 事件推送 slash 命令列表，端侧通过现有 session listener 或 JSAPI 回调接收。
 4. `slash_commands_result` 事件纳入 `StreamMessage` 协议扩展，至少包含 `slashCommands` 与 `welinkSessionId` 字段。
 5. 保持 Android、iOS、HarmonyOS 公共 API 语义一致，同时符合各平台异步风格。
@@ -60,7 +60,7 @@ flowchart TD
 
 ### 2.2 方案核心
 
-推荐方案是在各端 `WebSocketManager` 中补充通用的 WebSocket JSON 指令发送能力，并在 SDK 对外层新增 `sendWebSocketMessage` 方法；该方法只负责发送WebSocket message，查询结果仍通过现有 `registerSessionListener` 的 `onMessage(StreamMessage)` 接收，避免为一次请求型 WebSocket 指令新增第二套回调通道。
+推荐方案是在各端 `WebSocketManager` 中补充通用的 WebSocket message 字符串发送能力，并在 SDK 对外层新增 `sendWebSocketMessage` 方法；该方法只负责发送WebSocket message，查询结果仍通过现有 `registerSessionListener` 的 `onMessage(StreamMessage)` 接收，避免为一次请求型 WebSocket 指令新增第二套回调通道。
 
 ## 3. 时序图
 
@@ -76,7 +76,7 @@ sequenceDiagram
 
     Page->>Bridge: sendWebSocketMessage({ message })
     Bridge->>SDK: sendWebSocketMessage(params)
-    SDK->>SDK: 校验 message.action
+    SDK->>SDK: 校验 message 非空
     SDK->>WS: connectIfNeeded / connect
     WS-->>SDK: WebSocket 可用
     SDK->>WS: send {"action":"query_slash_commands","welinkSessionId"}
@@ -124,11 +124,11 @@ sequenceDiagram
 1. JSAPI 文档新增 `sendWebSocketMessage`：
    - 移动端：`window.HWH5EXT.sendWebSocketMessage(params)`
    - PC 端：`window.Pedestal.callMethod('method://agentSkills/handleSdk', { funName: 'sendWebSocketMessage', params })`
-   - 入参：`message: object`
+   - 入参：`message: string`
    - 返回：建议为 `{ status: "success" }`，只表示 WebSocket message 已发送成功，不代表业务结果已返回。
 2. SDK 公共接口文档新增 `sendWebSocketMessage(params)`，三端方法名保持一致。
 3. `WebSocketManager` 增加通用发送方法：
-   - 推荐内部通用方法：`sendMessage(message)`、`sendMessagePayload(payload)` 或平台等价实现。
+   - 推荐内部通用方法：`sendMessage(message)` 或平台等价实现。
    - 不为 `query_slash_commands` 单独新增底层业务方法，避免后续新增 action 时继续修改 SDK。
 4. `StreamMessage` 协议新增 `slash_commands_result` 事件类型。
 5. `StreamMessage` 类型新增 slash command 相关字段：
@@ -141,7 +141,7 @@ sequenceDiagram
 
 推荐采用“发送指令 Promise + 结果走 session listener”的双阶段语义。
 
-第一阶段，页面调用 `sendWebSocketMessage` 后，SDK 校验 `message.action` 并确保 WebSocket 可用，然后发送调用方传入的完整 JSON message。例如：
+第一阶段，页面调用 `sendWebSocketMessage` 后，SDK 校验 `message` 字符串非空并确保 WebSocket 可用，然后透传调用方传入的完整 message 字符串。例如：
 
 ```json
 {
@@ -270,11 +270,11 @@ SDK 解析为 `StreamMessage` 后，按 `welinkSessionId` 分发给当前会话�
 
 ### 9.1 功能测试
 
-1. 已连接 WebSocket 时调用 `sendWebSocketMessage`，确认发送 payload 为 `{"action":"query_slash_commands","welinkSessionId":"..."}`。
+1. 已连接 WebSocket 时调用 `sendWebSocketMessage`，确认发送文本帧为 `{"action":"query_slash_commands","welinkSessionId":"..."}`。
 2. 未连接 WebSocket 时调用，确认 SDK 先连接再发送，成功后 resolve。
 3. 服务端推送 `slash_commands_result`，确认 session listener 收到完整 `StreamMessage`。
 4. `slashCommands` 为空数组时，页面不展示命令面板但不报错。
-5. 缺少 `message` 或 `message.action` 时返回参数错误。
+5. 缺少 `message` 或 `message` 为空字符串时返回参数错误。
 6. WebSocket 未配置、连接失败、send 失败时返回明确错误。
 
 ### 9.2 兼容测试

@@ -445,8 +445,7 @@ export class SkillSDK {
   async sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketMessageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireObject(params.message, 'message');
-      Validator.requireString(params.message['action'], 'message.action');
+      Validator.requireString(params.message, 'message');
       await this.ensureWebSocketConnected();
       await this.wsManager.sendMessage(params.message);
       return { status: 'success' };

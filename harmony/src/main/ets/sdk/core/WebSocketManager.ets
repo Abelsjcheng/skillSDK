@@ -156,18 +156,17 @@ export class WebSocketManager {
     }
   }
 
-  async sendMessage(message: Record<string, Object | string | number | boolean | null>): Promise<void> {
+  async sendMessage(message: string): Promise<void> {
     if (!this.connected || this.socket === null) {
       throw new SkillSdkException(6000, 'WebSocket is not connected');
     }
 
-    const text = JSON.stringify(message);
     await new Promise<void>((resolve, reject) => {
       if (this.socket === null) {
         reject(new SkillSdkException(6000, 'WebSocket is not connected'));
         return;
       }
-      this.socket.send(text, (error: BusinessError) => {
+      this.socket.send(message, (error: BusinessError) => {
         if (error) {
           reject(new SkillSdkException(6001, 'Failed to send websocket command'));
           return;

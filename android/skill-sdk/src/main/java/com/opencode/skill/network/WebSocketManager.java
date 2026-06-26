@@ -200,8 +200,8 @@ public final class WebSocketManager {
         }
     }
 
-    public boolean sendMessage(@NonNull JsonObject message) {
-        if (!connected || webSocket == null || message.size() == 0) {
+    public boolean sendMessage(@NonNull String message) {
+        if (!connected || webSocket == null || message.trim().isEmpty()) {
             return false;
         }
         try {
@@ -212,8 +212,8 @@ public final class WebSocketManager {
     }
 
     @NonNull
-    static String buildMessagePayload(@NonNull JsonObject message) {
-        return message.toString();
+    static String buildMessagePayload(@NonNull String message) {
+        return message;
     }
 
     public synchronized void shutdown() {
