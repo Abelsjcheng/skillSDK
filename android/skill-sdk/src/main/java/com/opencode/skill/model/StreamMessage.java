@@ -1,6 +1,7 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonArray;
@@ -9,6 +10,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Keep
@@ -92,6 +94,8 @@ public class StreamMessage {
     private JsonArray messages;
     @Nullable
     private JsonArray parts;
+    @Nullable
+    private List<SlashCommand> slashCommands = new ArrayList<>();
 
     @Nullable
     public String getType() {
@@ -433,5 +437,17 @@ public class StreamMessage {
 
     public void setParts(@Nullable JsonArray parts) {
         this.parts = parts;
+    }
+
+    @NonNull
+    public List<SlashCommand> getSlashCommands() {
+        if (slashCommands == null) {
+            return Collections.emptyList();
+        }
+        return slashCommands;
+    }
+
+    public void setSlashCommands(@Nullable List<SlashCommand> slashCommands) {
+        this.slashCommands = slashCommands;
     }
 }

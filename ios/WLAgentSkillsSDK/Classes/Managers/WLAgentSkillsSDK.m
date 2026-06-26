@@ -498,6 +498,29 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     return [self buildUnregisterSessionListenerResult];
 }
 
+#pragma mark - 10.1. querySlashCommands
+
+- (void)querySlashCommands:(WLAgentSkillsQuerySlashCommandsParams *)params
+                   success:(void (^)(WLAgentSkillsQuerySlashCommandsResult *result))success
+                   failure:(void (^)(NSError *error))failure {
+    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
+        return;
+    }
+
+    BOOL accepted = [[WLAgentSkillsWebSocketManager sharedManager] sendQuerySlashCommandsForSessionId:params.welinkSessionId];
+    if (!accepted) {
+        [self dispatchFailure:failure code:6001 message:@"Failed to send query_slash_commands."];
+        return;
+    }
+
+    if (success) {
+        WLAgentSkillsQuerySlashCommandsResult *result = [[WLAgentSkillsQuerySlashCommandsResult alloc] init];
+        result.status = @"success";
+        success(result);
+    }
+}
+
 #pragma mark - 11. sendMessage
 
 - (void)sendMessage:(WLAgentSkillsSendMessageParams *)params

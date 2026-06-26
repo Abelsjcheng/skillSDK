@@ -31,6 +31,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
+| `querySlashCommands` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送 `query_slash_commands` 指令，结果由 `slash_commands_result` 事件返回 |
 | `onSessionStatusChange` / `onSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
 
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
@@ -50,6 +51,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | 8 | `getSessionMessage` | 获取当前会话消息列表 |
 | 8.1 | `getSessionMessageHistory` | 获取当前会话历史消息 |
 | 9 | `registerSessionListener` / `unregisterSessionListener` | 监听服务端流式消息 |
+| 9.1 | `querySlashCommands` | 查询会话可用 slash 命令 |
 | 10 | `sendMessage` | 发送消息内容 |
 | 11 | `replyPermission` | 权限确认 |
 | 12 | `controlSkillWeCode` | 小程序控制 |
@@ -1037,6 +1039,7 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - 会话状态：`session.status` / `session.title` / `session.error`
 - 断线恢复：`snapshot` / `streaming`
 - 云端扩展：`planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
+- 辅助查询结果：`slash_commands_result`
 - 系统事件：`agent.online` / `agent.offline` / `error`
 
 #### 字段对齐说明（重要）
@@ -1052,6 +1055,7 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
 - `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
 - `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
+- `slash_commands_result` 使用字段 `slashCommands`，用于返回当前会话可用 slash 命令列表
 - `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
 
 ### 接口名
@@ -1173,6 +1177,9 @@ try {
       case "ask_more":
         console.log("追问建议:", message.askMoreQuestions);
         break;
+      case "slash_commands_result":
+        console.log("Slash命令列表:", message.slashCommands);
+        break;
       case "agent.online":
       case "agent.offline":
         console.log("Agent状态事件:", message.type);
@@ -1264,6 +1271,92 @@ try {
 } catch (error) {
   console.error("移除会话监听器失败:", error.errorCode, error.errorMessage);
 }
+```
+
+---
+
+## 10.1 查询 Slash Commands 接口
+### 调用方
+
+we码调用
+
+### 接口说明
+
+通过既有 WebSocket 长连接发送 slash 命令查询指令。该接口只表示查询指令已成功发送或已被 SDK 接受发送；命令列表结果通过 `registerSessionListener` 注册的 `onMessage` 回调接收，事件类型为 `slash_commands_result`。
+
+建议页面先注册 `registerSessionListener`，再调用 `querySlashCommands`，避免服务端结果事件先于页面监听到达。
+
+### 接口名
+
+```typescript
+querySlashCommands(params: QuerySlashCommandsParams): Promise<QuerySlashCommandsResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定为 `success`，表示 WebSocket 查询指令发送成功或已被 SDK 接受发送 |
+
+### WebSocket 请求指令
+
+```json
+{
+  "action": "query_slash_commands",
+  "welinkSessionId": "42"
+}
+```
+
+### WebSocket 结果事件
+
+服务端通过 `slash_commands_result` 推送命令列表：
+
+```json
+{
+  "type": "slash_commands_result",
+  "seq": 135,
+  "welinkSessionId": "42",
+  "slashCommands": [
+    {
+      "command": "/new",
+      "description": "新建会话"
+    },
+    {
+      "command": "/delete",
+      "description": "删除"
+    }
+  ]
+}
+```
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 `welinkSessionId` |
+| 5000 | SDK 未初始化 | SDK 尚未初始化或 WebSocket 未配置 |
+| 6000 | WebSocket 连接失败 | 无法建立 WebSocket 连接 |
+| 6001 | WebSocket 指令发送失败 | 查询指令发送失败 |
+
+### 调用示例
+
+```typescript
+registerSessionListener({
+  welinkSessionId: "42",
+  onMessage: (message) => {
+    if (message.type === "slash_commands_result") {
+      console.log("Slash commands:", message.slashCommands);
+    }
+  }
+});
+
+await querySlashCommands({ welinkSessionId: "42" });
 ```
 
 ---
@@ -2202,6 +2295,7 @@ try {
 | `search_result` | 搜索结果（云端扩展） | `searchResults` |
 | `reference` | 引用列表（云端扩展） | `references` |
 | `ask_more` | 追问建议（云端扩展） | `askMoreQuestions` |
+| `slash_commands_result` | Slash 命令查询结果 | `slashCommands` |
 
 #### Subagent 事件处理约定
 
@@ -2276,6 +2370,7 @@ try {
 | response | string \| null | 权限回复值：`once` / `always` / `reject` |
 | messages | array \| null | `snapshot` 携带的已完成消息快照，元素结构见上文 `snapshot` 事件字段 |
 | parts | array \| null | `streaming` 携带的进行中消息部件，元素结构见上文 `streaming` 事件字段 |
+| slashCommands | Array<{ command: string; description: string }> \| null | `slash_commands_result` 携带的 slash 命令列表 |
 
 ### SendMessageResult
 

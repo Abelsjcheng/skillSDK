@@ -12,6 +12,7 @@ import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SkillSdkException;
+import com.opencode.skill.model.SlashCommand;
 import com.opencode.skill.model.StreamMessage;
 
 import java.util.ArrayList;
@@ -199,6 +200,25 @@ public final class WebSocketManager {
         }
     }
 
+    public boolean sendQuerySlashCommands(@NonNull String welinkSessionId) {
+        if (!connected || webSocket == null || welinkSessionId.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            return webSocket.send(buildQuerySlashCommandsPayload(welinkSessionId));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    @NonNull
+    static String buildQuerySlashCommandsPayload(@NonNull String welinkSessionId) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("action", "query_slash_commands");
+        payload.addProperty("welinkSessionId", welinkSessionId);
+        return payload.toString();
+    }
+
     public synchronized void shutdown() {
         disconnect();
         clearAllListeners();
@@ -299,6 +319,7 @@ public final class WebSocketManager {
         message.setSubagentName(getString(json, "subagentName"));
         message.setMessages(getArray(json, "messages"));
         message.setParts(getArray(json, "parts"));
+        message.setSlashCommands(getSlashCommands(json, "slashCommands"));
         return message;
     }
 
@@ -476,6 +497,28 @@ public final class WebSocketManager {
             if (element != null && element.isJsonPrimitive()) {
                 result.add(element.getAsString());
             }
+        }
+        return result;
+    }
+
+    @NonNull
+    private static List<SlashCommand> getSlashCommands(@NonNull JsonObject json, @NonNull String key) {
+        JsonArray array = getArray(json, key);
+        if (array == null) {
+            return Collections.emptyList();
+        }
+        List<SlashCommand> result = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (element == null || !element.isJsonObject()) {
+                continue;
+            }
+            JsonObject commandJson = element.getAsJsonObject();
+            String command = getString(commandJson, "command");
+            if (command == null || command.trim().isEmpty()) {
+                continue;
+            }
+            String description = getString(commandJson, "description");
+            result.add(new SlashCommand(command, description == null ? "" : description));
         }
         return result;
     }

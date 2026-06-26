@@ -40,6 +40,8 @@ import {
   QueryQrcodeInfoParams,
   QueryAssistantGraySingleParams,
   QueryAssistantGraySingleResult,
+  QuerySlashCommandsParams,
+  QuerySlashCommandsResult,
   RegisterSessionListenerParams,
   RegisterSessionListenerResult,
   RegenerateAnswerParams,
@@ -437,6 +439,19 @@ export class SkillSDK {
     Validator.requireString(params.welinkSessionId, 'welinkSessionId');
     this.wsManager.unregisterSessionListener(params.welinkSessionId);
     return { status: 'success' };
+  }
+
+  // 10.1 querySlashCommands
+  async querySlashCommands(params: QuerySlashCommandsParams): Promise<QuerySlashCommandsResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
+      await this.ensureWebSocketConnected();
+      await this.wsManager.sendQuerySlashCommands(params.welinkSessionId);
+      return { status: 'success' };
+    } catch (error) {
+      throw this.normalizeError('querySlashCommands', error);
+    }
   }
 
   // 11. sendMessage

@@ -31,6 +31,7 @@ typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeAction) {
 @class WLAgentSkillsSessionStatusResult;
 @class WLAgentSkillsStreamMessage;
 @class WLAgentSkillsAssistantDetailUpdatedPayload;
+@class WLAgentSkillsSlashCommand;
 
 #pragma mark - Callback Typedefs
 
@@ -115,6 +116,10 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsUnregisterSessionListenerParams : NSObject
+@property (nonatomic, copy) NSString *welinkSessionId;
+@end
+
+@interface WLAgentSkillsQuerySlashCommandsParams : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
@@ -412,6 +417,14 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 - (NSDictionary *)toDictionary;
 @end
 
+@interface WLAgentSkillsSlashCommand : NSObject
+@property (nonatomic, copy) NSString *command;
+@property (nonatomic, copy) NSString *commandDescription;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
 @interface WLAgentSkillsStreamMessage : NSObject
 @property (nonatomic, copy) NSString *type;
 @property (nonatomic, strong) NSNumber *seq;
@@ -437,6 +450,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy, nullable) NSString *header;
 @property (nonatomic, copy, nullable) NSString *question;
+@property (nonatomic, copy, nullable) NSString *questionId;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
 @property (nonatomic, copy, nullable) NSString *fileName;
 @property (nonatomic, copy, nullable) NSString *fileUrl;
@@ -453,6 +467,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *subagentName;
 @property (nonatomic, strong, nullable) NSArray *messages;
 @property (nonatomic, strong, nullable) NSArray *parts;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsSlashCommand *> *slashCommands;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;
@@ -491,6 +506,12 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsUnregisterSessionListenerResult : NSObject
+@property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsQuerySlashCommandsResult : NSObject
 @property (nonatomic, copy) NSString *status;
 
 - (NSDictionary *)toDictionary;

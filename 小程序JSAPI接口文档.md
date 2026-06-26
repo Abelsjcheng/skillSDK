@@ -26,6 +26,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getSessionMessageHistory](#31-getsessionmessagehistory) | 游标查询会话历史消息 |
 | [registerSessionListener](#4-registersessionlistener) | 注册会话监听器 |
 | [unregisterSessionListener](#5-unregistersessionlistener) | 移除会话监听器 |
+| [querySlashCommands](#51-queryslashcommands) | 查询会话可用 slash 命令 |
 | [sendMessage](#6-sendmessage) | 发送消息内容 |
 | [stopSkill](#7-stopskill) | 停止当前轮技能生成 |
 | [replyPermission](#8-replypermission) | 权限确认回复 |
@@ -549,12 +550,13 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | askMoreQuestions | string[] \| null | `ask_more` 事件追问建议列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照 |
 | parts | array \| null | `streaming` 携带的进行中消息部件 |
+| slashCommands | Array<{ command: string; description: string }> \| null | `slash_commands_result` 携带的 slash 命令列表 |
 | subagentSessionId | string \| null | 子 agent 的真实会话 ID，仅出现在 Part 级事件及恢复态 part 中 |
 | subagentName | string \| null | 子 agent 显示名，仅用于展示 |
 
 ### 事件类型
 
-`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
+`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more` / `slash_commands_result`
 
 恢复态说明：
 - 重连恢复时，服务端会先推送 `snapshot`，再推送 `streaming`。
@@ -621,6 +623,9 @@ const onMessage = (message) => {
       break;
     case 'ask_more':
       console.log('追问建议:', message.askMoreQuestions);
+      break;
+    case 'slash_commands_result':
+      console.log('Slash 命令列表:', message.slashCommands);
       break;
     case 'agent.online':
     case 'agent.offline':
@@ -690,6 +695,99 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'unregister
 ```javascript
 window.HWH5EXT.unregisterSessionListener({
   welinkSessionId: '42'
+});
+```
+
+---
+
+## 5.1 querySlashCommands
+
+### 接口说明
+
+通过既有 WebSocket 长连接发送 slash 命令查询指令。该接口不是 REST 查询接口；Promise resolve 只表示查询指令已发送成功或已被 SDK 接受发送，命令列表结果通过 `registerSessionListener` 的 `slash_commands_result` 事件返回。
+
+建议页面先调用 `registerSessionListener`，再调用 `querySlashCommands`。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.querySlashCommands(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'querySlashCommands', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### 返回值
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定为 `success`，表示 WebSocket 查询指令已发送成功或已被 SDK 接受发送 |
+
+### WebSocket 指令
+
+```json
+{
+  "action": "query_slash_commands",
+  "welinkSessionId": "42"
+}
+```
+
+### 结果事件
+
+```json
+{
+  "type": "slash_commands_result",
+  "seq": 135,
+  "welinkSessionId": "42",
+  "slashCommands": [
+    {
+      "command": "/new",
+      "description": "新建会话"
+    },
+    {
+      "command": "/delete",
+      "description": "删除"
+    }
+  ]
+}
+```
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 `welinkSessionId` |
+| 5000 | SDK 未初始化 | SDK 尚未初始化或 WebSocket 未配置 |
+| 6000 | WebSocket 连接失败 | 无法建立 WebSocket 连接 |
+| 6001 | WebSocket 指令发送失败 | 查询指令发送失败 |
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.registerSessionListener({
+  welinkSessionId: '42',
+  onMessage: (message) => {
+    if (message.type === 'slash_commands_result') {
+      console.log('slash commands:', message.slashCommands);
+    }
+  }
+});
+
+window.HWH5EXT.querySlashCommands({
+  welinkSessionId: '42'
+}).then((result) => {
+  console.log('查询指令已发送:', result.status);
+}).catch((error) => {
+  console.error('查询 slash commands 失败:', error.errorCode, error.errorMessage);
 });
 ```
 

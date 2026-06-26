@@ -156,6 +156,37 @@ export class WebSocketManager {
     }
   }
 
+  async sendQuerySlashCommands(welinkSessionId: string): Promise<void> {
+    if (welinkSessionId.trim() === '') {
+      throw new SkillSdkException(1000, 'welinkSessionId is invalid');
+    }
+    await this.sendCommand({
+      action: 'query_slash_commands',
+      welinkSessionId
+    });
+  }
+
+  private async sendCommand(payload: Record<string, Object | string>): Promise<void> {
+    if (!this.connected || this.socket === null) {
+      throw new SkillSdkException(6000, 'WebSocket is not connected');
+    }
+
+    const text = JSON.stringify(payload);
+    await new Promise<void>((resolve, reject) => {
+      if (this.socket === null) {
+        reject(new SkillSdkException(6000, 'WebSocket is not connected'));
+        return;
+      }
+      this.socket.send(text, (error: BusinessError) => {
+        if (error) {
+          reject(new SkillSdkException(6001, 'Failed to send websocket command'));
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
   private setupSocketEventHandlers(socket: webSocket.WebSocket): void {
     socket.on('open', (error: BusinessError) => {
       if (error) {

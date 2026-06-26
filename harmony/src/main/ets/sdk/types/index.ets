@@ -51,7 +51,8 @@ export type StreamMessageType =
   | 'agent.offline'
   | 'error'
   | 'snapshot'
-  | 'streaming';
+  | 'streaming'
+  | 'slash_commands_result';
 
 // ---------------------------
 // SDK Config and Error
@@ -213,6 +214,11 @@ export interface StreamingPart {
   fileMime?: string;
 }
 
+export interface SlashCommand {
+  command: string;
+  description: string;
+}
+
 export interface StreamMessage {
   type: StreamMessageType;
   seq?: number | null;
@@ -263,6 +269,7 @@ export interface StreamMessage {
   subagentName?: string;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
+  slashCommands?: SlashCommand[];
 }
 
 export interface SessionError {
@@ -384,6 +391,14 @@ export interface UnregisterSessionListenerParams {
 }
 
 export interface UnregisterSessionListenerResult {
+  status: 'success';
+}
+
+export interface QuerySlashCommandsParams {
+  welinkSessionId: string;
+}
+
+export interface QuerySlashCommandsResult {
   status: 'success';
 }
 

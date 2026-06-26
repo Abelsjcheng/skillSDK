@@ -44,6 +44,8 @@ import com.opencode.skill.model.PageParams;
 import com.opencode.skill.model.QrcodeInfo;
 import com.opencode.skill.model.QueryAssistantGraySingleParams;
 import com.opencode.skill.model.QueryAssistantGraySingleResult;
+import com.opencode.skill.model.QuerySlashCommandsParams;
+import com.opencode.skill.model.QuerySlashCommandsResult;
 import com.opencode.skill.model.QueryWeAgentParams;
 import com.opencode.skill.model.QueryQrcodeInfoParams;
 import com.opencode.skill.model.RegisterSessionListenerParams;
@@ -659,6 +661,36 @@ public final class SkillSDK {
             webSocketManager.unregisterListener(params.getWelinkSessionId(), binding.sessionListener);
         }
         return new UnregisterSessionListenerResult("success");
+    }
+
+    // 10.1 querySlashCommands
+    public void querySlashCommands(@NonNull QuerySlashCommandsParams params,
+            @NonNull SkillCallback<QuerySlashCommandsResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (isBlank(params.getWelinkSessionId())) {
+            callback.onError(error(1000, "welinkSessionId is invalid"));
+            return;
+        }
+
+        ensureConnected(new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean result) {
+                boolean sent = webSocketManager.sendQuerySlashCommands(params.getWelinkSessionId());
+                if (!sent) {
+                    callback.onError(error(6001, "Failed to send query_slash_commands"));
+                    return;
+                }
+                callback.onSuccess(new QuerySlashCommandsResult("success"));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
     }
 
     // 11. sendMessage
