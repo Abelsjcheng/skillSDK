@@ -394,11 +394,11 @@ export interface UnregisterSessionListenerResult {
   status: 'success';
 }
 
-export interface QuerySlashCommandsParams {
-  welinkSessionId: string;
+export interface SendWebSocketMessageParams {
+  message: Record<string, Object | string | number | boolean | null>;
 }
 
-export interface QuerySlashCommandsResult {
+export interface SendWebSocketMessageResult {
   status: 'success';
 }
 

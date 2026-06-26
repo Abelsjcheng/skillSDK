@@ -26,7 +26,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getSessionMessageHistory](#31-getsessionmessagehistory) | 游标查询会话历史消息 |
 | [registerSessionListener](#4-registersessionlistener) | 注册会话监听器 |
 | [unregisterSessionListener](#5-unregistersessionlistener) | 移除会话监听器 |
-| [querySlashCommands](#51-queryslashcommands) | 查询会话可用 slash 命令 |
+| [sendWebSocketMessage](#51-sendwebsocketmessage) | 发送通用 WebSocket message |
 | [sendMessage](#6-sendmessage) | 发送消息内容 |
 | [stopSkill](#7-stopskill) | 停止当前轮技能生成 |
 | [replyPermission](#8-replypermission) | 权限确认回复 |
@@ -700,39 +700,39 @@ window.HWH5EXT.unregisterSessionListener({
 
 ---
 
-## 5.1 querySlashCommands
+## 5.1 sendWebSocketMessage
 
 ### 接口说明
 
-通过既有 WebSocket 长连接发送 slash 命令查询指令。该接口不是 REST 查询接口；Promise resolve 只表示查询指令已发送成功或已被 SDK 接受发送，命令列表结果通过 `registerSessionListener` 的 `slash_commands_result` 事件返回。
+通过既有 WebSocket 长连接发送通用 JSON message。该接口不是 REST 查询接口；Promise resolve 只表示 message 已发送成功或已被 SDK 接受发送，不同 `action` 的业务结果仍通过 `registerSessionListener` 的 `onMessage` 回调返回。
 
-建议页面先调用 `registerSessionListener`，再调用 `querySlashCommands`。
+例如发送 `{ "action": "query_slash_commands", "welinkSessionId": "42" }` 后，命令列表结果通过 `slash_commands_result` 事件返回。建议页面先调用 `registerSessionListener`，再调用 `sendWebSocketMessage`。
 
 ### 调用方式
 
 ```javascript
-window.HWH5EXT.querySlashCommands(params)
+window.HWH5EXT.sendWebSocketMessage(params)
 ```
 
 ### PC端调用方式
 
 ```javascript
-window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'querySlashCommands', params})
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendWebSocketMessage', params})
 ```
 
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| welinkSessionId | string | 是 | 会话 ID |
+| message | object | 是 | 要通过 WebSocket 发送的完整 JSON message；必须包含非空 `action` 字段 |
 
 ### 返回值
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| status | string | 固定为 `success`，表示 WebSocket 查询指令已发送成功或已被 SDK 接受发送 |
+| status | string | 固定为 `success`，表示 WebSocket message 已发送成功或已被 SDK 接受发送 |
 
-### WebSocket 指令
+### WebSocket Message 示例
 
 ```json
 {
@@ -765,10 +765,10 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'querySlash
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
-| 1000 | 无效的参数 | 缺少 `welinkSessionId` |
+| 1000 | 无效的参数 | 缺少 `message` 或 `message.action` |
 | 5000 | SDK 未初始化 | SDK 尚未初始化或 WebSocket 未配置 |
 | 6000 | WebSocket 连接失败 | 无法建立 WebSocket 连接 |
-| 6001 | WebSocket 指令发送失败 | 查询指令发送失败 |
+| 6001 | WebSocket message 发送失败 | WebSocket message 发送失败 |
 
 ### 调用示例
 
@@ -782,12 +782,15 @@ window.HWH5EXT.registerSessionListener({
   }
 });
 
-window.HWH5EXT.querySlashCommands({
-  welinkSessionId: '42'
+window.HWH5EXT.sendWebSocketMessage({
+  message: {
+    action: 'query_slash_commands',
+    welinkSessionId: '42'
+  }
 }).then((result) => {
-  console.log('查询指令已发送:', result.status);
+  console.log('WebSocket message 已发送:', result.status);
 }).catch((error) => {
-  console.error('查询 slash commands 失败:', error.errorCode, error.errorMessage);
+  console.error('发送 WebSocket message 失败:', error.errorCode, error.errorMessage);
 });
 ```
 

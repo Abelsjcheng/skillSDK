@@ -2,6 +2,7 @@ package com.opencode.skill.network;
 
 import static org.junit.Assert.assertEquals;
 
+import com.google.gson.JsonObject;
 import com.opencode.skill.model.SlashCommand;
 import com.opencode.skill.model.StreamMessage;
 
@@ -12,8 +13,12 @@ import java.util.List;
 
 public class WebSocketManagerTest {
     @Test
-    public void buildQuerySlashCommandsPayloadUsesExpectedActionAndSessionId() {
-        String payload = WebSocketManager.buildQuerySlashCommandsPayload("session-123");
+    public void buildMessagePayloadSerializesGenericWebSocketMessage() {
+        JsonObject message = new JsonObject();
+        message.addProperty("action", "query_slash_commands");
+        message.addProperty("welinkSessionId", "session-123");
+
+        String payload = WebSocketManager.buildMessagePayload(message);
 
         assertEquals(
                 "{\"action\":\"query_slash_commands\",\"welinkSessionId\":\"session-123\"}",

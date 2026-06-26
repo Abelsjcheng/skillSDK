@@ -138,7 +138,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @implementation WLAgentSkillsUnregisterSessionListenerParams
 @end
 
-@implementation WLAgentSkillsQuerySlashCommandsParams
+@implementation WLAgentSkillsSendWebSocketMessageParams
 @end
 
 @implementation WLAgentSkillsSendMessageParams
@@ -1011,7 +1011,7 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
-@implementation WLAgentSkillsQuerySlashCommandsResult
+@implementation WLAgentSkillsSendWebSocketMessageResult
 
 - (NSDictionary *)toDictionary {
     return @{

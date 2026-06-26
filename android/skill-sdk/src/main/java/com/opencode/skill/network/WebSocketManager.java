@@ -200,23 +200,20 @@ public final class WebSocketManager {
         }
     }
 
-    public boolean sendQuerySlashCommands(@NonNull String welinkSessionId) {
-        if (!connected || webSocket == null || welinkSessionId.trim().isEmpty()) {
+    public boolean sendMessage(@NonNull JsonObject message) {
+        if (!connected || webSocket == null || message.size() == 0) {
             return false;
         }
         try {
-            return webSocket.send(buildQuerySlashCommandsPayload(welinkSessionId));
+            return webSocket.send(buildMessagePayload(message));
         } catch (Exception ignored) {
             return false;
         }
     }
 
     @NonNull
-    static String buildQuerySlashCommandsPayload(@NonNull String welinkSessionId) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("action", "query_slash_commands");
-        payload.addProperty("welinkSessionId", welinkSessionId);
-        return payload.toString();
+    static String buildMessagePayload(@NonNull JsonObject message) {
+        return message.toString();
     }
 
     public synchronized void shutdown() {

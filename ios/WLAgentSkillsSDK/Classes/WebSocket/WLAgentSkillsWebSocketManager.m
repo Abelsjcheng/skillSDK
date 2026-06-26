@@ -169,14 +169,10 @@
     }
 }
 
-- (BOOL)sendQuerySlashCommandsForSessionId:(NSString *)welinkSessionId {
-    if (welinkSessionId == nil || welinkSessionId.length == 0) {
+- (BOOL)sendMessagePayload:(NSDictionary *)payload {
+    if (![payload isKindOfClass:[NSDictionary class]] || payload.count == 0) {
     return NO;
     }
-    NSDictionary *payload = @{
-        @"action": @"query_slash_commands",
-        @"welinkSessionId": welinkSessionId
-    };
     NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
     if (data == nil) {
     return NO;

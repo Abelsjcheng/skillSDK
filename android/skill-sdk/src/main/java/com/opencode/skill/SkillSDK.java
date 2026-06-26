@@ -7,6 +7,8 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.opencode.skill.callback.AssistantDetailUpdatedCallback;
 import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SessionStatusCallback;
@@ -44,8 +46,6 @@ import com.opencode.skill.model.PageParams;
 import com.opencode.skill.model.QrcodeInfo;
 import com.opencode.skill.model.QueryAssistantGraySingleParams;
 import com.opencode.skill.model.QueryAssistantGraySingleResult;
-import com.opencode.skill.model.QuerySlashCommandsParams;
-import com.opencode.skill.model.QuerySlashCommandsResult;
 import com.opencode.skill.model.QueryWeAgentParams;
 import com.opencode.skill.model.QueryQrcodeInfoParams;
 import com.opencode.skill.model.RegisterSessionListenerParams;
@@ -57,6 +57,8 @@ import com.opencode.skill.model.SendMessageParams;
 import com.opencode.skill.model.SendMessageResult;
 import com.opencode.skill.model.SendMessageToIMParams;
 import com.opencode.skill.model.SendMessageToIMResult;
+import com.opencode.skill.model.SendWebSocketMessageParams;
+import com.opencode.skill.model.SendWebSocketMessageResult;
 import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SessionMessage;
 import com.opencode.skill.model.SessionMessagePart;
@@ -663,27 +665,27 @@ public final class SkillSDK {
         return new UnregisterSessionListenerResult("success");
     }
 
-    // 10.1 querySlashCommands
-    public void querySlashCommands(@NonNull QuerySlashCommandsParams params,
-            @NonNull SkillCallback<QuerySlashCommandsResult> callback) {
+    // 10.1 sendWebSocketMessage
+    public void sendWebSocketMessage(@NonNull SendWebSocketMessageParams params,
+            @NonNull SkillCallback<SendWebSocketMessageResult> callback) {
         if (!isInitialized()) {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId())) {
-            callback.onError(error(1000, "welinkSessionId is invalid"));
+        if (params.getMessage().size() == 0 || isBlank(getJsonString(params.getMessage(), "action"))) {
+            callback.onError(error(1000, "message.action is required"));
             return;
         }
 
         ensureConnected(new SkillCallback<Boolean>() {
             @Override
             public void onSuccess(@Nullable Boolean result) {
-                boolean sent = webSocketManager.sendQuerySlashCommands(params.getWelinkSessionId());
+                boolean sent = webSocketManager.sendMessage(params.getMessage());
                 if (!sent) {
-                    callback.onError(error(6001, "Failed to send query_slash_commands"));
+                    callback.onError(error(6001, "Failed to send websocket message"));
                     return;
                 }
-                callback.onSuccess(new QuerySlashCommandsResult("success"));
+                callback.onSuccess(new SendWebSocketMessageResult("success"));
             }
 
             @Override
@@ -2236,6 +2238,15 @@ public final class SkillSDK {
 
     private static boolean isPermissionResponseValid(@NonNull String value) {
         return "once".equalsIgnoreCase(value) || "always".equalsIgnoreCase(value) || "reject".equalsIgnoreCase(value);
+    }
+
+    @Nullable
+    private static String getJsonString(@NonNull JsonObject json, @NonNull String key) {
+        JsonElement value = json.get(key);
+        if (value == null || value.isJsonNull() || !value.isJsonPrimitive()) {
+            return null;
+        }
+        return value.getAsString();
     }
 
     private static boolean isSessionRecordStatusValid(@NonNull String value) {

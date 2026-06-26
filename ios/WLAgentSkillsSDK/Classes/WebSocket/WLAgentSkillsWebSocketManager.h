@@ -35,7 +35,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)removeAllListenersForSessionId:(NSString *)welinkSessionId;
 - (BOOL)hasListenerForSessionId:(NSString *)welinkSessionId;
 - (void)sendResumeMessageForSessionId:(NSString *)sessionId;
-- (BOOL)sendQuerySlashCommandsForSessionId:(NSString *)welinkSessionId;
+- (BOOL)sendMessagePayload:(NSDictionary *)payload;
 
 @end
 

@@ -119,8 +119,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
-@interface WLAgentSkillsQuerySlashCommandsParams : NSObject
-@property (nonatomic, copy) NSString *welinkSessionId;
+@interface WLAgentSkillsSendWebSocketMessageParams : NSObject
+@property (nonatomic, strong) NSDictionary *message;
 @end
 
 @interface WLAgentSkillsSendMessageParams : NSObject
@@ -511,7 +511,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 - (NSDictionary *)toDictionary;
 @end
 
-@interface WLAgentSkillsQuerySlashCommandsResult : NSObject
+@interface WLAgentSkillsSendWebSocketMessageResult : NSObject
 @property (nonatomic, copy) NSString *status;
 
 - (NSDictionary *)toDictionary;

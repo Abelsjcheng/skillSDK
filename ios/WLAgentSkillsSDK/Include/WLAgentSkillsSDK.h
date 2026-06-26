@@ -65,10 +65,10 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - 10. unregisterSessionListener
 - (WLAgentSkillsUnregisterSessionListenerResult *)unregisterSessionListener:(WLAgentSkillsUnregisterSessionListenerParams *)params;
 
-#pragma mark - 10.1. querySlashCommands
-- (void)querySlashCommands:(WLAgentSkillsQuerySlashCommandsParams *)params
-                   success:(void (^)(WLAgentSkillsQuerySlashCommandsResult *result))success
-                   failure:(void (^)(NSError *error))failure;
+#pragma mark - 10.1. sendWebSocketMessage
+- (void)sendWebSocketMessage:(WLAgentSkillsSendWebSocketMessageParams *)params
+                     success:(void (^)(WLAgentSkillsSendWebSocketMessageResult *result))success
+                     failure:(void (^)(NSError *error))failure;
 
 #pragma mark - 11. sendMessage
 - (void)sendMessage:(WLAgentSkillsSendMessageParams *)params

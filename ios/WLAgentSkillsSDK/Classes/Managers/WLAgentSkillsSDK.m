@@ -498,24 +498,29 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     return [self buildUnregisterSessionListenerResult];
 }
 
-#pragma mark - 10.1. querySlashCommands
+#pragma mark - 10.1. sendWebSocketMessage
 
-- (void)querySlashCommands:(WLAgentSkillsQuerySlashCommandsParams *)params
-                   success:(void (^)(WLAgentSkillsQuerySlashCommandsResult *result))success
-                   failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId == nil || params.welinkSessionId.length == 0) {
-        [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
+- (void)sendWebSocketMessage:(WLAgentSkillsSendWebSocketMessageParams *)params
+                     success:(void (^)(WLAgentSkillsSendWebSocketMessageResult *result))success
+                     failure:(void (^)(NSError *error))failure {
+    if (params == nil || ![params.message isKindOfClass:[NSDictionary class]] || params.message.count == 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: message is required."];
+        return;
+    }
+    id action = params.message[@"action"];
+    if (![action isKindOfClass:[NSString class]] || [(NSString *)action length] == 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: message.action is required."];
         return;
     }
 
-    BOOL accepted = [[WLAgentSkillsWebSocketManager sharedManager] sendQuerySlashCommandsForSessionId:params.welinkSessionId];
+    BOOL accepted = [[WLAgentSkillsWebSocketManager sharedManager] sendMessagePayload:params.message];
     if (!accepted) {
-        [self dispatchFailure:failure code:6001 message:@"Failed to send query_slash_commands."];
+        [self dispatchFailure:failure code:6001 message:@"Failed to send websocket message."];
         return;
     }
 
     if (success) {
-        WLAgentSkillsQuerySlashCommandsResult *result = [[WLAgentSkillsQuerySlashCommandsResult alloc] init];
+        WLAgentSkillsSendWebSocketMessageResult *result = [[WLAgentSkillsSendWebSocketMessageResult alloc] init];
         result.status = @"success";
         success(result);
     }

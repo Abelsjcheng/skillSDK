@@ -40,8 +40,6 @@ import {
   QueryQrcodeInfoParams,
   QueryAssistantGraySingleParams,
   QueryAssistantGraySingleResult,
-  QuerySlashCommandsParams,
-  QuerySlashCommandsResult,
   RegisterSessionListenerParams,
   RegisterSessionListenerResult,
   RegenerateAnswerParams,
@@ -51,6 +49,8 @@ import {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SetIsShowWeAgentParams,
   SetIsShowWeAgentResult,
   SessionMessage,
@@ -441,16 +441,17 @@ export class SkillSDK {
     return { status: 'success' };
   }
 
-  // 10.1 querySlashCommands
-  async querySlashCommands(params: QuerySlashCommandsParams): Promise<QuerySlashCommandsResult> {
+  // 10.1 sendWebSocketMessage
+  async sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketMessageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
+      Validator.requireObject(params.message, 'message');
+      Validator.requireString(params.message['action'], 'message.action');
       await this.ensureWebSocketConnected();
-      await this.wsManager.sendQuerySlashCommands(params.welinkSessionId);
+      await this.wsManager.sendMessage(params.message);
       return { status: 'success' };
     } catch (error) {
-      throw this.normalizeError('querySlashCommands', error);
+      throw this.normalizeError('sendWebSocketMessage', error);
     }
   }
 

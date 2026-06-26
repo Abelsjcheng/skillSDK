@@ -4,11 +4,11 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 @Keep
-public class QuerySlashCommandsResult {
+public class SendWebSocketMessageResult {
     @NonNull
     private final String status;
 
-    public QuerySlashCommandsResult(@NonNull String status) {
+    public SendWebSocketMessageResult(@NonNull String status) {
         this.status = status;
     }
 

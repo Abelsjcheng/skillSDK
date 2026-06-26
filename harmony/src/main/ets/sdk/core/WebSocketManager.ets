@@ -156,22 +156,12 @@ export class WebSocketManager {
     }
   }
 
-  async sendQuerySlashCommands(welinkSessionId: string): Promise<void> {
-    if (welinkSessionId.trim() === '') {
-      throw new SkillSdkException(1000, 'welinkSessionId is invalid');
-    }
-    await this.sendCommand({
-      action: 'query_slash_commands',
-      welinkSessionId
-    });
-  }
-
-  private async sendCommand(payload: Record<string, Object | string>): Promise<void> {
+  async sendMessage(message: Record<string, Object | string | number | boolean | null>): Promise<void> {
     if (!this.connected || this.socket === null) {
       throw new SkillSdkException(6000, 'WebSocket is not connected');
     }
 
-    const text = JSON.stringify(payload);
+    const text = JSON.stringify(message);
     await new Promise<void>((resolve, reject) => {
       if (this.socket === null) {
         reject(new SkillSdkException(6000, 'WebSocket is not connected'));
