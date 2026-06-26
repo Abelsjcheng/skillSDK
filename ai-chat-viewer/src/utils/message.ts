@@ -527,7 +527,10 @@ export function messageOperationToMessage(
   };
 }
 
-export function snapshotMessageToMessage(snapshot: SessionMessageSnapshot): Message {
+export function snapshotMessageToMessage(
+  snapshot: SessionMessageSnapshot,
+  options: MapRawPartOptions = {},
+): Message {
   return {
     id: snapshot.id,
     role: normalizeRole(snapshot.role),
@@ -535,7 +538,7 @@ export function snapshotMessageToMessage(snapshot: SessionMessageSnapshot): Mess
     contentType: snapshot.contentType ?? 'plain',
     timestamp: snapshot.createdAt ? new Date(snapshot.createdAt).getTime() : Date.now(),
     isStreaming: false,
-    parts: mapRawParts(snapshot.parts, false),
+    parts: mapRawParts(snapshot.parts, false, options),
   };
 }
 

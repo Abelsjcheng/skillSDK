@@ -1,5 +1,6 @@
-import type { StreamMessage, MessagePart, MessagePartSnapshot, PartStatus } from '../types';
-import { normalizeQuestionItems, normalizeQuestionOptions } from '../utils/message';
+import type { StreamMessage, MessagePart, MessagePartSnapshot } from '../types';
+import type { MapRawPartOptions } from '../types/components';
+import { mapRawPartToMessagePart, normalizeQuestionItems, normalizeQuestionOptions } from '../utils/message';
 
 export class StreamAssembler {
   private parts = new Map<string, MessagePart>();
@@ -263,49 +264,17 @@ export class StreamAssembler {
     this.partIdCounter = 0;
   }
 
-  initializeFromSnapshot(partSnapshots: MessagePartSnapshot[]): void {
+  initializeFromSnapshot(partSnapshots: MessagePartSnapshot[], options: MapRawPartOptions = {}): void {
     if (this.completed) return;
     this.parts.clear();
     this.partOrder = [];
     partSnapshots.forEach((partSnapshot) => {
-      const questionItems = normalizeQuestionItems({
-        header: partSnapshot.header,
-        question: partSnapshot.question,
-        options: partSnapshot.options,
-        multiSelect: partSnapshot.multiSelect,
-        questions: partSnapshot.questions,
-        content: partSnapshot.content,
-      });
-      const firstQuestion = questionItems?.[0];
       const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);
-      const part = this.getOrCreatePart(partId, partSnapshot.type);
-      part.content = partSnapshot.content ?? '';
-      part.isStreaming = true;
-      part.subagentSessionId = partSnapshot.subagentSessionId ?? undefined;
-      part.subagentName = partSnapshot.subagentName ?? undefined;
-      if (partSnapshot.toolCallId) part.toolCallId = partSnapshot.toolCallId;
-      if (partSnapshot.toolName) part.toolName = partSnapshot.toolName;
-      if (partSnapshot.status) part.status = partSnapshot.status as unknown as PartStatus;
-      if (partSnapshot.input) part.input = partSnapshot.input;
-      if (partSnapshot.output != null) part.output = partSnapshot.output;
-      if (partSnapshot.header ?? firstQuestion?.header) {
-        part.header = partSnapshot.header ?? firstQuestion?.header ?? undefined;
+      const part = mapRawPartToMessagePart({ ...partSnapshot, partId }, true, options);
+      if (!this.parts.has(partId)) {
+        this.partOrder.push(partId);
       }
-      if (partSnapshot.question ?? firstQuestion?.question) {
-        part.question = partSnapshot.question ?? firstQuestion?.question ?? undefined;
-      }
-      if (partSnapshot.questionId) part.questionId = partSnapshot.questionId;
-      if (partSnapshot.options ?? firstQuestion?.options) {
-        part.options = firstQuestion && firstQuestion.options.length > 0
-          ? firstQuestion.options
-          : normalizeQuestionOptions(partSnapshot.options) ?? undefined;
-      }
-      if (firstQuestion) part.multiSelect = firstQuestion.multiSelect;
-      if (questionItems) part.questions = questionItems;
-      if (partSnapshot.extParam) part.extParam = partSnapshot.extParam;
-      if (partSnapshot.fileName) part.fileName = partSnapshot.fileName;
-      if (partSnapshot.fileUrl) part.fileUrl = partSnapshot.fileUrl;
-      if (partSnapshot.fileMime) part.fileMime = partSnapshot.fileMime;
+      this.parts.set(partId, part);
     });
   }
 }

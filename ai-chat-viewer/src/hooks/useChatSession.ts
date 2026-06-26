@@ -43,6 +43,7 @@ import type {
 import { reportSendMessageClick } from '../utils/uemUtil';
 
 const HISTORY_PAGE_SIZE = 20;
+const RECOVERY_PART_MAP_OPTIONS = { allowInputQuestionsFallback: true };
 
 function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
   return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
@@ -143,6 +144,74 @@ function buildUserMessage(msg: StreamMessage): Message | null {
     timestamp: msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now(),
     isStreaming: false,
   };
+}
+
+function hasExpandedQuestionStructure(part: MessagePart | undefined): boolean {
+  if (!part || part.type !== 'question') {
+    return false;
+  }
+
+  const questions = part.questions ?? [];
+  return questions.length > 1
+    || questions[0]?.multiSelect === true
+    || part.multiSelect === true;
+}
+
+function mergeQuestionStructure(existingPart: MessagePart | undefined, nextPart: MessagePart): MessagePart {
+  if (
+    !existingPart
+    || existingPart.type !== 'question'
+    || nextPart.type !== 'question'
+    || !hasExpandedQuestionStructure(existingPart)
+    || hasExpandedQuestionStructure(nextPart)
+  ) {
+    return nextPart;
+  }
+
+  const firstQuestion = existingPart.questions?.[0];
+  return {
+    ...nextPart,
+    header: firstQuestion?.header ?? existingPart.header ?? nextPart.header,
+    question: firstQuestion?.question ?? existingPart.question ?? nextPart.question,
+    options: firstQuestion && firstQuestion.options.length > 0
+      ? firstQuestion.options
+      : existingPart.options ?? nextPart.options,
+    multiSelect: firstQuestion?.multiSelect ?? existingPart.multiSelect ?? nextPart.multiSelect,
+    questions: existingPart.questions ?? nextPart.questions,
+  };
+}
+
+function mergeRecoveredQuestionParts(
+  existingParts: MessagePart[] | undefined,
+  nextParts: MessagePart[] | undefined,
+): MessagePart[] | undefined {
+  if (!nextParts || !existingParts || existingParts.length === 0) {
+    return nextParts;
+  }
+
+  const existingPartsById = new Map(existingParts.map((part) => [part.partId, part]));
+  return nextParts.map((part) => mergeQuestionStructure(existingPartsById.get(part.partId), part));
+}
+
+function mergeRecoveredQuestionMessage(current: Message | undefined, nextMessage: Message): Message {
+  const parts = mergeRecoveredQuestionParts(current?.parts, nextMessage.parts);
+  return parts === nextMessage.parts
+    ? nextMessage
+    : {
+      ...nextMessage,
+      parts,
+    };
+}
+
+function mergeRecoveredQuestionMessages(currentMessages: Message[], nextMessages: Message[]): Message[] {
+  if (currentMessages.length === 0) {
+    return nextMessages;
+  }
+
+  const currentMessagesById = new Map(currentMessages.map((message) => [message.id, message]));
+  return nextMessages.map((message) => (
+    mergeRecoveredQuestionMessage(currentMessagesById.get(message.id), message)
+  ));
 }
 
 export function useChatSession({
@@ -268,7 +337,9 @@ export function useChatSession({
           ...message,
           content: finalText || message.content,
           isStreaming: false,
-          parts: finalParts.length > 0 ? [...finalParts] : message.parts,
+          parts: finalParts.length > 0
+            ? mergeRecoveredQuestionParts(message.parts, finalParts) ?? [...finalParts]
+            : message.parts,
         }
         : message
     )));
@@ -766,7 +837,12 @@ export function useChatSession({
           streamingAssemblersRef.current.clear();
           latestStreamingMsgIdRef.current = null;
           hidePendingAssistantPreview();
-          setMessages((msg.messages ?? []).map((item) => snapshotMessageToMessage(item)).reverse());
+          setMessages((prev) => {
+            const nextMessages = (msg.messages ?? [])
+              .map((item) => snapshotMessageToMessage(item, RECOVERY_PART_MAP_OPTIONS))
+              .reverse();
+            return mergeRecoveredQuestionMessages(prev, nextMessages);
+          });
           break;
         case 'streaming': {
           setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
@@ -778,10 +854,10 @@ export function useChatSession({
           latestStreamingMsgIdRef.current = messageId;
 
           const assembler = getOrCreateStreamingAssembler(messageId);
-          assembler.initializeFromSnapshot(msg.parts);
+          assembler.initializeFromSnapshot(msg.parts, RECOVERY_PART_MAP_OPTIONS);
 
           const nextRole = normalizeRole(msg.role);
-          const nextParts = mapRawParts(msg.parts, true);
+          const nextParts = mapRawParts(msg.parts, true, RECOVERY_PART_MAP_OPTIONS);
           upsertAssistantMessage(messageId, (current) => ({
             id: messageId,
             role: nextRole,
@@ -789,7 +865,7 @@ export function useChatSession({
             contentType: contentTypeForRole(nextRole),
             timestamp: current?.timestamp ?? (msg.emittedAt ? new Date(msg.emittedAt).getTime() : Date.now()),
             isStreaming: true,
-            parts: nextParts,
+            parts: mergeRecoveredQuestionParts(current?.parts, nextParts),
             meta: current?.meta,
             isHistory: false,
           }));
