@@ -18,8 +18,9 @@ import SlashCommandPanel from './SlashCommandPanel';
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,
   mode,
-  ak = '',
   partnerAccount = '',
+  slashCommands = [],
+  onRequestSlashCommands,
   onSend,
   onStop,
   leftActions,
@@ -33,7 +34,12 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const slashTokenSpaceDeletedRef = useRef(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
-  const slashSuggest = useSlashCommandSuggest({ ak, partnerAccount, isPcMiniApp });
+  const slashSuggest = useSlashCommandSuggest({
+    partnerAccount,
+    isPcMiniApp,
+    slashCommands,
+    onRequestCommands: onRequestSlashCommands,
+  });
   const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
     { mode: 'enter', label: t('weAgent.shortcut.enterSend') },
     { mode: 'ctrlEnter', label: t('weAgent.shortcut.ctrlEnterSend') },

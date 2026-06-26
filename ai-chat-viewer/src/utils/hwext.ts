@@ -41,6 +41,8 @@ import type {
   ResolveRobotIdOptions,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -148,6 +150,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
+    sendWebSocketMessage: (params) => call<SendWebSocketMessageResult>('sendWebSocketMessage', params),
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
     controlSkillWeCode: (params) => {
@@ -563,6 +566,12 @@ export function unregisterSessionListener(params: UnregisterSessionListenerParam
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
   return trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+}
+
+export async function sendWebSocketMessage(
+  params: SendWebSocketMessageParams,
+): Promise<SendWebSocketMessageResult> {
+  return getJsApiOrThrow().sendWebSocketMessage(params);
 }
 
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {

@@ -122,47 +122,6 @@ export function reportSlashCommandSelect(params: {
   });
 }
 
-export async function trackApiSlashCommandQuery<T extends { length: number }>(
-  params: {
-    ak: string;
-    partnerAccount: string;
-    throttled?: boolean;
-    reusedInFlight?: boolean;
-    fallbackStorageRead?: boolean;
-  },
-  request: Promise<T>,
-): Promise<T> {
-  try {
-    const result = await request;
-    void reportApiSuccess('api_slash_commands_query', '获取Slash命令列表接口', {
-      request: {
-        ak: params.ak,
-        hasAk: Boolean(params.ak),
-        partnerAccount: params.partnerAccount,
-      },
-      response: {
-        commandCount: result.length,
-      },
-      throttled: Boolean(params.throttled),
-      reusedInFlight: Boolean(params.reusedInFlight),
-      fallbackStorageRead: Boolean(params.fallbackStorageRead),
-    });
-    return result;
-  } catch (error) {
-    void reportApiError('api_slash_commands_query', '获取Slash命令列表接口', error, {
-      request: {
-        ak: params.ak,
-        hasAk: Boolean(params.ak),
-        partnerAccount: params.partnerAccount,
-      },
-      throttled: Boolean(params.throttled),
-      reusedInFlight: Boolean(params.reusedInFlight),
-      fallbackStorageRead: Boolean(params.fallbackStorageRead),
-    });
-    throw error;
-  }
-}
-
 export function reportSendMessageClick(
   page: 'weAgentCUI' | 'skillCUI',
   welinkSessionId: string,

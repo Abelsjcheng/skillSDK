@@ -3,7 +3,9 @@
 - 方案日期：`2026-06-04`
 - 目标工程：`ai-chat-viewer`
 - 参考文档：`docs/plans/技术方案模板.md`、`docs/plans/2026-05-20-ai-chat-viewer-telemetry-plan.md`、`docs/requirements.md`
-- 方案类型：`前端交互增强 / HWH5.fetch 接口接入 / 埋码补充`
+- 方案类型：`前端交互增强 / WebSocket slash 命令查询 / 埋码补充`
+
+> 2026-06-26 变更说明：slash 命令列表获取链路已由 `HWH5.fetch` REST 请求调整为 `HWH5EXT.sendWebSocketMessage` WebSocket 消息链路。前端通过 `sendWebSocketMessage({ message: { action: 'query_slash_commands', welinkSessionId } })` 发起查询，并在 `useChatSession` 中消费 `slash_commands_result` 事件的 `slashCommands` 字段作为命令列表数据源；原 `querySlashCommands` / `/api/v1/slash-commands/query` / `ak` 入参方案不再作为实现依据。
 
 ## 1. 背景
 

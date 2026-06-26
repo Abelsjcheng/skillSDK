@@ -12,16 +12,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
   });
 
   it('selects a slash command with keyboard on PC', async () => {
-    (window as any).HWH5 = {
-      fetch: jest.fn().mockResolvedValue({
-        code: 200,
-        errormsg: '',
-        data: [
-          { command: '/new', description: '新建会话' },
-          { command: '/help', description: '帮助' },
-        ],
-      }),
-    };
+    const onRequestSlashCommands = jest.fn().mockResolvedValue(undefined);
     const onSend = jest.fn();
     const user = userEvent.setup();
 
@@ -29,8 +20,12 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[
+          { command: '/new', description: '新建会话' },
+          { command: '/help', description: '帮助' },
+        ]}
+        onRequestSlashCommands={onRequestSlashCommands}
         onSend={onSend}
         onStop={jest.fn()}
       />,
@@ -41,6 +36,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await user.keyboard('/n');
 
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
+    expect(onRequestSlashCommands).not.toHaveBeenCalled();
     await user.keyboard('{Enter}');
 
     expect(input).toHaveTextContent('/new');
@@ -51,24 +47,18 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
   });
 
   it('moves highlight with arrow keys and closes with escape', async () => {
-    (window as any).HWH5 = {
-      fetch: jest.fn().mockResolvedValue({
-        code: 200,
-        errormsg: '',
-        data: [
-          { command: '/new', description: '新建会话' },
-          { command: '/help', description: '帮助' },
-        ],
-      }),
-    };
     const user = userEvent.setup();
 
     render(
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[
+          { command: '/new', description: '新建会话' },
+          { command: '/help', description: '帮助' },
+        ]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
         onSend={jest.fn()}
         onStop={jest.fn()}
       />,
@@ -92,21 +82,16 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
   });
 
   it('only opens slash suggestions when slash is typed at the beginning', async () => {
-    (window as any).HWH5 = {
-      fetch: jest.fn().mockResolvedValue({
-        code: 200,
-        errormsg: '',
-        data: [{ command: '/new', description: '新建会话' }],
-      }),
-    };
+    const onRequestSlashCommands = jest.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
 
     render(
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: '新建会话' }]}
+        onRequestSlashCommands={onRequestSlashCommands}
         onSend={jest.fn()}
         onStop={jest.fn()}
       />,
@@ -117,25 +102,19 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await user.keyboard('hello /');
 
     expect(screen.queryByText('/new')).not.toBeInTheDocument();
-    expect((window as any).HWH5.fetch).not.toHaveBeenCalled();
+    expect(onRequestSlashCommands).not.toHaveBeenCalled();
   });
 
   it('deletes a selected slash command as one token', async () => {
-    (window as any).HWH5 = {
-      fetch: jest.fn().mockResolvedValue({
-        code: 200,
-        errormsg: '',
-        data: [{ command: '/new', description: '新建会话' }],
-      }),
-    };
     const user = userEvent.setup();
 
     render(
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: '新建会话' }]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
         onSend={jest.fn()}
         onStop={jest.fn()}
       />,

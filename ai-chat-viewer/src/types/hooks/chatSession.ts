@@ -1,5 +1,6 @@
 import type { Message, PendingAssistantPreview, QuestionAnswerSubmission, SessionStatus } from '../index';
 import type { WeAgentDetails } from '../bridge';
+import type { SlashCommandItem } from '../slashCommand';
 
 export type ChatSessionMode = 'weAgentCUI' | 'skillCUI';
 
@@ -20,7 +21,9 @@ export interface UseChatSessionResult {
   isLoadingHistory: boolean;
   hasMoreHistory: boolean;
   scrollToBottomSignal: number;
+  slashCommands: SlashCommandItem[];
   onLoadMoreHistory: () => void;
+  onRequestSlashCommands: () => Promise<void>;
   onQuestionAnswered: (submission: QuestionAnswerSubmission) => Promise<void>;
   onSend: (content: string) => Promise<void>;
   onStop: () => Promise<void>;

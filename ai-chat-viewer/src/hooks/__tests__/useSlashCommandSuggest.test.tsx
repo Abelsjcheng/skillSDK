@@ -24,25 +24,26 @@ describe('useSlashCommandSuggest', () => {
   });
 
   it('loads all fetched commands and filters by command prefix', async () => {
+    const onRequestCommands = jest.fn().mockResolvedValue(undefined);
     (window as any).HWH5 = {
       getStorage: jest.fn().mockResolvedValue(null),
       setStorage: jest.fn().mockResolvedValue(undefined),
-      fetch: jest.fn().mockResolvedValue({
-        code: 200,
-        errormsg: '',
-        data: networkCommands,
-      }),
     };
 
-    const { result } = renderHook(() => useSlashCommandSuggest({
-      ak: 'appkey',
+    const { result, rerender } = renderHook((props: { commands: SlashCommandItem[] }) => useSlashCommandSuggest({
       partnerAccount: 'partner-1',
       isPcMiniApp: false,
-    }));
+      slashCommands: props.commands,
+      onRequestCommands,
+    }), { initialProps: { commands: [] } });
 
     act(() => {
       result.current.handleValueChange('/', 1);
     });
+
+    await waitFor(() => expect(onRequestCommands).toHaveBeenCalledTimes(1));
+
+    rerender({ commands: networkCommands });
 
     await waitFor(() => expect(result.current.isOpen).toBe(true));
     expect(result.current.filteredCommands).toEqual(networkCommands);
@@ -73,13 +74,13 @@ describe('useSlashCommandSuggest', () => {
         commands: staleCommands,
       },
     });
-    const fetch = jest.fn().mockRejectedValue(new Error('network failed'));
-    (window as any).HWH5 = { getStorage, fetch };
+    const onRequestCommands = jest.fn().mockRejectedValue(new Error('network failed'));
+    (window as any).HWH5 = { getStorage };
 
     const { result } = renderHook(() => useSlashCommandSuggest({
-      ak: 'appkey',
       partnerAccount: 'partner-1',
       isPcMiniApp: false,
+      onRequestCommands,
     }));
 
     act(() => {
@@ -88,7 +89,7 @@ describe('useSlashCommandSuggest', () => {
 
     await waitFor(() => expect(result.current.filteredCommands).toEqual(staleCommands));
     expect(result.current.isOpen).toBe(true);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(onRequestCommands).toHaveBeenCalledTimes(1);
     expect(getStorage).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -96,7 +97,7 @@ describe('useSlashCommandSuggest', () => {
     });
 
     await Promise.resolve();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(onRequestCommands).toHaveBeenCalledTimes(1);
     expect(getStorage).toHaveBeenCalledTimes(1);
   });
 
@@ -105,20 +106,17 @@ describe('useSlashCommandSuggest', () => {
       command: `/cmd${index}`,
       description: `命令 ${index}`,
     }));
+    const onRequestCommands = jest.fn().mockResolvedValue(undefined);
     (window as any).HWH5 = {
       getStorage: jest.fn().mockResolvedValue(null),
       setStorage: jest.fn().mockResolvedValue(undefined),
-      fetch: jest.fn().mockResolvedValue({
-        code: 200,
-        errormsg: '',
-        data: manyCommands,
-      }),
     };
 
     const { result } = renderHook(() => useSlashCommandSuggest({
-      ak: 'appkey',
       partnerAccount: 'partner-1',
       isPcMiniApp: false,
+      slashCommands: manyCommands,
+      onRequestCommands,
     }));
 
     act(() => {
@@ -137,5 +135,29 @@ describe('useSlashCommandSuggest', () => {
       result.current.moveHighlight(1);
     });
     expect(result.current.highlightedIndex).toBe(0);
+  });
+
+  it('clears commands when websocket result is empty', async () => {
+    const { result, rerender } = renderHook((props: { commands: SlashCommandItem[] }) => useSlashCommandSuggest({
+      partnerAccount: 'partner-1',
+      isPcMiniApp: false,
+      slashCommands: props.commands,
+      onRequestCommands: jest.fn().mockResolvedValue(undefined),
+    }), { initialProps: { commands: networkCommands } });
+
+    act(() => {
+      result.current.handleValueChange('/n', 2);
+    });
+
+    await waitFor(() => expect(result.current.filteredCommands).toEqual([
+      { command: '/new', description: '新建会话' },
+      { command: '/node', description: 'Node 帮助' },
+    ]));
+
+    rerender({ commands: [] });
+
+    await waitFor(() => expect(result.current.commands).toEqual([]));
+    expect(result.current.isOpen).toBe(false);
+    expect(result.current.filteredCommands).toEqual([]);
   });
 });

@@ -30,6 +30,8 @@ import type {
   ReplyPermissionParams,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -46,11 +48,6 @@ import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
-  fetch?: (url: string, options?: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: BodyInit | null;
-  }) => Promise<unknown> | unknown;
   getStorage?: (params: { key: string }) => Promise<unknown> | unknown;
   setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
@@ -2228,41 +2225,6 @@ function ensureMockHWH5Bridge(): void {
     };
   }
 
-  if (typeof hwh5.fetch !== 'function') {
-    hwh5.fetch = async (url) => {
-      if (url === '/api/v1/slash-commands/query') {
-        return {
-          json: async () => ({
-            code: 200,
-            errormsg: '',
-            data: [
-              { command: '/new', description: '新建会话' },
-              { command: '/help', description: '查看可用命令' },
-              { command: '/clear', description: '清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文' },
-              { command: '/clear1', description: '清空当前上下文' },
-              { command: '/clear2', description: '清空当前上下文' },
-              { command: '/clear3', description: '清空当前上下文' },
-              { command: '/clear4', description: '清空当前上下文' },
-              { command: '/clear5', description: '清空当前上下文' },
-              { command: '/clear6', description: '清空当前上下文' },
-              { command: '/clear7', description: '清空当前上下文' },
-              { command: '/clear8', description: '清空当前上下文' },
-              { command: '/clear9', description: '清空当前上下文' },
-              { command: '/clear10', description: '清空当前上下文' },
-              { command: '/clear11', description: '清空当前上下文' },
-              { command: '/clear12', description: '清空当前上下文' },
-              { command: '/clear13', description: '清空当前上下文' },
-              { command: '/clear14', description: '清空当前上下文' },
-            ],
-          }),
-        };
-      }
-      return {
-        json: async () => ({ code: 404, message: `mock HWH5.fetch unknown url: ${url}` }),
-      };
-    };
-  }
-
   if (typeof hwh5.getStorage !== 'function') {
     hwh5.getStorage = async ({ key }) => ({ data: hwh5StorageStore.get(key) ?? null });
   }
@@ -2431,6 +2393,43 @@ function buildMockApi(): HWH5EXT {
       }
       scheduleAssistantReply(record, params.content);
       return toSendMessageResponse(userMessage);
+    },
+
+    sendWebSocketMessage: async (
+      params: SendWebSocketMessageParams,
+    ): Promise<SendWebSocketMessageResult> => {
+      const action = params.message.action;
+      const welinkSessionId = typeof params.message.welinkSessionId === 'string'
+        ? params.message.welinkSessionId
+        : '';
+      if (action === 'query_slash_commands' && welinkSessionId) {
+        emit(welinkSessionId, {
+          type: 'slash_commands_result',
+          messageId: nextId('slash_commands'),
+          role: 'assistant',
+          status: 'running',
+          slashCommands: [
+            { command: '/new', description: '新建会话' },
+            { command: '/help', description: '查看可用命令' },
+            { command: '/clear', description: '清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文' },
+            { command: '/clear1', description: '清空当前上下文' },
+            { command: '/clear2', description: '清空当前上下文' },
+            { command: '/clear3', description: '清空当前上下文' },
+            { command: '/clear4', description: '清空当前上下文' },
+            { command: '/clear5', description: '清空当前上下文' },
+            { command: '/clear6', description: '清空当前上下文' },
+            { command: '/clear7', description: '清空当前上下文' },
+            { command: '/clear8', description: '清空当前上下文' },
+            { command: '/clear9', description: '清空当前上下文' },
+            { command: '/clear10', description: '清空当前上下文' },
+            { command: '/clear11', description: '清空当前上下文' },
+            { command: '/clear12', description: '清空当前上下文' },
+            { command: '/clear13', description: '清空当前上下文' },
+            { command: '/clear14', description: '清空当前上下文' },
+          ],
+        });
+      }
+      return { status: 'success' };
     },
 
     stopSkill: async (params: StopSkillParams) => {
