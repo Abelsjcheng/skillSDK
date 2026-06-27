@@ -1,27 +1,10 @@
 import React, {
   forwardRef,
-  KeyboardEvent,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
 } from 'react';
-import type { SlashCommandToken } from '../../types/slashCommand';
-
-export interface SlashCommandComposerHandle {
-  focus: () => void;
-  getSelectionRange: () => { start: number; end: number };
-  setCursor: (cursor: number) => void;
-}
-
-interface SlashCommandComposerProps {
-  className: string;
-  isPcMiniApp?: boolean;
-  placeholder: string;
-  slashToken: SlashCommandToken | null;
-  value: string;
-  onChange: (value: string, cursor: number) => void;
-  onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
-}
+import type { SlashCommandComposerHandle, SlashCommandComposerProps } from '../../types/components';
 
 function getTextNodeLength(node: Node): number {
   return node.textContent?.length ?? 0;

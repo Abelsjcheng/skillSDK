@@ -50,7 +50,7 @@ async function readMobileStorage(key: string): Promise<unknown> {
   if (typeof getStorage !== 'function') {
     return null;
   }
-  const result = await Promise.resolve(getStorage({ key }));
+  const result = await Promise.resolve(getStorage(key));
   if (result && typeof result === 'object' && 'data' in result) {
     return (result as { data?: unknown }).data;
   }

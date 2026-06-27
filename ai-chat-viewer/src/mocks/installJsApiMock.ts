@@ -48,7 +48,7 @@ import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
-  getStorage?: (params: { key: string }) => Promise<unknown> | unknown;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
   setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
@@ -2226,7 +2226,7 @@ function ensureMockHWH5Bridge(): void {
   }
 
   if (typeof hwh5.getStorage !== 'function') {
-    hwh5.getStorage = async ({ key }) => ({ data: hwh5StorageStore.get(key) ?? null });
+    hwh5.getStorage = async (key) => ({ data: hwh5StorageStore.get(key) ?? null });
   }
 
   if (typeof hwh5.setStorage !== 'function') {

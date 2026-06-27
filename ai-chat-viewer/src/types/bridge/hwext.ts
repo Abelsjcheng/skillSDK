@@ -391,7 +391,7 @@ export interface HWH5Bridge {
     headers?: Record<string, string>;
     body?: BodyInit | null;
   }) => Promise<unknown> | unknown;
-  getStorage?: (params: { key: string }) => Promise<unknown> | unknown;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
   setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   fetchFull: <T = unknown>(
     url: string,

@@ -8,11 +8,12 @@ import { useSlashCommandSuggest } from '../../hooks/useSlashCommandSuggest';
 import type {
   SendShortcutMode,
   ShortcutOption,
+  SlashCommandComposerHandle,
   WeAgentCUIFooterProps,
 } from '../../types/components';
 import type { SlashCommandItem, SlashCommandToken } from '../../types/slashCommand';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import SlashCommandComposer, { SlashCommandComposerHandle } from './SlashCommandComposer';
+import SlashCommandComposer from './SlashCommandComposer';
 import SlashCommandPanel from './SlashCommandPanel';
 
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
