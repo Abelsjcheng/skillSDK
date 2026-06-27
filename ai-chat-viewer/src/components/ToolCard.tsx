@@ -49,6 +49,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
     [],
   );
   const inputContent = resolveInputContent(part.input);
+  const errorContent = part?.error || part?.content || '';
 
   const renderMarkdown = (content: string) => (
     <ReactMarkdown
@@ -108,10 +109,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
               <div className="tool-card__code">{renderMarkdown(part.output)}</div>
             </div>
           )}
-          {status === 'error' && part.content && (
+          {status === 'error' && errorContent && (
             <div className="tool-card__section tool-card__error">
               <div className="tool-card__section-title">Error</div>
-              <div className="tool-card__code">{renderMarkdown(part.error ?? '')}</div>
+              <div className="tool-card__code">{renderMarkdown(errorContent)}</div>
             </div>
           )}
         </div>
