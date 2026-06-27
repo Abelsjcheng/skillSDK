@@ -13,7 +13,6 @@ import {
   collectUserMessageIds,
   contentTypeForRole,
   genMessageId,
-  hydrateStreamingQuestionPartsFromToolInput,
   mapRawParts,
   messageOperationToMessage,
   normalizeRole,
@@ -778,12 +777,11 @@ export function useChatSession({
 
           latestStreamingMsgIdRef.current = messageId;
 
-          const hydratedParts = hydrateStreamingQuestionPartsFromToolInput(msg.parts);
           const assembler = getOrCreateStreamingAssembler(messageId);
-          assembler.initializeFromSnapshot(hydratedParts);
+          assembler.initializeFromSnapshot(msg.parts);
 
           const nextRole = normalizeRole(msg.role);
-          const nextParts = mapRawParts(hydratedParts, true);
+          const nextParts = mapRawParts(msg.parts, true);
           upsertAssistantMessage(messageId, (current) => ({
             id: messageId,
             role: nextRole,

@@ -48,7 +48,7 @@ flowchart TD
     A["服务端 question part"] --> B["消息解析层"]
     B --> C{"是否存在 questions[]"}
     C -- "是" --> D["逐项归一化为 QuestionItem[]"]
-    C -- "否" --> E{"历史 input.questions 或 streaming 前置 tool.input.questions?"}
+    C -- "否" --> E{"历史且存在 input.questions?"}
     E -- "是" --> D
     E -- "否" --> F["旧字段补成单题 QuestionItem[]"]
     D --> M["消息 part 写入 part.questions"]
@@ -157,7 +157,7 @@ sequenceDiagram
 
 1. 类型层新增 `QuestionItem` 和 `QuestionAnswerMatrix = string[][]`，并将 `QuestionAnswerSubmission.answer` 从单字符串升级为二维答案矩阵。
 2. 消息工具层新增 question 归一化、答案矩阵序列化、安全解析、展示摘要格式化能力。
-3. 历史解析、实时解析和恢复解析统一使用同一套题目归一化规则；普通实时 question event 和 snapshot 不从 question part 自身 `input` 恢复 question。历史消息仍可在顶层 `questions` 缺失时从 question part 的 `input.questions` 兜底；`type=streaming` 恢复消息仅可从同一 `parts` 数组中前置 `toolName=question` 的 tool part `input.questions` 补齐后续 question part。
+3. 历史解析与实时流式解析统一使用同一套题目归一化规则，但仅历史消息在顶层 `questions` 缺失时允许从 `input.questions` 兜底；实时、snapshot、发送返回消息不从 `input` 恢复 question。
 4. `QuestionCard` 状态从单答案模型升级为 `currentQuestionIndex`、`selectedAnswers`、`customInputs`、`answered`、`submitting`。
 5. `QuestionAnswerSubmission` 除答案矩阵外携带 `partId`、`messageId`、`toolCallId`、`questionId`、`subagentSessionId`，便于上层定位原 assistant question part。
 6. `useChatSession` 在问题回答场景内把答案矩阵转成发送字符串，单题单答案复用旧答案字符串，其他场景使用 JSON 字符串，再复用现有发送接口；同时本地预更新原 question part 的 `answered` 与 `output`。
@@ -177,9 +177,8 @@ sequenceDiagram
 3. `multiSelect` 只读取正式字段 `multiSelect`，默认值为 `false`。
 4. `options` 同时兼容字符串数组和对象数组，最终统一为 `{ label, description? }[]`。
 5. question 渲染默认不从 `input` 字段读取题目、选项、多选状态或问题数组；`input` 只允许作为原始 part 字段透传给其他场景。
-6. 历史消息存在兼容例外：`sessionMessageToMessage()` 处理的历史 question part，在顶层 `questions` 缺失时允许读取该 question part 的 `input.questions` 作为题目数组兜底；普通实时 question event、snapshot、发送返回消息仍不读取 question part 自身的 `input.questions`。
-7. `type=streaming` 恢复消息存在单独兼容规则：当同一个 `parts` 数组中前置 `type=tool && toolName=question` 的 tool part 在 `input.questions` 中携带有效题目数组，且后续 question part 自身缺少有效 `questions` 时，可用该数组补齐 question part，并同步首题兼容字段 `header`、`question`、`options`、`multiSelect`。
-8. 为兼容现有渲染入口，归一化后同步保留首题的旧字段值：`header`、`question`、`options`、`multiSelect`。
+6. 历史消息存在兼容例外：仅 `sessionMessageToMessage()` 处理的历史 question part，在顶层 `questions` 缺失时，允许读取 `input.questions` 作为题目数组兜底；不读取 `input.header`、`input.question`、`input.options` 或 `input.multiSelect`。
+7. 为兼容现有渲染入口，归一化后同步保留首题的旧字段值：`header`、`question`、`options`、`multiSelect`。
 
 #### 4.2.2 答案矩阵
 
@@ -294,18 +293,17 @@ type QuestionAnswerMatrix = string[][];
 
 1. 没有 `questions` 字段时，按旧单题单选逻辑补齐题目数组。
 2. 历史消息存在顶层 `questions[]` 时，答案仍只读取最外层 `part.output`；题目项内即使存在 `output` 也忽略。
-3. 历史消息不存在顶层 `questions[]` 但存在 question part 自身 `input.questions` 时，使用该题目数组兜底；普通实时 question event、snapshot 和发送返回路径不启用该兜底。
-4. `type=streaming` 恢复消息中，若 question part 自身缺少有效 `questions`，可从同一 `parts` 数组中前置 `type=tool && toolName=question` 的 tool part `input.questions` 补齐；该补齐不跨 message、不跨事件缓存，且 question part 自身已有有效 `questions` 时优先使用自身字段。
-5. `part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵并按题目顺序展示；若不是 JSON，则先保守识别旧多题问答 transcript，识别成功按多条问答展示，识别失败再按旧单答案字符串兼容为第一题答案。
-6. 用户普通聊天内容即使是合法 `string[][]` JSON 字符串，也不能仅凭 JSON 形状被隐藏或改写；只有紧邻已回答 question 且内容等于该 question `output` 的历史 user message 才允许隐藏。
-7. 多题提交不强制所有题目必答，未回答题目保留为空数组。
-8. 自定义答案去除首尾空白后再进入答案矩阵，空字符串不提交。
-9. 服务端返回的 `questions` 中若某一项缺少有效 `question`，该项不应作为可渲染题目进入 UI。
-10. 若服务端同时返回旧字段和 `questions` 字段，以 `questions` 作为新协议主数据，旧字段仅作为首题兼容展示字段。
-11. 若服务端没有提供 option，仍允许用户通过自定义输入提交答案。
-12. 本地 Optimistic Update 失败回滚时，需要恢复提交前的原 part 状态，避免用户误以为答案已提交成功。
-13. 本地补丁只作用于 question part，不影响同一条 assistant message 中其他 text、tool、permission、error part。
-14. 答案-only 展示只作为历史兼容或调试兜底，不改变 `QuestionCard` 已回答卡片的题干展示。
+3. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 时，仅历史解析路径使用该题目数组兜底；实时、snapshot、发送返回路径不启用该兜底。
+4. `part.output` 若是二维数组 JSON 字符串，则解析为已回答矩阵并按题目顺序展示；若不是 JSON，则先保守识别旧多题问答 transcript，识别成功按多条问答展示，识别失败再按旧单答案字符串兼容为第一题答案。
+5. 用户普通聊天内容即使是合法 `string[][]` JSON 字符串，也不能仅凭 JSON 形状被隐藏或改写；只有紧邻已回答 question 且内容等于该 question `output` 的历史 user message 才允许隐藏。
+6. 多题提交不强制所有题目必答，未回答题目保留为空数组。
+7. 自定义答案去除首尾空白后再进入答案矩阵，空字符串不提交。
+8. 服务端返回的 `questions` 中若某一项缺少有效 `question`，该项不应作为可渲染题目进入 UI。
+9. 若服务端同时返回旧字段和 `questions` 字段，以 `questions` 作为新协议主数据，旧字段仅作为首题兼容展示字段。
+10. 若服务端没有提供 option，仍允许用户通过自定义输入提交答案。
+11. 本地 Optimistic Update 失败回滚时，需要恢复提交前的原 part 状态，避免用户误以为答案已提交成功。
+12. 本地补丁只作用于 question part，不影响同一条 assistant message 中其他 text、tool、permission、error part。
+13. 答案-only 展示只作为历史兼容或调试兜底，不改变 `QuestionCard` 已回答卡片的题干展示。
 
 ### 4.4 相关接口联动
 
@@ -396,15 +394,13 @@ type QuestionAnswerMatrix = string[][];
 2. 历史消息存在顶层 `questions[]` 且 `part.output` 为旧多题问答 transcript 普通字符串时，按 transcript 中的多条问答展示。
 3. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为二维数组 JSON 字符串时，按顺序展示每题答案。
 4. 历史消息不存在顶层 `questions[]` 但存在 `input.questions` 且 `part.output` 为旧多题问答 transcript 普通字符串时，按 transcript 中的多条问答展示。
-5. 普通实时 question event 只有 `input.questions` 时，不从 `input` 恢复为 question 内容。
-6. snapshot 的 question part 只有自身 `input.questions` 时，不从该 input 恢复为多题 question 内容。
-7. `type=streaming` 恢复消息中，前置 `type=tool && toolName=question` 的 tool part 存在 `input.questions`，且后续 question part 缺少 `questions` 时，可恢复为多题 question 内容；若第一题是多选，切回后仍保持复选框视觉。
-8. `options` 为字符串数组时，仍按 `label` 渲染。
-9. `options` 为对象数组时，保留 `description` 展示。
-10. 只有自定义输入、没有 option 的问题仍可提交。
-11. 普通用户聊天消息即使内容是合法 `string[][]`，只要不满足历史问题回答隐藏条件，仍按普通文本展示。
-12. 问题回答发送失败时，原 question part 回滚到提交前状态，并允许用户继续修改和重试。
-13. completed/error 事件携带服务端 output 时，以服务端 output 更新本地补丁；未携带 output 时保留本地已提交 JSON。
+5. 实时 question 或 streaming snapshot 只有 `input.questions` 时，不从 `input` 恢复为 question 内容。
+6. `options` 为字符串数组时，仍按 `label` 渲染。
+7. `options` 为对象数组时，保留 `description` 展示。
+8. 只有自定义输入、没有 option 的问题仍可提交。
+9. 普通用户聊天消息即使内容是合法 `string[][]`，只要不满足历史问题回答隐藏条件，仍按普通文本展示。
+10. 问题回答发送失败时，原 question part 回滚到提交前状态，并允许用户继续修改和重试。
+11. completed/error 事件携带服务端 output 时，以服务端 output 更新本地补丁；未携带 output 时保留本地已提交 JSON。
 
 ### 9.3 文档一致性检查
 

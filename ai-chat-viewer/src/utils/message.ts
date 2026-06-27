@@ -448,49 +448,6 @@ export function mapRawParts(
   return rawParts.map((part) => mapRawPartToMessagePart(part, isStreaming, options));
 }
 
-export function hydrateStreamingQuestionPartsFromToolInput(
-  partSnapshots: MessagePartSnapshot[],
-): MessagePartSnapshot[] {
-  let pendingQuestionToolQuestions: QuestionItem[] | undefined;
-  let changed = false;
-
-  const hydratedParts = partSnapshots.map((part) => {
-    if (part.type === 'tool' && part.toolName === 'question') {
-      pendingQuestionToolQuestions = normalizeQuestionItems({
-        questions: getInputQuestions(part.input),
-      });
-      return part;
-    }
-
-    if (part.type !== 'question') {
-      return part;
-    }
-
-    const currentQuestions = normalizeQuestionItems({
-      questions: part.questions,
-    });
-    const fallbackQuestions = pendingQuestionToolQuestions;
-    pendingQuestionToolQuestions = undefined;
-
-    if (currentQuestions || !fallbackQuestions) {
-      return part;
-    }
-
-    const firstQuestion = fallbackQuestions[0];
-    changed = true;
-    return {
-      ...part,
-      header: firstQuestion.header ?? part.header,
-      question: firstQuestion.question,
-      options: firstQuestion.options.length > 0 ? firstQuestion.options : part.options,
-      multiSelect: firstQuestion.multiSelect,
-      questions: fallbackQuestions,
-    };
-  });
-
-  return changed ? hydratedParts : partSnapshots;
-}
-
 export function shouldRenderMessagePart(part: MessagePart): boolean {
   switch (part.type) {
     case 'text':
