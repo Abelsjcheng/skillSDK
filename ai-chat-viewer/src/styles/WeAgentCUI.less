@@ -713,6 +713,11 @@
   line-height: 21px;
   min-width: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: none;
 }
 
 .we-agent-history-sidebar__session-item-text {
@@ -721,6 +726,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .we-agent-history-sidebar__session-item.is-selected {
@@ -730,6 +737,12 @@
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
+}
+
+.we-agent-history-sidebar__session-item.is-action-target {
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
 }
 
 .we-agent-history-sidebar__action-popup {
@@ -964,6 +977,15 @@
 
   .we-agent-history-sidebar--mobile .we-agent-history-sidebar__session-item.is-selected .we-agent-history-sidebar__session-item-text {
     color: rgba(13, 148, 255, 1);
+  }
+
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__session-item.is-action-target {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(220, 221, 221, 1);
+  }
+
+  .we-agent-history-sidebar--mobile .we-agent-history-sidebar__session-item.is-action-target .we-agent-history-sidebar__session-item-text {
+    color: rgba(220, 221, 221, 1);
   }
 
   .we-agent-history-sidebar__action-popup {

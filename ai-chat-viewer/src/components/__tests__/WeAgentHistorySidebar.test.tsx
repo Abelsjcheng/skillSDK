@@ -1,4 +1,5 @@
 import React from 'react';
+import { readFileSync } from 'fs';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WeAgentHistorySidebar from '../assistant/WeAgentHistorySidebar';
 import type { SkillSession } from '../../types/bridge';
@@ -306,5 +307,93 @@ describe('WeAgentHistorySidebar', () => {
 
     expect(onSessionSelect).not.toHaveBeenCalled();
     jest.useRealTimers();
+  });
+
+  it('keeps the selected session selected and marks the long-pressed mobile session as action target', () => {
+    jest.useFakeTimers();
+    isPcMiniAppSpy.mockReturnValue(false);
+    const selectedSession = createSession({ welinkSessionId: 'session-1', title: 'Selected session' });
+    const pressedSession = createSession({ welinkSessionId: 'session-2', title: 'Pressed session' });
+
+    render(
+      <WeAgentHistorySidebar
+        assistantAccount="assistant-1"
+        currentWelinkSessionId="session-1"
+        cachedCache={createCache([selectedSession, pressedSession])}
+        defaultOpen
+        historyLoaded
+      />,
+    );
+
+    const selectedItem = screen.getByRole('button', { name: 'Selected session' });
+    const pressedItem = screen.getByRole('button', { name: 'Pressed session' });
+    jest.spyOn(pressedItem, 'getBoundingClientRect').mockReturnValue({
+      top: 80,
+      right: 220,
+      bottom: 112,
+      left: 20,
+      width: 200,
+      height: 32,
+      x: 20,
+      y: 80,
+      toJSON: () => ({}),
+    });
+
+    expect(selectedItem).toHaveClass('is-selected');
+    expect(selectedItem).not.toHaveClass('is-action-target');
+    expect(pressedItem).not.toHaveClass('is-selected');
+    expect(pressedItem).not.toHaveClass('is-action-target');
+
+    fireEvent.touchStart(pressedItem);
+    act(() => {
+      jest.advanceTimersByTime(520);
+    });
+
+    expect(selectedItem).toHaveClass('is-selected');
+    expect(selectedItem).not.toHaveClass('is-action-target');
+    expect(pressedItem).not.toHaveClass('is-selected');
+    expect(pressedItem).toHaveClass('is-action-target');
+
+    fireEvent.mouseDown(document.body);
+
+    expect(selectedItem).toHaveClass('is-selected');
+    expect(selectedItem).not.toHaveClass('is-action-target');
+    expect(pressedItem).not.toHaveClass('is-selected');
+    expect(pressedItem).not.toHaveClass('is-action-target');
+    jest.useRealTimers();
+  });
+
+  it('uses distinct light and dark styles for history session action target', () => {
+    const styles = readFileSync(`${process.cwd()}/src/styles/WeAgentCUI.less`, 'utf8');
+    const actionTargetRule = /\.we-agent-history-sidebar__session-item\.is-action-target\s*\{[^}]*\}/s
+      .exec(styles)?.[0] ?? '';
+    const darkActionTargetRule =
+      /\.we-agent-history-sidebar--mobile \.we-agent-history-sidebar__session-item\.is-action-target\s*\{[^}]*\}/s
+        .exec(styles)?.[0] ?? '';
+
+    expect(actionTargetRule).toContain('background: rgba(0, 0, 0, 0.05);');
+    expect(actionTargetRule).toContain('color: #333;');
+    expect(darkActionTargetRule).toContain('background: rgba(255, 255, 255, 0.08);');
+    expect(darkActionTargetRule).toContain('color: rgba(220, 221, 221, 1);');
+  });
+
+  it('disables native touch highlight and color transitions on history session items', () => {
+    const styles = readFileSync(`${process.cwd()}/src/styles/WeAgentCUI.less`, 'utf8');
+    const sessionItemRule = /\.we-agent-history-sidebar__session-item\s*\{[^}]*\}/s.exec(styles)?.[0] ?? '';
+
+    expect(sessionItemRule).toContain('-webkit-tap-highlight-color: transparent;');
+    expect(sessionItemRule).toContain('transition: none;');
+  });
+
+  it('disables native text selection and system callouts on history session items', () => {
+    const styles = readFileSync(`${process.cwd()}/src/styles/WeAgentCUI.less`, 'utf8');
+    const sessionItemRule = /\.we-agent-history-sidebar__session-item\s*\{[^}]*\}/s.exec(styles)?.[0] ?? '';
+    const sessionItemTextRule = /\.we-agent-history-sidebar__session-item-text\s*\{[^}]*\}/s.exec(styles)?.[0] ?? '';
+
+    expect(sessionItemRule).toContain('-webkit-touch-callout: none;');
+    expect(sessionItemRule).toContain('-webkit-user-select: none;');
+    expect(sessionItemRule).toContain('user-select: none;');
+    expect(sessionItemTextRule).toContain('-webkit-user-select: none;');
+    expect(sessionItemTextRule).toContain('user-select: none;');
   });
 });

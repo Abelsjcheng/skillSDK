@@ -157,6 +157,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     [historySessions],
   );
   const hasMoreHistorySessions = !isLoading && currentPage + 1 < totalPages;
+  const activePopupSessionId = deleteTargetSession?.welinkSessionId ?? '';
 
   const historyGroupLabels = useMemo<Record<HistorySessionGroupKey, string>>(() => ({
     today: t('weAgent.today'),
@@ -536,6 +537,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                   const sessionId = session.welinkSessionId;
                   const sessionTitle = session.title?.trim() || t('weAgent.untitledSession');
                   const isSelected = currentWelinkSessionId === sessionId;
+                  const isActionTarget = activePopupSessionId === sessionId;
                   return (
                     <div
                       key={sessionId}
@@ -546,6 +548,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                         className={[
                           'we-agent-history-sidebar__session-item',
                           isSelected ? 'is-selected' : '',
+                          isActionTarget ? 'is-action-target' : '',
                         ].filter(Boolean).join(' ')}
                         onContextMenu={(event) => handleSessionContextMenu(event, session)}
                         onTouchStart={(event) => handleTouchStart(event, session)}
