@@ -385,8 +385,9 @@ function App({ assistantAccount = '' }: AppProps) {
               <WeAgentCUIFooter
                 isPcMiniApp={isPc}
                 mode={session.isGenerating ? 'generating' : 'generate'}
-                ak={assistantDetailRef.current?.appKey ?? ''}
                 partnerAccount={assistantAccount}
+                slashCommands={session.slashCommands}
+                onRequestSlashCommands={session.onRequestSlashCommands}
                 onSend={(content) => {
                   void session.onSend(content);
                 }}

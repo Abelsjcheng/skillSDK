@@ -1,3 +1,4 @@
+import type { SlashCommandItem } from './slashCommand';
 // ============================================================
 // StreamMessage Protocol Type Definitions
 // Based on 小程序JSAPI接口文档.md & SkillClientSdkInterfaceV1.md

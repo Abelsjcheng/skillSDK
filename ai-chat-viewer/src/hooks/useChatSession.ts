@@ -23,6 +23,7 @@ import {
 import {
   getSessionMessageHistory,
   registerSessionListener,
+  sendWebSocketMessage,
   sendMessage as sendMessageApi,
   sendMessageToIM,
   stopSkill,
@@ -35,6 +36,8 @@ import { reportFlowTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
 import { reportSendMessageClick } from '../utils/uemUtil';
+import { normalizeSlashCommands } from '../utils/slashCommand';
+import type { SlashCommandItem } from '../types/slashCommand';
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -79,6 +82,7 @@ export function useChatSession({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
+  const [slashCommands, setSlashCommands] = useState<SlashCommandItem[]>([]);
 
   const streamingAssemblersRef = useRef(new Map<string, StreamAssembler>());
   const latestStreamingMsgIdRef = useRef<string | null>(null);
@@ -129,6 +133,7 @@ export function useChatSession({
     setMessages([]);
     setHasMoreHistory(false);
     setIsLoadingHistory(false);
+    setSlashCommands([]);
     setSessionStatus('idle');
     hidePendingAssistantPreview();
   }, [hidePendingAssistantPreview]);
@@ -189,13 +194,10 @@ export function useChatSession({
   }, [getLatestStreamingMessageId]);
 
   const finalizeStreamingMessage = useCallback(() => {
-    const activeMessageIds = Array.from(streamingAssemblersRef.current.keys());
-    activeMessageIds.forEach((messageId) => {
-      finalizeStreamingMessageById(messageId);
-    });
-    latestStreamingMsgIdRef.current = null;
+    const latestMessageId = getLatestStreamingMessageId();
+    finalizeStreamingMessageById(latestMessageId);
     hidePendingAssistantPreview();
-  }, [finalizeStreamingMessageById, hidePendingAssistantPreview]);
+  }, [finalizeStreamingMessageById, getLatestStreamingMessageId, hidePendingAssistantPreview]);
 
   const appendAssistantErrorBlock = useCallback((message: string, fallbackMessage: string) => {
     const normalizedMessage = message || fallbackMessage;
@@ -580,6 +582,9 @@ export function useChatSession({
           setSessionStatus('idle');
           appendAssistantErrorBlock(agentOfflineTextRef.current, agentOfflineTextRef.current);
           break;
+        case 'slash_commands_result':
+          setSlashCommands(normalizeSlashCommands(msg.slashCommands ?? []));
+          break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
             setSessionStatus('idle');
@@ -780,6 +785,22 @@ export function useChatSession({
     }
   }, [mode, welinkSessionId]);
 
+  const onRequestSlashCommands = useCallback(async () => {
+    if (!welinkSessionId) return;
+
+    try {
+      await sendWebSocketMessage({
+        message: JSON.stringify({
+          action: 'query_slash_commands',
+          welinkSessionId,
+        }),
+      });
+    } catch (err) {
+      WeLog(`useChatSession sendWebSocketMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, action: 'query_slash_commands' })} | error=${JSON.stringify(err)}`);
+      throw err;
+    }
+  }, [mode, welinkSessionId]);
+
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
@@ -801,6 +822,8 @@ export function useChatSession({
     isLoadingHistory,
     hasMoreHistory,
     scrollToBottomSignal,
+    slashCommands,
+    onRequestSlashCommands,
     onLoadMoreHistory: loadMoreHistory,
     onQuestionAnswered: handleQuestionAnswered,
     onSend,
@@ -822,6 +845,8 @@ export function useChatSession({
     pendingAssistantPreview,
     resetTransientState,
     scrollToBottomSignal,
+    slashCommands,
+    onRequestSlashCommands,
     sessionStatus,
     welinkSessionId,
   ]);

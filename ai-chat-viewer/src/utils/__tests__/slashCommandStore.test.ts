@@ -25,32 +25,31 @@ describe('slashCommandStore', () => {
   });
 
   it('reads valid mobile storage data through HWH5.getStorage', async () => {
-    (window as any).HWH5 = {
-      getStorage: jest.fn().mockResolvedValue({
-        data: JSON.stringify({
-          partnerAccount: 'partner-1',
-          expiresAt: Date.now() + 1_000,
-          commands,
-        }),
+    const getStorage = jest.fn().mockResolvedValue({
+      data: JSON.stringify({
+        partnerAccount: 'partner-1',
+        expiresAt: Date.now() + 1_000,
+        commands,
       }),
-    };
+    });
+    (window as any).HWH5 = { getStorage };
 
     await expect(readSlashCommandStore({
       partnerAccount: 'partner-1',
       isPcMiniApp: false,
     })).resolves.toEqual(commands);
+    expect(getStorage).toHaveBeenCalledWith('slash_commands:partner-1');
   });
 
   it('treats expired storage as unavailable unless fallback ignores expiry', async () => {
-    (window as any).HWH5 = {
-      getStorage: jest.fn().mockResolvedValue({
-        data: {
-          partnerAccount: 'partner-1',
-          expiresAt: Date.now() - 1_000,
-          commands,
-        },
-      }),
-    };
+    const getStorage = jest.fn().mockResolvedValue({
+      data: {
+        partnerAccount: 'partner-1',
+        expiresAt: Date.now() - 1_000,
+        commands,
+      },
+    });
+    (window as any).HWH5 = { getStorage };
 
     await expect(readSlashCommandStore({
       partnerAccount: 'partner-1',

@@ -66,6 +66,35 @@ describe('installJsApiMock', () => {
     expect(textDone?.content).toBe('Mock upload received. The file card above is rendered from the sent UM link.');
   });
 
+  it('emits slash commands through mocked sendWebSocketMessage', async () => {
+    const { installJsApiMock } = await import('../installJsApiMock');
+
+    installJsApiMock();
+    const api = (window as any).HWH5EXT;
+    const session = await api.createNewSession({ assistantAccount: 'mock_assistant_001' });
+    const messages: StreamMessage[] = [];
+
+    api.registerSessionListener({
+      welinkSessionId: session.welinkSessionId,
+      onMessage: (message: StreamMessage) => messages.push(message),
+      onError: jest.fn(),
+      onClose: jest.fn(),
+    });
+
+    await api.sendWebSocketMessage({
+      message: JSON.stringify({
+        action: 'query_slash_commands',
+        welinkSessionId: session.welinkSessionId,
+      }),
+    });
+
+    const slashResult = messages.find((message) => message.type === 'slash_commands_result');
+    expect(slashResult?.slashCommands).toEqual(expect.arrayContaining([
+      { command: '/new', description: '新建会话' },
+      { command: '/help', description: '查看可用命令' },
+    ]));
+  });
+
   it('installs Pedestal file select and upload mocks for local preview', async () => {
     const { installJsApiMock } = await import('../installJsApiMock');
 

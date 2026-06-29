@@ -1,7 +1,8 @@
-import type { ReactNode, Ref } from 'react';
+import type { KeyboardEvent, ReactNode, Ref } from 'react';
 import type { SkillSession, WeAgentDetails } from '../bridge/hwext';
 import type { AssistantItem } from '../assistant';
 import type { DigitalTwinBasicInfoPayload } from '../digitalTwin';
+import type { SlashCommandItem, SlashCommandToken } from '../slashCommand';
 
 export interface AssistantDetailDeleteModalProps {
   open: boolean;
@@ -100,12 +101,29 @@ export interface ShortcutOption {
 export interface WeAgentCUIFooterProps {
   isPcMiniApp?: boolean;
   mode: 'generate' | 'generating' | 'regenerate';
-  ak?: string;
   partnerAccount?: string;
+  slashCommands?: SlashCommandItem[];
+  onRequestSlashCommands?: () => Promise<void> | void;
   onSend: (message: string) => void;
   onStop: () => void;
   onInputFocus?: () => void;
   leftActions?: ReactNode;
+}
+
+export interface SlashCommandComposerHandle {
+  focus: () => void;
+  getSelectionRange: () => { start: number; end: number };
+  setCursor: (cursor: number) => void;
+}
+
+export interface SlashCommandComposerProps {
+  className: string;
+  isPcMiniApp?: boolean;
+  placeholder: string;
+  slashToken: SlashCommandToken | null;
+  value: string;
+  onChange: (value: string, cursor: number) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
 export type HistorySessionGroupKey = 'today' | 'yesterday' | 'threeDaysAgo';

@@ -1,5 +1,6 @@
 import type { Message, PendingAssistantPreview, QuestionAnswerSubmission, SessionStatus } from '../index';
 import type { WeAgentDetails } from '../bridge';
+import type { SlashCommandItem } from '../slashCommand';
 
 export type ChatSessionMode = 'weAgentCUI' | 'skillCUI';
 

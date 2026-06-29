@@ -1,4 +1,4 @@
-import { buildOpenWeAgentCUIParams } from '../hwext';
+import { buildOpenWeAgentCUIParams, sendWebSocketMessage } from '../hwext';
 
 describe('buildOpenWeAgentCUIParams', () => {
   it('uses from=weAgent instead of robotId for myAgent external uri', () => {
@@ -21,5 +21,34 @@ describe('buildOpenWeAgentCUIParams', () => {
     expect(result.weAgentUri).toContain('wecodePlace=weAgent');
     expect(result.weAgentUri).toContain('robotId=robot_1');
     expect(result.weAgentUri).not.toContain('from=weAgent');
+  });
+});
+
+
+describe('sendWebSocketMessage', () => {
+  beforeEach(() => {
+    delete (window as any).HWH5EXT;
+  });
+
+  it('passes websocket message params to HWH5EXT', async () => {
+    const bridgeResult = { status: 'success' as const };
+    const bridgeSendWebSocketMessage = jest.fn().mockResolvedValue(bridgeResult);
+    (window as any).HWH5EXT = {
+      sendWebSocketMessage: bridgeSendWebSocketMessage,
+    };
+
+    await expect(sendWebSocketMessage({
+      message: JSON.stringify({
+        action: 'query_slash_commands',
+        welinkSessionId: '42',
+      }),
+    })).resolves.toEqual(bridgeResult);
+
+    expect(bridgeSendWebSocketMessage).toHaveBeenCalledWith({
+      message: JSON.stringify({
+        action: 'query_slash_commands',
+        welinkSessionId: '42',
+      }),
+    });
   });
 });

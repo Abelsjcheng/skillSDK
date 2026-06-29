@@ -30,6 +30,8 @@ import type {
   ReplyPermissionParams,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -2445,6 +2447,49 @@ function buildMockApi(): HWH5EXT {
       }
       scheduleAssistantReply(record, params.content);
       return toSendMessageResponse(userMessage);
+    },
+
+
+    sendWebSocketMessage: async (
+      params: SendWebSocketMessageParams,
+    ): Promise<SendWebSocketMessageResult> => {
+      let payload: { action?: string; welinkSessionId?: string } = {};
+      try {
+        payload = JSON.parse(params.message) as { action?: string; welinkSessionId?: string };
+      } catch {
+        payload = {};
+      }
+
+      if (payload.action === 'query_slash_commands' && payload.welinkSessionId) {
+        emit(payload.welinkSessionId, {
+          type: 'slash_commands_result',
+          messageId: nextId('slash_commands'),
+          welinkSessionId: payload.welinkSessionId,
+          role: 'assistant',
+          status: 'running',
+          slashCommands: [
+            { command: '/new', description: '新建会话' },
+            { command: '/help', description: '查看可用命令' },
+            { command: '/clear', description: '清空当前会话上下文' },
+            { command: '/clear1', description: '清空当前会话上下文' },
+            { command: '/clear2', description: '清空当前会话上下文' },
+            { command: '/clear3', description: '清空当前会话上下文' },
+            { command: '/clear4', description: '清空当前会话上下文' },
+            { command: '/clear5', description: '清空当前会话上下文' },
+            { command: '/clear6', description: '清空当前会话上下文' },
+            { command: '/clear7', description: '清空当前会话上下文' },
+            { command: '/clear8', description: '清空当前会话上下文' },
+            { command: '/clear9', description: '清空当前会话上下文' },
+            { command: '/clear10', description: '清空当前会话上下文' },
+            { command: '/clear11', description: '清空当前会话上下文' },
+            { command: '/clear12', description: '清空当前会话上下文' },
+            { command: '/clear13', description: '清空当前会话上下文' },
+            { command: '/clear14', description: '清空当前会话上下文' },
+          ],
+        });
+      }
+
+      return { status: 'success' };
     },
 
     stopSkill: async (params: StopSkillParams) => {

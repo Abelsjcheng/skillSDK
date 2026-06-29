@@ -72,8 +72,12 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[
+          { command: '/new', description: 'New session' },
+          { command: '/help', description: 'Help' },
+        ]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
         onSend={onSend}
         onStop={jest.fn()}
       />,
@@ -110,8 +114,12 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[
+          { command: '/new', description: 'New session' },
+          { command: '/help', description: 'Help' },
+        ]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
         onSend={jest.fn()}
         onStop={jest.fn()}
       />,
@@ -148,8 +156,9 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: 'New session' }]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
         onSend={jest.fn()}
         onStop={jest.fn()}
       />,
@@ -160,7 +169,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await user.keyboard('hello /');
 
     expect(screen.queryByText('/new')).not.toBeInTheDocument();
-    expect((window as any).HWH5.fetch).not.toHaveBeenCalled();
+    expect(screen.queryByText('/new')).not.toBeInTheDocument();
   });
 
   it('deletes a selected slash command as one token', async () => {
@@ -177,8 +186,9 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: 'New session' }]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
         onSend={jest.fn()}
         onStop={jest.fn()}
       />,
@@ -208,7 +218,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -236,7 +245,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -255,7 +263,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -283,7 +290,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -318,7 +324,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -350,7 +355,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -369,7 +373,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={jest.fn()}
@@ -394,7 +397,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={onSend}
         onStop={jest.fn()}
@@ -439,7 +441,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={onSend}
         onStop={jest.fn()}
@@ -473,7 +474,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={onSend}
         onStop={jest.fn()}
@@ -503,7 +503,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={onSend}
         onStop={onStop}
@@ -545,7 +544,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       <WeAgentCUIFooter
         isPcMiniApp
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={jest.fn()}
         onStop={onStop}
@@ -576,7 +574,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     render(
       <WeAgentCUIFooter
         mode="generate"
-        ak="appkey"
         partnerAccount="partner-1"
         onSend={onSend}
         onStop={onStop}

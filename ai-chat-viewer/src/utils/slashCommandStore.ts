@@ -1,4 +1,4 @@
-import type { SlashCommandItem, SlashCommandStoreValue } from '../types/slashCommand';
+﻿import type { SlashCommandItem, SlashCommandStoreValue } from '../types/slashCommand';
 import { normalizeSlashCommands } from './slashCommand';
 
 const SLASH_COMMAND_TTL_MS = 10 * 60 * 1000;
@@ -50,7 +50,7 @@ async function readMobileStorage(key: string): Promise<unknown> {
   if (typeof getStorage !== 'function') {
     return null;
   }
-  const result = await Promise.resolve(getStorage({ key }));
+  const result = await Promise.resolve(getStorage(key));
   if (result && typeof result === 'object' && 'data' in result) {
     return (result as { data?: unknown }).data;
   }

@@ -20,7 +20,7 @@ import { selectAgentFile } from '../../utils/agentFileSelect';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import { WeLog } from '../../utils/logger';
 import { showToast } from '../../utils/toast';
-import SlashCommandComposer, { SlashCommandComposerHandle } from './SlashCommandComposer';
+import SlashCommandComposer from './SlashCommandComposer';
 import SlashCommandPanel from './SlashCommandPanel';
 
 const MAX_SELECTED_FILES = 20;
@@ -33,8 +33,9 @@ interface SelectedUploadFile {
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,
   mode,
-  ak = '',
   partnerAccount = '',
+  slashCommands,
+  onRequestSlashCommands,
   onSend,
   onStop,
   leftActions,
@@ -56,7 +57,12 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
   const isBusy = isGenerating || isUploadingFiles;
-  const slashSuggest = useSlashCommandSuggest({ ak, partnerAccount, isPcMiniApp });
+  const slashSuggest = useSlashCommandSuggest({
+    partnerAccount,
+    isPcMiniApp,
+    slashCommands,
+    onRequestCommands: onRequestSlashCommands,
+  });
   const fileUploadTooltipText = t('weAgent.fileUploadToolTip');
   const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
     { mode: 'enter', label: t('weAgent.shortcut.enterSend') },

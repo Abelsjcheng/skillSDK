@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SlashCommandItem, SlashCommandToken, SlashCommandTrigger } from '../types/slashCommand';
-import { filterSlashCommands, findSlashTrigger, replaceSlashTrigger } from '../utils/slashCommand';
-import { querySlashCommands } from '../utils/slashCommandApi';
+import {
+  filterSlashCommands,
+  findSlashTrigger,
+  normalizeSlashCommands,
+  replaceSlashTrigger,
+} from '../utils/slashCommand';
 import { readSlashCommandStore, writeSlashCommandStore } from '../utils/slashCommandStore';
 import { reportSlashCommandPanelTrigger, reportSlashCommandSelect } from '../utils/uemUtil';
 
 const REQUEST_THROTTLE_MS = 1000;
 const FAILED_COOLDOWN_MS = 3000;
-const inFlightRequests = new Map<string, Promise<SlashCommandItem[]>>();
+const inFlightRequests = new Map<string, Promise<void>>();
 const lastRequestAt = new Map<string, number>();
 const failedAt = new Map<string, number>();
 
@@ -18,9 +22,10 @@ export function clearSlashCommandSuggestStateForTest(): void {
 }
 
 export interface UseSlashCommandSuggestOptions {
-  ak?: string;
   partnerAccount?: string;
   isPcMiniApp?: boolean;
+  slashCommands?: SlashCommandItem[];
+  onRequestCommands?: () => Promise<void> | void;
 }
 
 interface SelectSlashCommandResult {
@@ -30,11 +35,12 @@ interface SelectSlashCommandResult {
 }
 
 export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
-  const ak = options.ak?.trim() ?? '';
   const partnerAccount = options.partnerAccount?.trim() ?? '';
   const isPcMiniApp = Boolean(options.isPcMiniApp);
+  const slashCommands = options.slashCommands;
+  const onRequestCommands = options.onRequestCommands;
   const [commands, setCommands] = useState<SlashCommandItem[]>([]);
-  const [commandSource, setCommandSource] = useState<'storage' | 'db' | 'memory' | 'network'>('network');
+  const [commandSource, setCommandSource] = useState<'storage' | 'db' | 'memory' | 'websocket'>('websocket');
   const [trigger, setTrigger] = useState<SlashCommandTrigger | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const fallbackReadTriedRef = useRef(false);
@@ -44,6 +50,18 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
     [commands, trigger],
   );
   const isOpen = Boolean(trigger && filteredCommands.length > 0);
+
+  useEffect(() => {
+    const nextCommands = normalizeSlashCommands(slashCommands ?? []);
+    if (!partnerAccount || !slashCommands) {
+      return;
+    }
+    fallbackReadTriedRef.current = false;
+    failedAt.delete(partnerAccount);
+    setCommandSource('websocket');
+    setCommands(nextCommands);
+    void writeSlashCommandStore({ partnerAccount, isPcMiniApp, commands: nextCommands });
+  }, [isPcMiniApp, slashCommands, partnerAccount]);
 
   const loadCommands = useCallback(async () => {
     if (!partnerAccount) {
@@ -61,17 +79,15 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
       return storedCommands;
     }
 
-    if (!ak) {
+    if (!onRequestCommands) {
       return [];
     }
 
     const now = Date.now();
     const existingRequest = inFlightRequests.get(partnerAccount);
     if (existingRequest) {
-      const nextCommands = await existingRequest;
-      setCommandSource('network');
-      setCommands(nextCommands);
-      return nextCommands;
+      await existingRequest;
+      return commands;
     }
 
     const previousRequestAt = lastRequestAt.get(partnerAccount) ?? 0;
@@ -80,18 +96,15 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
       return commands;
     }
 
-    const request = querySlashCommands({ ak, partnerAccount });
+    const request = Promise.resolve(onRequestCommands());
     inFlightRequests.set(partnerAccount, request);
     lastRequestAt.set(partnerAccount, now);
 
     try {
-      const nextCommands = await request;
+      await request;
       failedAt.delete(partnerAccount);
       fallbackReadTriedRef.current = false;
-      setCommandSource('network');
-      setCommands(nextCommands);
-      await writeSlashCommandStore({ partnerAccount, isPcMiniApp, commands: nextCommands });
-      return nextCommands;
+      return commands;
     } catch (_error) {
       failedAt.set(partnerAccount, Date.now());
       if (!fallbackReadTriedRef.current) {
@@ -111,7 +124,7 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
     } finally {
       inFlightRequests.delete(partnerAccount);
     }
-  }, [ak, commands, isPcMiniApp, partnerAccount]);
+  }, [commands, isPcMiniApp, onRequestCommands, partnerAccount]);
 
   const handleValueChange = useCallback((value: string, cursor: number) => {
     const nextTrigger = findSlashTrigger(value, cursor);
