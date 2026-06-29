@@ -43,6 +43,7 @@ import {
 import {
   EXCLUSIVE_ASSISTANT_BIZ_TAG,
   resolveAssistantTag,
+  UNIVERSAL_ASSISTANT_BIZ_TAG,
 } from '../utils/assistantTag';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
@@ -160,11 +161,14 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
   const isExclusiveAssistant = isInternalAssistant && bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG;
+  const shouldShowAppCredential = bizRobotTag
+    ? bizRobotTag !== EXCLUSIVE_ASSISTANT_BIZ_TAG && bizRobotTag !== UNIVERSAL_ASSISTANT_BIZ_TAG
+    : !isInternalAssistant;
   const secret = detail?.appSecret ?? '';
   const displaySecret = isSecretVisible ? secret : maskSecret(secret);
 
-  const orgLabel = isInternalAssistant ? t('assistantDetail.capabilityProvider') : t('assistantDetail.appId');
-  const orgValue = isInternalAssistant ? displayTag : (detail?.appKey ?? '');
+  const orgLabel = shouldShowAppCredential ? t('assistantDetail.appId') : t('assistantDetail.capabilityProvider');
+  const orgValue = shouldShowAppCredential ? (detail?.appKey ?? '') : displayTag;
   const ownerLabel = t('assistantDetail.secret');
   const ownerValue = displaySecret;
   const hasDescription = Boolean(displayDescription.trim());
@@ -172,15 +176,15 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const hasOrgValue = Boolean(orgValue.trim());
   const hasSecretValue = Boolean(secret.trim());
   const showCreatorRow = !isExclusiveAssistant && hasCreator;
-  const showOrgRow = !isExclusiveAssistant && hasOrgValue;
-  const showSecretRow = !isInternalAssistant && hasSecretValue;
+  const showOrgRow = shouldShowAppCredential && hasOrgValue;
+  const showSecretRow = shouldShowAppCredential && hasSecretValue;
   const showIntroCard = hasDescription || showCreatorRow;
   const showOrgCard = showOrgRow || showSecretRow;
 
   const toggleSecretVisible = useCallback(() => {
-    if (isInternalAssistant) return;
+    if (!shouldShowAppCredential) return;
     setIsSecretVisible((previous) => !previous);
-  }, [isInternalAssistant]);
+  }, [shouldShowAppCredential]);
 
   const handleCopy = useCallback(async (content: string, successMessage: string) => {
     if (!content) {
@@ -197,7 +201,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
   useEffect(() => {
     setIsSecretVisible(false);
-  }, [isInternalAssistant, detail?.partnerAccount]);
+  }, [detail?.partnerAccount, shouldShowAppCredential]);
 
   const handleClosePage = useCallback(() => {
     dispatchAssistantCloseEvent();
@@ -380,7 +384,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   ), []);
 
   const orgValueNode = showOrgRow ? (
-    isInternalAssistant || !isPc ? (
+    !isPc ? (
       <span className="assistant-detail__org-value">{orgValue}</span>
     ) : (
       <div className="assistant-detail__value-with-actions">
