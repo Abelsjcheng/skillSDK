@@ -1,4 +1,5 @@
-﻿import React, { useMemo } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -10,6 +11,12 @@ import AvatarImage from './AvatarImage';
 import { copyTextToClipboard } from '../utils/clipboard';
 import copyIcon from '../imgs/icon-copy.svg';
 import sendImIcon from '../imgs/send_icon.svg';
+import docIcon from '../imgs/doc.png';
+import excelIcon from '../imgs/excel.png';
+import txtIcon from '../imgs/txt.png';
+import videoIcon from '../imgs/video.png';
+import unknownFileIcon from '../imgs/unknowFile.png';
+import downloadFileIcon from '../imgs/downloadFile.png';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
@@ -29,6 +36,13 @@ import defaultAvatar from '../imgs/defaultAvatar.png';
 import 'katex/dist/katex.min.css';
 import { showToast } from '../utils/toast';
 import { WeLog } from '../utils/logger';
+import {
+  formatUMFileSize,
+  getUMFileIconType,
+  parseUMContent,
+  type UMAsset,
+  type UMContentSegment,
+} from '../utils/umDecode';
 
 function formatMessageTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -77,6 +91,146 @@ function isPermissionPartReadonly(part: MessagePart, readonly: boolean): boolean
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
 const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
 
+function getFileCardIconSrc(asset: UMAsset): string {
+  switch (getUMFileIconType(asset.fileName, asset.fileType)) {
+    case 'doc':
+      return docIcon;
+    case 'excel':
+      return excelIcon;
+    case 'txt':
+      return txtIcon;
+    case 'video':
+      return videoIcon;
+    case 'unknown':
+    default:
+      return unknownFileIcon;
+  }
+}
+
+function getFileAccessUrl(asset: UMAsset): string {
+  return asset.extProps.cdnUrl || asset.url;
+}
+
+function createUMAssetFromMessagePart(part: MessagePart): UMAsset {
+  const fileMime = part.fileMime?.toLowerCase() ?? '';
+  return {
+    raw: '',
+    url: part.fileUrl ?? '',
+    fileType: fileMime.startsWith('video/') ? 'Video' : 'File',
+    fileName: part.fileName || '\u6587\u4ef6',
+    extProps: {},
+  };
+}
+
+interface UMFileCardProps {
+  asset: UMAsset;
+}
+
+const UMFileCard: React.FC<UMFileCardProps> = ({ asset }) => {
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const accessUrl = getFileAccessUrl(asset);
+  const canAccessFile = Boolean(accessUrl);
+  const fileSizeText = asset.fileSize === undefined ? '\u672a\u77e5\u5927\u5c0f' : formatUMFileSize(asset.fileSize);
+
+  useEffect(() => {
+    if (!menuPosition) {
+      return undefined;
+    }
+
+    const closeMenu = () => setMenuPosition(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', closeMenu, true);
+
+    return () => {
+      document.removeEventListener('click', closeMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', closeMenu, true);
+    };
+  }, [menuPosition]);
+
+  const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setMenuPosition({ x: event.clientX, y: event.clientY });
+  };
+
+  const handleOpenFile = () => {
+    if (!accessUrl) {
+      showToast('\u6587\u4ef6\u5730\u5740\u4e0d\u53ef\u7528');
+      return;
+    }
+    window.open(accessUrl, '_blank', 'noopener,noreferrer');
+    setMenuPosition(null);
+  };
+
+  const handleDownloadFile = () => {
+    if (!accessUrl) {
+      showToast('\u6587\u4ef6\u5730\u5740\u4e0d\u53ef\u7528');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = accessUrl;
+    link.download = asset.fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setMenuPosition(null);
+  };
+
+  const menuNode = menuPosition
+    ? createPortal(
+      <div
+        className="um-file-card-menu"
+        role="menu"
+        style={{ left: menuPosition.x, top: menuPosition.y }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button type="button" role="menuitem" onClick={handleOpenFile} disabled={!canAccessFile}>
+          {'\u6253\u5f00\u6587\u4ef6'}
+        </button>
+        <button type="button" role="menuitem" disabled>
+          {'\u6253\u5f00\u6587\u4ef6\u5939'}
+        </button>
+        <button type="button" role="menuitem" onClick={handleDownloadFile} disabled={!canAccessFile}>
+          {'\u4e0b\u8f7d'}
+        </button>
+      </div>,
+      document.body,
+    )
+    : null;
+
+  return (
+    <>
+      <div className="um-file-card" onContextMenu={handleContextMenu} title={asset.fileName}>
+        <img className="um-file-card__thumb" src={getFileCardIconSrc(asset)} alt="" aria-hidden="true" draggable="false" />
+        <div className="um-file-card__info">
+          <div className="um-file-card__name">{asset.fileName}</div>
+          <div className="um-file-card__meta">
+            <span className="um-file-card__size">{fileSizeText}</span>
+            <button
+              type="button"
+              className="um-file-card__download"
+              onClick={handleDownloadFile}
+              disabled={!canAccessFile}
+              aria-label={`\u4e0b\u8f7d${asset.fileName}`}
+            >
+              <img src={downloadFileIcon} alt="" aria-hidden="true" draggable="false" />
+            </button>
+          </div>
+        </div>
+      </div>
+      {menuNode}
+    </>
+  );
+};
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   welinkSessionId,
@@ -112,6 +266,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     </ReactMarkdown>
   );
 
+  const shouldRenderUMAsset = (segment: UMContentSegment): boolean => (
+    segment.type === 'asset' && (segment.asset.fileType === 'File' || segment.asset.fileType === 'Video')
+  );
+
+  const renderPlainText = (content: string, key?: string) => (
+    <span key={key} style={{ whiteSpace: 'pre-wrap' }}>{content}</span>
+  );
+
+  const renderContentWithUM = (content: string, keyPrefix: string, renderAsMarkdown: boolean) => {
+    const segments = parseUMContent(content);
+    if (!segments.some(shouldRenderUMAsset)) {
+      return renderAsMarkdown ? renderMarkdown(content) : renderPlainText(content);
+    }
+
+    return (
+      <div className="um-content">
+        {segments.map((segment, index) => {
+          const key = `${keyPrefix}-${index}`;
+          if (segment.type === 'asset') {
+            if (segment.asset.fileType !== 'File' && segment.asset.fileType !== 'Video') {
+              return renderAsMarkdown
+                ? <div key={key} className="um-content__text">{renderMarkdown(segment.asset.raw)}</div>
+                : renderPlainText(segment.asset.raw, key);
+            }
+            return <UMFileCard key={key} asset={segment.asset} />;
+          }
+
+          return renderAsMarkdown
+            ? <div key={key} className="um-content__text">{renderMarkdown(segment.content)}</div>
+            : renderPlainText(segment.content, key);
+        })}
+      </div>
+    );
+  };
+
   const renderPart = (part: MessagePart, nested = false): React.ReactNode => {
     switch (part.type) {
       case 'thinking':
@@ -142,19 +331,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         );
 
       case 'file':
-        return (
-          <div key={part.partId} className="file-part">
-            <span className="file-part__icon">附件</span>
-            {part.fileUrl ? (
-              <a href={part.fileUrl} target="_blank" rel="noopener noreferrer">
-                {part.fileName ?? '文件'}
-              </a>
-            ) : (
-              <span>{part.fileName ?? '文件'}</span>
-            )}
-          </div>
-        );
-
+        return <UMFileCard key={part.partId} asset={createUMAssetFromMessagePart(part)} />;
       case 'error':
         return <ErrorBlock key={part.partId} part={part} />;
 
@@ -173,7 +350,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       default:
         return (
           <div key={part.partId} className="text-part">
-            {renderMarkdown(part.content)}
+            {renderContentWithUM(part.content, part.partId, normalizedRole !== 'user')}
           </div>
         );
     }
@@ -196,9 +373,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content);
+      return renderContentWithUM(message.content, message.id, true);
     }
-    return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
+    return renderContentWithUM(message.content, message.id, false);
   };
 
   const handleCopy = () => {

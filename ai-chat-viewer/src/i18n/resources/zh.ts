@@ -2,6 +2,7 @@ export const zh = {
   'versionNotSupported': '当前客户端版本过低，请升级后再试',
   'common.close': '关闭',
   'common.back': '返回',
+  'common.delete': '删除',
   'common.service': '客服',
   'common.submit': '提交',
   'common.send': '发送',
@@ -14,6 +15,11 @@ export const zh = {
   'common.copySuccess': '复制成功',
   'pending.generating': '正在生成中，请稍等...',
   'weAgent.inputPlaceholder': '有问题尽管问我~',
+  'weAgent.fileUpload': '文件上传',
+  'weAgent.fileUploadToolTip': '*支持的文件类型：doc，docx，ppt，pptx，xls，xlsx，txt，pdf，jpg，jpeg，png，msg，md，zip，单个文件不超过50M，单次最多上传20个；',
+  'weAgent.fileUploadFailed': '文件上传失败',
+  'weAgent.fileSelectFailed': '选择文件失败',
+  'weAgent.selectedFiles': '已选文件',
   'weAgent.shortcut.enterSend': 'Enter键发送消息',
   'weAgent.shortcut.ctrlEnterSend': 'Ctrl+Enter键发送消息',
   'weAgent.shortcut.enterAction': 'Enter发送',
@@ -147,3 +153,4 @@ export const zh = {
   'createAssistant.descriptionInvalidHint': '仅支持汉字数字字母/常用标点符号',
   'permission.allowOnce': '\u5141\u8bb8\u4e00\u6b21',
 } as const;
+

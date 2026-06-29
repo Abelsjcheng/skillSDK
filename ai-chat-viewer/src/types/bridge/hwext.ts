@@ -349,8 +349,27 @@ export interface HWH5EXT {
   openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<OpenWeAgentCUIResult> | OpenWeAgentCUIResult;
 }
 
+export interface AgentOpenDialogOptions {
+  title: string;
+  properties: Array<'openFile' | string>;
+  filters: Array<{
+    name: string;
+    extensions: string[];
+  }>;
+}
+
+export interface AgentOpenDialogResult {
+  canceled: boolean;
+  filePaths: string[];
+}
+
 export interface Pedestal {
   callMethod: (method: string, payload?: unknown) => Promise<unknown> | unknown;
+  remote?: {
+    dialog?: {
+      showOpenDialog?: (options: AgentOpenDialogOptions) => Promise<AgentOpenDialogResult> | AgentOpenDialogResult;
+    };
+  };
 }
 
 export interface HWH5Bridge {

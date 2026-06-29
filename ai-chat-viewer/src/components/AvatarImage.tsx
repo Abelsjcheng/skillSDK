@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { AvatarImageProps } from '../types/components';
 import { isRemoteAvatarUrl } from '../utils/avatar';
-
 const loadedRemoteAvatarSet = new Set<string>();
 
 const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) => {

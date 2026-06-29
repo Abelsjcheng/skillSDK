@@ -3,6 +3,7 @@ export const en = {
   'common.back': 'Back',
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
+  'common.delete': 'Delete',
   'common.service': 'Support',
   'common.submit': 'Submit',
   'common.send': 'Send',
@@ -16,6 +17,11 @@ export const en = {
   'versionNotSupported': 'Your client version is too low. Please upgrade and try again',
   'pending.generating': 'Generating, please wait...',
   'weAgent.inputPlaceholder': 'Ask me anything',
+  'weAgent.fileUpload': 'File upload',
+  'weAgent.fileUploadToolTip': '*Supported file types: doc, docx, ppt, pptx, xls, xlsx, txt, pdf, jpg, jpeg, png, msg, md, zip. Each file must be no larger than 50 MB, with up to 20 files per upload.',
+  'weAgent.fileUploadFailed': 'File upload failed',
+  'weAgent.fileSelectFailed': 'Failed to select file',
+  'weAgent.selectedFiles': 'Selected files',
   'weAgent.shortcut.enterSend': 'Send with Enter',
   'weAgent.shortcut.ctrlEnterSend': 'Send with Ctrl+Enter',
   'weAgent.shortcut.enterAction': 'Send with Enter',
@@ -147,3 +153,4 @@ export const en = {
   'switchAssistant.title': 'Switch Agent',
   'switchAssistant.confirmSwitch': 'Confirm switch',
 } as const;
+
