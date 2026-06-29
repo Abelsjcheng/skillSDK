@@ -370,7 +370,11 @@ function App({ assistantAccount = '' }: AppProps) {
     setWelinkSessionId(newSession.welinkSessionId);
   }, [createSessionForAssistant, resolveAssistantDetail]);
 
-  const handleSessionDeleted = useCallback(async (deletedSessionId: string, refreshAfterDelete: boolean) => {
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    shouldCreateFallback: boolean,
+  ) => {
     const normalizedDeletedSessionId = deletedSessionId.trim();
     if (!normalizedDeletedSessionId) {
       return;
@@ -389,6 +393,9 @@ function App({ assistantAccount = '' }: AppProps) {
       session.resetTransientState();
       if (nextSession) {
         setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!shouldCreateFallback) {
+        setWelinkSessionId(null);
         setIsSwitchingSessionAfterDelete(false);
       } else {
         try {
@@ -413,11 +420,11 @@ function App({ assistantAccount = '' }: AppProps) {
   }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
 
   const handleSessionDeletedFromAction = useCallback((deletedSessionId: string) => (
-    handleSessionDeleted(deletedSessionId, false)
+    handleSessionDeleted(deletedSessionId, false, true)
   ), [handleSessionDeleted]);
 
   const handleSessionDeletedFromPush = useCallback((deletedSessionId: string) => (
-    handleSessionDeleted(deletedSessionId, true)
+    handleSessionDeleted(deletedSessionId, true, false)
   ), [handleSessionDeleted]);
 
   useEffect(() => {
