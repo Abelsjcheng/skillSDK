@@ -19,6 +19,7 @@
 | `mock-question` | question | 触发追问卡片 |
 | `mock-permission` | permission | 触发权限卡片，点按钮后回 `permission.reply` |
 | `mock-file` | file | 触发文件卡片 |
+| `mock-um-file` | UM file | Return UM encoded text and render file card through UM decode |
 | `mock-step` | step | 触发 `step.start` / `step.done`，带 `tokens/cost` |
 | `mock-snapshot` | snapshot | 触发快照恢复，替换当前消息列表 |
 | `mock-streaming` | streaming | 先出 `streaming`，再继续补发 `thinking/text` |

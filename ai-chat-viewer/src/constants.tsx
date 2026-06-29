@@ -5,7 +5,7 @@ export function isPcMiniApp(): boolean {
     return false;
   }
 
-  return false;
+  return Boolean(window.Pedestal?.callMethod);
 }
 
 function resolveIsProEnv(): boolean {
@@ -15,7 +15,7 @@ function resolveIsProEnv(): boolean {
       if (_APPENV === 'uat') {
         return false;
       } else {
-        return true;
+        return Boolean(window.Pedestal?.callMethod);
       }
     } catch (error) {
       return true
@@ -44,7 +44,7 @@ export function isIosMobileDevice(): boolean {
 
   const userAgent = navigator.userAgent || '';
   if (/iPhone|iPad|iPod|mac/i.test(userAgent)) {
-    return true;
+    return Boolean(window.Pedestal?.callMethod);
   }
 
   return false;
@@ -57,7 +57,7 @@ export function isHarmonyMobileDevice(): boolean {
 
   const userAgent = navigator.userAgent || '';
   if (/ArkWeb/.test(userAgent)) {
-    return true;
+    return Boolean(window.Pedestal?.callMethod);
   } else {
     return false;
   }
@@ -70,7 +70,7 @@ export function isAndroidMobileDevice(): boolean {
 
   const userAgent = navigator.userAgent || '';
   if (/Android|SymbianOS|Windows Phone/.test(userAgent)) {
-    return true;
+    return Boolean(window.Pedestal?.callMethod);
   } else {
     return false;
   }

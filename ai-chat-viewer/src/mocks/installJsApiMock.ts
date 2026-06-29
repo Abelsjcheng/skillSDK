@@ -40,6 +40,8 @@ import type {
   WeAgentDetailsArrayResult,
   WeAgentListResult,
   WeAgentUriResult,
+  AgentOpenDialogOptions,
+  AgentOpenDialogResult,
 } from '../types/bridge';
 import { HOST } from '../constants';
 import { WeLog } from '../utils/logger';
@@ -543,6 +545,17 @@ function buildMockFileUrl(fileName: string): string {
   return `${URL_BASE}/downloads/${encodeURIComponent(fileName)}`;
 }
 
+const MOCK_SELECTED_UPLOAD_FILE_PATH = 'C:\\mock\\mock-release-notes.md';
+
+function getMockFileNameFromPath(filePath: string): string {
+  return filePath.split(/[\\/]/).filter(Boolean).pop() || 'mock-release-notes.md';
+}
+
+function buildMockUploadUMLink(fileName: string): string {
+  const fileUrl = buildMockFileUrl(fileName);
+  return `/:um_begin{${fileUrl}|File|2048000|${fileName}|0|;;mock_upload_access_code|isOriginalImg:0;md5:mockupload123;cdnUrl:${fileUrl}}/:um_end`;
+}
+
 function matchesMockKeyword(normalized: string, keywords: string[]): boolean {
   return keywords.some((keyword) => normalized.includes(keyword));
 }
@@ -570,6 +583,13 @@ function resolveSubagentName(subagentSessionId: string): string {
 
 function resolveMockReplyScenario(content: string): MockReplyScenario {
   const normalized = content.trim().toLowerCase();
+
+  if (content.includes('/:um_begin')) {
+    return {
+      type: 'normal',
+      assistantContent: 'Mock upload received. The file card above is rendered from the sent UM link.',
+    };
+  }
 
   if (
     normalized.includes('触发session.error')
@@ -614,18 +634,11 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
     };
   }
 
-  if (matchesMockKeyword(normalized, ['mock-codeblock', 'trigger-codeblock', '触发代码块样式'])) {
+  if (matchesMockKeyword(normalized, ['mock-codeblock', 'trigger-codeblock'])) {
     return {
       type: 'normal',
       assistantContent: [
-        '使用 Python 的 PIL/Pillow 库去去除背景。代码逻辑分以下四步：',
-        '',
-        '1. 把图片转成 RGBA 模式（带透明通道）',
-        '2. 识别背景颜色（灰色区域）',
-        '3. 把那些像素点的 alpha 通道设为 0（变透明）',
-        '4. 导出处理后的 PNG 图片',
-        '',
-        '具体代码：',
+        'Code block rendering preview:',
         '',
         '```cpp',
         'class Solution {',
@@ -635,19 +648,6 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
         '        for (int battery : batteryPercentages) {',
         '            if (battery - tested > 0) {',
         '                tested++;',
-        '            }',
-        '        }',
-        '        return tested;',
-        '    }',
-        '};',
-        '',
-        'class Solution {',
-        'public:',
-        '    int countTestedDevices(vector<int>& batteryPercentages) {',
-        '        int tested = 0;',
-        '        for (int i = 0; i < static_cast<int>(batteryPercentages.size()); ++i) {',
-        '            if (batteryPercentages[i] > tested) {',
-        '                tested += 1;',
         '            }',
         '        }',
         '        return tested;',
@@ -746,6 +746,16 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
       title: 'Need permission to write a markdown file',
       content: 'The assistant wants to create a case document under docs/.',
       assistantContent: 'Permission request emitted. Please approve or reject it from the card.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-um-file', 'trigger-um-file'])) {
+    const fileName = 'mock-um-release-notes.docx';
+    const fileUrl = buildMockFileUrl(fileName);
+    const umContent = `/:um_begin{${fileUrl}|File|2048000|${fileName}|0|;;mock_access_code|isOriginalImg:0;md5:mockum123;cdnUrl:${fileUrl}}/:um_end`;
+    return {
+      type: 'normal',
+      assistantContent: ['UM decode file card preview:', '', umContent].join('\n'),
     };
   }
 
@@ -900,8 +910,12 @@ function emit(sessionId: string, payload: MockEmitPayload): void {
     emittedAt: payload.emittedAt ?? nowIso(),
   };
 
+  window.dispatchEvent(new CustomEvent('agentSkills_registerSessionListener_onMessage', {
+    detail: { msg: message },
+  }));
+
   const listener = listeners.get(sessionId);
-  if (!listener) {
+  if (!listener?.onMessage) {
     return;
   }
 
@@ -2688,6 +2702,73 @@ function buildMockApi(): HWH5EXT {
   };
 }
 
+function ensureMockPedestalBridge(): void {
+  const existingPedestal = window.Pedestal;
+  const existingRemote = existingPedestal?.remote ?? {};
+  const existingDialog = existingRemote.dialog ?? {};
+
+  const callMockApi = async (funName: string, params?: unknown): Promise<unknown> => {
+    if (funName === 'registerSessionListener' || funName === 'unregisterSessionListener') {
+      return undefined;
+    }
+
+    const mockApi = buildMockApi() as Record<string, unknown>;
+    const handler = mockApi[funName];
+    if (typeof handler !== 'function') {
+      throw new Error(`Mock Pedestal.callMethod does not implement agent skill API ${funName}`);
+    }
+
+    return (handler as (params?: unknown) => Promise<unknown> | unknown)(params);
+  };
+
+  window.Pedestal = {
+    ...existingPedestal,
+    callMethod: async (method: string, payload?: unknown): Promise<unknown> => {
+      if (method === 'method://agentSkillsDialog/uploadFile') {
+        const uploadPayload = (payload ?? {}) as { fileName?: string; filePath?: string; uploadId?: string };
+        const fileName = uploadPayload.fileName || getMockFileNameFromPath(uploadPayload.filePath || MOCK_SELECTED_UPLOAD_FILE_PATH);
+        return {
+          success: 'true',
+          uploadId: uploadPayload.uploadId,
+          umLink: buildMockUploadUMLink(fileName),
+          umUrl: buildMockFileUrl(fileName),
+          umPlainAccessCode: 'mock_upload_access_code',
+        };
+      }
+
+      if (method === 'method://agentSkills/handleSdk') {
+        const sdkPayload = (payload ?? {}) as { funName?: string; params?: unknown };
+        if (!sdkPayload.funName) {
+          throw new Error('Mock Pedestal.callMethod missing funName for handleSdk');
+        }
+        return callMockApi(sdkPayload.funName, sdkPayload.params);
+      }
+
+      const dialogPrefix = 'method://agentSkillsDialog/';
+      if (method.startsWith(dialogPrefix)) {
+        return callMockApi(method.slice(dialogPrefix.length), payload);
+      }
+
+      if (typeof existingPedestal?.callMethod === 'function') {
+        return existingPedestal.callMethod(method, payload);
+      }
+
+      throw new Error(`Mock Pedestal.callMethod does not implement ${method}`);
+    },
+    remote: {
+      ...existingRemote,
+      dialog: {
+        ...existingDialog,
+        showOpenDialog: async (options: AgentOpenDialogOptions): Promise<AgentOpenDialogResult> => (
+          typeof existingDialog.showOpenDialog === 'function'
+            ? existingDialog.showOpenDialog(options)
+            : { canceled: false, filePaths: [MOCK_SELECTED_UPLOAD_FILE_PATH] }
+        ),
+      },
+    },
+  };
+}
+
 export function installJsApiMock(): void {
   try {
     if (typeof window === 'undefined') {
@@ -2703,9 +2784,6 @@ export function installJsApiMock(): void {
       return;
     }
 
-    if (typeof window.Pedestal?.callMethod === 'function') {
-      return;
-    }
 
     if (window.HWH5EXT && !window.__AI_CHAT_VIEWER_JSAPI_MOCK__ && !enableFromQuery) {
       return;
@@ -2713,6 +2791,7 @@ export function installJsApiMock(): void {
 
     seedMockData();
     ensureMockHWH5Bridge();
+    ensureMockPedestalBridge();
 
     if (!window.HWH5EXT || enableFromQuery) {
       window.HWH5EXT = buildMockApi();
@@ -2721,7 +2800,7 @@ export function installJsApiMock(): void {
     window.__AI_CHAT_VIEWER_JSAPI_MOCK__ = true;
     ensureDefaultMockRouteQueryInHash();
   } catch (error) {
-    // mock 安装失败不应阻断页面渲染，避免首屏白屏
+    // Mock installation should not block initial rendering.
     WeLog(`installJsApiMock installJsApiMock failed | error=${JSON.stringify(error)}`);
   }
 }

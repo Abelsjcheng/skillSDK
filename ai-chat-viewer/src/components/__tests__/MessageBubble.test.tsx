@@ -1,4 +1,38 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children?: string }) => {
+    const React = require('react');
+    const content = String(children ?? '');
+    const lines = content.split(/\n/).filter(Boolean);
+    if (lines.every((line) => line.startsWith('- '))) {
+      return React.createElement(
+        'ul',
+        null,
+        lines.map((line, index) => React.createElement('li', { key: index }, line.slice(2))),
+      );
+    }
+    return React.createElement(
+      React.Fragment,
+      null,
+      content.split(/\n\s*\n/).map((paragraph, index) => (
+        React.createElement('p', { key: index }, paragraph)
+      )),
+    );
+  },
+}));
+
+jest.mock('remark-gfm', () => jest.fn());
+jest.mock('remark-breaks', () => jest.fn());
+jest.mock('remark-math', () => jest.fn());
+jest.mock('rehype-raw', () => jest.fn());
+jest.mock('rehype-katex', () => jest.fn());
+jest.mock('../markdownComponents', () => ({
+  createMarkdownComponents: () => ({}),
+  normalizeMarkdownHtml: (content: string) => content,
+}));
+
 import { MessageBubble } from '../MessageBubble';
 import type { Message, MessagePart } from '../../types';
 
@@ -116,5 +150,75 @@ describe('MessageBubble', () => {
 
     expect(container.querySelector('.permission-card')).toBeInTheDocument();
     expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
+  });
+
+  it('renders File UM content as a file card without exposing raw UM text', () => {
+    const umContent = 'before /:um_begin{https://origin.example/report.docx|File|2048|report.docx|||cdnUrl:https://cdn.example/report.docx}/:um_end after';
+    const { container } = render(
+      <MessageBubble message={createAssistantMessage(umContent)} welinkSessionId="session-1" />,
+    );
+
+    expect(screen.getByText('report.docx')).toBeInTheDocument();
+    expect(screen.getByText('2KB')).toBeInTheDocument();
+    const card = container.querySelector('.um-file-card');
+    const meta = container.querySelector('.um-file-card__meta');
+    expect(card).toBeInTheDocument();
+    expect(meta?.querySelector('.um-file-card__download')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('/:um_begin');
+  });
+
+  it('renders multiple UM file cards from mixed content', () => {
+    const umContent = [
+      '/:um_begin{https://origin.example/a.doc|File|1024|a.doc||||}/:um_end',
+      'text between',
+      '/:um_begin{https://origin.example/b.mp4|Video|1048576|b.mp4|12|||}/:um_end',
+    ].join(' ');
+    const { container } = render(
+      <MessageBubble message={createAssistantMessage(umContent)} welinkSessionId="session-1" />,
+    );
+
+    expect(container.querySelectorAll('.um-file-card')).toHaveLength(2);
+    expect(screen.getByText('a.doc')).toBeInTheDocument();
+    expect(screen.getByText('b.mp4')).toBeInTheDocument();
+    expect(screen.getByText('1MB')).toBeInTheDocument();
+  });
+
+  it('shows the UM file card context menu on right click', () => {
+    const umContent = '/:um_begin{https://origin.example/report.docx|File|2048|report.docx||||}/:um_end';
+    const { container } = render(
+      <MessageBubble message={createAssistantMessage(umContent)} welinkSessionId="session-1" />,
+    );
+
+    const card = container.querySelector('.um-file-card');
+    expect(card).toBeInTheDocument();
+    fireEvent.contextMenu(card as Element, { clientX: 24, clientY: 36 });
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.getByText('\u6253\u5f00\u6587\u4ef6')).toBeInTheDocument();
+    expect(screen.getByText('\u6253\u5f00\u6587\u4ef6\u5939')).toBeInTheDocument();
+    expect(screen.getByText('\u4e0b\u8f7d')).toBeInTheDocument();
+  });
+
+  it('uses the UM file card for structured file parts', () => {
+    const filePart: MessagePart = {
+      partId: 'file-part-1',
+      type: 'file',
+      content: '',
+      isStreaming: false,
+      fileName: 'existing.pdf',
+      fileUrl: 'https://origin.example/existing.pdf',
+      fileMime: 'application/pdf',
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createHistoryAssistantMessage([filePart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    expect(container.querySelector('.um-file-card')).toBeInTheDocument();
+    expect(screen.getByText('existing.pdf')).toBeInTheDocument();
+    expect(container.querySelector('.file-part')).not.toBeInTheDocument();
   });
 });
