@@ -48,7 +48,7 @@ export const zh = {
   'weAgent.deleteSession': '删除',
   'weAgent.confirmDeleteSession': '删除会话',
   'weAgent.confirmDeleteSessionTitle': '确认删除会话吗？',
-  'weAgent.confirmDeleteSessionDescription': '删除会话后不可恢复',
+  'weAgent.confirmDeleteSessionDescription': '删除会话后不可恢复。',
   'weAgent.deleteSessionFailed': '删除会话失败',
   'weAgent.today': '今天',
   'weAgent.yesterday': '昨天',

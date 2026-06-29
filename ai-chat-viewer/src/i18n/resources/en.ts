@@ -50,7 +50,7 @@ export const en = {
   'weAgent.deleteSession': 'Delete',
   'weAgent.confirmDeleteSession': 'Delete chat',
   'weAgent.confirmDeleteSessionTitle': 'Delete Chat',
-  'weAgent.confirmDeleteSessionDescription': 'Deleted chats cannot be restored',
+  'weAgent.confirmDeleteSessionDescription': 'Deleted chats cannot be restored.',
   'weAgent.deleteSessionFailed': 'Failed to delete session',
   'weAgent.today': 'Today',
   'weAgent.yesterday': 'yesterday',
