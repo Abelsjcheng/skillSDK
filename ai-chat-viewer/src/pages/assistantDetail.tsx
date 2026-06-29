@@ -167,19 +167,23 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const secret = detail?.appSecret ?? '';
   const displaySecret = isSecretVisible ? secret : maskSecret(secret);
 
-  const orgLabel = shouldShowAppCredential ? t('assistantDetail.appId') : t('assistantDetail.capabilityProvider');
-  const orgValue = shouldShowAppCredential ? (detail?.appKey ?? '') : displayTag;
+  const providerLabel = t('assistantDetail.capabilityProvider');
+  const providerValue = displayTag;
+  const orgLabel = t('assistantDetail.appId');
+  const orgValue = detail?.appKey ?? '';
   const ownerLabel = t('assistantDetail.secret');
   const ownerValue = displaySecret;
   const hasDescription = Boolean(displayDescription.trim());
   const hasCreator = Boolean(displayCreator.trim());
+  const hasProviderValue = Boolean(providerValue.trim());
   const hasOrgValue = Boolean(orgValue.trim());
   const hasSecretValue = Boolean(secret.trim());
   const showCreatorRow = !isExclusiveAssistant && hasCreator;
+  const showProviderRow = isInternalAssistant && hasProviderValue;
   const showOrgRow = shouldShowAppCredential && hasOrgValue;
   const showSecretRow = shouldShowAppCredential && hasSecretValue;
   const showIntroCard = hasDescription || showCreatorRow;
-  const showOrgCard = showOrgRow || showSecretRow;
+  const showOrgCard = showProviderRow || showOrgRow || showSecretRow;
 
   const toggleSecretVisible = useCallback(() => {
     if (!shouldShowAppCredential) return;
@@ -495,6 +499,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
         {showOrgCard ? (
           <section className="assistant-detail__card assistant-detail__card--org">
+            {showProviderRow ? (
+              <DetailInfoRow
+                label={providerLabel}
+                valueNode={<span className="assistant-detail__org-value">{providerValue}</span>}
+              />
+            ) : null}
             {showOrgRow ? (
               <DetailInfoRow
                 label={orgLabel}
