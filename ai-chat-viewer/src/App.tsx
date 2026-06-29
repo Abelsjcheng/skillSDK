@@ -57,12 +57,18 @@ function prependSessionToCache(
   cache: HistorySessionsCache | null,
   session: SkillSession,
 ): HistorySessionsCache | null {
+  const nextSession = ensureSessionTimestamps(session);
   if (!cache) {
-    return cache;
+    return {
+      content: [nextSession],
+      page: 0,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+      total: 1,
+      totalPages: 1,
+    };
   }
 
   // 新建会话需要立即进入侧边栏缓存，并通过去重避免重复显示同一个会话。
-  const nextSession = ensureSessionTimestamps(session);
   const hasExistingSession = cache.content.some((item) => item.welinkSessionId === nextSession.welinkSessionId);
   const nextContent = [
     nextSession,
@@ -151,6 +157,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const welinkSessionIdRef = useRef<string | null>(null);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
+  const locallyDeletedSessionIdsRef = useRef(new Set<string>());
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
 
   initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
@@ -222,6 +229,7 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
     userInfoRef.current = null;
+    locallyDeletedSessionIdsRef.current.clear();
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setIsHistorySidebarVisible(isPc);
@@ -367,10 +375,15 @@ function App({ assistantAccount = '' }: AppProps) {
       await createSessionForAssistant(currentAssistantAccount, detail.appKey),
     );
     setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
+    setHistorySessionsLoaded(true);
     setWelinkSessionId(newSession.welinkSessionId);
   }, [createSessionForAssistant, resolveAssistantDetail]);
 
-  const handleSessionDeleted = useCallback(async (deletedSessionId: string, refreshAfterDelete: boolean) => {
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    createFallbackWhenEmpty: boolean,
+  ) => {
     const normalizedDeletedSessionId = deletedSessionId.trim();
     if (!normalizedDeletedSessionId) {
       return;
@@ -389,6 +402,9 @@ function App({ assistantAccount = '' }: AppProps) {
       session.resetTransientState();
       if (nextSession) {
         setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!createFallbackWhenEmpty) {
+        setWelinkSessionId(null);
         setIsSwitchingSessionAfterDelete(false);
       } else {
         try {
@@ -412,13 +428,22 @@ function App({ assistantAccount = '' }: AppProps) {
     }
   }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
 
-  const handleSessionDeletedFromAction = useCallback((deletedSessionId: string) => (
-    handleSessionDeleted(deletedSessionId, false)
-  ), [handleSessionDeleted]);
+  const handleSessionDeletedFromAction = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      locallyDeletedSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+    return handleSessionDeleted(deletedSessionId, false, true);
+  }, [handleSessionDeleted]);
 
-  const handleSessionDeletedFromPush = useCallback((deletedSessionId: string) => (
-    handleSessionDeleted(deletedSessionId, true)
-  ), [handleSessionDeleted]);
+  const handleSessionDeletedFromPush = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (locallyDeletedSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      locallyDeletedSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      return Promise.resolve();
+    }
+    return handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
 
   useEffect(() => {
     handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
