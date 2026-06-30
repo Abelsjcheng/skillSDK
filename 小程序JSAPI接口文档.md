@@ -1177,6 +1177,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | bizRobotName | string | 助理对应业务机器人名称（中文） |
 | bizRobotNameEn | string | 助理对应业务机器人名称（英文） |
 | bizRobotTag | string | 大脑机器人 tag |
+| tagName | string | 助理标签中文名称 |
+| tagNameEn | string | 助理标签英文名称 |
 | robotId | string | 助理机器人 ID |
 
 ### 错误处理
@@ -1195,7 +1197,7 @@ window.HWH5EXT.getWeAgentList({
   pageNumber: 1
 }).then((result) => {
   result.content.forEach((item) => {
-    console.log(item.name, item.partnerAccount, item.bizRobotTag);
+    console.log(item.name, item.partnerAccount, item.bizRobotTag, item.tagName, item.tagNameEn);
   });
 }).catch((error) => {
   console.error('获取助理列表失败:', error.errorCode, error.errorMessage);
@@ -1207,7 +1209,7 @@ window.HWH5EXT.getWeAgentList({
 1. JSAPI 调用 SDK `getWeAgentList` 接口。
 2. SDK 调用服务端 `GET /v4-1/we-crew/list`，透传查询参数 `pageSize`、`pageNumber`。
 3. SDK 解析服务端返回 `data[]` 并组装为 `WeAgentList`。
-4. 服务端新增字段 `data[].bizRobotTag` 需同步透传到 JSAPI 出参 `content[].bizRobotTag`。
+4. 服务端字段 `data[].bizRobotTag`、`data[].tagName`、`data[].tagNameEn` 需同步透传到 JSAPI 出参 `content[].bizRobotTag`、`content[].tagName`、`content[].tagNameEn`。
 
 ---
 
@@ -1276,13 +1278,16 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | bizRobotNameEn | string | 助理对应业务机器人名称（英文） |
 | bizRobotTag | string | 大脑机器人 tag |
 | bizRobotId | string | 助理对应业务机器人 ID |
+| tagName | string | 助理标签中文名称 |
+| tagNameEn | string | 助理标签英文名称 |
 | weCodeUrl | string | 助理 We 码地址 |
 
 ### 行为说明
 
 1. 移动端：传入 `partnerAccount` 时，SDK 调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；未传时，SDK 调用 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情。
 2. PC端：保持原有实现，使用 `partnerAccounts` 数组入参获取详情列表。
-3. 当最终查询对象仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离），供 `getWeAgentUri` 使用。
+3. `GET /v1/robot-partners/{partnerAccount}` 返回的 `data[]` 详情对象，以及 `GET /v4-1/we-crew/my-agent` 返回的 `data` 主助理详情对象，均新增 `tagName`、`tagNameEn` 字段；SDK 需原样透传到 JSAPI 出参 `WeAgentDetails`。
+4. 当最终查询对象仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离），供 `getWeAgentUri` 使用；写入详情需包含服务端返回的 `tagName`、`tagNameEn`。
 
 ### 错误处理
 
@@ -1299,7 +1304,7 @@ window.HWH5EXT.getWeAgentDetails({
   partnerAccount: 'x00_1'
 }).then((result) => {
   result.weAgentDetailsArray.forEach((detail) => {
-    console.log('助理详情:', detail.name, detail.weCodeUrl);
+    console.log('助理详情:', detail.name, detail.weCodeUrl, detail.tagName, detail.tagNameEn);
   });
 }).catch((error) => {
   console.error('获取助理详情失败:', error.errorCode, error.errorMessage);
@@ -1311,7 +1316,7 @@ window.HWH5EXT.getWeAgentDetails({
 ```javascript
 window.HWH5EXT.getWeAgentDetails({})
   .then((result) => {
-    console.log('当前主助理详情:', result.weAgentDetailsArray);
+    console.log('当前主助理详情:', result.weAgentDetailsArray[0]?.tagName, result.weAgentDetailsArray[0]?.tagNameEn);
   })
   .catch((error) => {
     console.error('获取当前主助理详情失败:', error.errorCode, error.errorMessage);
@@ -1378,6 +1383,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateWeAg
 4. 服务端返回 `code = 200` 时，SDK 返回 `{ updateResult: 'success' }`；否则抛出异常，并透传服务端 `code` 与 `message`。
 5. 更新成功后，SDK 仅更新本地已存在且 `partnerAccount` 匹配的 `current_we_agent_detail` 和 `we_agent_details` 缓存，不新增未命中的缓存。
 6. 更新成功后，SDK 通过 `GET /v1/robot-partners/{partnerAccount}` 补拉完整助理详情，并触发 `agentskills.agentUpdated` 更新广播；补拉失败时不触发更新广播。
+7. 补拉详情返回的 `tagName`、`tagNameEn` 需与其他 `WeAgentDetails` 字段一起透传到更新广播 payload 的 `data` 中。
 
 ### 错误处理
 
@@ -1517,8 +1523,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getAssista
 1. JSAPI 调用 SDK `getAssistantDetails` 接口。
 2. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`，并从中按 `partnerAccount` 读取对应助理详情对象缓存。
 3. 若读取到对应缓存，则 SDK 将该对象组装为 `weAgentDetailsArray` 返回。
-4. 在返回缓存后，SDK 异步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情；若返回结果非空，则取首个助理详情对象写回 `we_agent_details[partnerAccount]`。
-5. 若未读取到缓存，则 SDK 同步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；若返回结果非空，则取首个助理详情对象写入 `we_agent_details[partnerAccount]`，并将完整结果组装为 `weAgentDetailsArray` 返回。
+4. 在返回缓存后，SDK 异步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情；服务端返回的 `data[]` 详情对象新增 `tagName`、`tagNameEn` 字段，SDK 需与其他 `WeAgentDetails` 字段一起解析和缓存。若返回结果非空，则取首个助理详情对象写回 `we_agent_details[partnerAccount]`。
+5. 若未读取到缓存，则 SDK 同步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；服务端返回的 `tagName`、`tagNameEn` 需原样透传到 JSAPI 出参。若返回结果非空，则取首个助理详情对象写入 `we_agent_details[partnerAccount]`，并将完整结果组装为 `weAgentDetailsArray` 返回。
 6. 若服务端返回的助理详情为空，则 SDK 不设置新缓存，也不删除旧缓存。
 7. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果。
 
