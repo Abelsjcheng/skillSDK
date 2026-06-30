@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WeAgentCUIFooter from '../assistant/WeAgentCUIFooter';
 import { clearSlashCommandSuggestStateForTest } from '../../hooks/useSlashCommandSuggest';
@@ -190,6 +190,40 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
 
     expect(screen.queryByText('/new')).not.toBeInTheDocument();
     expect(onRequestSlashCommands).not.toHaveBeenCalled();
+  });
+
+  it('does not commit pinyin letters while IME composition is active', async () => {
+    const onSend = jest.fn();
+    const user = userEvent.setup();
+
+    render(
+      <WeAgentCUIFooter
+        isPcMiniApp
+        mode="generate"
+        partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: '新建会话' }]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
+        onSend={onSend}
+        onStop={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByRole('textbox');
+    const sendButton = screen.getByRole('button', { name: '发送' });
+
+    fireEvent.compositionStart(input);
+    input.textContent = 'ni';
+    fireEvent.input(input, { inputType: 'insertCompositionText', data: 'ni' });
+
+    expect(sendButton).toBeDisabled();
+
+    input.textContent = '你';
+    fireEvent.compositionEnd(input);
+
+    expect(sendButton).not.toBeDisabled();
+    await user.click(sendButton);
+
+    expect(onSend).toHaveBeenCalledWith('你');
   });
 
   it('deletes a selected slash command as one token', async () => {

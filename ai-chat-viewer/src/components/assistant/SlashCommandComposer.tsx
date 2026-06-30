@@ -121,6 +121,7 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
   const composerRef = useRef<HTMLDivElement | null>(null);
   const suffixRef = useRef<HTMLSpanElement | null>(null);
   const nextCursorRef = useRef<number | null>(null);
+  const isComposingRef = useRef(false);
   const hasSlashToken = Boolean(
     slashToken && value.slice(slashToken.start, slashToken.end) === slashToken.command,
   );
@@ -171,22 +172,48 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
     setCaretOffset(element, nextCursor);
   }, [hasSlashToken, value, slashToken]);
 
-  const handleInput = (event: React.FormEvent<HTMLDivElement>): void => {
-    const target = event.currentTarget;
+  const isCompositionInput = (nativeEvent: Event): boolean => {
+    const inputEvent = nativeEvent as InputEvent;
+    return Boolean(inputEvent.isComposing) || inputEvent.inputType === 'insertCompositionText';
+  };
+
+  const commitPlainInput = (target: HTMLElement): void => {
     const cursor = getCaretOffset(target);
     nextCursorRef.current = cursor;
     onChange(normalizeComposerText(target), cursor);
   };
 
-  const handleSuffixInput = (event: React.FormEvent<HTMLSpanElement>): void => {
+  const commitSuffixInput = (target: HTMLElement): void => {
     if (!slashToken) {
       return;
     }
-    const target = event.currentTarget;
     const suffix = normalizeComposerText(target);
     const cursor = slashToken.end + getCaretOffset(target);
     nextCursorRef.current = cursor;
     onChange(`${value.slice(0, slashToken.end)}${suffix}`, cursor);
+  };
+
+  const handleInput = (event: React.FormEvent<HTMLDivElement>): void => {
+    if (isComposingRef.current || isCompositionInput(event.nativeEvent)) {
+      return;
+    }
+    commitPlainInput(event.currentTarget);
+  };
+
+  const handleSuffixInput = (event: React.FormEvent<HTMLSpanElement>): void => {
+    if (isComposingRef.current || isCompositionInput(event.nativeEvent)) {
+      return;
+    }
+    commitSuffixInput(event.currentTarget);
+  };
+
+  const handleCompositionStart = (): void => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (target: HTMLElement, commit: (element: HTMLElement) => void): void => {
+    isComposingRef.current = false;
+    commit(target);
   };
 
   if (hasSlashToken && slashToken) {
@@ -228,6 +255,10 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
           suppressContentEditableWarning
           onInput={handleSuffixInput}
           onKeyDown={onKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={(event) => {
+            handleCompositionEnd(event.currentTarget, commitSuffixInput);
+          }}
         >
           {value.slice(slashToken.end)}
         </span>
@@ -248,6 +279,10 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
       suppressContentEditableWarning
       onInput={handleInput}
       onKeyDown={onKeyDown}
+      onCompositionStart={handleCompositionStart}
+      onCompositionEnd={(event) => {
+        handleCompositionEnd(event.currentTarget, commitPlainInput);
+      }}
       onDrop={(event) => {
         event.preventDefault();
         event.stopPropagation();
