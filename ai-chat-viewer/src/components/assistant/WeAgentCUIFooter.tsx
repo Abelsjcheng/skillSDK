@@ -1,4 +1,4 @@
-import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import React, { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import checkIcon from '../../imgs/check.svg';
 import sendIcon from '../../imgs/send_icon.svg';
@@ -8,12 +8,10 @@ import { useSlashCommandSuggest } from '../../hooks/useSlashCommandSuggest';
 import type {
   SendShortcutMode,
   ShortcutOption,
-  SlashCommandComposerHandle,
   WeAgentCUIFooterProps,
 } from '../../types/components';
 import type { SlashCommandItem, SlashCommandToken } from '../../types/slashCommand';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import SlashCommandComposer from './SlashCommandComposer';
 import SlashCommandPanel from './SlashCommandPanel';
 
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
@@ -31,7 +29,8 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const [selectedSlashToken, setSelectedSlashToken] = useState<SlashCommandToken | null>(null);
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
-  const composerRef = useRef<SlashCommandComposerHandle | null>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const isComposingRef = useRef(false);
   const slashTokenSpaceDeletedRef = useRef(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
@@ -121,11 +120,13 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   };
 
   const setComposerCursor = (cursor: number) => {
-    composerRef.current?.setCursor(cursor);
-    composerRef.current?.focus();
+    const element = inputRef.current;
+    element?.focus();
+    element?.setSelectionRange(cursor, cursor);
     window.requestAnimationFrame(() => {
-      composerRef.current?.setCursor(cursor);
-      composerRef.current?.focus();
+      const nextElement = inputRef.current;
+      nextElement?.focus();
+      nextElement?.setSelectionRange(cursor, cursor);
     });
   };
 
@@ -141,6 +142,31 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     slashSuggest.handleValueChange(nextValue, cursor);
   };
 
+  const handleNativeInputChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const nativeEvent = event.nativeEvent as InputEvent;
+    if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.inputType === 'insertCompositionText') {
+      return;
+    }
+    const nextValue = event.target.value;
+    const cursor = event.target.selectionStart ?? nextValue.length;
+    handleInputValueChange(nextValue, cursor);
+  };
+
+  const handleNativeCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleNativeCompositionEnd = (
+    event: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    isComposingRef.current = false;
+    const nextValue = event.currentTarget.value;
+    const cursor = event.currentTarget.selectionStart ?? nextValue.length;
+    handleInputValueChange(nextValue, cursor);
+  };
+
   const selectSlashCommand = (command?: SlashCommandItem) => {
     const result = slashSuggest.selectCommand(value, command);
     if (!result) {
@@ -154,13 +180,19 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   };
 
   const deleteSelectedSlashToken = (
-    event: KeyboardEvent<HTMLDivElement>,
+    event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     if (!selectedSlashToken || (event.key !== 'Backspace' && event.key !== 'Delete')) {
       return false;
     }
 
-    const selectionRange = composerRef.current?.getSelectionRange() ?? { start: value.length, end: value.length };
+    const inputElement = inputRef.current;
+    const selectionRange = inputElement
+      ? {
+        start: inputElement.selectionStart ?? value.length,
+        end: inputElement.selectionEnd ?? value.length,
+      }
+      : { start: value.length, end: value.length };
     const rangeStart = selectionRange.start;
     const rangeEnd = selectionRange.end;
     const tokenStart = selectedSlashToken.start;
@@ -223,7 +255,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     return true;
   };
 
-  const handleSlashKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleSlashKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (!slashSuggest.isOpen) {
       return false;
     }
@@ -254,7 +286,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     return false;
   };
 
-  const handleMobileKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleMobileKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing || isGenerating) {
       return;
     }
@@ -275,7 +307,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     handleSend();
   };
 
-  const handlePcKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handlePcKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing || isGenerating) {
       return;
     }
@@ -347,14 +379,15 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     return (
       <div className="we-agent-cui-footer">
         {renderSlashPanel()}
-        <SlashCommandComposer
-          ref={composerRef}
+        <input
+          ref={inputRef as React.RefObject<HTMLInputElement>}
+          type="text"
           className="we-agent-cui-footer__input"
-          isPcMiniApp={false}
           placeholder={t('weAgent.inputPlaceholder')}
           value={value}
-          slashToken={selectedSlashToken}
-          onChange={handleInputValueChange}
+          onChange={handleNativeInputChange}
+          onCompositionStart={handleNativeCompositionStart}
+          onCompositionEnd={handleNativeCompositionEnd}
           onKeyDown={handleMobileKeyDown}
         />
         {renderSendButton()}
@@ -365,14 +398,15 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   return (
     <div className="we-agent-cui-footer we-agent-cui-footer--pc">
       {renderSlashPanel()}
-      <SlashCommandComposer
-        ref={composerRef}
+      <textarea
+        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
         className="we-agent-cui-footer__input"
-        isPcMiniApp
         placeholder={t('weAgent.inputPlaceholder')}
         value={value}
-        slashToken={selectedSlashToken}
-        onChange={handleInputValueChange}
+        rows={2}
+        onChange={handleNativeInputChange}
+        onCompositionStart={handleNativeCompositionStart}
+        onCompositionEnd={handleNativeCompositionEnd}
         onKeyDown={handlePcKeyDown}
       />
       <div className="we-agent-cui-footer__toolbar">

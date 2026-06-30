@@ -39,10 +39,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(onRequestSlashCommands).not.toHaveBeenCalled();
     await user.keyboard('{Enter}');
 
-    expect(input).toHaveTextContent('/new');
-    const slashToken = screen.getByTestId('slash-command-token');
-    expect(slashToken).toHaveTextContent('/new');
-    expect(slashToken).toHaveStyle({ color: '#0D94FF' });
+    expect(input).toHaveValue('/new ');
     expect(onSend).not.toHaveBeenCalled();
   });
 
@@ -70,7 +67,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
 
     await user.keyboard('{ArrowDown}{Enter}');
-    expect(input).toHaveTextContent('/help');
+    expect(input).toHaveValue('/help ');
 
     await user.keyboard('{Backspace}{Backspace}');
     await user.keyboard('/');
@@ -212,12 +209,12 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     const sendButton = screen.getByRole('button', { name: '发送' });
 
     fireEvent.compositionStart(input);
-    input.textContent = 'ni';
+    (input as HTMLTextAreaElement).value = 'ni';
     fireEvent.input(input, { inputType: 'insertCompositionText', data: 'ni' });
 
     expect(sendButton).toBeDisabled();
 
-    input.textContent = '你';
+    (input as HTMLTextAreaElement).value = '你';
     fireEvent.compositionEnd(input);
 
     expect(sendButton).not.toBeDisabled();
@@ -247,14 +244,13 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
     await user.keyboard('{Enter}');
 
-    expect(input).toHaveTextContent('/new');
+    expect(input).toHaveValue('/new ');
 
     await user.keyboard('{Backspace}');
 
-    expect(input).toHaveTextContent('/new');
+    expect(input).toHaveValue('/new');
     await user.keyboard('{Backspace}');
 
-    expect(input).toBeEmptyDOMElement();
-    expect(screen.queryByTestId('slash-command-token')).not.toBeInTheDocument();
+    expect(input).toHaveValue('');
   });
 });
