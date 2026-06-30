@@ -387,9 +387,13 @@ public final class SkillSDK {
         ensureInitializedForVoid();
         SkillWecodeStatusCallback callback = params == null ? null : params.getCallback();
         if (callback == null) {
+            WeLinkLogger.i(TAG, "offSkillWecodeStatusChange clear all callbacks, count="
+                    + wecodeStatusCallbacks.size());
             wecodeStatusCallbacks.clear();
         } else {
-            wecodeStatusCallbacks.remove(callback);
+            boolean removed = wecodeStatusCallbacks.remove(callback);
+            WeLinkLogger.i(TAG, "offSkillWecodeStatusChange remove callback, removed="
+                    + removed + ", remaining=" + wecodeStatusCallbacks.size());
         }
     }
 
