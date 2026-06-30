@@ -166,6 +166,17 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     const tokenStart = selectedSlashToken.start;
     const tokenEnd = selectedSlashToken.end;
     const isCollapsedSelection = rangeStart === rangeEnd;
+    const isBackspaceOnTokenWithOnlySpace = event.key === 'Backspace'
+      && value === `${selectedSlashToken.command} `;
+    if (isBackspaceOnTokenWithOnlySpace) {
+      event.preventDefault();
+      const nextValue = selectedSlashToken.command;
+      slashTokenSpaceDeletedRef.current = true;
+      setValue(nextValue);
+      slashSuggest.close();
+      setComposerCursor(tokenEnd);
+      return true;
+    }
     const isBackspaceAfterTokenSpace = event.key === 'Backspace'
       && isCollapsedSelection
       && rangeStart === tokenEnd + 1
@@ -177,6 +188,17 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       setValue(nextValue);
       slashSuggest.close();
       setComposerCursor(tokenEnd);
+      return true;
+    }
+    const isDeletingBareToken = value === selectedSlashToken.command;
+    if (isDeletingBareToken) {
+      event.preventDefault();
+      const nextValue = `${value.slice(0, tokenStart)}${value.slice(tokenEnd)}`;
+      setValue(nextValue);
+      setSelectedSlashToken(null);
+      slashTokenSpaceDeletedRef.current = false;
+      slashSuggest.close();
+      setComposerCursor(tokenStart);
       return true;
     }
     const cursorTouchesToken = event.key === 'Backspace'

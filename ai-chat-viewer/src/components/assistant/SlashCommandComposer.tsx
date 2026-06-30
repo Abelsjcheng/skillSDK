@@ -119,16 +119,25 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
   onKeyDown,
 }, ref) => {
   const composerRef = useRef<HTMLDivElement | null>(null);
+  const suffixRef = useRef<HTMLSpanElement | null>(null);
   const nextCursorRef = useRef<number | null>(null);
   const hasSlashToken = Boolean(
     slashToken && value.slice(slashToken.start, slashToken.end) === slashToken.command,
   );
+  const editableElement = () => suffixRef.current ?? composerRef.current;
 
   useImperativeHandle(ref, () => ({
     focus: () => {
-      composerRef.current?.focus();
+      editableElement()?.focus();
     },
     getSelectionRange: () => {
+      if (hasSlashToken && slashToken && suffixRef.current) {
+        const selectionRange = getSelectionRange(suffixRef.current);
+        return {
+          start: slashToken.end + selectionRange.start,
+          end: slashToken.end + selectionRange.end,
+        };
+      }
       if (!composerRef.current) {
         return { start: value.length, end: value.length };
       }
@@ -136,24 +145,31 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
     },
     setCursor: (cursor: number) => {
       nextCursorRef.current = cursor;
-      const element = composerRef.current;
+      const element = editableElement();
       if (!element) {
         return;
       }
+      const nextCursor = hasSlashToken && slashToken
+        ? Math.max(0, cursor - slashToken.end)
+        : cursor;
       element.focus();
-      setCaretOffset(element, cursor);
+      setCaretOffset(element, nextCursor);
     },
-  }), []);
+  }), [hasSlashToken, slashToken, value.length]);
 
   useLayoutEffect(() => {
     const cursor = nextCursorRef.current;
-    if (cursor === null || !composerRef.current) {
+    const element = editableElement();
+    if (cursor === null || !element) {
       return;
     }
     nextCursorRef.current = null;
-    composerRef.current.focus();
-    setCaretOffset(composerRef.current, cursor);
-  }, [value, slashToken]);
+    const nextCursor = hasSlashToken && slashToken
+      ? Math.max(0, cursor - slashToken.end)
+      : cursor;
+    element.focus();
+    setCaretOffset(element, nextCursor);
+  }, [hasSlashToken, value, slashToken]);
 
   const handleInput = (event: React.FormEvent<HTMLDivElement>): void => {
     const target = event.currentTarget;
@@ -162,27 +178,62 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
     onChange(normalizeComposerText(target), cursor);
   };
 
-  const renderContent = () => {
-    if (!hasSlashToken || !slashToken) {
-      return value;
+  const handleSuffixInput = (event: React.FormEvent<HTMLSpanElement>): void => {
+    if (!slashToken) {
+      return;
     }
+    const target = event.currentTarget;
+    const suffix = normalizeComposerText(target);
+    const cursor = slashToken.end + getCaretOffset(target);
+    nextCursorRef.current = cursor;
+    onChange(`${value.slice(0, slashToken.end)}${suffix}`, cursor);
+  };
 
+  if (hasSlashToken && slashToken) {
     return (
-      <>
+      <div
+        ref={composerRef}
+        role="textbox"
+        aria-label={placeholder}
+        aria-multiline={isPcMiniApp}
+        className={className}
+        data-placeholder={placeholder}
+        data-empty={value ? 'false' : 'true'}
+        onKeyDown={onKeyDown}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            event.preventDefault();
+            suffixRef.current?.focus();
+          }
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
+        }}
+      >
         {value.slice(0, slashToken.start)}
         <span
           className="we-agent-cui-footer__slash-token"
-          contentEditable={false}
           data-testid="slash-command-token"
           data-slash-token={slashToken.command}
           style={{ color: '#0D94FF' }}
         >
           {slashToken.command}
         </span>
-        {value.slice(slashToken.end)}
-      </>
+        <span
+          ref={suffixRef}
+          className="we-agent-cui-footer__input-suffix"
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleSuffixInput}
+          onKeyDown={onKeyDown}
+        >
+          {value.slice(slashToken.end)}
+        </span>
+      </div>
     );
-  };
+  }
 
   return (
     <div
@@ -203,7 +254,7 @@ const SlashCommandComposer = forwardRef<SlashCommandComposerHandle, SlashCommand
         return false;
       }}
     >
-      {renderContent()}
+      {value}
     </div>
   );
 });
