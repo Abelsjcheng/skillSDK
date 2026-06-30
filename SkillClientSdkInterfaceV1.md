@@ -481,7 +481,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void
+onSkillWecodeStatusChange(callback: function): void
 ```
 
 ### 入参
@@ -512,16 +512,14 @@ onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void
 
 ```typescript
 try {
-  onSkillWecodeStatusChange({
-    callback: (result) => {
-      switch (result.status) {
-        case SkillWecodeStatus.CLOSED:
-          console.log("小程序已关闭");
-          break;
-        case SkillWecodeStatus.MINIMIZED:
-          console.log("小程序已最小化");
-          break;
-      }
+  onSkillWecodeStatusChange((result) => {
+    switch (result.status) {
+      case SkillWecodeStatus.CLOSED:
+        console.log("小程序已关闭");
+        break;
+      case SkillWecodeStatus.MINIMIZED:
+        console.log("小程序已最小化");
+        break;
     }
   });
 } catch (error) {
@@ -537,19 +535,19 @@ try {
 IM 客户端调用
 ### 接口说明
 
-取消通过 `onSkillWecodeStatusChange` 注册的小程序状态变更回调。传入 `callback` 时仅取消对应注册的回调；未传 `callback` 时清空所有已注册的小程序状态变更回调。
+取消通过 `onSkillWecodeStatusChange` 注册的小程序状态变更回调。接口直接接收注册时使用的同一个 `callback` 引用，并仅取消该回调对应的监听。
 
 ### 接口名
 
 ```typescript
-offSkillWecodeStatusChange(params?: OffSkillWecodeStatusChangeParams): void
+offSkillWecodeStatusChange(callback: function): void
 ```
 
 ### 入参
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| callback | function | 否 | 需要取消监听的回调函数；传入时仅取消该回调，未传时清空所有小程序状态变更回调 |
+| callback | function | 是 | 需要取消监听的回调函数；必须与 `onSkillWecodeStatusChange` 注册时传入的 callback 引用一致 |
 
 ### 出参
 
@@ -557,21 +555,24 @@ offSkillWecodeStatusChange(params?: OffSkillWecodeStatusChangeParams): void
 
 ### 错误处理
 
-无。若传入的 `callback` 未注册，或当前不存在任何小程序状态变更回调，SDK 均按成功语义处理，不抛出异常。
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 `callback` 参数 |
+
+若传入的 `callback` 未注册，SDK 按成功语义处理，不抛出异常。
 
 ### 组合调用场景
 
 在与其他接口组合调用时：
 1. 建议在小程序页面卸载、IM 容器销毁或不再需要监听小程序状态时调用。
-2. 仅需要取消某个回调时，传入与 `onSkillWecodeStatusChange` 注册时相同的 `callback` 引用。
-3. 需要清空全部小程序状态监听时，可不传入参直接调用。
-4. 调用后再次需要监听小程序状态时，可重新调用 `onSkillWecodeStatusChange` 注册回调。
+2. 必须传入与 `onSkillWecodeStatusChange` 注册时相同的 `callback` 引用，否则无法匹配并移除原监听。
+3. 调用后再次需要监听小程序状态时，可重新调用 `onSkillWecodeStatusChange` 注册回调。
 
 ### 调用示例
 
 ```typescript
 try {
-  offSkillWecodeStatusChange();
+  offSkillWecodeStatusChange(handleSkillWecodeStatusChange);
 } catch (error) {
   console.error("取消小程序状态回调失败:", error.errorCode, error.errorMessage);
 }
@@ -582,13 +583,9 @@ const handleSkillWecodeStatusChange = (result) => {
   console.log("小程序状态:", result.status);
 };
 
-onSkillWecodeStatusChange({
-  callback: handleSkillWecodeStatusChange
-});
+onSkillWecodeStatusChange(handleSkillWecodeStatusChange);
 
-offSkillWecodeStatusChange({
-  callback: handleSkillWecodeStatusChange
-});
+offSkillWecodeStatusChange(handleSkillWecodeStatusChange);
 ```
 
 ---
@@ -1924,18 +1921,6 @@ try {
 |------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
 | callback | function | 是 | 状态变更回调函数 |
-
-### OnSkillWecodeStatusChangeParams
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| callback | function | 是 | 小程序状态变更回调函数 |
-
-### OffSkillWecodeStatusChangeParams
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| callback | function | 否 | 需要取消监听的小程序状态变更回调函数；未传时清空所有小程序状态变更回调 |
 
 ### GetSessionMessageParams
 

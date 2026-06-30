@@ -33,9 +33,7 @@ import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.GetIsShowWeAgentResult;
 import com.opencode.skill.model.HistorySessionsParams;
-import com.opencode.skill.model.OffSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
-import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OpenAssistantEditPageParams;
 import com.opencode.skill.model.OpenAssistantEditPageResult;
 import com.opencode.skill.model.OpenWeAgentParams;
@@ -374,27 +372,23 @@ public final class SkillSDK {
     }
 
     // 5. onSkillWecodeStatusChange
-    public void onSkillWecodeStatusChange(@NonNull OnSkillWecodeStatusChangeParams params) {
+    public void onSkillWecodeStatusChange(@NonNull SkillWecodeStatusCallback callback) {
         ensureInitializedForVoid();
-        if (params.getCallback() == null) {
+        if (callback == null) {
             throw error(1000, "callback is required");
         }
-        wecodeStatusCallbacks.addIfAbsent(params.getCallback());
+        wecodeStatusCallbacks.addIfAbsent(callback);
     }
 
     // 5.1. offSkillWecodeStatusChange
-    public void offSkillWecodeStatusChange(@Nullable OffSkillWecodeStatusChangeParams params) {
+    public void offSkillWecodeStatusChange(@NonNull SkillWecodeStatusCallback callback) {
         ensureInitializedForVoid();
-        SkillWecodeStatusCallback callback = params == null ? null : params.getCallback();
         if (callback == null) {
-            WeLinkLogger.i(TAG, "offSkillWecodeStatusChange clear all callbacks, count="
-                    + wecodeStatusCallbacks.size());
-            wecodeStatusCallbacks.clear();
-        } else {
-            boolean removed = wecodeStatusCallbacks.remove(callback);
-            WeLinkLogger.i(TAG, "offSkillWecodeStatusChange remove callback, removed="
-                    + removed + ", remaining=" + wecodeStatusCallbacks.size());
+            throw error(1000, "callback is required");
         }
+        boolean removed = wecodeStatusCallbacks.remove(callback);
+        WeLinkLogger.i(TAG, "offSkillWecodeStatusChange remove callback, removed="
+                + removed + ", remaining=" + wecodeStatusCallbacks.size());
     }
 
     // 6. regenerateAnswer
