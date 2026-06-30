@@ -14,6 +14,9 @@ import type { SlashCommandItem } from '../../types/slashCommand';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 import SlashCommandPanel from './SlashCommandPanel';
 
+const PC_TEXTAREA_MIN_HEIGHT = 44;
+const PC_TEXTAREA_MAX_HEIGHT = 132;
+
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,
   mode,
@@ -105,6 +108,21 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       document.removeEventListener('mousedown', handleDocumentMouseDown);
     };
   }, [closeSlashPanel, isSlashPanelOpen]);
+
+  useEffect(() => {
+    if (!isPcMiniApp || !(inputRef.current instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    const textarea = inputRef.current;
+    textarea.style.height = `${PC_TEXTAREA_MIN_HEIGHT}px`;
+    const nextHeight = Math.max(
+      PC_TEXTAREA_MIN_HEIGHT,
+      Math.min(textarea.scrollHeight, PC_TEXTAREA_MAX_HEIGHT),
+    );
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > PC_TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+  }, [isPcMiniApp, value]);
 
   const handleSend = () => {
     const trimmedValue = value.trim();

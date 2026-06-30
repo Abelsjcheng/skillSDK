@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WeAgentCUIFooter from '../assistant/WeAgentCUIFooter';
 import { clearSlashCommandSuggestStateForTest } from '../../hooks/useSlashCommandSuggest';
@@ -218,5 +218,30 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await user.keyboard('{Backspace}');
 
     expect(input).toHaveValue('/ne');
+  });
+
+  it('caps PC textarea at six lines and enables scrolling', () => {
+    render(
+      <WeAgentCUIFooter
+        isPcMiniApp
+        mode="generate"
+        partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: '新建会话' }]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
+        onSend={jest.fn()}
+        onStop={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement;
+    Object.defineProperty(input, 'scrollHeight', {
+      configurable: true,
+      value: 154,
+    });
+
+    fireEvent.change(input, { target: { value: 'line\nline\nline\nline\nline\nline\nline' } });
+
+    expect(input.style.height).toBe('132px');
+    expect(input.style.overflowY).toBe('auto');
   });
 });
