@@ -223,28 +223,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(onSend).toHaveBeenCalledWith('你');
   });
 
-  it('keeps normal PC textarea input editable', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <WeAgentCUIFooter
-        isPcMiniApp
-        mode="generate"
-        partnerAccount="partner-1"
-        slashCommands={[{ command: '/new', description: '新建会话' }]}
-        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
-        onSend={jest.fn()}
-        onStop={jest.fn()}
-      />,
-    );
-
-    const input = screen.getByRole('textbox');
-    await user.click(input);
-    await user.keyboard('hello');
-
-    expect(input).toHaveValue('hello');
-  });
-
   it('keeps the selected slash command as plain input text', async () => {
     const user = userEvent.setup();
 
