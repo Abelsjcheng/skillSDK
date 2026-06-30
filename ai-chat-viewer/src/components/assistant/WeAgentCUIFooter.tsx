@@ -35,9 +35,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const slashTokenSpaceDeletedRef = useRef(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
-  const composerKey = selectedSlashToken
-    ? `slash-token:${selectedSlashToken.command}:${selectedSlashToken.start}:${selectedSlashToken.end}`
-    : 'plain-text';
   const slashSuggest = useSlashCommandSuggest({
     partnerAccount,
     isPcMiniApp,
@@ -169,16 +166,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     const tokenStart = selectedSlashToken.start;
     const tokenEnd = selectedSlashToken.end;
     const isCollapsedSelection = rangeStart === rangeEnd;
-    const isBackspaceOnTokenWithOnlySpace = event.key === 'Backspace'
-      && value === `${selectedSlashToken.command} `;
-    if (isBackspaceOnTokenWithOnlySpace) {
-      event.preventDefault();
-      slashTokenSpaceDeletedRef.current = true;
-      setValue(selectedSlashToken.command);
-      slashSuggest.close();
-      setComposerCursor(tokenEnd);
-      return true;
-    }
     const isBackspaceAfterTokenSpace = event.key === 'Backspace'
       && isCollapsedSelection
       && rangeStart === tokenEnd + 1
@@ -190,16 +177,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       setValue(nextValue);
       slashSuggest.close();
       setComposerCursor(tokenEnd);
-      return true;
-    }
-    const isDeletingBareToken = value === selectedSlashToken.command;
-    if (isDeletingBareToken) {
-      event.preventDefault();
-      setValue(`${value.slice(0, tokenStart)}${value.slice(tokenEnd)}`);
-      setSelectedSlashToken(null);
-      slashTokenSpaceDeletedRef.current = false;
-      slashSuggest.close();
-      setComposerCursor(tokenStart);
       return true;
     }
     const cursorTouchesToken = event.key === 'Backspace'
@@ -349,7 +326,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       <div className="we-agent-cui-footer">
         {renderSlashPanel()}
         <SlashCommandComposer
-          key={composerKey}
           ref={composerRef}
           className="we-agent-cui-footer__input"
           isPcMiniApp={false}
@@ -368,7 +344,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     <div className="we-agent-cui-footer we-agent-cui-footer--pc">
       {renderSlashPanel()}
       <SlashCommandComposer
-        key={composerKey}
         ref={composerRef}
         className="we-agent-cui-footer__input"
         isPcMiniApp

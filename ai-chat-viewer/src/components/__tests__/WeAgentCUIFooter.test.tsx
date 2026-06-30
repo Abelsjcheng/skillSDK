@@ -39,7 +39,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(onRequestSlashCommands).not.toHaveBeenCalled();
     await user.keyboard('{Enter}');
 
-    expect(screen.getByRole('textbox')).toHaveTextContent('/new');
+    expect(input).toHaveTextContent('/new');
     const slashToken = screen.getByTestId('slash-command-token');
     expect(slashToken).toHaveTextContent('/new');
     expect(slashToken).toHaveStyle({ color: '#0D94FF' });
@@ -70,16 +70,15 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
 
     await user.keyboard('{ArrowDown}{Enter}');
-    expect(screen.getByRole('textbox')).toHaveTextContent('/help');
+    expect(input).toHaveTextContent('/help');
 
-    await user.click(screen.getByRole('textbox'));
     await user.keyboard('{Backspace}{Backspace}');
     await user.keyboard('/');
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
     await user.keyboard('{Escape}');
 
     expect(screen.queryByText('/new')).not.toBeInTheDocument();
-    expect(screen.getByRole('textbox')).toHaveFocus();
+    expect(input).toHaveFocus();
   });
 
   it('closes slash suggestions when clicking outside the slash panel', async () => {
@@ -208,25 +207,20 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
       />,
     );
 
-    const initialInput = screen.getByRole('textbox');
-    await user.click(initialInput);
+    const input = screen.getByRole('textbox');
+    await user.click(input);
     await user.keyboard('/n');
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
     await user.keyboard('{Enter}');
 
-    const tokenInput = screen.getByRole('textbox');
-    expect(tokenInput).not.toBe(initialInput);
-    expect(tokenInput).toHaveTextContent('/new');
+    expect(input).toHaveTextContent('/new');
 
-    await user.click(tokenInput);
     await user.keyboard('{Backspace}');
 
-    expect(screen.getByRole('textbox')).toHaveTextContent('/new');
+    expect(input).toHaveTextContent('/new');
     await user.keyboard('{Backspace}');
 
-    const plainInput = screen.getByRole('textbox');
-    expect(plainInput).not.toBe(tokenInput);
-    expect(plainInput).toBeEmptyDOMElement();
+    expect(input).toBeEmptyDOMElement();
     expect(screen.queryByTestId('slash-command-token')).not.toBeInTheDocument();
   });
 });
