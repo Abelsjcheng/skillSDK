@@ -29,7 +29,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  const isComposingRef = useRef(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
   const slashSuggest = useSlashCommandSuggest({
@@ -125,25 +124,8 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const handleNativeInputChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
-    const nativeEvent = event.nativeEvent as InputEvent;
-    if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.inputType === 'insertCompositionText') {
-      return;
-    }
     const nextValue = event.target.value;
     const cursor = event.target.selectionStart ?? nextValue.length;
-    handleInputValueChange(nextValue, cursor);
-  };
-
-  const handleNativeCompositionStart = () => {
-    isComposingRef.current = true;
-  };
-
-  const handleNativeCompositionEnd = (
-    event: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    isComposingRef.current = false;
-    const nextValue = event.currentTarget.value;
-    const cursor = event.currentTarget.selectionStart ?? nextValue.length;
     handleInputValueChange(nextValue, cursor);
   };
 
@@ -282,8 +264,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
           placeholder={t('weAgent.inputPlaceholder')}
           value={value}
           onChange={handleNativeInputChange}
-          onCompositionStart={handleNativeCompositionStart}
-          onCompositionEnd={handleNativeCompositionEnd}
           onKeyDown={handleMobileKeyDown}
         />
         {renderSendButton()}
@@ -301,8 +281,6 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         value={value}
         rows={2}
         onChange={handleNativeInputChange}
-        onCompositionStart={handleNativeCompositionStart}
-        onCompositionEnd={handleNativeCompositionEnd}
         onKeyDown={handlePcKeyDown}
       />
       <div className="we-agent-cui-footer__toolbar">
