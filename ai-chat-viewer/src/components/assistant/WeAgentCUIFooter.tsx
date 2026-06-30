@@ -28,6 +28,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   const [value, setValue] = useState('');
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const isComposingRef = useRef(false);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
@@ -108,6 +109,9 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   }, [closeSlashPanel, isSlashPanelOpen]);
 
   const handleSend = () => {
+    if (isComposingRef.current) {
+      return;
+    }
     const trimmedValue = value.trim();
     if (!trimmedValue) {
       return;
@@ -126,22 +130,25 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const nativeEvent = event.nativeEvent as InputEvent;
-    if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.inputType === 'insertCompositionText') {
-      return;
-    }
     const nextValue = event.target.value;
     const cursor = event.target.selectionStart ?? nextValue.length;
+    if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.inputType === 'insertCompositionText') {
+      setValue(nextValue);
+      return;
+    }
     handleInputValueChange(nextValue, cursor);
   };
 
   const handleNativeCompositionStart = () => {
     isComposingRef.current = true;
+    setIsComposing(true);
   };
 
   const handleNativeCompositionEnd = (
     event: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     isComposingRef.current = false;
+    setIsComposing(false);
     const nextValue = event.currentTarget.value;
     const cursor = event.currentTarget.selectionStart ?? nextValue.length;
     handleInputValueChange(nextValue, cursor);
@@ -252,7 +259,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       type="button"
       className={sendButtonClassName}
       onClick={handleSendButtonClick}
-      disabled={isGenerating ? false : !value.trim()}
+      disabled={isGenerating ? false : isComposing || !value.trim()}
       aria-label={sendButtonLabel}
     >
       <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" draggable="false" />
