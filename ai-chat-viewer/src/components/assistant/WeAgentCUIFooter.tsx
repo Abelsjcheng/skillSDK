@@ -41,6 +41,8 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     slashCommands,
     onRequestCommands: onRequestSlashCommands,
   });
+  const isSlashPanelOpen = slashSuggest.isOpen;
+  const closeSlashPanel = slashSuggest.close;
   const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
     { mode: 'enter', label: t('weAgent.shortcut.enterSend') },
     { mode: 'ctrlEnter', label: t('weAgent.shortcut.ctrlEnterSend') },
@@ -82,6 +84,31 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       document.removeEventListener('mousedown', handleDocumentMouseDown);
     };
   }, [isPcMiniApp, isShortcutPopupOpen]);
+
+  useEffect(() => {
+    if (!isSlashPanelOpen) {
+      return;
+    }
+
+    const handleDocumentMouseDown = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (
+        target instanceof Element
+        && target.closest('.we-agent-cui-footer__slash-panel, .we-agent-cui-footer__input')
+      ) {
+        return;
+      }
+      closeSlashPanel();
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
+  }, [closeSlashPanel, isSlashPanelOpen]);
 
   const handleSend = () => {
     const trimmedValue = value.trim();
@@ -283,7 +310,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   );
 
   const renderSlashPanel = () => (
-    slashSuggest.isOpen ? (
+    isSlashPanelOpen ? (
       <SlashCommandPanel
         commands={slashSuggest.filteredCommands}
         highlightedIndex={slashSuggest.highlightedIndex}

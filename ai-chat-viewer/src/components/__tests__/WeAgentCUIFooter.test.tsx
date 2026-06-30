@@ -81,6 +81,93 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(input).toHaveFocus();
   });
 
+  it('closes slash suggestions when clicking outside the slash panel', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <>
+        <button type="button">outside</button>
+        <WeAgentCUIFooter
+          isPcMiniApp
+          mode="generate"
+          partnerAccount="partner-1"
+          slashCommands={[
+            { command: '/new', description: '新建会话' },
+            { command: '/help', description: '帮助' },
+          ]}
+          onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
+          onSend={jest.fn()}
+          onStop={jest.fn()}
+        />
+      </>,
+    );
+
+    const input = screen.getByRole('textbox');
+    await user.click(input);
+    await user.keyboard('/');
+    await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'outside' }));
+
+    expect(screen.queryByText('/new')).not.toBeInTheDocument();
+  });
+
+  it('keeps slash suggestions open when clicking the input', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <WeAgentCUIFooter
+        isPcMiniApp
+        mode="generate"
+        partnerAccount="partner-1"
+        slashCommands={[
+          { command: '/new', description: '新建会话' },
+          { command: '/help', description: '帮助' },
+        ]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
+        onSend={jest.fn()}
+        onStop={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByRole('textbox');
+    await user.click(input);
+    await user.keyboard('/');
+    await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
+
+    await user.click(input);
+
+    expect(screen.getByText('/new')).toBeInTheDocument();
+  });
+
+  it('closes slash suggestions when clicking the send button', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <WeAgentCUIFooter
+        isPcMiniApp
+        mode="generate"
+        partnerAccount="partner-1"
+        slashCommands={[
+          { command: '/new', description: '新建会话' },
+          { command: '/help', description: '帮助' },
+        ]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
+        onSend={jest.fn()}
+        onStop={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByRole('textbox');
+    await user.click(input);
+    await user.keyboard('/');
+    await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    expect(screen.queryByText('/new')).not.toBeInTheDocument();
+  });
+
   it('only opens slash suggestions when slash is typed at the beginning', async () => {
     const onRequestSlashCommands = jest.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
