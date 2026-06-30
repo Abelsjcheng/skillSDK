@@ -128,6 +128,8 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   defaultOpen = false,
   historyLoaded = false,
   onHistoryLoaded,
+  onSessionDeleteFailed,
+  onSessionDeleteStart,
   onSessionDeleted,
   onSessionSelect,
   onVisibilityChange,
@@ -467,6 +469,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
 
     const sessionId = target.welinkSessionId;
     setIsDeletingSession(true);
+    onSessionDeleteStart?.(sessionId);
     try {
       await deleteHistorySession({ welinkSessionId: sessionId });
       removeDeletedSessionLocally(sessionId);
@@ -475,12 +478,21 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       setSessionActionPopupPosition(null);
       setConfirmDeleteSession(null);
     } catch (error) {
+      onSessionDeleteFailed?.(sessionId);
       WeLog(`WeAgentHistorySidebar deleteHistorySession failed | extra=${JSON.stringify({ welinkSessionId: sessionId })} | error=${JSON.stringify(error)}`);
       showToast(t('weAgent.deleteSessionFailed'));
     } finally {
       setIsDeletingSession(false);
     }
-  }, [confirmDeleteSession, isDeletingSession, onSessionDeleted, removeDeletedSessionLocally, t]);
+  }, [
+    confirmDeleteSession,
+    isDeletingSession,
+    onSessionDeleteFailed,
+    onSessionDeleteStart,
+    onSessionDeleted,
+    removeDeletedSessionLocally,
+    t,
+  ]);
 
   const handleLoadMore = useCallback(() => {
     if (isLoading || isLoadingMore || !hasMoreHistorySessions) {

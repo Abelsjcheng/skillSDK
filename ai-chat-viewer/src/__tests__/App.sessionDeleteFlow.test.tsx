@@ -170,4 +170,30 @@ describe('App session delete flow', () => {
 
     expect(mockCreateNewSession).not.toHaveBeenCalled();
   });
+
+  it('keeps local action delete responsible for fallback when its push echo arrives first', async () => {
+    render(<App assistantAccount="assistant-1" />);
+
+    await waitFor(() => {
+      expect(latestHistorySidebarProps?.currentWelinkSessionId).toBe('session-1');
+    });
+
+    expect(latestHistorySidebarProps?.onSessionDeleteStart).toEqual(expect.any(Function));
+
+    await act(async () => {
+      latestHistorySidebarProps?.onSessionDeleteStart?.('session-1');
+      latestChatSessionOptions?.onSessionDeleted?.('session-1');
+      await Promise.resolve();
+    });
+
+    expect(mockCreateNewSession).not.toHaveBeenCalled();
+    expect(latestHistorySidebarProps?.currentWelinkSessionId).toBe('session-1');
+
+    await act(async () => {
+      await latestHistorySidebarProps?.onSessionDeleted?.('session-1');
+    });
+
+    expect(mockCreateNewSession).toHaveBeenCalledTimes(1);
+    expect(latestHistorySidebarProps?.currentWelinkSessionId).toBe('fallback-1');
+  });
 });

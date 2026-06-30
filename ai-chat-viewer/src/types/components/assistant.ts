@@ -149,6 +149,8 @@ export interface WeAgentHistorySidebarProps {
   historyLoaded?: boolean;
   onHistoryLoaded?: (cache: HistorySessionsCache) => void;
   onSessionSelect?: (welinkSessionId: string) => void;
+  onSessionDeleteStart?: (welinkSessionId: string) => void;
+  onSessionDeleteFailed?: (welinkSessionId: string) => void;
   onSessionDeleted?: (welinkSessionId: string) => void | Promise<void>;
   onVisibilityChange?: (visible: boolean) => void;
 }

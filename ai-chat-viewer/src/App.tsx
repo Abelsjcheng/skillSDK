@@ -152,6 +152,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
+  const pendingActionDeleteSessionIdsRef = useRef<Set<string>>(new Set());
 
   initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
 
@@ -222,6 +223,7 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
     userInfoRef.current = null;
+    pendingActionDeleteSessionIdsRef.current.clear();
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setIsHistorySidebarVisible(isPc);
@@ -419,13 +421,38 @@ function App({ assistantAccount = '' }: AppProps) {
     }
   }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
 
-  const handleSessionDeletedFromAction = useCallback((deletedSessionId: string) => (
-    handleSessionDeleted(deletedSessionId, false, true)
-  ), [handleSessionDeleted]);
+  const handleSessionDeleteStart = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+  }, []);
 
-  const handleSessionDeletedFromPush = useCallback((deletedSessionId: string) => (
-    handleSessionDeleted(deletedSessionId, true, false)
-  ), [handleSessionDeleted]);
+  const handleSessionDeleteFailed = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeletedFromAction = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    try {
+      await handleSessionDeleted(deletedSessionId, false, true);
+    } finally {
+      if (normalizedDeletedSessionId) {
+        pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      }
+    }
+  }, [handleSessionDeleted]);
+
+  const handleSessionDeletedFromPush = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId && pendingActionDeleteSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      return;
+    }
+    await handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
 
   useEffect(() => {
     handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
@@ -492,6 +519,8 @@ function App({ assistantAccount = '' }: AppProps) {
                   setHistorySessionsLoaded(true);
                 }}
                 onSessionSelect={handleSwitchWeAgentSession}
+                onSessionDeleteStart={handleSessionDeleteStart}
+                onSessionDeleteFailed={handleSessionDeleteFailed}
                 onSessionDeleted={handleSessionDeletedFromAction}
                 onVisibilityChange={setIsHistorySidebarVisible}
               />
