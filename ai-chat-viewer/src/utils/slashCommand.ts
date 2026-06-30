@@ -1,4 +1,4 @@
-import type { SlashCommandItem, SlashCommandToken, SlashCommandTrigger } from '../types/slashCommand';
+import type { SlashCommandItem, SlashCommandTrigger } from '../types/slashCommand';
 
 function normalizeCommandName(command: string): string {
   const trimmedCommand = command.trim();
@@ -82,22 +82,10 @@ export function replaceSlashTrigger(
   value: string,
   trigger: SlashCommandTrigger,
   command: string,
-): { value: string; cursor: number; token: SlashCommandToken } {
+): string {
   const normalizedCommand = normalizeCommandName(command);
   const replacement = `${normalizedCommand} `;
   const suffix = value.slice(trigger.end);
   const normalizedSuffix = suffix.startsWith(' ') ? suffix.slice(1) : suffix;
-  const nextValue = `${value.slice(0, trigger.start)}${replacement}${normalizedSuffix}`;
-  const cursor = trigger.start + replacement.length;
-  const tokenEnd = trigger.start + normalizedCommand.length;
-
-  return {
-    value: nextValue,
-    cursor,
-    token: {
-      command: normalizedCommand,
-      start: trigger.start,
-      end: tokenEnd,
-    },
-  };
+  return `${value.slice(0, trigger.start)}${replacement}${normalizedSuffix}`;
 }

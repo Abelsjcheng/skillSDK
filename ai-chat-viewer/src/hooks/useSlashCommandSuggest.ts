@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SlashCommandItem, SlashCommandToken, SlashCommandTrigger } from '../types/slashCommand';
+import type { SlashCommandItem, SlashCommandTrigger } from '../types/slashCommand';
 import {
   filterSlashCommands,
   findSlashTrigger,
@@ -30,8 +30,6 @@ export interface UseSlashCommandSuggestOptions {
 
 interface SelectSlashCommandResult {
   value: string;
-  cursor: number;
-  token: SlashCommandToken;
 }
 
 export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
@@ -175,7 +173,7 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
     if (!selectedCommand) {
       return null;
     }
-    const result = replaceSlashTrigger(value, trigger, selectedCommand.command);
+    const nextValue = replaceSlashTrigger(value, trigger, selectedCommand.command);
     reportSlashCommandSelect({
       partnerAccount,
       command: selectedCommand.command,
@@ -184,7 +182,7 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
       isPcMiniApp,
     });
     close();
-    return result;
+    return { value: nextValue };
   }, [close, filteredCommands, highlightedIndex, isPcMiniApp, partnerAccount, trigger]);
 
   return {

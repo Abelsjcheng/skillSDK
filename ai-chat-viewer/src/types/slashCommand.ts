@@ -9,12 +9,6 @@ export interface SlashCommandTrigger {
   query: string;
 }
 
-export interface SlashCommandToken {
-  command: string;
-  start: number;
-  end: number;
-}
-
 export interface SlashCommandQueryParams {
   ak: string;
   partnerAccount: string;

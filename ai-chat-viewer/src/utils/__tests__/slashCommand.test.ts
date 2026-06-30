@@ -38,10 +38,6 @@ describe('slashCommand utilities', () => {
   });
 
   it('replaces the slash fragment and appends a trailing space', () => {
-    expect(replaceSlashTrigger('ask /ne today', { start: 4, end: 7, query: 'ne' }, '/new')).toEqual({
-      value: 'ask /new today',
-      cursor: 9,
-      token: { command: '/new', start: 4, end: 8 },
-    });
+    expect(replaceSlashTrigger('ask /ne today', { start: 4, end: 7, query: 'ne' }, '/new')).toBe('ask /new today');
   });
 });

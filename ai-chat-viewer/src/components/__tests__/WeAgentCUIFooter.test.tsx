@@ -69,7 +69,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await user.keyboard('{ArrowDown}{Enter}');
     expect(input).toHaveValue('/help ');
 
-    await user.keyboard('{Backspace}{Backspace}');
+    await user.clear(input);
     await user.keyboard('/');
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
     await user.keyboard('{Escape}');
@@ -223,7 +223,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(onSend).toHaveBeenCalledWith('你');
   });
 
-  it('deletes a selected slash command as one token', async () => {
+  it('keeps the selected slash command as plain input text', async () => {
     const user = userEvent.setup();
 
     render(
@@ -251,6 +251,6 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(input).toHaveValue('/new');
     await user.keyboard('{Backspace}');
 
-    expect(input).toHaveValue('');
+    expect(input).toHaveValue('/ne');
   });
 });
