@@ -171,6 +171,30 @@ describe('App session delete flow', () => {
     expect(mockCreateNewSession).not.toHaveBeenCalled();
   });
 
+  it('selects the refreshed remote fallback session when push sync deletes the current last session', async () => {
+    render(<App assistantAccount="assistant-1" />);
+
+    await waitFor(() => {
+      expect(latestHistorySidebarProps?.currentWelinkSessionId).toBe('session-1');
+    });
+
+    mockGetHistorySessionsList.mockResolvedValue({
+      content: [createSession('remote-fallback-1')],
+      page: 0,
+      size: 50,
+      total: 1,
+      totalPages: 1,
+    });
+
+    await act(async () => {
+      latestChatSessionOptions?.onSessionDeleted?.('session-1');
+      await Promise.resolve();
+    });
+
+    expect(mockCreateNewSession).not.toHaveBeenCalled();
+    expect(latestHistorySidebarProps?.currentWelinkSessionId).toBe('remote-fallback-1');
+  });
+
   it('keeps local action delete responsible for fallback when its push echo arrives first', async () => {
     render(<App assistantAccount="assistant-1" />);
 

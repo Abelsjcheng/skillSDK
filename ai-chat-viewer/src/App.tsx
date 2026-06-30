@@ -338,10 +338,10 @@ function App({ assistantAccount = '' }: AppProps) {
     setWelinkSessionId(normalizedSessionId);
   }, [session, welinkSessionId]);
 
-  const refreshHistorySessionsFirstPage = useCallback(async () => {
+  const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
     const currentAssistantAccount = assistantAccountRef.current;
     if (!currentAssistantAccount) {
-      return;
+      return null;
     }
 
     const historyResult = await getHistorySessionsList({
@@ -350,8 +350,10 @@ function App({ assistantAccount = '' }: AppProps) {
       page: 0,
       size: HISTORY_SESSIONS_PAGE_SIZE,
     });
-    setHistorySessionsCache(createHistorySessionsCache(historyResult));
+    const nextCache = createHistorySessionsCache(historyResult);
+    setHistorySessionsCache(nextCache);
     setHistorySessionsLoaded(true);
+    return nextCache;
   }, []);
 
   const createAndSelectFallbackSession = useCallback(async () => {
@@ -413,8 +415,20 @@ function App({ assistantAccount = '' }: AppProps) {
 
     if (refreshAfterDelete) {
       try {
-        await refreshHistorySessionsFirstPage();
-        setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+        const refreshedCache = await refreshHistorySessionsFirstPage();
+        const refreshedCacheWithoutDeletedSession = removeSessionFromHistoryCache(
+          refreshedCache,
+          normalizedDeletedSessionId,
+        );
+        setHistorySessionsCache(refreshedCacheWithoutDeletedSession);
+        if (isDeletingCurrentSession && !shouldCreateFallback) {
+          const refreshedNextSession = refreshedCacheWithoutDeletedSession
+            ? getLatestAvailableSessionByUpdatedAt(refreshedCacheWithoutDeletedSession.content)
+            : null;
+          if (refreshedNextSession) {
+            setWelinkSessionId(refreshedNextSession.welinkSessionId);
+          }
+        }
       } catch (error) {
         WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
       }
