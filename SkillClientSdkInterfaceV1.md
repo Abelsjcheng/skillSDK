@@ -31,7 +31,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
-| `onSessionStatusChange` / `onSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
+| `onSessionStatusChange` / `onSkillWecodeStatusChange` / `offSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
 
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
 
@@ -45,6 +45,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | 3 | `stopSkill` | 停止当前轮回答 |
 | 4 | `onSessionStatusChange` | 会话状态变更回调 |
 | 5 | `onSkillWecodeStatusChange` | 小程序状态变更回调 |
+| 5.1 | `offSkillWecodeStatusChange` | 取消小程序状态变更回调 |
 | 6 | `regenerateAnswer` | 重新生成问答 |
 | 7 | `sendMessageToIM` | 将 AI 结果发送到 IM |
 | 8 | `getSessionMessage` | 获取当前会话消息列表 |
@@ -526,6 +527,68 @@ try {
 } catch (error) {
   console.error("注册小程序状态回调失败:", error.errorCode, error.errorMessage);
 }
+```
+
+---
+
+## 5.1. 取消小程序状态变更回调接口
+### 调用方
+
+IM 客户端调用
+### 接口说明
+
+取消通过 `onSkillWecodeStatusChange` 注册的小程序状态变更回调。传入 `callback` 时仅取消对应注册的回调；未传 `callback` 时清空所有已注册的小程序状态变更回调。
+
+### 接口名
+
+```typescript
+offSkillWecodeStatusChange(params?: OffSkillWecodeStatusChangeParams): void
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| callback | function | 否 | 需要取消监听的回调函数；传入时仅取消该回调，未传时清空所有小程序状态变更回调 |
+
+### 出参
+
+无。
+
+### 错误处理
+
+无。若传入的 `callback` 未注册，或当前不存在任何小程序状态变更回调，SDK 均按成功语义处理，不抛出异常。
+
+### 组合调用场景
+
+在与其他接口组合调用时：
+1. 建议在小程序页面卸载、IM 容器销毁或不再需要监听小程序状态时调用。
+2. 仅需要取消某个回调时，传入与 `onSkillWecodeStatusChange` 注册时相同的 `callback` 引用。
+3. 需要清空全部小程序状态监听时，可不传入参直接调用。
+4. 调用后再次需要监听小程序状态时，可重新调用 `onSkillWecodeStatusChange` 注册回调。
+
+### 调用示例
+
+```typescript
+try {
+  offSkillWecodeStatusChange();
+} catch (error) {
+  console.error("取消小程序状态回调失败:", error.errorCode, error.errorMessage);
+}
+```
+
+```typescript
+const handleSkillWecodeStatusChange = (result) => {
+  console.log("小程序状态:", result.status);
+};
+
+onSkillWecodeStatusChange({
+  callback: handleSkillWecodeStatusChange
+});
+
+offSkillWecodeStatusChange({
+  callback: handleSkillWecodeStatusChange
+});
 ```
 
 ---
@@ -1867,6 +1930,12 @@ try {
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | callback | function | 是 | 小程序状态变更回调函数 |
+
+### OffSkillWecodeStatusChangeParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| callback | function | 否 | 需要取消监听的小程序状态变更回调函数；未传时清空所有小程序状态变更回调 |
 
 ### GetSessionMessageParams
 

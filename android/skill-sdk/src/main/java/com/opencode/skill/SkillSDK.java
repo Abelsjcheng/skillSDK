@@ -33,6 +33,7 @@ import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.GetIsShowWeAgentResult;
 import com.opencode.skill.model.HistorySessionsParams;
+import com.opencode.skill.model.OffSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
 import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OpenAssistantEditPageParams;
@@ -379,6 +380,17 @@ public final class SkillSDK {
             throw error(1000, "callback is required");
         }
         wecodeStatusCallbacks.addIfAbsent(params.getCallback());
+    }
+
+    // 5.1. offSkillWecodeStatusChange
+    public void offSkillWecodeStatusChange(@Nullable OffSkillWecodeStatusChangeParams params) {
+        ensureInitializedForVoid();
+        SkillWecodeStatusCallback callback = params == null ? null : params.getCallback();
+        if (callback == null) {
+            wecodeStatusCallbacks.clear();
+        } else {
+            wecodeStatusCallbacks.remove(callback);
+        }
     }
 
     // 6. regenerateAnswer
