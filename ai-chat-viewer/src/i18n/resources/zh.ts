@@ -74,7 +74,7 @@ export const zh = {
   'createAssistant.next': '下一步',
   'createAssistant.prev': '上一步',
   'createAssistant.confirm': '确定',
-  'createAssistant.createFailed': '创建失败，个人助手数量已达上线',
+  'createAssistant.createFailed': '创建失败，个人助手数量已达上限',
   'createAssistant.chooseAvatarFailed': '选择头像失败',
   'createAssistant.uploadAvatarFailed': '上传头像失败',
   'createAssistant.loadInternalAssistantsFailed': '获取内部助手列表失败',
