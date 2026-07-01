@@ -4,7 +4,6 @@ import AssistantPageHeader from './AssistantPageHeader';
 import { StepBasicInfo } from '../createAssistant/StepBasicInfo';
 import {
   DEFAULT_NEW_AVATARS,
-  resolveAssistantIconUrl,
   resolveDefaultAvatarIdByIcon,
 } from '../createAssistant/constants';
 import { ensureLanguageInitialized } from '../../i18n/config';
@@ -24,14 +23,13 @@ import { useSubmitLock } from '../../hooks/useSubmitLock';
 import '../../styles/DigitalTwinCreator.less';
 
 function resolveInitialValue(detail: WeAgentDetails): DigitalTwinBasicInfoPayload {
-  const icon = resolveAssistantIconUrl(detail.icon);
   const avatarId = resolveDefaultAvatarIdByIcon(detail.icon);
 
   return {
     avatarType: avatarId ? 'default' : 'custom',
     avatarId,
     name: detail.name ?? '',
-    icon,
+    icon: detail.icon ?? '',
     description: detail.desc ?? '',
   };
 }
