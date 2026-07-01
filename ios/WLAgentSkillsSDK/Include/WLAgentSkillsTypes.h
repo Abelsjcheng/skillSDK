@@ -219,6 +219,16 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 - (NSDictionary *)toDictionary;
 @end
 
+@interface WLAgentSkillsQuestionItem : NSObject
+@property (nonatomic, copy, nullable) NSString *header;
+@property (nonatomic, copy, nullable) NSString *question;
+@property (nonatomic, strong, nullable) NSArray<NSString *> *options;
+@property (nonatomic, strong, nullable) NSNumber *multiSelect;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
 @interface WLAgentSkillsSessionMessagePart : NSObject
 @property (nonatomic, copy, nullable) NSString *partId;
 @property (nonatomic, strong, nullable) NSNumber *partSeq;
@@ -235,6 +245,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy, nullable) NSString *question;
 @property (nonatomic, copy, nullable) NSString *questionId;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsQuestionItem *> *questions;
 @property (nonatomic, copy, nullable) NSString *permissionId;
 @property (nonatomic, copy, nullable) NSString *permType;
 @property (nonatomic, strong, nullable) NSDictionary *metadata;
@@ -416,6 +427,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, copy, nullable) NSString *header;
 @property (nonatomic, copy, nullable) NSString *question;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsQuestionItem *> *questions;
 @property (nonatomic, copy, nullable) NSString *fileName;
 @property (nonatomic, copy, nullable) NSString *fileUrl;
 @property (nonatomic, copy, nullable) NSString *fileMime;

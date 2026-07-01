@@ -31,6 +31,7 @@ export {
   PageParams,
   QrcodeInfo,
   PermissionResponse,
+  QuestionItem,
   QueryWeAgentParams,
   QueryQrcodeInfoParams,
   RegisterSessionListenerParams,

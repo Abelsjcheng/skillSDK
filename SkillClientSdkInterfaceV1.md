@@ -1102,13 +1102,14 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 #### 字段对齐说明（重要）
 
 - WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外**没有外层 envelope**
+- 服务端 WebSocket `onmessage` 中 `question` 事件新增 `questions` 字段；字段格式为 `QuestionItem[]`，用于一次返回多组问题。
 - `snapshot.messages[].id` 类型为 `string`（稳定消息 ID）
 - `snapshot.messages[].seq` 类型为 `number | null`（数据库排序序号，用户消息可能为 `null`）
 - `snapshot.messages[].messageSeq` 类型为 `number | null`（会话内消息序号）
 - `snapshot.messages[].contentType` 类型为 `string`（`plain` / `markdown`）
 - `streaming.messageId` 类型为 `string | null`（仅 `parts` 非空时出现）
 - `streaming.parts[].status` 为工具状态字段（字段名为 `status`）
-- `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
+- `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `questions`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
 - `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
 - `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
 - `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
@@ -1198,7 +1199,7 @@ try {
         break;
       case "question":
         if (message.status === "running") {
-          console.log("AI提问:", message.question, message.options);
+          console.log("AI提问:", message.question, message.options, message.questions);
         } else {
           console.log("AI提问已完成:", message.toolCallId, message.output);
         }
@@ -2072,6 +2073,7 @@ try {
 | question | string \| null | 问题正文（`question` 类型） |
 | questionId | string \| null | 问题 ID（`question` 类型）；服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
 | options | string[] \| null | 问题选项（`question` 类型） |
+| questions | QuestionItem[] \| null | 多题结构（`question` 类型）；服务端 WebSocket `onmessage` 新增字段 |
 | permissionId | string \| null | 权限请求 ID（`permission` 类型） |
 | permType | string \| null | 权限类型（`permission` 类型） |
 | metadata | object \| null | 权限元数据（`permission` 类型） |
@@ -2089,6 +2091,30 @@ try {
 |------|------|------|
 | subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议客户端作为子任务分组主键 |
 | subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
+
+### QuestionItem
+
+`questions` 字段中的单个问题对象，用于 WebSocket `question` 事件、`SessionMessagePart.questions`、`streaming.parts[].questions` 等多题结构。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| header | string | 问题分组标题 |
+| question | string | 问题正文 |
+| options | string[] | 问题选项 |
+| multiSelect | boolean | 是否支持多选 |
+
+示例：
+
+```json
+[
+  {
+    "header": "编程",
+    "question": "问题1",
+    "options": ["python", "java"],
+    "multiSelect": false
+  }
+]
+```
 
 ### SessionStatusResult
 
@@ -2157,8 +2183,22 @@ try {
 | partId | string \| null | Part 唯一 ID（仅 part 类事件出现） |
 | partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现；`permission.ask` / `permission.reply` 可能缺失） |
 
+#### Question事件字段（`type = question`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| header | string \| null | 问题分组标题；`running` 阶段可返回 |
+| question | string \| null | 问题正文；`running` 阶段可返回 |
+| options | string[] \| null | 问题选项；`running` 阶段可返回 |
+| questions | QuestionItem[] \| null | 多题结构；服务端 WebSocket `onmessage` 新增字段，`running` 阶段可返回 |
+| questionId | string \| null | 问题 ID；服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
+| status | string \| null | question 状态：`running` / `completed` / `error` |
+| toolName | string \| null | 工具名 |
+| toolCallId | string \| null | 工具调用 ID |
+| output | string \| null | `completed` 阶段返回的输出 |
+
 > 说明：
-> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam` / `questionId`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId`。
+> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `questions` / `questionId`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId`。
 > - `permission.reply` 为极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
 
 #### StreamMessage 的 Subagent 扩展字段
@@ -2212,9 +2252,7 @@ try {
 | parts[].header | string | question 分组标题（可选） |
 | parts[].question | string | question 正文（可选） |
 | parts[].options | string[] | question 选项（可选） |
-| parts[].multiSelect | boolean | question 是否多选（可选） |
-| parts[].questions | object[] | question 多题结构（可选） |
-| parts[].extParam | object | question 云端透传字段（可选） |
+| parts[].questions | QuestionItem[] | question 多题结构（可选） |
 | parts[].permissionId | string | 权限请求 ID（可选） |
 | parts[].permType | string | 权限类型（可选） |
 | parts[].metadata | object | 权限元数据（可选） |
@@ -2235,7 +2273,7 @@ try {
 | `thinking.delta` | 思维链增量 | `content` |
 | `thinking.done` | 思维链完成 | `content` |
 | `tool.update` | 工具调用状态更新 | `toolName` `toolCallId` `status` `input` `output` `error` `title` |
-| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` `multiSelect` `questions` `extParam` |
+| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` `questions` |
 | `file` | 文件或图片附件 | `fileName` `fileUrl` `fileMime` |
 | `step.start` | 推理步骤开始 | 无额外必填字段 |
 | `step.done` | 推理步骤结束 | `tokens` `cost` `reason` |

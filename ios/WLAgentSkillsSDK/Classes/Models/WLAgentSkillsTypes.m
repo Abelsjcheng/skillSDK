@@ -414,6 +414,38 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
+@implementation WLAgentSkillsQuestionItem
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
+        _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
+        _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+        _multiSelect = WLAgentSkillsNumberValue(dictionary[@"multiSelect"], nil);
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
+    if (self.header != nil && self.header.length > 0) {
+        dictionary[@"header"] = self.header;
+    }
+    if (self.question != nil && self.question.length > 0) {
+        dictionary[@"question"] = self.question;
+    }
+    if (self.options != nil && self.options.count > 0) {
+        dictionary[@"options"] = self.options;
+    }
+    if (self.multiSelect != nil) {
+        dictionary[@"multiSelect"] = self.multiSelect;
+    }
+    return dictionary;
+}
+
+@end
+
 @implementation WLAgentSkillsSessionMessagePart
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
@@ -443,6 +475,16 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
     _questionId = WLAgentSkillsStringValue(dictionary[@"questionId"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+    if ([dictionary[@"questions"] isKindOfClass:[NSArray class]]) {
+        NSMutableArray<WLAgentSkillsQuestionItem *> *questions = [NSMutableArray array];
+        for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"questions"])) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [questions addObject:[[WLAgentSkillsQuestionItem alloc] initWithDictionary:item]];
+        }
+        _questions = [questions copy];
+    }
     _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
     _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
     _metadata = [dictionary[@"metadata"] isKindOfClass:[NSDictionary class]] ? dictionary[@"metadata"] : nil;
@@ -502,6 +544,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     }
     if (self.options != nil && self.options.count > 0) {
     dictionary[@"options"] = self.options;
+    }
+    if (self.questions != nil && self.questions.count > 0) {
+    dictionary[@"questions"] = WLAgentSkillsSerializeModelArray(self.questions);
     }
     if (self.permissionId != nil && self.permissionId.length > 0) {
     dictionary[@"permissionId"] = self.permissionId;
@@ -793,6 +838,16 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
     _questionId = WLAgentSkillsStringValue(dictionary[@"questionId"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+    if ([dictionary[@"questions"] isKindOfClass:[NSArray class]]) {
+        NSMutableArray<WLAgentSkillsQuestionItem *> *questions = [NSMutableArray array];
+        for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"questions"])) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [questions addObject:[[WLAgentSkillsQuestionItem alloc] initWithDictionary:item]];
+        }
+        _questions = [questions copy];
+    }
     _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
     _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
     _fileMime = WLAgentSkillsStringValue(dictionary[@"fileMime"], nil);
@@ -837,6 +892,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"question" : WLAgentSkillsNullObject(self.question),
         @"questionId" : WLAgentSkillsNullObject(self.questionId),
         @"options" : WLAgentSkillsNullObject(self.options),
+        @"questions" : self.questions != nil
+            ? WLAgentSkillsSerializeModelArray(self.questions)
+            : [NSNull null],
         @"fileName" : WLAgentSkillsNullObject(self.fileName),
         @"fileUrl" : WLAgentSkillsNullObject(self.fileUrl),
         @"fileMime" : WLAgentSkillsNullObject(self.fileMime),
