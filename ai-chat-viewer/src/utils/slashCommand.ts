@@ -1,4 +1,4 @@
-import type { SlashCommandItem, SlashCommandTrigger } from '../types/slashCommand';
+import type { SlashCommandItem } from '../types/slashCommand';
 
 function normalizeCommandName(command: string): string {
   const trimmedCommand = command.trim();
@@ -37,34 +37,17 @@ export function normalizeSlashCommands(rawCommands: unknown): SlashCommandItem[]
   return commands;
 }
 
-export function findSlashTrigger(value: string, cursor: number): SlashCommandTrigger | null {
-  const safeCursor = Math.max(0, Math.min(cursor, value.length));
-  const beforeCursor = value.slice(0, safeCursor);
-  const slashIndex = beforeCursor.lastIndexOf('/');
-
-  if (slashIndex < 0) {
+export function findSlashQuery(value: string): string | null {
+  if (!value.startsWith('/')) {
     return null;
   }
 
-  if (slashIndex !== 0) {
-    return null;
-  }
-
-  const previousCharacter = slashIndex > 0 ? value[slashIndex - 1] : '';
-  if (previousCharacter && !/\s/.test(previousCharacter)) {
-    return null;
-  }
-
-  const fragment = value.slice(slashIndex, safeCursor);
+  const fragment = value.trimEnd();
   if (/\s/.test(fragment)) {
     return null;
   }
 
-  return {
-    start: slashIndex,
-    end: safeCursor,
-    query: fragment.slice(1),
-  };
+  return fragment.slice(1);
 }
 
 export function filterSlashCommands(commands: SlashCommandItem[], query: string): SlashCommandItem[] {
@@ -78,14 +61,7 @@ export function filterSlashCommands(commands: SlashCommandItem[], query: string)
   ));
 }
 
-export function replaceSlashTrigger(
-  value: string,
-  trigger: SlashCommandTrigger,
-  command: string,
-): string {
+export function buildSlashCommandValue(command: string): string {
   const normalizedCommand = normalizeCommandName(command);
-  const replacement = `${normalizedCommand} `;
-  const suffix = value.slice(trigger.end);
-  const normalizedSuffix = suffix.startsWith(' ') ? suffix.slice(1) : suffix;
-  return `${value.slice(0, trigger.start)}${replacement}${normalizedSuffix}`;
+  return `${normalizedCommand} `;
 }

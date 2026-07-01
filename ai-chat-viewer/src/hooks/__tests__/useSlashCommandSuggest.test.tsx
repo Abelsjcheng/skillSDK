@@ -38,7 +38,7 @@ describe('useSlashCommandSuggest', () => {
     }), { initialProps: { commands: [] } });
 
     act(() => {
-      result.current.handleValueChange('/', 1);
+      result.current.handleValueChange('/');
     });
 
     await waitFor(() => expect(onRequestCommands).toHaveBeenCalledTimes(1));
@@ -49,7 +49,7 @@ describe('useSlashCommandSuggest', () => {
     expect(result.current.filteredCommands).toEqual(networkCommands);
 
     act(() => {
-      result.current.handleValueChange('/n', 2);
+      result.current.handleValueChange('/n');
     });
 
     expect(result.current.filteredCommands).toEqual([
@@ -58,7 +58,7 @@ describe('useSlashCommandSuggest', () => {
     ]);
 
     act(() => {
-      result.current.handleValueChange('/h', 2);
+      result.current.handleValueChange('/h');
     });
 
     expect(result.current.filteredCommands).toEqual([
@@ -84,7 +84,7 @@ describe('useSlashCommandSuggest', () => {
     }));
 
     act(() => {
-      result.current.handleValueChange('/h', 2);
+      result.current.handleValueChange('/h');
     });
 
     await waitFor(() => expect(result.current.filteredCommands).toEqual(staleCommands));
@@ -93,7 +93,7 @@ describe('useSlashCommandSuggest', () => {
     expect(getStorage).toHaveBeenCalledTimes(1);
 
     act(() => {
-      result.current.handleValueChange('/he', 3);
+      result.current.handleValueChange('/he');
     });
 
     await Promise.resolve();
@@ -120,7 +120,7 @@ describe('useSlashCommandSuggest', () => {
     }));
 
     act(() => {
-      result.current.handleValueChange('/cmd', 4);
+      result.current.handleValueChange('/cmd');
     });
 
     await waitFor(() => expect(result.current.filteredCommands).toHaveLength(12));
@@ -146,7 +146,7 @@ describe('useSlashCommandSuggest', () => {
     }), { initialProps: { commands: networkCommands } });
 
     act(() => {
-      result.current.handleValueChange('/n', 2);
+      result.current.handleValueChange('/n');
     });
 
     await waitFor(() => expect(result.current.filteredCommands).toEqual([

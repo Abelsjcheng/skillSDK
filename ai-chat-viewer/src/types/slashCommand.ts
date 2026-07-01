@@ -3,12 +3,6 @@ export interface SlashCommandItem {
   description: string;
 }
 
-export interface SlashCommandTrigger {
-  start: number;
-  end: number;
-  query: string;
-}
-
 export interface SlashCommandQueryParams {
   ak: string;
   partnerAccount: string;

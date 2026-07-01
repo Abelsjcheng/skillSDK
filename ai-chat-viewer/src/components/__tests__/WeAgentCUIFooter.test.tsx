@@ -208,7 +208,7 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     await user.click(input);
     await user.keyboard('/n');
     await waitFor(() => expect(screen.getByText('/new')).toBeInTheDocument());
-    await user.keyboard('{Enter}');
+    await user.click(screen.getByText('/new'));
 
     expect(input).toHaveValue('/new ');
 

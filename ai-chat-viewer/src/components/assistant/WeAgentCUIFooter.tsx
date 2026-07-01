@@ -134,21 +134,20 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     setIsShortcutPopupOpen(false);
   };
 
-  const handleInputValueChange = (nextValue: string, cursor: number) => {
+  const handleInputValueChange = (nextValue: string) => {
     setValue(nextValue);
-    slashSuggest.handleValueChange(nextValue, cursor);
+    slashSuggest.handleValueChange(nextValue);
   };
 
   const handleNativeInputChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const nextValue = event.target.value;
-    const cursor = event.target.selectionStart ?? nextValue.length;
-    handleInputValueChange(nextValue, cursor);
+    handleInputValueChange(nextValue);
   };
 
   const selectSlashCommand = (command?: SlashCommandItem) => {
-    const result = slashSuggest.selectCommand(value, command);
+    const result = slashSuggest.selectCommand(command);
     if (!result) {
       return false;
     }

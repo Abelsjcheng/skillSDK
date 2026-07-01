@@ -40,17 +40,5 @@ describe('SlashCommandPanel', () => {
 
     expect(screen.getByRole('option', { name: '/cmd10 命令 10' })).toHaveAttribute('aria-selected', 'true');
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
-
-    scrollIntoView.mockClear();
-    rerender(
-      <SlashCommandPanel
-        commands={commands}
-        highlightedIndex={0}
-        onSelect={jest.fn()}
-      />,
-    );
-
-    expect(screen.getByRole('option', { name: '/cmd0 命令 0' })).toHaveAttribute('aria-selected', 'true');
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
   });
 });

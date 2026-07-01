@@ -1,8 +1,8 @@
 import {
-  findSlashTrigger,
+  buildSlashCommandValue,
   filterSlashCommands,
+  findSlashQuery,
   normalizeSlashCommands,
-  replaceSlashTrigger,
 } from '../slashCommand';
 
 describe('slashCommand utilities', () => {
@@ -19,11 +19,11 @@ describe('slashCommand utilities', () => {
     ]);
   });
 
-  it('finds a slash trigger only at the beginning of the input', () => {
-    expect(findSlashTrigger('/ne', 3)).toEqual({ start: 0, end: 3, query: 'ne' });
-    expect(findSlashTrigger('hello /ne', 9)).toBeNull();
-    expect(findSlashTrigger('hello/a', 7)).toBeNull();
-    expect(findSlashTrigger('/new session', 12)).toBeNull();
+  it('finds a slash query only at the beginning of the input', () => {
+    expect(findSlashQuery('/ne')).toBe('ne');
+    expect(findSlashQuery('hello /ne')).toBeNull();
+    expect(findSlashQuery('hello/a')).toBeNull();
+    expect(findSlashQuery('/new session')).toBeNull();
   });
 
   it('filters by command prefix without matching description', () => {
@@ -37,7 +37,7 @@ describe('slashCommand utilities', () => {
     expect(filterSlashCommands(commands, 'he')).toEqual([{ command: '/help', description: '帮助' }]);
   });
 
-  it('replaces the slash fragment and appends a trailing space', () => {
-    expect(replaceSlashTrigger('ask /ne today', { start: 4, end: 7, query: 'ne' }, '/new')).toBe('ask /new today');
+  it('builds a plain slash command value with trailing space', () => {
+    expect(buildSlashCommandValue('/new')).toBe('/new ');
   });
 });

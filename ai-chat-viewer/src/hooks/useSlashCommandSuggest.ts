@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SlashCommandItem, SlashCommandTrigger } from '../types/slashCommand';
+import type { SlashCommandItem } from '../types/slashCommand';
 import {
+  buildSlashCommandValue,
   filterSlashCommands,
-  findSlashTrigger,
+  findSlashQuery,
   normalizeSlashCommands,
-  replaceSlashTrigger,
 } from '../utils/slashCommand';
 import { readSlashCommandStore, writeSlashCommandStore } from '../utils/slashCommandStore';
 import { reportSlashCommandPanelTrigger, reportSlashCommandSelect } from '../utils/uemUtil';
@@ -39,15 +39,15 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
   const onRequestCommands = options.onRequestCommands;
   const [commands, setCommands] = useState<SlashCommandItem[]>([]);
   const [commandSource, setCommandSource] = useState<'storage' | 'db' | 'memory' | 'websocket'>('websocket');
-  const [trigger, setTrigger] = useState<SlashCommandTrigger | null>(null);
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const fallbackReadTriedRef = useRef(false);
 
   const filteredCommands = useMemo(
-    () => (trigger ? filterSlashCommands(commands, trigger.query) : []),
-    [commands, trigger],
+    () => (slashQuery === null ? [] : filterSlashCommands(commands, slashQuery)),
+    [commands, slashQuery],
   );
-  const isOpen = Boolean(trigger && filteredCommands.length > 0);
+  const isOpen = Boolean(slashQuery !== null && filteredCommands.length > 0);
 
   useEffect(() => {
     const nextCommands = normalizeSlashCommands(slashCommands ?? []);
@@ -124,15 +124,15 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
     }
   }, [commands, isPcMiniApp, onRequestCommands, partnerAccount]);
 
-  const handleValueChange = useCallback((value: string, cursor: number) => {
-    const nextTrigger = findSlashTrigger(value, cursor);
-    setTrigger(nextTrigger);
-    if (!nextTrigger) {
+  const handleValueChange = useCallback((value: string) => {
+    const nextSlashQuery = findSlashQuery(value);
+    setSlashQuery(nextSlashQuery);
+    if (nextSlashQuery === null) {
       setHighlightedIndex(-1);
       return;
     }
 
-    setHighlightedIndex(nextTrigger.query ? 0 : -1);
+    setHighlightedIndex(nextSlashQuery ? 0 : -1);
     void loadCommands();
   }, [loadCommands]);
 
@@ -151,7 +151,7 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
   }, [commandSource, filteredCommands.length, isOpen, isPcMiniApp, partnerAccount]);
 
   const close = useCallback(() => {
-    setTrigger(null);
+    setSlashQuery(null);
     setHighlightedIndex(-1);
   }, []);
 
@@ -165,32 +165,32 @@ export function useSlashCommandSuggest(options: UseSlashCommandSuggestOptions) {
     });
   }, [filteredCommands.length]);
 
-  const selectCommand = useCallback((value: string, command?: SlashCommandItem): SelectSlashCommandResult | null => {
-    if (!trigger) {
+  const selectCommand = useCallback((command?: SlashCommandItem): SelectSlashCommandResult | null => {
+    if (slashQuery === null) {
       return null;
     }
     const selectedCommand = command ?? (highlightedIndex >= 0 ? filteredCommands[highlightedIndex] : undefined);
     if (!selectedCommand) {
       return null;
     }
-    const nextValue = replaceSlashTrigger(value, trigger, selectedCommand.command);
+    const nextValue = buildSlashCommandValue(selectedCommand.command);
     reportSlashCommandSelect({
       partnerAccount,
       command: selectedCommand.command,
-      queryLength: trigger.query.length,
+      queryLength: slashQuery.length,
       selectMethod: command ? 'click' : 'enter',
       isPcMiniApp,
     });
     close();
     return { value: nextValue };
-  }, [close, filteredCommands, highlightedIndex, isPcMiniApp, partnerAccount, trigger]);
+  }, [close, filteredCommands, highlightedIndex, isPcMiniApp, partnerAccount, slashQuery]);
 
   return {
     commands,
     filteredCommands,
     highlightedIndex,
     isOpen,
-    trigger,
+    slashQuery,
     close,
     handleValueChange,
     moveHighlight,
