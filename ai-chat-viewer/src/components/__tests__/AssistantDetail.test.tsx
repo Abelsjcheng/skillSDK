@@ -128,6 +128,12 @@ describe('AssistantDetail', () => {
     expect(screen.getByText(i18n.t('assistantDetail.capabilityProvider'))).toBeInTheDocument();
   });
 
+  it('renders as an exported component without router context', async () => {
+    render(<AssistantDetail partnerAccount="x00_1" />);
+
+    expect(await screen.findByText('Assistant A')).toBeInTheDocument();
+  });
+
   it('uses creatorNameEn with creatorW3Account when current language is english', async () => {
     window.localStorage.setItem('language', '1033');
     await i18n.changeLanguage('en');

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { WeAgentDetails } from '../bridge';
 
 export interface DetailInfoRowProps {
   label: string;
@@ -8,6 +9,7 @@ export interface DetailInfoRowProps {
 
 export interface AssistantDetailProps {
   partnerAccount?: string;
+  onEditAssistant?: (detail: WeAgentDetails | null) => void;
 }
 
 export interface SkillCUIProps {
