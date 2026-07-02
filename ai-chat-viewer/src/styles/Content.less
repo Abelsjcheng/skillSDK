@@ -979,15 +979,23 @@
     font-size: 16px;
   }
 
-  &.app-container--we-agent-cui:not(.pc-mode) {
-    .thinking-block__header {
-      -webkit-tap-highlight-color: transparent;
+  &.app-container--we-agent-cui:not(.pc-mode),
+  &.skill-cui:not(.pc-mode) {
+    .thinking-block__header,
+    .thinking-block__header[role='button'] {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      -webkit-focus-ring-color: rgba(0, 0, 0, 0);
+      touch-action: manipulation;
+    }
 
-      &:focus,
-      &:focus-visible,
-      &:active {
-        outline: none;
-      }
+    .thinking-block__header:focus,
+    .thinking-block__header:focus-visible,
+    .thinking-block__header:active,
+    .thinking-block__header[role='button']:focus,
+    .thinking-block__header[role='button']:focus-visible,
+    .thinking-block__header[role='button']:active {
+      outline: none !important;
+      box-shadow: none !important;
     }
   }
 }
@@ -1078,15 +1086,6 @@
       background: rgba(255, 255, 255, 0.04);
     }
 
-    .thinking-block__header,
-    .thinking-block__header:hover,
-    .thinking-block__header:active,
-    .thinking-block__header:focus,
-    .thinking-block__header:focus-visible {
-      background: #242627;
-      outline: none;
-    }
-
     .tool-card__chevron,
     .thinking-block__chevron {
       filter: brightness(0) saturate(100%) invert(79%) sepia(4%) saturate(76%) hue-rotate(182deg) brightness(90%) contrast(86%);
@@ -1147,5 +1146,21 @@
     .file-part a:hover {
       color: #69b1ff;
     }
+  }
+
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header,
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:hover,
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:active,
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:focus,
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:focus-visible,
+  .skill-cui:not(.pc-mode) .thinking-block__header,
+  .skill-cui:not(.pc-mode) .thinking-block__header:hover,
+  .skill-cui:not(.pc-mode) .thinking-block__header:active,
+  .skill-cui:not(.pc-mode) .thinking-block__header:focus,
+  .skill-cui:not(.pc-mode) .thinking-block__header:focus-visible {
+    background: #242627 !important;
+    background-color: #242627 !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
 }
