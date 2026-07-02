@@ -244,4 +244,27 @@ describe('WeAgentCUIFooter slash command suggestion', () => {
     expect(input.style.height).toBe('132px');
     expect(input.style.overflowY).toBe('auto');
   });
+
+  it('keeps empty PC textarea at the two-line minimum height', () => {
+    const scrollHeightSpy = jest.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockReturnValue(154);
+
+    render(
+      <WeAgentCUIFooter
+        isPcMiniApp
+        mode="generate"
+        partnerAccount="partner-1"
+        slashCommands={[{ command: '/new', description: '新建会话' }]}
+        onRequestSlashCommands={jest.fn().mockResolvedValue(undefined)}
+        onSend={jest.fn()}
+        onStop={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement;
+
+    expect(input).toHaveValue('');
+    expect(input.style.height).toBe('44px');
+    expect(input.style.overflowY).toBe('hidden');
+    scrollHeightSpy.mockRestore();
+  });
 });

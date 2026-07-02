@@ -116,6 +116,11 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
 
     const textarea = inputRef.current;
     textarea.style.height = `${PC_TEXTAREA_MIN_HEIGHT}px`;
+    if (!value) {
+      textarea.style.overflowY = 'hidden';
+      return;
+    }
+
     const nextHeight = Math.max(
       PC_TEXTAREA_MIN_HEIGHT,
       Math.min(textarea.scrollHeight, PC_TEXTAREA_MAX_HEIGHT),
