@@ -979,8 +979,8 @@
     font-size: 16px;
   }
 
-  &.app-container--we-agent-cui,
-  &.skill-cui {
+  &.app-container--we-agent-cui:not(.pc-mode),
+  &.skill-cui:not(.pc-mode) {
     .thinking-block__header,
     .thinking-block__header[role='button'] {
       -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
@@ -1152,26 +1152,26 @@
     }
   }
 
-  .app-container--we-agent-cui .thinking-block__header,
-  .skill-cui .thinking-block__header {
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header,
+  .skill-cui:not(.pc-mode) .thinking-block__header {
     background: #242627 !important;
     background-color: #242627 !important;
   }
 
-  .app-container--we-agent-cui .thinking-block__header:hover,
-  .app-container--we-agent-cui .thinking-block__header:active,
-  .app-container--we-agent-cui .thinking-block__header:focus,
-  .skill-cui .thinking-block__header:hover,
-  .skill-cui .thinking-block__header:active,
-  .skill-cui .thinking-block__header:focus {
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:hover,
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:active,
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:focus,
+  .skill-cui:not(.pc-mode) .thinking-block__header:hover,
+  .skill-cui:not(.pc-mode) .thinking-block__header:active,
+  .skill-cui:not(.pc-mode) .thinking-block__header:focus {
     background: #242627 !important;
     background-color: #242627 !important;
     outline: none !important;
     box-shadow: none !important;
   }
 
-  .app-container--we-agent-cui .thinking-block__header:focus-visible,
-  .skill-cui .thinking-block__header:focus-visible {
+  .app-container--we-agent-cui:not(.pc-mode) .thinking-block__header:focus-visible,
+  .skill-cui:not(.pc-mode) .thinking-block__header:focus-visible {
     background: #242627 !important;
     background-color: #242627 !important;
     outline: none !important;
