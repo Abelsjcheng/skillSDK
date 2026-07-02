@@ -978,6 +978,18 @@
   .file-part__icon {
     font-size: 16px;
   }
+
+  &.app-container--we-agent-cui:not(.pc-mode) {
+    .thinking-block__header {
+      -webkit-tap-highlight-color: transparent;
+
+      &:focus,
+      &:focus-visible,
+      &:active {
+        outline: none;
+      }
+    }
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1057,14 +1069,22 @@
       border: 1px solid var(--ai-dark-border-soft);
     }
 
-    .tool-card__header:hover,
-    .thinking-block__header:hover {
+    .tool-card__header:hover {
       background: rgba(255, 255, 255, 0.04);
     }
 
     .tool-card__header,
     .permission-card__header {
       background: rgba(255, 255, 255, 0.04);
+    }
+
+    .thinking-block__header,
+    .thinking-block__header:hover,
+    .thinking-block__header:active,
+    .thinking-block__header:focus,
+    .thinking-block__header:focus-visible {
+      background: #242627;
+      outline: none;
     }
 
     .tool-card__chevron,
