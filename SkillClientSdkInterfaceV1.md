@@ -31,6 +31,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
+| `querySlashCommands` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送 `query_slash_commands` 命令，结果通过 `slash_commands_result` 事件返回 |
 | `onSessionStatusChange` / `onSkillWecodeStatusChange` / `offSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
 
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
@@ -55,7 +56,8 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | 11 | `replyPermission` | 权限确认 |
 | 12 | `controlSkillWeCode` | 小程序控制 |
 | 13 | `createNewSession` | 创建新会话 |
-| 14 | `getHistorySessionsList` | 获取历史会话列表 |
+| 15 | `getHistorySessionsList` | 获取历史会话列表 |
+| 16 | `querySlashCommands` | 通过 WebSocket 查询 Slash Commands |
 
 ## 1. 创建会话接口
 
@@ -1886,6 +1888,131 @@ try {
 }
 ```
 
+## 16. 查询 Slash Commands 接口
+
+### 调用方
+
+Skill 小程序 / JSAPI bridge 调用
+
+### 接口说明
+
+通过既有 Skill WebSocket 长连接查询当前会话可用的 Slash Commands。
+
+该接口不是 REST 接口。SDK 方法返回只表示 WebSocket 查询命令已发送，真实命令列表由服务端异步推送 `slash_commands_result` 事件，并通过 `registerSessionListener` 的 `onMessage` 回调返回给调用方。
+
+### 接口名
+
+```typescript
+querySlashCommands(params: QuerySlashCommandsParams): Promise<QuerySlashCommandsResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### WebSocket 发送命令
+
+```json
+{
+  "action": "query_slash_commands",
+  "welinkSessionId": "42"
+}
+```
+
+### 出参
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 固定为 `success`，表示查询命令已发送 |
+
+### 结果事件
+
+服务端通过 WebSocket 推送平铺的 `StreamMessage`：
+
+```json
+{
+  "type": "slash_commands_result",
+  "seq": 135,
+  "emittedAt": "2026-06-15T00:00:00Z",
+  "messageId": "{string}",
+  "messageSeq": 6,
+  "role": "assistant",
+  "sourceMessageId": "{string}",
+  "partId": "{string}",
+  "partSeq": 4,
+  "status": "running",
+  "sessionID": "{string}",
+  "welinkSessionId": "42",
+  "slashCommands": [
+    {
+      "command": "/new",
+      "description": "新建会话"
+    },
+    {
+      "command": "/delete",
+      "description": "删除"
+    }
+  ]
+}
+```
+
+字段说明：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定为 `slash_commands_result` |
+| welinkSessionId | string | 所属会话 ID |
+| slashCommands | Array<SlashCommand> | Slash Commands 列表，可能为空数组 |
+| slashCommands[].command | string | Slash 命令，如 `/new` |
+| slashCommands[].description | string \| null | 命令描述 |
+
+说明：
+- SDK 对外主会话字段统一使用 `welinkSessionId`。
+- 若服务端返回 `sessionID`，SDK 可在 `raw` 中保留该字段，但不作为 SDK 对外主字段。
+- `slash_commands_result` 不进入本地流式消息缓存，不参与 `getSessionMessage` 的历史消息聚合。
+
+### 实现方法
+
+1. SDK 校验 `welinkSessionId`，为空时返回 `1000`。
+2. SDK 确保 WebSocket 已连接；未连接时先建立连接。
+3. SDK 通过 `WebSocketManager` 发送 `query_slash_commands` 命令。
+4. 服务端异步推送 `slash_commands_result`。
+5. WebSocketManager 按 `welinkSessionId` 将事件分发给已注册的会话监听器。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+| 5000 | SDK 未初始化 | SDK 尚未完成初始化 |
+| 6000 | 网络错误 | WebSocket 连接或发送失败 |
+| 7000 | 服务端错误 | 服务端返回错误事件或无法处理查询命令 |
+
+### 组合调用场景
+
+1. 建议调用方先调用 `registerSessionListener`，再调用 `querySlashCommands`。
+2. 若调用方未注册监听器，查询命令仍可发送成功，但端侧无法消费异步结果事件。
+3. 页面卸载时调用 `unregisterSessionListener`，避免结果事件投递到已销毁页面。
+
+### 调用示例
+
+```typescript
+registerSessionListener({
+  welinkSessionId: "42",
+  onMessage: (message: StreamMessage) => {
+    if (message.type === "slash_commands_result") {
+      console.log("Slash Commands:", message.slashCommands ?? []);
+    }
+  }
+});
+
+await querySlashCommands({
+  welinkSessionId: "42"
+});
+```
+
 ## 数据类型定义
 
 > 说明：
@@ -1995,6 +2122,21 @@ try {
 > 说明：
 > - `content` 为可选入参；若传入则建议使用最终确认后的完整文本内容
 > - `chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
+
+### QuerySlashCommandsParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### SlashCommand
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| command | string | Slash 命令，如 `/new` |
+| description | string \| null | 命令描述 |
+
+### RegisterSessionListenerParams
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -2294,6 +2436,7 @@ try {
 | `search_result` | 搜索结果（云端扩展） | `searchResults` |
 | `reference` | 引用列表（云端扩展） | `references` |
 | `ask_more` | 追问建议（云端扩展） | `askMoreQuestions` |
+| `slash_commands_result` | Slash Commands 查询结果 | `slashCommands` |
 
 #### Subagent 事件处理约定
 
@@ -2366,6 +2509,7 @@ try {
 | permType | string \| null | 权限类型 |
 | metadata | object \| null | 权限请求详情 |
 | response | string \| null | 权限回复值：`once` / `always` / `reject` |
+| slashCommands | Array<SlashCommand> \| null | `slash_commands_result` 事件返回的 Slash Commands 列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照，元素结构见上文 `snapshot` 事件字段 |
 | parts | array \| null | `streaming` 携带的进行中消息部件，元素结构见上文 `streaming` 事件字段 |
 
@@ -2428,6 +2572,12 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | success | boolean | 发送是否成功（服务端字段） |
+
+### QuerySlashCommandsResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 固定为 `success`，表示 WebSocket 查询命令已发送 |
 
 ### Session
 ```typescript
