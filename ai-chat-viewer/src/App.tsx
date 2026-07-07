@@ -191,10 +191,45 @@ function App({ assistantAccount = '' }: AppProps) {
   }, []);
 
   const handleWeAgentUpdated = useCallback((payload: WeAgentUpdatedEventPayload) => {
-    if (payload?.type !== 'update') {
+    if (payload?.type !== 'update' && payload?.type !== 'offline_notify') {
+      WeLog(`handleWeAgentUpdated type failed type=${payload?.type}`)
       return;
     }
+    if (payload.type === 'offline_notify') {
+      if (!payload.data || !Array.isArray(payload.data) || payload.data.length === 0) {
+        return;
+      }
 
+      const currentAssistantAccount = assistantAccountRef.current.trim();
+      const matchedEvent = payload.data.find((event) => 
+        event.type === 'update' &&
+      event.data?.partnerAccount?.trim() === currentAssistantAccount
+      ) as Extract<WeAgentUpdatedEventPayload, { type: 'update'}> | undefined;
+      if (!matchedEvent) {
+        return;
+      }
+
+      WeLog(`handleWeAgentUpdated offline_notify matched assistant: ${matchedEvent.data.partnerAccount}`, 'info');
+
+      // 复用现有更新逻辑
+      const updatedDetail = matchedEvent.data;
+      const currentDetail = assistantDetailRef.current;
+          const nextDetail = {
+      ...currentDetail,
+      ...updatedDetail,
+      desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    } as WeAgentDetails;
+        assistantDetailRef.current = nextDetail;
+    setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
+    setWeAgentAssistantDescription(
+      updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    );
+    setWeAgentAssistantAvatar(
+      resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
+    );
+    return
+
+    }
     const updatedDetail = payload.data;
     const currentAssistantAccount = assistantAccountRef.current.trim();
     const updatedPartnerAccount = updatedDetail?.partnerAccount?.trim();
@@ -221,11 +256,11 @@ function App({ assistantAccount = '' }: AppProps) {
 
   useEffect(() => {
     void registerEventListener({
-      type: 'agentskills.agentUpdated',
+      type: 'aagentskills_agentUpdated',
       func: handleWeAgentUpdated,
     }).catch((error) => {
       WeLog(`App registerEventListener failed | extra=${JSON.stringify({
-        type: 'agentskills.agentUpdated',
+        type: 'agentskills_agentUpdated',
       })} | error=${JSON.stringify(error)}`);
     });
   }, [handleWeAgentUpdated]);
