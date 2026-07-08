@@ -65,7 +65,7 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .filter(Boolean)
     .join(' ');
 
-const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => {
+const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handlePcDelete }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const isPc = isPcMiniApp();
@@ -266,16 +266,6 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
     );
   }, [detail, isPc, navigate]);
 
-  const handleRequestDeleteAssistant = useCallback(() => {
-    setIsPcMenuOpen(false);
-
-    if (isPc) {
-      // Reserved for future implementation.
-      return;
-    }
-
-    setOverlay('delete-modal');
-  }, [isPc]);
 
   const handleConfirmDelete = useCallback(async () => {
     const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount ?? '').trim();
@@ -291,7 +281,9 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           partnerAccount: targetPartnerAccount,
         });
         setOverlay('none');
-        window.HWH5.close();
+        if (!isPc) {
+          window.HWH5.close();
+        }
       } catch (error) {
         WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
           partnerAccount: targetPartnerAccount,
@@ -300,6 +292,19 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
       }
     });
   }, [detail?.partnerAccount, partnerAccount, runDeleteWithSubmitLock, t]);
+
+    const handleRequestDeleteAssistant = useCallback(() => {
+    setIsPcMenuOpen(false);
+
+    if (isPc) {
+      handlePcDelete && handlePcDelete(detail, () => {
+        handleConfirmDelete()
+      })
+      return;
+    }
+
+    setOverlay('delete-modal');
+  }, [isPc, handleConfirmDelete]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {
