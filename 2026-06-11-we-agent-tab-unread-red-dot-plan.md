@@ -809,7 +809,7 @@ HWH5EXT.registerEventListener({
 
 广播规则：
 
-1. `initUnReadState` 冷启动按 `bizRobotTag` 分支处理：`MyAgent` 直接根据员工助手服务端 `un_read_count` 更新员工助手未读态，`uniassistant` 不设置助理 Tab 小红点，其他 WeAgentCUI 场景通过 `applyUnReadStatus` 更新 `sessionUnreadSet` 后调用 `onUnReadedChanged`；`onAssistantChanged`、IM 在线/离线通知、CUI 已读上报完成后，也统一调用 `onUnReadedChanged`。
+1. `initUnReadState` 冷启动按 `bizRobotTag` 分支处理：`MyAgent` 直接根据员工助手服务端 `un_read_count` 更新员工助手未读态，`uniassistant` 不设置助理 Tab 小红点，其他 WeAgentCUI 场景通过 `applyUnReadStatus` 更新 `sessionUnreadSet` 后调用 `onUnReadedChanged`；`onAssistantChanged`、网络恢复补偿查询、IM 在线/离线通知、CUI 已读上报完成后，也统一调用 `onUnReadedChanged`。
 2. `onUnReadedChanged` 读取当前助理详情、`IMPersionalAssistant` 权限状态、助理 Tab 聚焦状态、员工助手 `un_read_count` 或 `sessionUnreadSet`，按“助理 Tab 展示规则”判断是否展示小红点，并在需要通知 `weAgentCUI` 时通过 `HWH5INNER.eventListener` 发送 `agentskills_weAgentUnreadChanged`。
 3. SDK 冷启动时，如果 ABTest 判断无 `IMPersionalAssistant` 权限，则不调用 `onUnReadedChanged`，也不发送 `agentskills_weAgentUnreadChanged`。
 4. 切换助理后由 agentSkills 容器层 `openWeAgentCUI` 从持久化缓存读取当前助理详情缓存，再触发 agentSkills SDK 接口 `onAssistantChanged({ assistantDetail })`；SDK 先清空旧助理未读列表，再根据助理详情缓存中的 `assistantAccount` 和 `bizRobotTag` 执行冷启动场景中对应流程，服务端返回后覆盖单例未读缓存，再通过 `onUnReadedChanged` 刷新 Tab 和 `weAgentCUI`。
@@ -866,6 +866,7 @@ HWH5EXT.registerEventListener({
 13. 单次内存缓存更新失败时，需要记录日志或埋码，后续主动查询或 IM 广播仍可继续校正未读状态。
 14. 小红点相关能力是新版本 SDK 新增能力，`weAgentCUI` 运行在不同版本 SDK 中时必须在调用前做 SDK 版本判断；若当前 SDK 版本低于支持小红点能力的最低版本，则不调用 `getWeAgentUnreadMessage`、`reportWeAgentSessionRead`、`onSessionViewing`、`onSessionViewingEnd`，也不依赖 `agentskills_weAgentUnreadChanged` 广播，按低版本兼容处理：不展示助理 Tab、历史入口和历史 item 小红点，不影响打开助理和消息收发。
 15. 新版本 SDK + 旧版本 `weAgentCUI` 时，SDK 可以按本方案维护助理 Tab 小红点；旧页面不消费未读广播，不展示历史入口和历史 item 小红点，不影响旧页面功能。
+16. 网络恢复补偿查询需要做节流和并发保护：同一网络恢复事件只触发一次当前助理未读查询；若冷启动、切换助理或主动查询正在进行，可复用进行中的请求或等待完成后按最后一次结果刷新。
 
 ### 4.4 相关接口联动
 
@@ -881,6 +882,7 @@ HWH5EXT.registerEventListener({
 10. `registerSessionListener.onMessage` / `messages`：`ai-chat-viewer` 通过 `useChatSession` 接收服务端实时消息并更新 `messages`；`weAgentCUI` 在 `visibility=1` 时监听新增 AI 回复消息，取最大 `messageSeq ?? seq` 作为 `readSeq` 调用 `reportWeAgentSessionRead`。
 11. SDK 对 `weAgentCUI` H5 内部广播：SDK 调用 `HWH5INNER.eventListener` 发送 `agentskills_weAgentUnreadChanged`，`weAgentCUI` 通过 `HWH5EXT.registerEventListener` 注册监听，更新 CUI 未读缓存并刷新历史会话入口和会话 item 小红点。
 12. 低版本 SDK 版本判断：`weAgentCUI` 调用小红点相关接口前需要判断 SDK 版本是否满足最低支持版本；低版本时不调用小红点相关接口，输出本地日志并降级为“不展示小红点、不上报未读相关已读、不进入查看态”，但保留原有消息渲染和会话操作。
+13. 网络状态监听：SDK 监听网络从不可用恢复为可用的事件，触发 `UnReadManager.onNetworkReconnected`；`MyAgent` 查询员工助手全量未读，其他 WeAgentCUI 场景查询 POST `/api/skill/sessions/unread`，查询成功后按现有流程刷新缓存、助理 Tab 和 CUI 广播。
 
 ### 4.5 文档需要同步修改的内容
 
@@ -897,6 +899,7 @@ HWH5EXT.registerEventListener({
 4. 历史会话列表 item 小红点使用内存缓存映射，不对每个会话单独请求。
 5. 已读上报只在 `weAgentCUI` 移动端前台可见时触发，避免 HarmonyOS / iOS 冷启动预加载造成额外请求和误清小红点。
 6. 前台可见期间监听 `messages` 新增 AI 回复消息时，需要按 `welinkSessionId + readSeq` 做幂等控制；同一条流式 assistant 消息多次更新不重复上报，只有最大 `readSeq` 前进时才触发已读上报。
+7. 网络恢复补偿查询只在网络状态从不可用变为可用时触发，不做周期性轮询；短时间内多次网络抖动需要做节流，避免重复请求员工助手未读接口或 `/api/skill/sessions/unread`。
 
 ## 6. 功耗
 
@@ -905,7 +908,8 @@ HWH5EXT.registerEventListener({
 3. 不新增后台常驻任务。
 4. 页面不可见或处于 HarmonyOS / iOS 冷启动预加载态时不触发已读上报。
 5. `messages` 监听只在页面前台可见且存在当前会话时触发已读判断；页面不可见时不因服务端 `onMessage` 或历史消息加载触发已读上报。
-6. 未读状态由初始化当前助理未读查询、主动查询、IM 广播事件和前台新 AI 回复已读上报驱动更新，不新增轮询或高频刷新。
+6. 未读状态由初始化当前助理未读查询、切换助理查询、网络恢复补偿查询、主动查询、IM 广播事件和前台新 AI 回复已读上报驱动更新，不新增轮询或高频刷新。
+7. 网络恢复补偿查询需要做节流和请求合并，避免网络抖动造成连续未读查询。
 
 ## 7. 埋码
 
@@ -945,6 +949,9 @@ HWH5EXT.registerEventListener({
 | 冷启动未读查询失败 | `[WeAgentUnread] init_unread_fail` | `assistantAccount`、`bizRobotTag`、`errorCode`、`fallback=memory/none` |
 | 切换助理清空单例缓存 | `[WeAgentUnread] assistant_changed_clear_cache` | `oldAssistantAccount`、`newAssistantAccount` |
 | 切换助理未读覆盖完成 | `[WeAgentUnread] assistant_changed_apply_cache` | `assistantAccount`、`sessionCount`、`hasUnread` |
+| 网络恢复补偿查询开始 | `[WeAgentUnread] network_reconnect_refresh_start` | `assistantAccount`、`bizRobotTag`、`networkType` |
+| 网络恢复补偿查询成功 | `[WeAgentUnread] network_reconnect_refresh_success` | `assistantAccount`、`bizRobotTag`、`sessionCount`、`hasUnread` |
+| 网络恢复补偿查询失败 | `[WeAgentUnread] network_reconnect_refresh_fail` | `assistantAccount`、`bizRobotTag`、`errorCode` |
 | `applyUnReadStatus` 执行 | `[WeAgentUnread] apply_unread_status` | `assistantAccount`、`currentViewingSessionId`、`sessionCount`、`unreadCount` |
 | 助理 Tab 小红点计算 | `[WeAgentUnread] tab_red_dot_decision` | `assistantAccount`、`bizRobotTag`、`abEnabled`、`tabFocused`、`hasUnread`、`showRedDot`、`reason` |
 | IM 员工助手通知 | `[WeAgentUnread] im_myagent_unread` | `assistantAccount`、`unReadCount`、`showRedDot` |
@@ -969,9 +976,10 @@ HWH5EXT.registerEventListener({
 
 1. ABTest 相关用例通过 `abtest_start`、`abtest_result`、`init_skip_abtest_disabled` 判断权限分支是否正确。
 2. 冷启动和切换助理用例通过 `init_unread_success`、`assistant_changed_clear_cache`、`assistant_changed_apply_cache` 判断是否清空旧缓存并覆盖单例缓存。
-3. 助理 Tab 小红点用例通过 `tab_red_dot_decision` 的 `reason` 验证隐藏原因，如 `abDisabled`、`tabFocused`、`noUnread`、`uniassistant`、`backendDisabled`。
-4. CUI 兼容用例通过 `sdk_version_unsupported` 验证低版本 SDK 不调用小红点相关接口且默认隐藏小红点。
-5. 新 AI 回复已读上报用例通过 `messages_ai_reply_detected`、`report_read_start`、`report_read_success` 验证 `readSeq` 来源和幂等行为。
+3. 网络恢复用例通过 `network_reconnect_refresh_start`、`network_reconnect_refresh_success` 或 `network_reconnect_refresh_fail` 判断是否触发补偿查询以及查询路径是否正确。
+4. 助理 Tab 小红点用例通过 `tab_red_dot_decision` 的 `reason` 验证隐藏原因，如 `abDisabled`、`tabFocused`、`noUnread`、`uniassistant`、`backendDisabled`。
+5. CUI 兼容用例通过 `sdk_version_unsupported` 验证低版本 SDK 不调用小红点相关接口且默认隐藏小红点。
+6. 新 AI 回复已读上报用例通过 `messages_ai_reply_detected`、`report_read_start`、`report_read_success` 验证 `readSeq` 来源和幂等行为。
 
 ## 8. 影响范围
 
