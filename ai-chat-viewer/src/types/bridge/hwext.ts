@@ -50,7 +50,12 @@ export type WeAgentUpdatedEventPayload =
     extraData?: {
       source?: 'server' | 'local';
     };
-  };
+  }
+  | {
+    type: 'offline_notify',
+    data?: Extract<WeAgentUpdatedEventPayload, { type: 'update'} | { type: 'delete'}>[]
+  }
+  ;
 
 export interface RegisterEventListenerParams {
   type: string;
@@ -344,7 +349,7 @@ export interface HWH5EXT {
   getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse>;
   getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<GetSessionMessageHistoryResponse>;
   onTabForUpdate?: (callback: () => void) => void;
-  registerEventListener(params: RegisterEventListenerParams): Promise<void> | void;
+  registerEventListener(params: RegisterEventListenerParams): void;
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
