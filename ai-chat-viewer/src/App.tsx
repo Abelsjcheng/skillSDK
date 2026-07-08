@@ -256,7 +256,7 @@ function App({ assistantAccount = '' }: AppProps) {
 
   useEffect(() => {
     void registerEventListener({
-      type: 'aagentskills_agentUpdated',
+      type: 'agentskills_agentUpdated',
       func: handleWeAgentUpdated,
     }).catch((error) => {
       WeLog(`App registerEventListener failed | extra=${JSON.stringify({
