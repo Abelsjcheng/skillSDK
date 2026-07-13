@@ -3,10 +3,15 @@ package com.opencode.skill.util;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import com.opencode.skill.model.SkillSdkException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Utility helpers for runtime parameter coercion.
@@ -109,6 +114,52 @@ public final class TypeConvertUtils {
             return result;
         }
         throw new SkillSdkException(1000, fieldName + " must be a string array");
+    }
+
+    @Nullable
+    /**
+     * 将通知字段安全转换为字符串；仅接受字符串、数字和布尔值，复杂类型返回 null。
+     */
+    public static String valueAsString(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof Number || value instanceof Boolean) {
+            return String.valueOf(value);
+        }
+        return null;
+    }
+
+    @Nullable
+    /**
+     * 将通知字段安全转换为字符串键 Map。
+     *
+     * <p>输入可以是 Map 或 JSON 字符串；非法 JSON、数组及其他类型返回 null，避免异常通知
+     * 中断同步链路。</p>
+     */
+    public static Map<String, Object> valueAsMap(@NonNull Gson gson, @Nullable Object value) {
+        if (value instanceof Map) {
+            Map<?, ?> raw = (Map<?, ?>) value;
+            Map<String, Object> result = new HashMap<>();
+            for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                if (entry.getKey() instanceof String) {
+                    result.put((String) entry.getKey(), entry.getValue());
+                }
+            }
+            return result;
+        }
+        if (value instanceof String) {
+            try {
+                return gson.fromJson((String) value, new TypeToken<Map<String, Object>>() {
+                }.getType());
+            } catch (JsonSyntaxException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     @Nullable
