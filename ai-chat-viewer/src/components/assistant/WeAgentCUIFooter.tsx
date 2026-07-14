@@ -25,6 +25,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   onRequestSlashCommands,
   onSend,
   onStop,
+  onInputFocus,
   leftActions,
 }) => {
   const { t } = useTranslation();
@@ -115,18 +116,34 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     }
 
     const textarea = inputRef.current;
-    textarea.style.height = `${PC_TEXTAREA_MIN_HEIGHT}px`;
-    if (!value) {
-      textarea.style.overflowY = 'hidden';
+    const minHeightValue = `${PC_TEXTAREA_MIN_HEIGHT}px`;
+    if (value.trim().length === 0) {
+      if (textarea.style.height !== minHeightValue) {
+        textarea.style.height = minHeightValue;
+      }
+      if (textarea.style.overflowY !== 'hidden') {
+        textarea.style.overflowY = 'hidden';
+      }
       return;
     }
 
-    const nextHeight = Math.max(
-      PC_TEXTAREA_MIN_HEIGHT,
-      Math.min(textarea.scrollHeight, PC_TEXTAREA_MAX_HEIGHT),
+    if (textarea.style.height !== minHeightValue) {
+      textarea.style.height = minHeightValue;
+    }
+
+    const nextHeight = Math.min(
+      Math.max(textarea.scrollHeight, PC_TEXTAREA_MIN_HEIGHT),
+      PC_TEXTAREA_MAX_HEIGHT,
     );
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = textarea.scrollHeight > PC_TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+    const nextHeightValue = `${nextHeight}px`;
+    if (textarea.style.height !== nextHeightValue) {
+      textarea.style.height = nextHeightValue;
+    }
+
+    const nextOverflowY = textarea.scrollHeight > PC_TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+    if (textarea.style.overflowY !== nextOverflowY) {
+      textarea.style.overflowY = nextOverflowY;
+    }
   }, [isPcMiniApp, value]);
 
   const handleSend = () => {
@@ -137,6 +154,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     onSend(trimmedValue);
     setValue('');
     setIsShortcutPopupOpen(false);
+    slashSuggest.close();
   };
 
   const handleInputValueChange = (nextValue: string) => {
@@ -258,6 +276,7 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       onClick={handleSendButtonClick}
       disabled={isGenerating ? false : !value.trim()}
       aria-label={sendButtonLabel}
+      data-tooltip={isPcMiniApp && isGenerating ? sendButtonLabel : undefined}
     >
       <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" draggable="false" />
     </button>
@@ -286,7 +305,13 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
           placeholder={t('weAgent.inputPlaceholder')}
           value={value}
           onChange={handleNativeInputChange}
+          onFocus={onInputFocus}
           onKeyDown={handleMobileKeyDown}
+          onDrop={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+          }}
         />
         {renderSendButton()}
       </div>
@@ -303,7 +328,13 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
         value={value}
         rows={2}
         onChange={handleNativeInputChange}
+        onFocus={onInputFocus}
         onKeyDown={handlePcKeyDown}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
+        }}
       />
       <div className="we-agent-cui-footer__toolbar">
         <div className="we-agent-cui-footer__toolbar-left">{leftActions}</div>
