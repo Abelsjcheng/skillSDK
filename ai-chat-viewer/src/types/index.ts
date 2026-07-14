@@ -159,6 +159,9 @@ export interface StreamMessage
   // snapshot/streaming fields
   messages?: SessionMessageSnapshot[] | null;
   parts?: MessagePartSnapshot[] | null;
+
+  // agent status
+  partnerAccount?: string | null;
   keywords?: string[] | null;
   searchResults?: object[] | null;
   references?: object[] | null;

@@ -23,6 +23,7 @@ import {
 import { showToast } from '../utils/toast';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
 import { reportEnableNowClick } from '../utils/uemUtil';
+import { useAgentOnlineStatus } from '../hooks/useAgentOnlineStatus';
 
 const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
@@ -30,10 +31,15 @@ const SelectAssistant: React.FC = () => {
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 
-  const assistantItems = useMemo<AssistantItem[]>(
-    () => mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language),
-    [assistantList, i18n.language, i18n.resolvedLanguage],
-  );
+  const { agentStatusMap, fetchAllAgentStatus, isOpen } = useAgentOnlineStatus();
+
+  const assistantItems = useMemo<AssistantItem[]>(() => {
+    const items = mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language);
+    return items.map((item) => ({
+      ...item,
+      isOnline: agentStatusMap[item.id],
+    }));
+  }, [assistantList, i18n.language, i18n.resolvedLanguage, agentStatusMap]);
 
   const loadAssistantList = useCallback(async (): Promise<void> => {
     try {
@@ -108,6 +114,7 @@ const SelectAssistant: React.FC = () => {
             assistants={assistantItems}
             selectedAssistantId={selectedAssistantId}
             onSelectAssistant={setSelectedAssistantId}
+            showOnlineStatus={isOpen}
           />
         </main>
 

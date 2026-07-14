@@ -4,9 +4,7 @@ import type {
   MessagePart,
   PendingAssistantPreview,
   QuestionAnswerSubmission,
-  SessionStatus,
 } from '../index';
-import type { WeAgentDetails } from '../bridge';
 
 export interface AppProps {
   assistantAccount?: string;
@@ -31,6 +29,8 @@ export interface ContentProps {
   weAgentAssistantName?: string;
   weAgentAssistantDescription?: string;
   weAgentAssistantAvatar?: string;
+  showOnlineStatus?: boolean;
+  isOnline?: boolean;
 }
 
 export interface CodeBlockProps {
@@ -71,6 +71,8 @@ export interface MessageBubbleProps {
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
+  showOnlineStatus?: boolean;
+  isOnline?: boolean;
 }
 
 export interface ToolCardProps {
@@ -91,11 +93,15 @@ export interface PendingAssistantBubbleProps {
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
   messageVariant?: 'weAgent' | 'plain';
+  showOnlineStatus?: boolean;
+  isOnline?: boolean;
 }
 
 export interface AvatarImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   src?: string | null;
   fallbackSrc: string;
+  showOnlineStatus?: boolean;
+  isOnline?: boolean;
 }
 
 export interface HiddenQuestionAnswerUserMessage {
@@ -133,32 +139,4 @@ export interface QuestionAnswerDisplayLabels {
 export interface LegacyQuestionAnswerTranscriptItem {
   question: string;
   answer: string;
-}
-
-export type ChatSessionMode = 'weAgentCUI' | 'skillCUI';
-
-export interface UseChatSessionOptions {
-  mode: ChatSessionMode;
-  welinkSessionId: string;
-  assistantDetail?: WeAgentDetails | null;
-  onSessionTitleChange?: (sessionId: string, title: string) => void;
-  onSessionActivity?: (sessionId: string, updatedAt: string) => void;
-}
-
-export interface UseChatSessionResult {
-  messages: Message[];
-  pendingAssistantPreview: PendingAssistantPreview;
-  welinkSessionId: string;
-  sessionStatus: SessionStatus;
-  isGenerating: boolean;
-  isLoadingHistory: boolean;
-  hasMoreHistory: boolean;
-  scrollToBottomSignal: number;
-  onLoadMoreHistory: () => void;
-  onQuestionAnswered: (submission: QuestionAnswerSubmission) => Promise<void>;
-  onSend: (content: string) => Promise<void>;
-  onStop: () => Promise<void>;
-  onSendToIM: (content: string) => Promise<void>;
-  onCopy: (content: string) => Promise<void>;
-  resetTransientState: () => void;
 }

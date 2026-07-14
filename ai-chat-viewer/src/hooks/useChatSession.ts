@@ -38,9 +38,8 @@ import { showToast } from '../utils/toast';
 import type {
   HiddenQuestionAnswerUserMessage,
   SendUserMessageOptions,
-  UseChatSessionOptions,
-  UseChatSessionResult,
 } from '../types/components';
+import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
 import { reportSendMessageClick } from '../utils/uemUtil';
 import { normalizeSlashCommands } from '../utils/slashCommand';
 import type { SlashCommandItem } from '../types/slashCommand';
@@ -156,6 +155,8 @@ export function useChatSession({
   onSessionTitleChange,
   onSessionActivity,
   onSessionDeleted,
+  onAgentStatusChange,
+  onSessionClose,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -189,11 +190,15 @@ export function useChatSession({
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const onSessionActivityRef = useRef(onSessionActivity);
   const onSessionDeletedRef = useRef(onSessionDeleted);
+  const onAgentStatusChangeRef = useRef(onAgentStatusChange);
+  const onSessionCloseRef = useRef(onSessionClose);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
   onSessionActivityRef.current = onSessionActivity;
   onSessionDeletedRef.current = onSessionDeleted;
+  onAgentStatusChangeRef.current = onAgentStatusChange;
+  onSessionCloseRef.current = onSessionClose;
   aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
@@ -745,6 +750,9 @@ export function useChatSession({
           break;
         case 'agent.online':
           agentOfflineHandledRef.current = false;
+          if (msg.partnerAccount) {
+            onAgentStatusChangeRef.current?.(msg.partnerAccount, true);
+          }
           break;
         case 'agent.offline':
           if (agentOfflineHandledRef.current) {
@@ -752,6 +760,9 @@ export function useChatSession({
           }
           agentOfflineHandledRef.current = true;
           setSessionStatus('idle');
+          if (msg.partnerAccount) {
+            onAgentStatusChangeRef.current?.(msg.partnerAccount, false);
+          }
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
@@ -832,6 +843,7 @@ export function useChatSession({
 
     const onClose = (reason: string) => {
       WeLog(`useChatSession session listener closed | extra=${JSON.stringify({ mode, welinkSessionId, reason })}`);
+      onSessionCloseRef.current?.();
     };
 
     const registerCurrentSessionListener = () => {

@@ -5,6 +5,7 @@ import type {
   DeleteWeAgentParams,
   DeleteWeAgentResult,
   GetHistorySessionsListParams,
+  GetOnlineStatusResult,
   GetSessionMessageHistoryParams,
   GetWeAgentDetailsParams,
   GetWeAgentListParams,
@@ -445,6 +446,27 @@ export async function trackApiGetWeAgentList(
         pageSize: params.pageSize,
       },
     });
+    throw error;
+  }
+}
+
+export async function trackApiGetOnlineStatus(
+  request: Promise<GetOnlineStatusResult>,
+): Promise<GetOnlineStatusResult> {
+  try {
+    const result = await request;
+    const onlineCount = Object.values(result.statuses ?? {}).filter(Boolean).length;
+    const offlineCount = Object.values(result.statuses ?? {}).filter((v) => !v).length;
+    void reportApiSuccess('api_get_online_status', '获取助手在线状态接口', {
+      response: {
+        onlineCount,
+        offlineCount,
+        totalCount: onlineCount + offlineCount,
+      },
+    });
+    return result;
+  } catch (error) {
+    void reportApiError('api_get_online_status', '获取助手在线状态接口', error, {});
     throw error;
   }
 }

@@ -7,6 +7,7 @@ export const API_ROOTS = {
 
 export const API_PATHS = {
   deleteHistorySession: (sessionId: string) => `/api/skill/sessions/${encodeURIComponent(sessionId)}`,
+  onlineStatus: '/api/skill/sessions/onlinestatus',
 } as const;
 
 function trimTrailingSlash(value: string): string {
@@ -24,4 +25,8 @@ export function buildApiUrl(path: string): string {
 
 export function buildDeleteHistorySessionUrl(sessionId: string): string {
   return buildApiUrl(API_PATHS.deleteHistorySession(sessionId));
+}
+
+export function buildOnlineStatusUrl(): string {
+  return buildApiUrl(API_PATHS.onlineStatus);
 }

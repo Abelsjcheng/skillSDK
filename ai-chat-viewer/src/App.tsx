@@ -7,6 +7,7 @@ import WeAgentHistorySidebar from './components/assistant/WeAgentHistorySidebar'
 import { resolveAssistantIconUrl } from './components/createAssistant/constants';
 import { useChatSession } from './hooks/useChatSession';
 import { useIosKeyboardLift } from './hooks/useIosKeyboardLift';
+import { useAgentOnlineStatus } from './hooks/useAgentOnlineStatus';
 import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
@@ -151,6 +152,15 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
   const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
+  const [isCurrentAgentOnline, setIsCurrentAgentOnline] = useState<boolean | undefined>(undefined);
+
+  const {
+    isOpen,
+    fetchAllAgentStatus,
+    updateAgentStatus,
+    resetIsOpen,
+    getAgentStatus,
+  } = useAgentOnlineStatus();
 
   const assistantAccountRef = useRef(assistantAccount);
   const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);
@@ -174,6 +184,20 @@ function App({ assistantAccount = '' }: AppProps) {
     },
     onSessionDeleted: (sessionId) => {
       void handleSessionDeletedFromPushRef.current?.(sessionId);
+      },
+    onAgentStatusChange: (partnerAccount, isOnline) => {
+      const currentAssistantAccount = assistantAccountRef.current.trim();
+      if (partnerAccount === currentAssistantAccount) {
+        setIsCurrentAgentOnline(isOnline);
+      }
+      if (!isOpen) {
+        void fetchAllAgentStatus().then(() => updateAgentStatus(partnerAccount, isOnline));
+      } else {
+        void updateAgentStatus(partnerAccount, isOnline);
+      }
+    },
+    onSessionClose: () => {
+      resetIsOpen();
     },
   });
 
@@ -582,6 +606,8 @@ function App({ assistantAccount = '' }: AppProps) {
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantDescription={weAgentAssistantDescription}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
+              showOnlineStatus={isOpen}
+              isOnline={isCurrentAgentOnline}
             />
           </div>
 

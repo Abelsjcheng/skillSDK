@@ -184,6 +184,7 @@ export interface WeAgentListItem {
   bizRobotNameEn: string;
   bizRobotTag: string;
   robotId: string;
+  isOnline?: boolean;
 }
 
 export interface GetWeAgentDetailsMobileParams {
@@ -227,6 +228,15 @@ export interface DeleteHistorySessionResult {
 export interface DeleteHistorySessionResponse {
   code: number;
   data: DeleteHistorySessionResult;
+}
+
+export interface GetOnlineStatusResult {
+  statuses: Record<string, boolean>;
+}
+
+export interface GetOnlineStatusResponse {
+  code: number;
+  data: GetOnlineStatusResult;
 }
 
 export interface QueryQrcodeInfoParams {
@@ -397,7 +407,19 @@ export interface Pedestal {
   callMethod: (method: string, payload?: unknown) => Promise<unknown> | unknown;
 }
 
+export interface HWH5NetworkStatus {
+  isConnected: boolean;
+}
+
+export interface HWH5AppLifecycle {
+  onShow?: () => void;
+  onHide?: () => void;
+}
+
 export interface HWH5Bridge {
+  app?: (lifecycle: HWH5AppLifecycle) => void;
+  onNetworkStatusChange?: (listener: (res: HWH5NetworkStatus) => void) => void;
+  unregisterNetworkListener?: () => Promise<void>;
   openWebview: (payload: { uri: string }) => void;
   log?: (payload: { content: string; type: 'i' }) => Promise<unknown> | unknown;
   uem?: (

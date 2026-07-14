@@ -9,6 +9,7 @@ const AssistantCardList: React.FC<AssistantCardListProps> = ({
   assistants,
   selectedAssistantId,
   onSelectAssistant,
+  showOnlineStatus = false,
 }) => {
   const handleAssistantKeyDown = (
     event: React.KeyboardEvent<HTMLElement>,
@@ -50,6 +51,8 @@ const AssistantCardList: React.FC<AssistantCardListProps> = ({
               alt=""
               className="switch-assistant__avatar-img"
               aria-hidden="true"
+              showOnlineStatus={showOnlineStatus}
+              isOnline={assistant.isOnline}
             />
           </div>
           <div className="switch-assistant__desc">

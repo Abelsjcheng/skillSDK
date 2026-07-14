@@ -1,4 +1,4 @@
-import { buildOpenWeAgentCUIParams, sendWebSocketMessage, deleteHistorySession } from '../hwext';
+import { buildOpenWeAgentCUIParams, sendWebSocketMessage, deleteHistorySession, getOnlineStatus } from '../hwext';
 
 describe('deleteHistorySession', () => {
   beforeEach(() => {
@@ -95,6 +95,67 @@ describe('sendWebSocketMessage', () => {
         action: 'query_slash_commands',
         welinkSessionId: '42',
       }),
+    });
+  });
+});
+
+describe('getOnlineStatus', () => {
+  beforeEach(() => {
+    (window as any).HWH5 = {
+      fetchFull: jest.fn().mockResolvedValue({
+        json: jest.fn().mockResolvedValue({
+          code: 0,
+          data: {
+            statuses: {
+              'partner-1': true,
+              'partner-2': false,
+            },
+          },
+        }),
+      }),
+    };
+  });
+
+  it('gets online status through HWH5.fetchFull', async () => {
+    await expect(getOnlineStatus()).resolves.toEqual({
+      statuses: {
+        'partner-1': true,
+        'partner-2': false,
+      },
+    });
+
+    expect(window.HWH5.fetchFull).toHaveBeenCalledWith(
+      'https://www.example.com/mag/api/skill/sessions/onlinestatus',
+      {
+        method: 'get',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+  });
+
+  it('throws error when HWH5.fetchFull is not available', async () => {
+    delete (window as any).HWH5;
+
+    await expect(getOnlineStatus()).rejects.toThrow(
+      'HWH5.fetchFull is not available.',
+    );
+  });
+
+  it('throws error when response code is not 0', async () => {
+    (window as any).HWH5 = {
+      fetchFull: jest.fn().mockResolvedValue({
+        json: jest.fn().mockResolvedValue({
+          code: 1,
+          message: 'error',
+        }),
+      }),
+    };
+
+    await expect(getOnlineStatus()).rejects.toEqual({
+      code: 1,
+      message: 'error',
     });
   });
 });

@@ -20,6 +20,8 @@ export const PendingAssistantBubble: React.FC<PendingAssistantBubbleProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
   messageVariant = 'weAgent',
+  showOnlineStatus = false,
+  isOnline,
 }) => {
   const { t } = useTranslation();
   const assistantName = weAgentAssistantName.trim();
@@ -36,6 +38,8 @@ export const PendingAssistantBubble: React.FC<PendingAssistantBubbleProps> = ({
               src={weAgentAssistantAvatar}
               fallbackSrc={defaultAvatar}
               alt=""
+              showOnlineStatus={showOnlineStatus}
+              isOnline={isOnline}
             />
             <span className="we-agent-message__meta-text">{messageMetaText}</span>
           </div>

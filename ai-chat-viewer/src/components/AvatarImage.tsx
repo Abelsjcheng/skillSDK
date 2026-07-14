@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import type { AvatarImageProps } from '../types/components';
+import agentOnlineIcon from '../imgs/agent-online.svg';
+import agentOfflineIcon from '../imgs/agent-offline.svg';
 
 const loadedRemoteAvatarSet = new Set<string>();
 
-const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) => {
+const AvatarImage: React.FC<AvatarImageProps> = ({
+  src,
+  fallbackSrc,
+  showOnlineStatus,
+  isOnline,
+  className,
+  ...rest
+}) => {
   const [resolvedSrc, setResolvedSrc] = useState(loadedRemoteAvatarSet.has(src ?? '') ? src : fallbackSrc);
 
   useEffect(() => {
@@ -43,7 +52,29 @@ const AvatarImage: React.FC<AvatarImageProps> = ({ src, fallbackSrc, ...rest }) 
     };
   }, [src, fallbackSrc]);
 
-  return <img {...rest} src={resolvedSrc} draggable="false" />;
+  const statusIcon = showOnlineStatus ? (isOnline ? agentOnlineIcon : agentOfflineIcon) : null;
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <img {...rest} src={resolvedSrc ?? undefined} draggable="false" className={className} />
+      {statusIcon && (
+        <img
+          src={statusIcon}
+          alt=""
+          className="avatar-status-icon"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            border: '2px solid #ffffff',
+          }}
+        />
+      )}
+    </div>
+  );
 };
 
 export default AvatarImage;

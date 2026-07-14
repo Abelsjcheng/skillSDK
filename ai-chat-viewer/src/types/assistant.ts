@@ -4,4 +4,5 @@ export interface AssistantItem {
   tag: string;
   description: string;
   icon?: string;
+  isOnline?: boolean;
 }

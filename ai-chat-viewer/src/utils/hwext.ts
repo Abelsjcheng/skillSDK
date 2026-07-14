@@ -22,6 +22,8 @@ import type {
   DeleteWeAgentParams,
   DeleteWeAgentResult,
   GetHistorySessionsListParams,
+  GetOnlineStatusResponse,
+  GetOnlineStatusResult,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
   GetWeAgentDetailsParams,
@@ -59,7 +61,7 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
-import { buildDeleteHistorySessionUrl } from './apiEndpoints';
+import { buildDeleteHistorySessionUrl, buildOnlineStatusUrl } from './apiEndpoints';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -67,6 +69,7 @@ import {
   trackApiCreateNewSession,
   trackApiDeleteWeAgent,
   trackApiGetHistorySessions,
+  trackApiGetOnlineStatus,
   trackApiGetSessionMessageHistory,
   trackApiGetWeAgentDetails,
   trackApiGetWeAgentList,
@@ -701,6 +704,40 @@ export async function deleteHistorySession(
   }
 
   return deleteHistorySessionWithHWH5FetchFull(sessionId);
+}
+
+async function getOnlineStatusWithHWH5FetchFull(): Promise<GetOnlineStatusResult> {
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    throw new Error('HWH5.fetchFull is not available.');
+  }
+
+  const response = await window.HWH5.fetchFull<GetOnlineStatusResponse>(
+    buildOnlineStatusUrl(),
+    {
+      method: 'get',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  const reply = await response.json();
+  if (reply?.code !== 0 || !reply.data) {
+    throw reply;
+  }
+  return reply.data;
+}
+
+async function getOnlineStatusWithPcBridge(): Promise<GetOnlineStatusResult> {
+  // PC 端暂不支持
+  return { statuses: {} };
+}
+
+export async function getOnlineStatus(): Promise<GetOnlineStatusResult> {
+  if (isPcMiniApp()) {
+    return getOnlineStatusWithPcBridge();
+  }
+
+  return trackApiGetOnlineStatus(getOnlineStatusWithHWH5FetchFull());
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {

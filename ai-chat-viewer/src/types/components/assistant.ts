@@ -66,6 +66,7 @@ export interface AssistantCardListProps {
   assistants: AssistantItem[];
   selectedAssistantId: string;
   onSelectAssistant: (assistantId: string) => void;
+  showOnlineStatus?: boolean;
 }
 
 export interface AssistantPageHeaderAction {

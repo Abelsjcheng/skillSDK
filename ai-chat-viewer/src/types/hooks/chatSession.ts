@@ -15,6 +15,8 @@ export interface UseChatSessionOptions {
   onSessionTitleChange?: (sessionId: string, title: string) => void;
   onSessionActivity?: (sessionId: string, updatedAt: string) => void;
   onSessionDeleted?: (sessionId: string) => void;
+  onAgentStatusChange?: (partnerAccount: string, isOnline: boolean) => void;
+  onSessionClose?: () => void;
 }
 
 export interface UseChatSessionResult {
