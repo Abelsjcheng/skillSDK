@@ -327,6 +327,59 @@ describe('useChatSession', () => {
     expect(onSessionActivity).toHaveBeenCalledWith('session_1', '2026-05-25T10:00:00.000Z');
   });
 
+  it('notifies when the active session is deleted through websocket event', async () => {
+    const onSessionDeleted = jest.fn();
+
+    renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+      onSessionDeleted,
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+
+    act(() => {
+      listener.onMessage({
+        type: 'session.deleted',
+        welinkSessionId: 'session_1',
+        content: '{"welinkSessionId":"session_1"}',
+        seq: null,
+      } as any);
+    });
+
+    expect(onSessionDeleted).toHaveBeenCalledWith('session_1');
+  });
+
+  it('ignores session.deleted events for a different registered session', async () => {
+    const onSessionDeleted = jest.fn();
+
+    renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+      onSessionDeleted,
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+
+    act(() => {
+      listener.onMessage({
+        type: 'session.deleted',
+        welinkSessionId: 'session_2',
+        seq: null,
+      } as any);
+    });
+
+    expect(onSessionDeleted).not.toHaveBeenCalled();
+  });
+
   it('preserves questionId from question events when answering question cards', async () => {
     const { result } = renderHook(() => useChatSession({
       mode: 'weAgentCUI',

@@ -215,6 +215,20 @@ export interface DeleteWeAgentResult {
   deleteResult: string;
 }
 
+export interface DeleteHistorySessionParams {
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResult {
+  status: string;
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResponse {
+  code: number;
+  data: DeleteHistorySessionResult;
+}
+
 export interface QueryQrcodeInfoParams {
   qrcode: string;
 }

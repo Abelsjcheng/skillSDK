@@ -1,4 +1,51 @@
-import { buildOpenWeAgentCUIParams, sendWebSocketMessage } from '../hwext';
+import { buildOpenWeAgentCUIParams, sendWebSocketMessage, deleteHistorySession } from '../hwext';
+
+describe('deleteHistorySession', () => {
+  beforeEach(() => {
+    (window as any).HWH5 = {
+      fetchFull: jest.fn().mockResolvedValue({
+        json: jest.fn().mockResolvedValue({
+          code: 0,
+          data: {
+            status: 'deleted',
+            welinkSessionId: 'session/1',
+          },
+        }),
+      }),
+    };
+  });
+
+  it('deletes a session through HWH5.fetchFull without a request body', async () => {
+    await expect(deleteHistorySession({ welinkSessionId: 'session/1' })).resolves.toEqual({
+      status: 'deleted',
+      welinkSessionId: 'session/1',
+    });
+
+    expect(window.HWH5.fetchFull).toHaveBeenCalledWith(
+      'https://www.example.com/mag/api/skill/sessions/session%2F1',
+      {
+        method: 'delete',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+  });
+
+  it('throws a clear error when welinkSessionId is undefined', async () => {
+    await expect(deleteHistorySession({ welinkSessionId: undefined } as any)).rejects.toThrow(
+      'welinkSessionId is required.',
+    );
+    expect(window.HWH5.fetchFull).not.toHaveBeenCalled();
+  });
+
+  it('throws a clear error when welinkSessionId is null', async () => {
+    await expect(deleteHistorySession({ welinkSessionId: null } as any)).rejects.toThrow(
+      'welinkSessionId is required.',
+    );
+    expect(window.HWH5.fetchFull).not.toHaveBeenCalled();
+  });
+});
 
 describe('buildOpenWeAgentCUIParams', () => {
   beforeEach(() => {

@@ -155,6 +155,7 @@ export function useChatSession({
   assistantDetail,
   onSessionTitleChange,
   onSessionActivity,
+  onSessionDeleted,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -187,10 +188,12 @@ export function useChatSession({
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const onSessionActivityRef = useRef(onSessionActivity);
+  const onSessionDeletedRef = useRef(onSessionDeleted);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
   onSessionActivityRef.current = onSessionActivity;
+  onSessionDeletedRef.current = onSessionDeleted;
   aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
@@ -579,6 +582,9 @@ export function useChatSession({
         case 'slash_commands_result':
           setSlashCommands(normalizeSlashCommands(msg.slashCommands ?? []));
           break;
+        case 'session.deleted':
+          onSessionDeletedRef.current?.(activeWelinkSessionId);
+          break;
         case 'text.delta':
         case 'text.done':
         case 'thinking.delta':
@@ -749,6 +755,7 @@ export function useChatSession({
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
+            finalizeStreamingMessageById(latestStreamingMsgIdRef.current);
             setSessionStatus('idle');
             finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
@@ -903,6 +910,7 @@ export function useChatSession({
     };
   }, [
     appendAssistantErrorBlock,
+    finalizeStreamingMessageById,
     getOrCreateStreamingAssembler,
     hidePendingAssistantPreview,
     mode,

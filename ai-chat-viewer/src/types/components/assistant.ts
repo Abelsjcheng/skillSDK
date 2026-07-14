@@ -24,6 +24,26 @@ export interface ConfirmModalProps {
   confirmDisabled?: boolean;
 }
 
+export interface ResponsiveConfirmModalProps {
+  open: boolean;
+  headerTitle?: string;
+  title: string;
+  description?: string;
+  cancelText?: string;
+  confirmText?: string;
+  cancelTextColor?: string;
+  cancelBackgroundColor?: string;
+  confirmTextColor?: string;
+  confirmBackgroundColor?: string;
+  mobileCancelTextColor?: string;
+  mobileConfirmTextColor?: string;
+  showMask?: boolean;
+  confirmDisabled?: boolean;
+  onClose: () => void;
+  onCancel?: () => void;
+  onConfirm?: () => void;
+}
+
 export interface AssistantDetailActionSheetProps {
   open: boolean;
   onClose: () => void;
@@ -134,5 +154,8 @@ export interface WeAgentHistorySidebarProps {
   historyLoaded?: boolean;
   onHistoryLoaded?: (cache: HistorySessionsCache) => void;
   onSessionSelect?: (welinkSessionId: string) => void;
+  onSessionDeleteStart?: (welinkSessionId: string) => void;
+  onSessionDeleteFailed?: (welinkSessionId: string) => void;
+  onSessionDeleted?: (welinkSessionId: string) => void | Promise<void>;
   onVisibilityChange?: (visible: boolean) => void;
 }

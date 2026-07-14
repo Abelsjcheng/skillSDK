@@ -17,6 +17,7 @@ export type StreamMessageType =
   | 'step.done'
   | 'session.status'
   | 'session.title'
+  | 'session.deleted'
   | 'session.error'
   | 'permission.ask'
   | 'permission.reply'
@@ -127,6 +128,7 @@ export interface StreamMessage
   type: StreamMessageType;
   seq: number | null;
   welinkSessionId?: string | null;
+  sessionId?: string | null;
   emittedAt?: string | null;
   raw?: object;
 

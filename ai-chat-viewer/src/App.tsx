@@ -34,6 +34,10 @@ import {
   getSessionUpdatedAtTimestamp,
   HISTORY_SESSIONS_PAGE_SIZE,
 } from './utils/session';
+import {
+  removeSessionFromHistoryCache,
+  resolveNextSessionAfterDelete,
+} from './utils/sessionDelete';
 import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
@@ -146,11 +150,15 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantName, setWeAgentAssistantName] = useState('');
   const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
+  const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
 
   const assistantAccountRef = useRef(assistantAccount);
+  const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);
+  const welinkSessionIdRef = useRef<string | null>(null);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
+  const pendingActionDeleteSessionIdsRef = useRef<Set<string>>(new Set());
 
   initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
 
@@ -164,13 +172,26 @@ function App({ assistantAccount = '' }: AppProps) {
     onSessionActivity: (sessionId, updatedAt) => {
       setHistorySessionsCache((prev) => updateSessionActivityInCache(prev, sessionId, updatedAt));
     },
+    onSessionDeleted: (sessionId) => {
+      void handleSessionDeletedFromPushRef.current?.(sessionId);
+    },
   });
+
+  const handleSessionDeletedFromPushRef = useRef<((sessionId: string) => Promise<void>) | null>(null);
 
   useEffect(() => installBrowserJsErrorTelemetry(() => ({
     page: 'weAgentCUI',
     assistantAccount: assistantAccountRef.current,
     welinkSessionId: welinkSessionId ?? undefined,
   })), [welinkSessionId]);
+
+  useEffect(() => {
+    historySessionsCacheRef.current = historySessionsCache;
+  }, [historySessionsCache]);
+
+  useEffect(() => {
+    welinkSessionIdRef.current = welinkSessionId;
+  }, [welinkSessionId]);
 
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
@@ -283,6 +304,7 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
     userInfoRef.current = null;
+    pendingActionDeleteSessionIdsRef.current.clear();
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setIsHistorySidebarVisible(isPc);
@@ -397,6 +419,140 @@ function App({ assistantAccount = '' }: AppProps) {
     setWelinkSessionId(normalizedSessionId);
   }, [session, welinkSessionId]);
 
+  const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return null;
+    }
+
+    const historyResult = await getHistorySessionsList({
+      assistantAccount: currentAssistantAccount,
+      businessSessionDomain: 'miniapp',
+      page: 0,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+    });
+    const nextCache = createHistorySessionsCache(historyResult);
+    setHistorySessionsCache(nextCache);
+    setHistorySessionsLoaded(true);
+    return nextCache;
+  }, []);
+
+  const createAndSelectFallbackSession = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return;
+    }
+
+    let detail = assistantDetailRef.current;
+    if (!detail || detail.partnerAccount !== currentAssistantAccount) {
+      detail = await resolveAssistantDetail(currentAssistantAccount);
+    }
+
+    const newSession = ensureSessionTimestamps(
+      await createSessionForAssistant(currentAssistantAccount, detail.appKey),
+    );
+    setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
+    setWelinkSessionId(newSession.welinkSessionId);
+  }, [createSessionForAssistant, resolveAssistantDetail]);
+
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    shouldCreateFallback: boolean,
+  ) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (!normalizedDeletedSessionId) {
+      return;
+    }
+
+    const previousCache = historySessionsCacheRef.current;
+    const isDeletingCurrentSession = welinkSessionIdRef.current === normalizedDeletedSessionId;
+    const nextSession = previousCache
+      ? resolveNextSessionAfterDelete(previousCache.content, normalizedDeletedSessionId)
+      : null;
+
+    setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+
+    if (isDeletingCurrentSession) {
+      setIsSwitchingSessionAfterDelete(true);
+      session.resetTransientState();
+      if (nextSession) {
+        setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!shouldCreateFallback) {
+        setWelinkSessionId(null);
+        setIsSwitchingSessionAfterDelete(false);
+      } else {
+        try {
+          await createAndSelectFallbackSession();
+        } catch (error) {
+          WeLog(`App create fallback session after delete failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+          showToast(t('weAgent.createSessionFailed'));
+        } finally {
+          setIsSwitchingSessionAfterDelete(false);
+        }
+      }
+    }
+
+    if (refreshAfterDelete) {
+      try {
+        const refreshedCache = await refreshHistorySessionsFirstPage();
+        const refreshedCacheWithoutDeletedSession = removeSessionFromHistoryCache(
+          refreshedCache,
+          normalizedDeletedSessionId,
+        );
+        setHistorySessionsCache(refreshedCacheWithoutDeletedSession);
+        if (isDeletingCurrentSession && !shouldCreateFallback) {
+          const refreshedNextSession = refreshedCacheWithoutDeletedSession
+            ? getLatestAvailableSessionByUpdatedAt(refreshedCacheWithoutDeletedSession.content)
+            : null;
+          if (refreshedNextSession) {
+            setWelinkSessionId(refreshedNextSession.welinkSessionId);
+          }
+        }
+      } catch (error) {
+        WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+      }
+    }
+  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
+
+  const handleSessionDeleteStart = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeleteFailed = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeletedFromAction = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    try {
+      await handleSessionDeleted(deletedSessionId, false, true);
+    } finally {
+      if (normalizedDeletedSessionId) {
+        pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      }
+    }
+  }, [handleSessionDeleted]);
+
+  const handleSessionDeletedFromPush = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId && pendingActionDeleteSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      return;
+    }
+    await handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
+
+  useEffect(() => {
+    handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
+  }, [handleSessionDeletedFromPush]);
+
   return (
     <div
       className={[
@@ -460,6 +616,9 @@ function App({ assistantAccount = '' }: AppProps) {
                   setHistorySessionsLoaded(true);
                 }}
                 onSessionSelect={handleSwitchWeAgentSession}
+                onSessionDeleteStart={handleSessionDeleteStart}
+                onSessionDeleteFailed={handleSessionDeleteFailed}
+                onSessionDeleted={handleSessionDeletedFromAction}
                 onVisibilityChange={setIsHistorySidebarVisible}
               />
             </div>
@@ -472,9 +631,15 @@ function App({ assistantAccount = '' }: AppProps) {
                 slashCommands={session.slashCommands}
                 onRequestSlashCommands={session.onRequestSlashCommands}
                 onSend={(content) => {
+                  if (isSwitchingSessionAfterDelete) {
+                    return;
+                  }
                   void session.onSend(content);
                 }}
                 onStop={() => {
+                  if (isSwitchingSessionAfterDelete) {
+                    return;
+                  }
                   void session.onStop();
                 }}
               />
