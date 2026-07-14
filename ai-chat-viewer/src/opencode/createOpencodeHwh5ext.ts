@@ -18,11 +18,10 @@ import type {
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   QueryQrcodeInfoResult,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   ReplyPermissionParams,
   SendMessageParams,
@@ -587,6 +586,12 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
       };
     },
 
+    registerEventListener(params: RegisterEventListenerParams): void {
+      window.addEventListener(params.type, ((event: Event) => {
+        params.func((event as CustomEvent).detail);
+      }) as EventListener);
+    },
+
     registerSessionListener(params: RegisterSessionListenerParams): void {
       socket.register(params);
     },
@@ -785,14 +790,6 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
     },
 
     async updateQrcodeInfo(): Promise<UpdateQrcodeInfoResult> {
-      return {
-        status: 'success',
-      };
-    },
-
-    async notifyAssistantDetailUpdated(
-      _params: NotifyAssistantDetailUpdatedParams,
-    ): Promise<NotifyAssistantDetailUpdatedResult> {
       return {
         status: 'success',
       };

@@ -32,6 +32,7 @@ export interface StepBasicInfoProps {
   initialValue?: DigitalTwinBasicInfoPayload | null;
   className?: string;
   showHeader?: boolean;
+  pcTitle?: string;
   expired?: boolean;
   expiredImageSrc?: string;
   expiredMessage?: string;
@@ -39,6 +40,7 @@ export interface StepBasicInfoProps {
   onClose: () => void;
   onMobileBack?: () => void;
   onNext: (payload: DigitalTwinBasicInfoPayload) => void;
+  submitting?: boolean;
   submitLabel?: string;
 }
 
@@ -47,4 +49,5 @@ export interface StepBrainSelectProps {
   onClose: () => void;
   onPrev: () => void;
   onConfirm: (payload: DigitalTwinBrainPayload) => void;
+  submitting?: boolean;
 }

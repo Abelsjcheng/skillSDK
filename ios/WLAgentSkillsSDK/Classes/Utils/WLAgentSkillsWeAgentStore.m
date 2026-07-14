@@ -130,15 +130,85 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
     return (NSDictionary *)value;
 }
 
+/// 汇总详情缓存和当前详情中的账号，去重后用于冷启动批量补偿查询。
+- (NSArray<NSString *> *)cachedWeAgentPartnerAccounts {
+    NSMutableOrderedSet<NSString *> *accounts = [NSMutableOrderedSet orderedSet];
+    for (NSString *key in [self loadWeAgentDetailsCacheDictionary].allKeys) {
+        NSString *normalized = [self normalizedStringValue:key];
+        if (normalized.length > 0) {
+            [accounts addObject:normalized];
+        }
+    }
+    NSString *currentPartnerAccount =
+        [self normalizedStringValue:[self loadCurrentWeAgentDetailDictionary][@"partnerAccount"]];
+    if (currentPartnerAccount.length > 0) {
+        [accounts addObject:currentPartnerAccount];
+    }
+    return accounts.array;
+}
+
+/// 仅覆盖已存在的详情缓存；若目标是当前助理，也同步覆盖当前详情。
+/// 不新增缓存，避免迟到更新恢复已经删除的助理。
+- (void)replaceCachedWeAgentDetailIfPresent:(NSDictionary *)dictionary
+                          forPartnerAccount:(NSString *)partnerAccount {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsDetailsCacheKey];
+    NSMutableDictionary *cache = [[self loadWeAgentDetailsCacheDictionary] mutableCopy];
+    if (cache[partnerAccount] != nil) {
+        cache[partnerAccount] = dictionary;
+        [defaults setObject:cache forKey:key];
+        [defaults synchronize];
+    }
+    NSDictionary *currentDetail = [self loadCurrentWeAgentDetailDictionary];
+    NSString *currentPartnerAccount = [self normalizedStringValue:currentDetail[@"partnerAccount"]];
+    if ([currentPartnerAccount isEqualToString:partnerAccount]) {
+        [self saveCurrentWeAgentDetailDictionary:dictionary];
+    }
+}
+
+/// 按账号幂等删除详情缓存，账号为空或目标不存在时不写入持久化存储。
+- (void)removeWeAgentDetailForPartnerAccount:(NSString *)partnerAccount {
+    if (partnerAccount.length == 0) {
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsDetailsCacheKey];
+    NSMutableDictionary *cache = [[self loadWeAgentDetailsCacheDictionary] mutableCopy];
+    if (cache[partnerAccount] == nil) {
+        return;
+    }
+    [cache removeObjectForKey:partnerAccount];
+    if (cache.count == 0) {
+        [defaults removeObjectForKey:key];
+    } else {
+        [defaults setObject:cache forKey:key];
+    }
+    [defaults synchronize];
+}
+
+/// 从已有列表缓存中过滤目标账号并回写；没有列表缓存时保持原状态。
+- (void)removeWeAgentFromListForPartnerAccount:(NSString *)partnerAccount {
+    if (partnerAccount.length == 0 || ![self hasWeAgentListCache]) {
+        return;
+    }
+    NSArray<NSDictionary *> *list = [self loadWeAgentListDictionaries];
+    NSMutableArray<NSDictionary *> *nextList = [NSMutableArray array];
+    for (NSDictionary *item in list) {
+        NSString *itemPartnerAccount = [self normalizedStringValue:item[@"partnerAccount"]];
+        if (![itemPartnerAccount isEqualToString:partnerAccount]) {
+            [nextList addObject:item];
+        }
+    }
+    [self saveWeAgentListDictionaries:nextList];
+}
+
 - (void)updateCachedWeAgentDetailsWithPartnerAccount:(nullable NSString *)partnerAccount
-                                             robotId:(nullable NSString *)robotId
                                                 name:(NSString *)name
                                                 icon:(NSString *)icon
                                          description:(NSString *)description {
     NSDictionary *currentDetail = [self loadCurrentWeAgentDetailDictionary];
     NSDictionary *updatedCurrentDetail = [self updatedDetailDictionaryIfMatched:currentDetail
                                                                  partnerAccount:partnerAccount
-                                                                        robotId:robotId
                                                                            name:name
                                                                            icon:icon
                                                                     description:description];
@@ -159,29 +229,12 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
         NSDictionary *cachedDetail = cache[partnerAccount];
         NSDictionary *updatedDetail = [self updatedDetailDictionaryIfMatched:cachedDetail
                                                               partnerAccount:partnerAccount
-                                                                     robotId:nil
                                                                         name:name
                                                                         icon:icon
                                                                  description:description];
         if (updatedDetail != nil) {
             cache[partnerAccount] = updatedDetail;
             updated = YES;
-        }
-    } else if (robotId.length > 0) {
-        for (NSString *cacheKey in cache.allKeys) {
-            NSDictionary *cachedDetail = cache[cacheKey];
-            NSDictionary *updatedDetail = [self updatedDetailDictionaryIfMatched:cachedDetail
-                                                                  partnerAccount:nil
-                                                                         robotId:robotId
-                                                                            name:name
-                                                                            icon:icon
-                                                                     description:description];
-            if (updatedDetail == nil) {
-                continue;
-            }
-            cache[cacheKey] = updatedDetail;
-            updated = YES;
-            break;
         }
     }
 
@@ -230,6 +283,7 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
     });
 }
 
+/// 读取持久化的完整助理详情缓存，并过滤非法键值后返回。
 - (NSDictionary<NSString *, NSDictionary *> *)loadWeAgentDetailsCacheDictionary {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *key = [self.prefix stringByAppendingString:WLAgentSkillsDetailsCacheKey];
@@ -254,7 +308,6 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
 
 - (nullable NSDictionary *)updatedDetailDictionaryIfMatched:(nullable NSDictionary *)dictionary
                                              partnerAccount:(nullable NSString *)partnerAccount
-                                                    robotId:(nullable NSString *)robotId
                                                        name:(NSString *)name
                                                        icon:(NSString *)icon
                                                 description:(NSString *)description {
@@ -263,15 +316,9 @@ static NSString * const WLAgentSkillsAssistantGraySingleCacheKey = @"assistant_g
     }
 
     NSString *normalizedPartnerAccount = [self normalizedStringValue:partnerAccount];
-    NSString *normalizedRobotId = [self normalizedStringValue:robotId];
     if (normalizedPartnerAccount != nil) {
         NSString *cachedPartnerAccount = [self normalizedStringValue:dictionary[@"partnerAccount"]];
         if (![normalizedPartnerAccount isEqualToString:cachedPartnerAccount]) {
-            return nil;
-        }
-    } else if (normalizedRobotId != nil) {
-        NSString *cachedRobotId = [self normalizedStringValue:dictionary[@"id"]];
-        if (![normalizedRobotId isEqualToString:cachedRobotId]) {
             return nil;
         }
     } else {

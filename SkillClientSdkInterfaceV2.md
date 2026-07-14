@@ -18,13 +18,13 @@
 | `getWeAgentList` | `GET /v4-1/we-crew/list` | 查询个人助理列表 |
 | `getWeAgentDetails` | `GET /v1/robot-partners/{partnerAccount}` | 获取并按需持久化助理详情 |
 | `getAssistantDetails` | `GET /v1/robot-partners/{partnerAccount}` | 优先返回缓存助理详情，并异步刷新缓存 |
+| `getWeAgentInfo` | 无（SDK 本地扩展能力） | 读取并返回当前助理完整详情，助理标签中英文名称按规则兜底 |
 | `updateWeAgent` | `PUT /v4-1/we-crew` | 更新个人助理信息 |
 | `deleteWeAgent` | `DELETE /v4-1/we-crew` | 删除个人助理 |
 | `setIsShowWeAgent` | 无（SDK 本地扩展能力） | 设置是否展示助理 tab 的持久化缓存并同步基座展示态 |
 | `getIsShowWeAgent` | 无（SDK 本地扩展能力） | 获取是否展示助理 tab 的持久化缓存值 |
 | `openWeAgent` | 无（SDK 本地扩展能力；未传 `partnerAccount` 时复用 `getWeAgentUri`） | 打开助理 |
 | `openAssistantEditPage` | 无（SDK 本地扩展能力） | 打开助理编辑页面 |
-| `notifyAssistantDetailUpdated` | 无（SDK 本地扩展能力） | 通知助理详情已更新 |
 | `queryQrcodeInfo` | `GET /v4-1/we-crew/im-register/qrcode/{qrcode}` | 查询二维码信息 |
 | `updateQrcodeInfo` | `PUT /v4-1/we-crew/im-register/qrcode` | 更新二维码信息 |
 | `queryAssistantGraySingle` | `GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}` | 查询助理单人灰度标记 |
@@ -240,6 +240,13 @@ getWeAgentList(params: PageParams): Promise<WeAgentList>
 |---|---|---|
 | `content` | `Array<WeAgent>` | 用户创建的 WeAgent 列表 |
 
+`GET /v4-1/we-crew/list` 服务端返回的每个 `data[]` 列表项新增：
+
+| 字段名 | 类型 | 说明 |
+|---|---|---|
+| `tagName` | `string` | 助理标签中文名称 |
+| `tagNameEn` | `string` | 助理标签英文名称 |
+
 ### 出参示例
 
 ```json
@@ -253,6 +260,8 @@ getWeAgentList(params: PageParams): Promise<WeAgentList>
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "yuangongzhushou",
       "bizRobotTag": "main-agent",
+      "tagName": "助手",
+      "tagNameEn": "Agent",
       "robotId": "78985451212"
     }
   ]
@@ -262,7 +271,9 @@ getWeAgentList(params: PageParams): Promise<WeAgentList>
 ### 实现方法
 
 1. SDK 调用服务端 REST API：`GET /v4-1/we-crew/list`，透传查询参数 `pageSize`、`pageNumber`。
-2. SDK 解析返回 `data[]` 并组装为 `WeAgentList`，其中服务端新增字段 `data[].bizRobotTag` 需同步透传到 SDK 出参 `content[].bizRobotTag`。
+2. SDK 解析返回 `data[]` 并组装为 `WeAgentList`，其中服务端字段 `data[].bizRobotTag`、`data[].tagName`、`data[].tagNameEn` 需同步透传到 SDK 出参对应字段。
+   - `tagName`：助理标签中文名称。
+   - `tagNameEn`：助理标签英文名称。
 3. SDK 可按 `userId`（当前 mock 值：`mock_user_id`）维度更新本地 `we_agent_list_cache` 缓存，供后续读取优化。
 4. SDK 返回 `Promise<WeAgentList>`。
 
@@ -317,7 +328,7 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 |---|---|---|
 | `weAgentDetailsArray` | `Array<WeAgentDetails>` | 助理详情数组 |
 
-`WeAgentDetails` 对象新增字段：`id`（字符串）、`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`ownerWelinkId`（责任人的 id，字符串）、`creatorWorkId`（创建者的工号，字符串）、`bizRobotTag`（大脑机器人 tag，字符串）、`ownerW3Account`（大脑机器人责任人的账号，字符串）、`creatorW3Account`（创建者的账号，字符串）；移除 `robotId` 字段。
+`WeAgentDetails` 对象新增字段：`id`（字符串）、`bizRobotName`（字符串）、`bizRobotNameEn`（字符串）、`ownerWelinkId`（责任人的 id，字符串）、`creatorWorkId`（创建者的工号，字符串）、`bizRobotTag`（大脑机器人 tag，字符串）、`ownerW3Account`（大脑机器人责任人的账号，字符串）、`creatorW3Account`（创建者的账号，字符串）、`tagName`（助理标签中文名称，字符串）、`tagNameEn`（助理标签英文名称，字符串）；移除 `robotId` 字段。
 
 ### 出参示例
 
@@ -348,6 +359,8 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "bizRobotNameEn": "employee_assistant",
       "bizRobotTag": "",
       "bizRobotId": "",
+      "tagName": "助手",
+      "tagNameEn": "Agent",
       "weCodeUrl": "https://xxx"
     }
   ]
@@ -356,14 +369,14 @@ getWeAgentDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ### 实现方法
 
-1. 当传入 `partnerAccount` 时，调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-2. 当移动端未传 `partnerAccount` 时，调用服务端 REST API：`GET /v4-1/we-crew/my-agent`；该接口无入参，服务端返回通用包装结构 `code`、`message`、`data`，其中 `data` 为对象，包含：`partnerAccount`、`name`、`icon`、`description`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`robotId`、`weCodeUrl`。
+1. 当传入 `partnerAccount` 时，调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`；服务端返回的 `data[]` 详情对象新增 `tagName`（助理标签中文名称）、`tagNameEn`（助理标签英文名称），SDK 原样透传到 `WeAgentDetails`。
+2. 当移动端未传 `partnerAccount` 时，调用服务端 REST API：`GET /v4-1/we-crew/my-agent`；该接口无入参，服务端返回通用包装结构 `code`、`message`、`data`，其中 `data` 为对象，包含：`partnerAccount`、`name`、`icon`、`description`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`tagName`、`tagNameEn`、`robotId`、`weCodeUrl`。
 3. SDK 统一将返回结果组装为 `weAgentDetailsArray`：
    - `GET /v1/robot-partners/{partnerAccount}` 场景直接解析服务端返回的 `data[]`；
    - `GET /v4-1/we-crew/my-agent` 场景将 `data` 单对象适配为仅包含一个元素的 `weAgentDetailsArray`，其中：
      - `description` 映射到 `desc`
      - `robotId` 映射到 `id`
-     - `partnerAccount`、`name`、`icon`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`weCodeUrl` 按字段语义写入对应的 `WeAgentDetails`
+     - `partnerAccount`、`name`、`icon`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`tagName`、`tagNameEn`、`weCodeUrl` 按字段语义写入对应的 `WeAgentDetails`
      - `moduleId`、`appKey`、`appSecret`、`createdBy`、`creatorWorkId`、`creatorW3Account`、`creatorName`、`creatorNameEn`、`ownerWelinkId`、`ownerW3Account`、`ownerName`、`ownerNameEn`、`ownerDeptName`、`ownerDeptNameEn` 等服务端未返回字段，SDK 使用空字符串兜底
 4. SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离，`userId` 当前使用 mock 值：`mock_user_id`），用于 `getWeAgentUri`。
 5. SDK 返回 `Promise<weAgentDetailsArray>`。
@@ -443,6 +456,8 @@ getAssistantDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
       "bizRobotNameEn": "employee_assistant",
       "bizRobotTag": "",
       "bizRobotId": "",
+      "tagName": "助手",
+      "tagNameEn": "Agent",
       "weCodeUrl": "https://xxx"
     }
   ]
@@ -454,11 +469,91 @@ getAssistantDetails(params: QueryWeAgentParams): Promise<WeAgentDetailsArray>
 1. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`（`userId` 当前使用 mock 值：`mock_user_id`），并从中按 `partnerAccount` 读取对应助理详情对象缓存。
 2. 若读取到对应 `partnerAccount` 的助理详情对象缓存，则 SDK 将该对象组装为 `weAgentDetailsArray` 返回。
 3. 在返回缓存后，SDK 异步调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-4. SDK 解析服务端返回 `data[]`；若返回结果非空，则取首个助理详情对象写回按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并覆盖更新缓存 key `we_agent_details`。
+4. SDK 解析服务端返回 `data[]`；详情对象中的 `tagName`、`tagNameEn` 需与其他 `WeAgentDetails` 字段一并返回和缓存。若返回结果非空，则取首个助理详情对象写回按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并覆盖更新缓存 key `we_agent_details`。
 5. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v1/robot-partners/{partnerAccount}`。
-6. SDK 解析服务端返回 `data[]`；若返回结果非空，则取首个助理详情对象写入按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并更新缓存 key `we_agent_details`；同时 SDK 仍按接口约定将完整结果组装为 `weAgentDetailsArray` 返回给调用方。
+6. SDK 解析服务端返回 `data[]`；详情对象中的 `tagName`、`tagNameEn` 需与其他 `WeAgentDetails` 字段一并返回和缓存。若返回结果非空，则取首个助理详情对象写入按 `userId` 隔离的缓存对象中对应的 `partnerAccount` 字段，并更新缓存 key `we_agent_details`；同时 SDK 仍按接口约定将完整结果组装为 `weAgentDetailsArray` 返回给调用方。
 7. 若服务端返回的助理详情为空，则 SDK 不设置新缓存，也不删除旧缓存。
 8. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 可记录日志用于排查。
+
+---
+
+## 4.2 获取当前助理详情接口
+
+### 调用方
+
+助理 Tab 宿主或需要读取当前助理信息的模块调用。
+
+### 接口说明
+
+读取按 `userId` 隔离的 `current_we_agent_detail` 缓存，并返回当前助理的完整 `WeAgentDetails` 对象。
+
+接口不发起服务端请求，也不修改本地缓存。返回时保留缓存中的全部助理详情字段，仅对 `tagName`、`tagNameEn` 执行固定兜底：
+
+- `tagName` 为空、缺失或缓存读取异常时，返回 `"助手"`；
+- `tagNameEn` 为空、缺失或缓存读取异常时，返回 `"Agent"`。
+
+### 接口名
+
+```typescript
+getWeAgentInfo(): WeAgentDetails
+```
+
+### 入参
+
+无。
+
+### 出参
+
+返回完整 `WeAgentDetails` 对象。名称、头像、账号、机器人信息、WeCode 地址等字段保持当前详情缓存中的原值。
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `WeAgentDetails` 全部字段 | 与 `WeAgentDetails` 定义一致 | 从 `current_we_agent_detail` 读取并返回 |
+| `tagName` | `string` | 助理标签中文名称；为空、缺失或读取异常时返回 `"助手"` |
+| `tagNameEn` | `string` | 助理标签英文名称；为空、缺失或读取异常时返回 `"Agent"` |
+
+### 出参示例
+
+```json
+{
+  "name": "员工助手",
+  "icon": "http://www.test.com/xxx",
+  "desc": "我是xxx",
+  "moduleId": "M1000",
+  "appKey": "",
+  "appSecret": "",
+  "partnerAccount": "x00_1",
+  "createdBy": "",
+  "creatorWorkId": "",
+  "creatorW3Account": "",
+  "creatorName": "",
+  "creatorNameEn": "",
+  "ownerWelinkId": "",
+  "ownerW3Account": "",
+  "ownerName": "",
+  "ownerNameEn": "",
+  "ownerDeptName": "",
+  "ownerDeptNameEn": "",
+  "id": "78985451212",
+  "bizRobotName": "员工助手",
+  "bizRobotNameEn": "employee_assistant",
+  "bizRobotTag": "myAgent",
+  "bizRobotId": "",
+  "tagName": "助手",
+  "tagNameEn": "Agent",
+  "weCodeUrl": "https://xxx"
+}
+```
+
+### 实现方法
+
+1. SDK 读取按 `userId` 隔离的 `current_we_agent_detail` 缓存。
+2. 缓存存在时，SDK 返回缓存中的整个 `WeAgentDetails` 对象，不裁剪或改写其他详情字段。
+3. `tagName` 为空或缺失时，仅在接口返回对象中将其兜底为 `"助手"`。
+4. `tagNameEn` 为空或缺失时，仅在接口返回对象中将其兜底为 `"Agent"`。
+5. 缓存不存在或读取异常时，SDK 按三端既有模型默认值构造字段完整的空 `WeAgentDetails`，并设置 `tagName = "助手"`、`tagNameEn = "Agent"` 后返回。
+6. 兜底值只作用于本次接口返回，不回写 `current_we_agent_detail`。
+7. 接口不判断客户端语言环境；调用方设置助理 Tab 标题时，中文环境使用 `tagName`，英文环境使用 `tagNameEn`。
 
 ---
 
@@ -482,8 +577,7 @@ updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
-| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `partnerAccount` | `string` | 是 | 助理账号 ID；`updateWeAgent` 仅支持通过 `partnerAccount` 定位助理 |
 | `name` | `string` | 是 | 助理名称 |
 | `icon` | `string` | 是 | 助理头像地址 |
 | `description` | `string` | 是 | 助理简介 |
@@ -516,14 +610,15 @@ updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult>
 ### 实现方法
 
 1. 调用服务端 REST API：`PUT /v4-1/we-crew`。
-2. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`；若两者同时传入，则两个参数都透传给服务端。
+2. SDK 校验 `partnerAccount`、`name`、`icon`、`description` 均为非空有效字符串，并仅向服务端透传 `partnerAccount`、`name`、`icon`、`description`；`robotId` 不再作为该接口入参。
 3. SDK 根据服务端返回对象中的 `code` 判断结果；其中 `code` 为 `number` 类型：
    - 当 `code` 为 `200` 时，返回 `updateResult: "success"`；
    - 当 `code` 不为 `200` 时，SDK 抛出异常，并透传服务端返回的 `code` 与 `message`。
 4. 当服务端接口请求成功，且 `code = 200` 后，SDK 需按 `userId`（当前 mock 值：`mock_user_id`）更新本地缓存：
-   - 更新 `current_we_agent_detail`：若当前缓存中的助理与本次更新目标一致，则将其名称、头像、简介同步更新为最新值；
-   - 更新 `we_agent_details`：定位对应助理在缓存对象中的条目，并将其名称、头像、简介同步更新为最新值。
+   - 更新 `current_we_agent_detail`：若当前缓存中的助理 `partnerAccount` 与本次更新目标一致，则将其名称、头像、简介同步更新为最新值；
+   - 更新 `we_agent_details`：按 `partnerAccount` 定位对应助理在缓存对象中的条目，并将其名称、头像、简介同步更新为最新值。
 5. 若本地未命中对应助理缓存，则 SDK 不新增缓存，仅更新已存在且匹配的缓存项。
+6. 本端主动调用 `updateWeAgent` 成功后，SDK 需触发 `agentskills.agentUpdated` 更新广播；广播前通过 `GET /v1/robot-partners/{partnerAccount}` 补拉完整助理详情，并以完整详情对象作为广播 `data`。若补拉详情失败，则不触发更新广播。
 
 ---
 
@@ -547,8 +642,7 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
-| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则 SDK 将两个参数都透传给服务端 |
+| `partnerAccount` | `string` | 是 | 助理账号 ID；`deleteWeAgent` 仅支持通过 `partnerAccount` 定位助理 |
 
 ### 入参示例
 
@@ -574,34 +668,27 @@ deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult>
 
 ### 实现方法
 
-1. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传删除标识参数：
-   - 若仅传 `partnerAccount`，则透传 `partnerAccount`；
-   - 若仅传 `robotId`，则透传 `robotId`；
-   - 若两者同时传入，则两个参数都透传给服务端。
+1. SDK 校验 `partnerAccount` 为非空有效字符串，并仅向服务端透传 `partnerAccount`；`robotId` 不再作为该接口入参。
 2. SDK 在调用删除服务端接口前，需先按 `userId`（当前 mock 值：`mock_user_id`）读取本地 `current_we_agent_detail`，并判断当前被删除助理是否命中“当前助理缓存”：
-   - 若当前缓存存在，且其 `partnerAccount` 或 `id` 与本次删除目标匹配，则视为“删除当前助理”；
+   - 若当前缓存存在，且其 `partnerAccount` 与本次删除目标匹配，则视为“删除当前助理”；
    - 否则视为“删除非当前助理”。
 3. 调用服务端 REST API：`DELETE /v4-1/we-crew`。
 4. SDK 根据服务端返回对象中的 `code` 判断结果；其中 `code` 为 `number` 类型：
    - 当 `code` 为 `200` 时，返回 `deleteResult: "success"`；
    - 当 `code` 不为 `200` 时，SDK 抛出异常，并透传服务端返回的 `code` 与 `message`。
 5. 当服务端接口请求成功，且 `code = 200` 后，若判定为“删除非当前助理”，则 SDK 仅尝试更新本地 `we_agent_list_cache`：
-   - 若本地存在助理列表缓存，则从缓存列表中移除当前被删除助理，并将删除后的列表回写到本地 `we_agent_list_cache`；
+   - 若本地存在助理列表缓存，则按 `partnerAccount` 从缓存列表中移除当前被删除助理，并将删除后的列表回写到本地 `we_agent_list_cache`；
    - 若本地不存在助理列表缓存，则不做任何缓存处理；
-   - 该场景下不触发当前助理切换逻辑，不修改 `current_we_agent_detail`，也不组装 `nextUris`。
-6. 当服务端接口请求成功，且 `code = 200` 后，若判定为“删除当前助理”，则 SDK 才执行切换助理相关逻辑：
-   - 先按 `userId` 优先读取本地 `we_agent_list_cache`；若本地不存在助理列表缓存，则先调用 `getWeAgentList` 对应的服务端接口获取最新助理列表，并更新本地 `we_agent_list_cache`。
-7. SDK 基于“删除前”的助理列表定位当前被删除助理，并预先计算可切换的下一个助理：
-   - 若当前删除助理不是列表最后一个，则取其后一个助理；
-   - 若当前删除助理是列表最后一个，则取列表第 `0` 个助理；
-   - 若列表中不存在可切换的下一个助理，则标记删除成功后需删除本地 `current_we_agent_detail` 缓存。
-8. SDK 基于删除前列表快照同步移除当前被删除助理，并将删除后的列表回写到本地 `we_agent_list_cache`。
-9. 若预先计算得到下一个助理，则 SDK 基于该助理的 `partnerAccount` 从本地 `we_agent_details` 中读取对应助理详情；若本地不存在该助理详情缓存，则调用查助理详情的服务端接口 `GET /v1/robot-partners/{partnerAccount}` 获取对应详情，并更新本地 `we_agent_details` 缓存。
-10. 若成功获取到下一个助理详情，则将该助理详情设置到本地 `current_we_agent_detail` 缓存；若未预计算到下一个助理，或仍无法获取到下一个助理详情，则删除本地 `current_we_agent_detail` 缓存。
-11. SDK 需在内存中直接组装对应的 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`，不再额外调用 `getWeAgentUri` 读取缓存；`deleteWeAgent` 与 `getWeAgentUri` 需复用同一套 URI 组装规则，保证结果一致：
-   - 若已获取到下一个助理详情，则基于该详情组装 URI；
-   - 若下一个助理详情为空，则按 `getWeAgentUri` 的 fallback 规则组装 `nextUris`。
-12. `todo`：使用 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri` 调用 `openWeAgentCUI` 方法打开助理。
+   - 若本地 `we_agent_details` 中存在该 `partnerAccount` 对应的助理详情缓存，则删除该条详情缓存并回写；
+   - 该场景下不触发当前助理切换逻辑，不修改 `current_we_agent_detail`，也不组装跳转 URI。
+6. 当服务端接口请求成功，且 `code = 200` 后，若判定为“删除当前助理”，则 SDK 执行当前助理删除后的跳转逻辑：
+   - 仅尝试按 `partnerAccount` 更新本地 `we_agent_list_cache`；若本地不存在助理列表缓存，则不主动调用 `getWeAgentList`，也不做列表缓存处理；
+   - 删除 `current_we_agent_detail` 中的当前被删助理；
+   - 若本地 `we_agent_details` 中存在该 `partnerAccount` 对应的助理详情缓存，则删除该条详情缓存并回写；
+   - 不在 `deleteWeAgent` 内部计算当前助理的下一个助理，不直接判断删除后列表是否存在主助理，也不直接组装主助理或激活页 URI；
+   - 直接调用 `getWeAgentUri` 获取删除后的目标 URI，由 `getWeAgentUri` 内部判断是否存在主助理：有主助理时返回主助理相关 URI；无主助理、主助理获取失败或 `weCodeUrl` 为空时，按该接口约定返回激活页面 URI；
+   - SDK 按 `getWeAgentUri` 返回结果执行跳转。
+7. 本端主动调用 `deleteWeAgent` 成功后，SDK 需触发 `agentskills.agentUpdated` 删除广播，payload 为 `{ type: 'delete', data: { partnerAccount }, extraData: { source: 'local' } }`。
 
 ---
 
@@ -814,8 +901,9 @@ Skill 小程序调用
 
 ### 接口说明
 
-打开助理编辑页面，并注册详情更新回调。
+打开助理编辑页面。
 该接口为 SDK 本地扩展接口，无对应服务端接口。
+助理详情更新后的数据不通过该接口回传；调用方如通讯录需要通过注册 `agentskills.agentUpdated` 端侧详情广播通知获取更新后的助理数据。
 
 ### 接口名
 
@@ -827,19 +915,13 @@ openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistan
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
-| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
-| `onUpdated` | `function` | 是 | 监听详情更新回调，回调出参为 `AssistantDetailUpdatedPayload`；相同 ID（按入参标识生成，优先使用 `partnerAccount`，否则使用 `robotId`）重复注册时覆盖旧监听，一个 ID 仅对应一个监听函数 |
+| `partnerAccount` | `string` | 是 | 助理账号 ID |
 
 ### 入参示例
 
 ```typescript
 {
-  partnerAccount: 'x00_1',
-  robotId: '78985451212',
-  onUpdated: (payload) => {
-    console.log(payload.name, payload.icon, payload.description)
-  }
+  partnerAccount: 'x00_1'
 }
 ```
 
@@ -859,85 +941,24 @@ openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistan
 
 ### 实现方法
 
-1. SDK 接收 `partnerAccount`、`robotId` 与 `onUpdated` 回调，其中 `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
-2. SDK 按入参标识在本地注册回调监听，唯一 ID 生成规则为：优先使用 `partnerAccount`；当未传 `partnerAccount` 时，使用 `robotId`。
-3. 若相同 ID 已存在监听函数，则使用新的 `onUpdated` 覆盖旧监听；同一 ID 在任意时刻仅保留一个监听函数。
-4. SDK 将已有的标识参数拼接到 `h5://S008623/index.html#editAssistant`：
-   - 若传入 `partnerAccount`，则追加 query `partnerAccount={partnerAccount}`；
-   - 若未传 `partnerAccount` 但传入 `robotId`，则追加 query `robotId={robotId}`；
-   - 若两者均传入，则优先使用 `partnerAccount`。
-5. 拼接完成后的 uri 地址当前先记为 `todo`，待后续页面地址方案确认后补齐。
-6. SDK 拉起助理编辑页面。
-7. SDK 返回 `OpenAssistantEditPageResult`，其中 `status` 固定为 `success`。
+1. SDK 接收并校验 `partnerAccount`，该参数必填且不能为空字符串。
+2. SDK 仅使用入参标识定位待编辑助理，不注册更新回调，也不负责向调用方回传更新后的助理详情数据。
+3. SDK 将 `partnerAccount` 拼接到 `h5://S008623/index.html#editAssistant`，追加 query `partnerAccount={partnerAccount}`。
+4. 拼接完成后的 uri 地址当前先记为 `todo`，待后续页面地址方案确认后补齐。
+5. SDK 拉起助理编辑页面。
+6. SDK 返回 `OpenAssistantEditPageResult`，其中 `status` 固定为 `success`。
+7. 编辑页完成助理详情更新后，更新后数据通过 `agentskills.agentUpdated` 端侧详情广播通知同步给调用方；通讯录等调用方需自行注册并消费该广播。
 
----
+### 错误码（参考）
 
-## 11. 通知助理详情更新接口
-
-### 调用方
-
-助理编辑页面调用
-
-### 接口说明
-
-通知 SDK 当前助理详情已更新，并触发 `openAssistantEditPage` 注册的 `onUpdated` 回调。
-该接口为 SDK 本地扩展接口，无对应服务端接口。
-
-### 接口名
-
-```typescript
-notifyAssistantDetailUpdated(params: NotifyAssistantDetailUpdatedParams): Promise<NotifyAssistantDetailUpdatedResult>
-```
-
-### 入参
-
-| 参数名 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `name` | `string` | 是 | 助理名称 |
-| `icon` | `string` | 是 | 助理头像地址 |
-| `description` | `string` | 是 | 助理简介 |
-| `partnerAccount` | `string` | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
-| `robotId` | `string` | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
-
-### 入参示例
-
-```json
-{
-  "name": "更新名称",
-  "icon": "/mocloud/xxx",
-  "description": "更新简介",
-  "partnerAccount": "x00_1",
-  "robotId": "78985451212"
-}
-```
-
-### 出参
-
-| 参数名 | 类型 | 说明 |
+| 错误码 | 错误消息 | 说明 |
 |---|---|---|
-| `status` | `string` | 固定返回 `success` |
-
-### 出参示例
-
-```json
-{
-  "status": "success"
-}
-```
-
-### 实现方法
-
-1. SDK 接收 `name`、`icon`、`description`、`partnerAccount` 与 `robotId`，其中 `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
-2. SDK 根据与 `openAssistantEditPage` 一致的唯一 ID 规则定位当前已注册的回调监听：优先使用 `partnerAccount`；当未传 `partnerAccount` 时，使用 `robotId`；若该 ID 发生过重复注册，则以最后一次注册覆盖后的监听函数为准。
-3. SDK 触发对应的 `onUpdated` 回调，并将以下对象作为回调参数传出：
-   - `name`
-   - `icon`
-   - `description`
-4. SDK 返回 `NotifyAssistantDetailUpdatedResult`，其中 `status` 固定为 `success`。
+| `1000` | 无效的参数 | `partnerAccount` 缺失、为空字符串或格式错误 |
+| `5000` | 内部错误 | 编辑页 URI 拼接失败、页面地址方案未配置，或基座拉起助理编辑页面失败 |
 
 ---
 
-## 12. 查询二维码信息接口
+## 11. 查询二维码信息接口
 
 ### 调用方
 
@@ -1014,7 +1035,7 @@ queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
 
 ---
 
-## 13. 更新二维码信息接口
+## 12. 更新二维码信息接口
 
 ### 调用方
 
@@ -1074,7 +1095,7 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 
 ---
 
-## 14. 查询助理单人灰度接口
+## 13. 查询助理单人灰度接口
 
 ### 调用方
 
@@ -1141,7 +1162,7 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 
 ---
 
-## 15. 获取主助理详情接口
+## 14. 获取主助理详情接口
 
 ### 调用方
 
@@ -1175,6 +1196,8 @@ getMyAgentDetail(): Promise<MyAgentDetail>
 | `bizRobotName` | `string` | 助理类型名称 |
 | `bizRobotNameEn` | `string` | 助理类型英文名称 |
 | `bizRobotTag` | `string` | 助理标签 |
+| `tagName` | `string` | 助理标签中文名称 |
+| `tagNameEn` | `string` | 助理标签英文名称 |
 | `robotId` | `string` | 主助理 ID |
 | `weCodeUrl` | `string` | 主助理 WeCode 地址 |
 
@@ -1190,6 +1213,8 @@ getMyAgentDetail(): Promise<MyAgentDetail>
   "bizRobotName": "员工助手",
   "bizRobotNameEn": "staffAssistant",
   "bizRobotTag": "myAgent",
+  "tagName": "助手",
+  "tagNameEn": "Agent",
   "robotId": "78985451212",
   "weCodeUrl": "h5://S008623/index.html"
 }
@@ -1202,7 +1227,9 @@ getMyAgentDetail(): Promise<MyAgentDetail>
 3. 服务端返回通用包装结构：
    - `code`：状态码，正常为 `200`
    - `message`：响应消息
-   - `data`：主助理详情对象，包含 `partnerAccount`、`name`、`icon`、`description`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`robotId`、`weCodeUrl`
+   - `data`：主助理详情对象，包含 `partnerAccount`、`name`、`icon`、`description`、`bizRobotId`、`bizRobotName`、`bizRobotNameEn`、`bizRobotTag`、`tagName`、`tagNameEn`、`robotId`、`weCodeUrl`
+   - `tagName`：助理标签中文名称
+   - `tagNameEn`：助理标签英文名称
 4. SDK 对外直接返回 `data` 对象，不新增字段，不改写字段名。
 5. SDK 返回 `Promise<MyAgentDetail>`。
 
@@ -1214,7 +1241,7 @@ getMyAgentDetail(): Promise<MyAgentDetail>
 
 ---
 
-## 16. 获取当前 WeAgentUri 接口
+## 15. 获取当前 WeAgentUri 接口
 
 ### 调用方
 
@@ -1291,7 +1318,7 @@ getWeAgentUri(): WeAgentUriResult
    - `switchAssistantUri` 组装为：`h5://S008623/index.html` + query 参数 `partnerAccount={partnerAccount}` + hash `switchAssistant`。
 5. 若读取不到持久化助理详情，则 SDK 调用服务端 REST API：`GET /v4-1/we-crew/my-agent`。
 6. 当 `/v4-1/we-crew/my-agent` 返回成功时：
-   - SDK 将服务端返回对象适配为主助理详情，其中 `robotId` 映射到 `id`；
+   - SDK 将服务端返回对象适配为主助理详情，其中 `robotId` 映射到 `id`，`tagName`、`tagNameEn` 原样映射到 `WeAgentDetails`；
    - 若当前本地没有详情，或当前本地详情本身就是主助理，则将该主助理详情写入 `current_we_agent_detail`；
    - 若返回详情中的 `weCodeUrl` 非空，则按第 3 步的主助理规则组装 `weAgentUri`、`assistantDetailUri`、`switchAssistantUri`。
 7. 若 `/v4-1/we-crew/my-agent` 请求失败、返回结构异常，或返回详情中的 `weCodeUrl` 为空，则 SDK 直接走兜底逻辑：
@@ -1366,8 +1393,7 @@ type QueryWeAgentParams = {
 
 ```typescript
 type UpdateWeAgentParams = {
-  partnerAccount?: string
-  robotId?: string
+  partnerAccount: string
   name: string
   icon: string
   description: string
@@ -1386,8 +1412,7 @@ type UpdateWeAgentResult = {
 
 ```typescript
 type DeleteWeAgentParams = {
-  partnerAccount?: string
-  robotId?: string
+  partnerAccount: string
 }
 ```
 
@@ -1439,23 +1464,11 @@ type OpenWeAgentResult = {
 }
 ```
 
-### AssistantDetailUpdatedPayload
-
-```typescript
-type AssistantDetailUpdatedPayload = {
-  name: string
-  icon: string
-  description: string
-}
-```
-
 ### OpenAssistantEditPageParams
 
 ```typescript
 type OpenAssistantEditPageParams = {
-  partnerAccount?: string
-  robotId?: string
-  onUpdated: (payload: AssistantDetailUpdatedPayload) => void
+  partnerAccount: string
 }
 ```
 
@@ -1463,26 +1476,6 @@ type OpenAssistantEditPageParams = {
 
 ```typescript
 type OpenAssistantEditPageResult = {
-  status: string
-}
-```
-
-### NotifyAssistantDetailUpdatedParams
-
-```typescript
-type NotifyAssistantDetailUpdatedParams = {
-  name: string
-  icon: string
-  description: string
-  partnerAccount?: string
-  robotId?: string
-}
-```
-
-### NotifyAssistantDetailUpdatedResult
-
-```typescript
-type NotifyAssistantDetailUpdatedResult = {
   status: string
 }
 ```
@@ -1554,6 +1547,8 @@ type MyAgentDetail = {
   bizRobotName: string
   bizRobotNameEn: string
   bizRobotTag: string
+  tagName: string
+  tagNameEn: string
   robotId: string
   weCodeUrl: string
 }
@@ -1570,6 +1565,8 @@ type WeAgent = {
   bizRobotName: string
   bizRobotNameEn: string
   bizRobotTag: string
+  tagName: string
+  tagNameEn: string
   robotId: string
 }
 ```
@@ -1609,6 +1606,8 @@ type WeAgentDetails = {
   bizRobotNameEn: string
   bizRobotTag: string
   bizRobotId: string
+  tagName: string
+  tagNameEn: string
   weCodeUrl: string
 }
 ```

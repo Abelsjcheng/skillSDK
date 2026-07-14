@@ -152,7 +152,7 @@ export class WebSocketManager {
       });
     } catch (error) {
       // 恢复订阅属于尽力而为能力，不向上抛错打断历史消息正常返回。
-      this.logger.warn('send resume failed', error);
+      this.logger.warn(`send resume failed: ${JSON.stringify(error)}`);
     }
   }
 
@@ -176,7 +176,7 @@ export class WebSocketManager {
       try {
         parsed = JSON.parse(payload) as StreamMessage;
       } catch (parseError) {
-        this.logger.warn('ignore invalid ws message', payload, parseError);
+        this.logger.warn(`ignore invalid ws message, payload=${payload}, error=${JSON.stringify(parseError)}`);
         return;
       }
 
@@ -196,7 +196,7 @@ export class WebSocketManager {
       try {
         listener.onMessage(parsed);
       } catch (listenerError) {
-        this.logger.warn('listener onMessage failed', listenerError);
+        this.logger.warn(`listener onMessage failed: ${JSON.stringify(listenerError)}`);
       }
     });
 
@@ -225,7 +225,7 @@ export class WebSocketManager {
         try {
           listener.onError(payload);
         } catch (error) {
-          this.logger.warn('listener onError failed', error);
+          this.logger.warn(`listener onError failed: ${JSON.stringify(error)}`);
         }
       }
     }
@@ -237,7 +237,7 @@ export class WebSocketManager {
         try {
           listener.onClose(reason);
         } catch (error) {
-          this.logger.warn('listener onClose failed', error);
+          this.logger.warn(`listener onClose failed: ${JSON.stringify(error)}`);
         }
       }
     }

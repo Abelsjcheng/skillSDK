@@ -28,19 +28,20 @@ import type {
   HWH5EXT,
   HWH5UserInfo,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   Pedestal,
   QueryQrcodeInfoParams,
   QueryQrcodeInfoResult,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ResolveRobotIdOptions,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -125,6 +126,16 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     onTabForUpdate: () => undefined,
+    registerEventListener: (params) => {
+      const validEventTypes = ['agentskills_agentUpdated'];
+      if (!validEventTypes.includes(params.type)) {
+        return;
+      }
+      window.addEventListener(params.type, (e: any) => {
+        const data = e.detail;
+        params.func && params.func(data)
+      })
+    },
     registerSessionListener: (params) => {
       if (isPcMiniApp()) {
         listenerParams = params;
@@ -148,6 +159,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
+    sendWebSocketMessage: (params) => call<SendWebSocketMessageResult>('sendWebSocketMessage', params),
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
     controlSkillWeCode: (params) => {
@@ -165,7 +177,6 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     deleteWeAgent: (params) => assistantCall<DeleteWeAgentResult>('deleteWeAgent', params),
     queryQrcodeInfo: (params) => assistantCall<QueryQrcodeInfoResult>('queryQrcodeInfo', params),
     updateQrcodeInfo: (params) => assistantCall<UpdateQrcodeInfoResult>('updateQrcodeInfo', params),
-    notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
     openWeAgentCUI: (params) => call<OpenWeAgentCUIResult>('openWeAgentCUI', params),
@@ -581,6 +592,12 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
   }
 }
 
+export async function sendWebSocketMessage(
+  params: SendWebSocketMessageParams,
+): Promise<SendWebSocketMessageResult> {
+  return getJsApiOrThrow().sendWebSocketMessage(params);
+}
+
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
   return trackApiStopSkill(params, getJsApiOrThrow().stopSkill(params));
 }
@@ -603,6 +620,10 @@ export async function createNewSession(params: CreateNewSessionParams): Promise<
 
 export async function getAccountInfoUid(): Promise<string> {
   return (await getUserInfo()).uid;
+}
+
+export async function registerEventListener(params: RegisterEventListenerParams): Promise<void> {
+  await getJsApiOrThrow().registerEventListener(params);
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {
@@ -639,12 +660,6 @@ export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<Qu
 
 export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
   return trackApiUpdateQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().updateQrcodeInfo(params)));
-}
-
-export async function notifyAssistantDetailUpdated(
-  params: NotifyAssistantDetailUpdatedParams,
-): Promise<NotifyAssistantDetailUpdatedResult> {
-  return getJsApiOrThrow().notifyAssistantDetailUpdated(params);
 }
 
 export async function getHistorySessionsList(

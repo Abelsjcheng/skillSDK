@@ -30,7 +30,6 @@ typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeAction) {
 @class WLAgentSkillsSkillWecodeStatusResult;
 @class WLAgentSkillsSessionStatusResult;
 @class WLAgentSkillsStreamMessage;
-@class WLAgentSkillsAssistantDetailUpdatedPayload;
 
 #pragma mark - Callback Typedefs
 
@@ -39,7 +38,6 @@ typedef void (^WLAgentSkillsWecodeStatusCallback)(WLAgentSkillsSkillWecodeStatus
 typedef void (^WLAgentSkillsSessionMessageCallback)(WLAgentSkillsStreamMessage *message);
 typedef void (^WLAgentSkillsSessionErrorCallback)(WLAgentSkillsSessionError *error);
 typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
-typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssistantDetailUpdatedPayload *payload);
 
 #pragma mark - Param Models
 
@@ -161,8 +159,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsUpdateWeAgentParams : NSObject
-@property (nonatomic, strong, nullable) id partnerAccount;
-@property (nonatomic, strong, nullable) id robotId;
+@property (nonatomic, strong) id partnerAccount;
 @property (nonatomic, strong, nullable) id name;
 @property (nonatomic, strong, nullable) id icon;
 @property (nonatomic, strong, nullable) id descriptionValue;
@@ -172,8 +169,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsDeleteWeAgentParams : NSObject
-@property (nonatomic, strong, nullable) id partnerAccount;
-@property (nonatomic, strong, nullable) id robotId;
+@property (nonatomic, strong) id partnerAccount;
 @end
 
 @interface WLAgentSkillsSetIsShowWeAgentParams : NSObject
@@ -185,20 +181,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsOpenAssistantEditPageParams : NSObject
-@property (nonatomic, strong, nullable) id partnerAccount;
-@property (nonatomic, strong, nullable) id robotId;
-@property (nonatomic, copy, nullable) WLAgentSkillsAssistantDetailUpdatedCallback onUpdated;
-@end
-
-@interface WLAgentSkillsNotifyAssistantDetailUpdatedParams : NSObject
-@property (nonatomic, strong, nullable) id name;
-@property (nonatomic, strong, nullable) id icon;
-@property (nonatomic, strong, nullable) id descriptionValue;
-@property (nonatomic, strong, nullable) id partnerAccount;
-@property (nonatomic, strong, nullable) id robotId;
-
-- (nullable id)description;
-- (void)setDescription:(nullable id)description;
+@property (nonatomic, strong) id partnerAccount;
 @end
 
 @interface WLAgentSkillsQueryQrcodeInfoParams : NSObject
@@ -236,6 +219,16 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 - (NSDictionary *)toDictionary;
 @end
 
+@interface WLAgentSkillsQuestionItem : NSObject
+@property (nonatomic, copy, nullable) NSString *header;
+@property (nonatomic, copy, nullable) NSString *question;
+@property (nonatomic, strong, nullable) NSArray<NSString *> *options;
+@property (nonatomic, strong, nullable) NSNumber *multiSelect;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+- (NSDictionary *)toDictionary;
+@end
+
 @interface WLAgentSkillsSessionMessagePart : NSObject
 @property (nonatomic, copy, nullable) NSString *partId;
 @property (nonatomic, strong, nullable) NSNumber *partSeq;
@@ -252,6 +245,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *question;
 @property (nonatomic, copy, nullable) NSString *questionId;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsQuestionItem *> *questions;
 @property (nonatomic, copy, nullable) NSString *permissionId;
 @property (nonatomic, copy, nullable) NSString *permType;
 @property (nonatomic, strong, nullable) NSDictionary *metadata;
@@ -337,6 +331,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *bizRobotName;
 @property (nonatomic, copy) NSString *bizRobotNameEn;
 @property (nonatomic, copy) NSString *bizRobotTag;
+@property (nonatomic, copy) NSString *tagName;
+@property (nonatomic, copy) NSString *tagNameEn;
 @property (nonatomic, copy) NSString *robotId;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
@@ -367,6 +363,8 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *bizRobotNameEn;
 @property (nonatomic, copy) NSString *bizRobotTag;
 @property (nonatomic, copy) NSString *bizRobotId;
+@property (nonatomic, copy) NSString *tagName;
+@property (nonatomic, copy) NSString *tagNameEn;
 @property (nonatomic, copy) NSString *weCodeUrl;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary;
@@ -378,15 +376,6 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *assistantDetailUri;
 @property (nonatomic, copy) NSString *switchAssistantUri;
 
-- (NSDictionary *)toDictionary;
-@end
-
-@interface WLAgentSkillsAssistantDetailUpdatedPayload : NSObject
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *icon;
-@property (nonatomic, copy) NSString *descriptionValue;
-
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 - (NSDictionary *)toDictionary;
 @end
 
@@ -438,6 +427,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *header;
 @property (nonatomic, copy, nullable) NSString *question;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
+@property (nonatomic, strong, nullable) NSArray<WLAgentSkillsQuestionItem *> *questions;
 @property (nonatomic, copy, nullable) NSString *fileName;
 @property (nonatomic, copy, nullable) NSString *fileUrl;
 @property (nonatomic, copy, nullable) NSString *fileMime;
@@ -581,12 +571,6 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsOpenAssistantEditPageResult : NSObject
-@property (nonatomic, copy) NSString *status;
-
-- (NSDictionary *)toDictionary;
-@end
-
-@interface WLAgentSkillsNotifyAssistantDetailUpdatedResult : NSObject
 @property (nonatomic, copy) NSString *status;
 
 - (NSDictionary *)toDictionary;

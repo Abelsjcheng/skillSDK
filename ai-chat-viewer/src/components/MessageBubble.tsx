@@ -1,5 +1,6 @@
 ﻿import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useTranslation } from 'react-i18next';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
@@ -54,8 +55,29 @@ function messageContainsCodeBlock(message: Message): boolean {
   return hasMarkdownCodeBlock(message.content);
 }
 
+function isQuestionPartReadonly(part: MessagePart, readonly: boolean): boolean {
+  if (part.type !== 'question') {
+    return readonly;
+  }
+  if (part.answered) {
+    return readonly;
+  }
+  return false;
+}
+
+function isPermissionPartReadonly(part: MessagePart, readonly: boolean): boolean {
+  if (part.type !== 'permission') {
+    return readonly;
+  }
+  if (part.permResolved) {
+    return readonly;
+  }
+  return false;
+}
+
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
 const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
+const MESSAGE_COPY_TOAST_OPTIONS = { toastClassName: 'toast toast--message-copy' } as const;
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -70,12 +92,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
 }) => {
+  const { t } = useTranslation();
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
   const isPlainVariant = variant === 'plain';
   const canRenderActions = showActions && !isUser;
+  const copyContent = message.content.trim();
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -107,7 +131,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             part={part}
             messageId={message.id}
             onAnswered={onQuestionAnswered}
-            readonly={isHistoryAssistantReadonly}
+            readonly={isQuestionPartReadonly(part, isHistoryAssistantReadonly)}
           />
         );
 
@@ -117,7 +141,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             key={part.partId}
             part={part}
             welinkSessionId={welinkSessionId}
-            readonly={isHistoryAssistantReadonly}
+            readonly={isPermissionPartReadonly(part, isHistoryAssistantReadonly)}
           />
         );
 
@@ -182,15 +206,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleCopy = () => {
-    if (onCopy) {
-      void onCopy(message.content);
+    if (!copyContent) {
       return;
     }
 
-    void copyTextToClipboard(message.content)
-      .then(() => {})
+    if (onCopy) {
+      void onCopy(copyContent);
+      return;
+    }
+
+    void copyTextToClipboard(copyContent)
+      .then(() => {
+        showToast(t('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
+      })
       .catch((error) => {
         WeLog(`MessageBubble copy failed | error=${JSON.stringify(error)}`);
+        showToast(t('common.copyFailed'), MESSAGE_COPY_TOAST_OPTIONS);
       });
   };
 
@@ -198,25 +229,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     void onSendToIM?.(message.content);
   };
 
-  const renderActions = () => {
-    if (!canRenderActions || message.isStreaming || !message.content) {
+  const renderWeAgentActions = () => {
+    if (!canRenderActions || message.isStreaming || !copyContent || !onCopy) {
       return null;
     }
 
     return (
-      <div className="message-actions">
+      <div className="message-actions message-actions--we-agent">
+        <button
+          type="button"
+          className="action-btn copy-btn"
+          onClick={handleCopy}
+          title={t('common.copyContent')}
+        >
+          <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderPlainActions = () => {
+    if (!canRenderActions || message.isStreaming || !copyContent || (!onCopy && !onSendToIM)) {
+      return null;
+    }
+
+    return (
+      <div className="message-actions message-actions--plain">
         {onCopy ? (
           <button
             type="button"
             className="action-btn copy-btn"
             onClick={handleCopy}
-            title="复制内容"
+            title={t('common.copyContent')}
           >
             <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
-            <span className="action-btn__text">复制</span>
+            <span className="action-btn__text">{t('common.copy')}</span>
           </button>
         ) : null}
-        {onSendToIM ? (
+        {onSendToIM && message.content ? (
           <button
             type="button"
             className="action-btn send-btn"
@@ -244,7 +294,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <div className={`message-block ${isUser ? 'message-user' : 'message-assistant'}`}>
         <div className="message-content">{messageContent}</div>
-        {renderActions()}
+        {renderPlainActions()}
       </div>
     );
   }
@@ -283,6 +333,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ].filter(Boolean).join(' ')}
         >
           <div className="message-content">{messageContent}</div>
+          {renderWeAgentActions()}
         </div>
       </div>
     </div>

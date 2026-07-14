@@ -6,6 +6,7 @@ import ConfirmModal from '../system/ConfirmModal';
 const AssistantDetailDeleteModal: React.FC<AssistantDetailDeleteModalProps> = ({
   open,
   assistantName,
+  submitting = false,
   onClose,
   onConfirm,
 }) => {
@@ -19,6 +20,7 @@ const AssistantDetailDeleteModal: React.FC<AssistantDetailDeleteModalProps> = ({
       cancelText={t('assistantDetail.cancelAction')}
       confirmText={t('assistantDetail.deleteAssistant')}
       confirmTextColor="rgba(243, 111, 100, 1)"
+      confirmDisabled={submitting}
       onClose={onClose}
       onConfirm={onConfirm}
     />
