@@ -2,16 +2,13 @@ package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.util.Objects;
 
 @Keep
 public class UpdateWeAgentParams {
-    @Nullable
+    @NonNull
     private final String partnerAccount;
-    @Nullable
-    private final String robotId;
     @NonNull
     private final String name;
     @NonNull
@@ -19,28 +16,26 @@ public class UpdateWeAgentParams {
     @NonNull
     private final String description;
 
+    /**
+     * 创建助理更新参数。
+     *
+     * <p>partnerAccount 是唯一定位标识，name、icon 和 description 是本次提交的完整基础字段。</p>
+     */
     public UpdateWeAgentParams(
-            @Nullable String partnerAccount,
-            @Nullable String robotId,
+            @NonNull String partnerAccount,
             @NonNull String name,
             @NonNull String icon,
             @NonNull String description
     ) {
-        this.partnerAccount = partnerAccount;
-        this.robotId = robotId;
+        this.partnerAccount = Objects.requireNonNull(partnerAccount, "partnerAccount == null");
         this.name = Objects.requireNonNull(name, "name == null");
         this.icon = Objects.requireNonNull(icon, "icon == null");
         this.description = Objects.requireNonNull(description, "description == null");
     }
 
-    @Nullable
+    @NonNull
     public String getPartnerAccount() {
         return partnerAccount;
-    }
-
-    @Nullable
-    public String getRobotId() {
-        return robotId;
     }
 
     @NonNull

@@ -1,6 +1,6 @@
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
-export const DEFAULT_BUTTON_DEBOUNCE_DELAY_MS = 600;
+export const DEFAULT_BUTTON_DEBOUNCE_DELAY_MS = 1000;
 
 const lastClickAtMap = new WeakMap<HTMLButtonElement, number>();
 

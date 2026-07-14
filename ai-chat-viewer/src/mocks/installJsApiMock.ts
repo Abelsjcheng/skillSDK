@@ -13,6 +13,7 @@ import type {
   CreateNewSessionParams,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
+  GetAssistantDetailsParams,
   GetSessionMessageHistoryParams,
   GetHistorySessionsListParams,
   GetSessionMessageParams,
@@ -20,16 +21,17 @@ import type {
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   QueryQrcodeInfoResult,
   RegenerateAnswerParams,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   ReplyPermissionParams,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -46,6 +48,8 @@ import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
   addEventListener?: (params: { type: 'back'; func: () => boolean }) => Promise<unknown> | unknown;
@@ -61,6 +65,8 @@ interface MockHWH5Bridge {
   navigateBack: () => void;
   close: () => void;
 }
+
+const hwh5StorageStore = new Map<string, unknown>();
 
 interface SessionRecord {
   session: SkillSession;
@@ -2273,6 +2279,16 @@ function ensureMockHWH5Bridge(): void {
     };
   }
 
+  if (typeof hwh5.getStorage !== 'function') {
+    hwh5.getStorage = async (key) => ({ data: hwh5StorageStore.get(key) ?? null });
+  }
+
+  if (typeof hwh5.setStorage !== 'function') {
+    hwh5.setStorage = async ({ key, data }) => {
+      hwh5StorageStore.set(key, data);
+    };
+  }
+
   if (typeof hwh5.reboot !== 'function') {
     hwh5.reboot = async () => undefined;
   }
@@ -2403,6 +2419,12 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
+    registerEventListener: (params: RegisterEventListenerParams): void => {
+      window.addEventListener(params.type, ((event: Event) => {
+        params.func((event as CustomEvent).detail);
+      }) as EventListener);
+    },
+
     registerSessionListener: (params: RegisterSessionListenerParams): void => {
       listeners.set(params.welinkSessionId, {
         onMessage: params.onMessage,
@@ -2431,6 +2453,50 @@ function buildMockApi(): HWH5EXT {
       }
       scheduleAssistantReply(record, params.content);
       return toSendMessageResponse(userMessage);
+    },
+
+    sendWebSocketMessage: async (
+      params: SendWebSocketMessageParams,
+    ): Promise<SendWebSocketMessageResult> => {
+      let message: Record<string, unknown> = {};
+      try {
+        const parsedMessage = JSON.parse(params.message);
+        message = parsedMessage && typeof parsedMessage === 'object' ? parsedMessage : {};
+      } catch (_error) {
+        message = {};
+      }
+      const action = message.action;
+      const welinkSessionId = typeof message.welinkSessionId === 'string'
+        ? message.welinkSessionId
+        : '';
+      if (action === 'query_slash_commands' && welinkSessionId) {
+        emit(welinkSessionId, {
+          type: 'slash_commands_result',
+          messageId: nextId('slash_commands'),
+          role: 'assistant',
+          status: 'running',
+          slashCommands: [
+            { command: '/new', description: '新建会话' },
+            { command: '/help', description: '查看可用命令' },
+            { command: '/clear', description: '清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文' },
+            { command: '/clear1', description: '清空当前上下文' },
+            { command: '/clear2', description: '清空当前上下文' },
+            { command: '/clear3', description: '清空当前上下文' },
+            { command: '/clear4', description: '清空当前上下文' },
+            { command: '/clear5', description: '清空当前上下文' },
+            { command: '/clear6', description: '清空当前上下文' },
+            { command: '/clear7', description: '清空当前上下文' },
+            { command: '/clear8', description: '清空当前上下文' },
+            { command: '/clear9', description: '清空当前上下文' },
+            { command: '/clear10', description: '清空当前上下文' },
+            { command: '/clear11', description: '清空当前上下文' },
+            { command: '/clear12', description: '清空当前上下文' },
+            { command: '/clear13', description: '清空当前上下文' },
+            { command: '/clear14', description: '清空当前上下文' },
+          ],
+        });
+      }
+      return { status: 'success' };
     },
 
     stopSkill: async (params: StopSkillParams) => {
@@ -2570,6 +2636,13 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
+    getAssistantDetails: async (params: GetAssistantDetailsParams): Promise<WeAgentDetailsArrayResult> => {
+      const detail = assistantDetailsStore.get(params.partnerAccount);
+      return {
+        weAgentDetailsArray: detail ? [cloneAssistantDetail(detail)] : [],
+      };
+    },
+
     updateWeAgent: async (params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> => {
       const detail = findAssistantDetail(params);
       if (!detail) {
@@ -2618,15 +2691,6 @@ function buildMockApi(): HWH5EXT {
     updateQrcodeInfo: async (): Promise<UpdateQrcodeInfoResult> => ({
       status: 'success',
     }),
-
-    notifyAssistantDetailUpdated: async (
-      params: NotifyAssistantDetailUpdatedParams,
-    ): Promise<NotifyAssistantDetailUpdatedResult> => {
-      window.dispatchEvent(new CustomEvent('assistant-detail-updated', { detail: { ...params } }));
-      return {
-        status: 'success',
-      };
-    },
 
     getHistorySessionsList: async (params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> => {
       const page = Math.max(0, params.page ?? 0);

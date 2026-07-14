@@ -113,7 +113,7 @@ export class SessionStateManager {
     try {
       callback({ status });
     } catch (error) {
-      this.logger.warn(`status callback failed for session=${sessionId}`, error);
+      this.logger.warn(`status callback failed for session=${sessionId}, error=${JSON.stringify(error)}`);
     }
   }
 }

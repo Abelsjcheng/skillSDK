@@ -1,27 +1,24 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
-import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
+
+import java.util.Objects;
 
 @Keep
 public class DeleteWeAgentParams {
-    @Nullable
+    @NonNull
     private final String partnerAccount;
-    @Nullable
-    private final String robotId;
 
-    public DeleteWeAgentParams(@Nullable String partnerAccount, @Nullable String robotId) {
-        this.partnerAccount = partnerAccount;
-        this.robotId = robotId;
+    /**
+     * 创建删除助理参数，partnerAccount 是服务端和缓存定位助理的唯一标识。
+     */
+    public DeleteWeAgentParams(@NonNull String partnerAccount) {
+        this.partnerAccount = Objects.requireNonNull(partnerAccount, "partnerAccount == null");
     }
 
-    @Nullable
+    @NonNull
     public String getPartnerAccount() {
         return partnerAccount;
-    }
-
-    @Nullable
-    public String getRobotId() {
-        return robotId;
     }
 }

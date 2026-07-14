@@ -26,6 +26,19 @@ const statusIcons: Record<string, string> = {
   error: errorIcon,
 };
 
+function resolveInputContent(input: object | null | undefined): string {
+  if (!input) {
+    return '';
+  }
+
+  const content = (input as { content: string }).content;
+  if (typeof content === 'string' && content) {
+    return content;
+  }
+
+  return JSON.stringify(input);
+}
+
 export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
   const [expanded, setExpanded] = useState(false);
   const status = part.status ?? 'pending';
@@ -35,9 +48,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
     () => createMarkdownComponents(true),
     [],
   );
-  const inputContent = typeof (part.input as { content?: unknown } | null)?.content === 'string'
-    ? ((part.input as { content: string }).content)
-    : '';
+  const inputContent = resolveInputContent(part.input);
+  const errorContent = part?.error || part?.content || '';
 
   const renderMarkdown = (content: string) => (
     <ReactMarkdown
@@ -97,10 +109,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ part }) => {
               <div className="tool-card__code">{renderMarkdown(part.output)}</div>
             </div>
           )}
-          {status === 'error' && part.content && (
+          {status === 'error' && errorContent && (
             <div className="tool-card__section tool-card__error">
               <div className="tool-card__section-title">Error</div>
-              <div className="tool-card__code">{renderMarkdown(part.content)}</div>
+              <div className="tool-card__code">{renderMarkdown(errorContent)}</div>
             </div>
           )}
         </div>

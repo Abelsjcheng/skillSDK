@@ -130,6 +130,7 @@ export interface SessionMessagePart {
   question?: string;
   questionId?: string;
   options?: string[];
+  questions?: QuestionItem[];
   permissionId?: string;
   permType?: string;
   metadata?: Record<string, Object>;
@@ -202,6 +203,7 @@ export interface StreamingPart {
   header?: string;
   question?: string;
   options?: string[];
+  questions?: QuestionItem[];
   permissionId?: string;
   permType?: string;
   metadata?: Record<string, Object>;
@@ -240,6 +242,7 @@ export interface StreamMessage {
   question?: string;
   questionId?: string | null;
   options?: string[];
+  questions?: QuestionItem[];
   fileName?: string;
   fileUrl?: string;
   fileMime?: string;
@@ -263,6 +266,13 @@ export interface StreamMessage {
   subagentName?: string;
   messages?: StreamSnapshotMessage[];
   parts?: StreamingPart[];
+}
+
+export interface QuestionItem {
+  header?: string;
+  question?: string;
+  options?: string[];
+  multiSelect?: boolean;
 }
 
 export interface SessionError {
@@ -466,8 +476,7 @@ export interface QueryWeAgentParams {
 }
 
 export interface UpdateWeAgentParams {
-  partnerAccount?: string;
-  robotId?: string;
+  partnerAccount: string;
   name: string;
   icon: string;
   description: string;
@@ -478,8 +487,7 @@ export interface UpdateWeAgentResult {
 }
 
 export interface DeleteWeAgentParams {
-  partnerAccount?: string;
-  robotId?: string;
+  partnerAccount: string;
 }
 
 export interface DeleteWeAgentResult {
@@ -506,31 +514,11 @@ export interface OpenWeAgentResult {
   status: string;
 }
 
-export interface AssistantDetailUpdatedPayload {
-  name: string;
-  icon: string;
-  description: string;
-}
-
 export interface OpenAssistantEditPageParams {
-  partnerAccount?: string;
-  robotId?: string;
-  onUpdated: (payload: AssistantDetailUpdatedPayload) => void;
+  partnerAccount: string;
 }
 
 export interface OpenAssistantEditPageResult {
-  status: string;
-}
-
-export interface NotifyAssistantDetailUpdatedParams {
-  name: string;
-  icon: string;
-  description: string;
-  partnerAccount?: string;
-  robotId?: string;
-}
-
-export interface NotifyAssistantDetailUpdatedResult {
   status: string;
 }
 
@@ -573,6 +561,8 @@ export interface WeAgent {
   bizRobotName: string;
   bizRobotNameEn: string;
   bizRobotTag: string;
+  tagName: string;
+  tagNameEn: string;
   robotId: string;
 }
 
@@ -604,6 +594,8 @@ export interface WeAgentDetails {
   bizRobotNameEn: string;
   bizRobotTag: string;
   bizRobotId: string;
+  tagName: string;
+  tagNameEn: string;
   weCodeUrl: string;
 }
 

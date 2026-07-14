@@ -104,11 +104,11 @@ export class HttpClient {
     }
 
     try {
-      this.logger.debug(`${method} ${requestUrl}`, body ?? {});
+      this.logger.debug(`${method} ${requestUrl}, body=${body === undefined ? '' : JSON.stringify(body)}`);
       const response = await client.request(requestUrl, requestOptions);
       const responseText = (response.result as string) ?? '';
 
-      this.logger.debug(`response code=${response.responseCode}`, responseText);
+      this.logger.debug(`response code=${response.responseCode}, body=${responseText}`);
 
       if (response.responseCode !== 200) {
         throw new SkillSdkException(7000, `HTTP status ${response.responseCode}`);

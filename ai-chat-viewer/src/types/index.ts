@@ -2,6 +2,7 @@
 // StreamMessage Protocol Type Definitions
 // Based on 小程序JSAPI接口文档.md & SkillClientSdkInterfaceV1.md
 // ============================================================
+import type { SlashCommandItem } from './slashCommand';
 
 /** All supported StreamMessage type strings */
 export type StreamMessageType =
@@ -30,7 +31,8 @@ export type StreamMessageType =
   | 'searching'
   | 'search_result'
   | 'reference'
-  | 'ask_more';
+  | 'ask_more'
+  | 'slash_commands_result';
 
 export type MessagePartType =
   | 'text'
@@ -159,6 +161,7 @@ export interface StreamMessage
   searchResults?: object[] | null;
   references?: object[] | null;
   askMoreQuestions?: string[] | null;
+  slashCommands?: SlashCommandItem[] | null;
   subagentSessionId?: string | null;
   subagentName?: string | null;
 }

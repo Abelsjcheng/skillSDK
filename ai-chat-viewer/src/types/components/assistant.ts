@@ -2,10 +2,12 @@ import type { ReactNode, Ref } from 'react';
 import type { SkillSession, WeAgentDetails } from '../bridge/hwext';
 import type { AssistantItem } from '../assistant';
 import type { DigitalTwinBasicInfoPayload } from '../digitalTwin';
+import type { SlashCommandItem } from '../slashCommand';
 
 export interface AssistantDetailDeleteModalProps {
   open: boolean;
   assistantName: string;
+  submitting?: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -19,6 +21,7 @@ export interface ConfirmModalProps {
   onClose: () => void;
   onConfirm: () => void;
   confirmTextColor?: string;
+  confirmDisabled?: boolean;
 }
 
 export interface AssistantDetailActionSheetProps {
@@ -85,7 +88,6 @@ export interface EditAssistantContentProps {
   source?: 'assistantDetail' | 'external';
   initialDetail?: WeAgentDetails | null;
   partnerAccount?: string;
-  robotId?: string;
   onClose: () => void;
   onSuccess?: (payload: DigitalTwinBasicInfoPayload) => void;
 }
@@ -100,6 +102,9 @@ export interface ShortcutOption {
 export interface WeAgentCUIFooterProps {
   isPcMiniApp?: boolean;
   mode: 'generate' | 'generating' | 'regenerate';
+  partnerAccount?: string;
+  slashCommands?: SlashCommandItem[];
+  onRequestSlashCommands?: () => Promise<void> | void;
   onSend: (message: string) => void;
   onStop: () => void;
   onInputFocus?: () => void;

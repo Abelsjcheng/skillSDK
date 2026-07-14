@@ -87,6 +87,7 @@ function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'exte
   });
   Object.defineProperty(window, 'HWH5', {
     value: {
+      addEventListener: jest.fn(),
       navigateBack: jest.fn(),
       openWebview: jest.fn(),
     },

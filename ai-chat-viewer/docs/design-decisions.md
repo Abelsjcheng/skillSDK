@@ -398,7 +398,7 @@ interface CreateDigitalTwinParams {
    - 删除确认弹窗：点击“删除助理”后出现，使用独立组件 + `createPortal(document.body)` + 固定定位居中面板，宽度 `280px`、圆角 `8px`、白底；标题使用当前助理名称插值，样式调整为 `16px/400/24px` 且允许换行显示，内容说明文本保持居中对齐，底部通过两个文本按钮“取消 / 删除”组成操作区，中间有 `1px x 16px` 分割线。
 8. 两个覆盖层组件样式从 `AssistantDetail.less` 中拆出，分别维护独立 less 文件，避免继续受详情页主容器样式污染。
 9. 页面层不再用两个分散的布尔值控制弹窗，而是收口成单一 overlay 状态（如 `none / action-sheet / delete-modal`），减少切换时的样式与时序问题。
-10. 交互上“取消”和蒙层负责关闭对应弹窗；“修改助理信息”继续保留空实现；移动端最终“删除”按钮接入真实删除链路：调用 `deleteWeAgent({ partnerAccount, robotId? })`，成功后直接执行 `window.HWH5.close()`，失败则按既有规范 `showToast(固定错误文案)`。
+10. 交互上“取消”和蒙层负责关闭对应弹窗；“修改助理信息”继续保留空实现；移动端最终“删除”按钮接入真实删除链路：调用 `deleteWeAgent({ partnerAccount })`，成功后直接执行 `window.HWH5.close()`，失败则按既有规范 `showToast(固定错误文案)`。
 11. 编辑助理页回填头像时，默认头像识别与头像显示分开处理：默认头像判断阶段直接使用原始 `detail.icon` 与 `DEFAULT_AVATARS.image` 做严格相等比较，不走 `resolveAssistantIconUrl`；真正回填给表单展示的 `icon` 则统一使用 `resolveAssistantIconUrl(detail.icon)`，保证非默认头像与默认头像回显都使用同一显示规范化结果。
 
 ## 15. 切换助理页面设计

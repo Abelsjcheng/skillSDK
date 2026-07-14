@@ -26,13 +26,13 @@ import { reportEnableNowClick } from '../utils/uemUtil';
 
 const SelectAssistant: React.FC = () => {
   const isPc = isPcMiniApp();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 
   const assistantItems = useMemo<AssistantItem[]>(
-    () => mapWeAgentListToAssistantItems(assistantList),
-    [assistantList],
+    () => mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language),
+    [assistantList, i18n.language, i18n.resolvedLanguage],
   );
 
   const loadAssistantList = useCallback(async (): Promise<void> => {
