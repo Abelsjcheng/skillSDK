@@ -103,12 +103,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const canRenderActions = showActions && !isUser;
   const displayContent = useMemo(() => {
     if (!isUser) {
-      return message.content;
+      return message.content?.trim() ?? '';
     }
     const questionAnswerMatrix = parseQuestionAnswerMatrix(message.content);
     return questionAnswerMatrix
       ? formatQuestionAnswerDisplay([], questionAnswerMatrix, { showQuestionTitle: false })
-      : message.content;
+      : message.content?.trim() ?? '';
   }, [isUser, message.content]);
 
   const markdownComponents: Components = useMemo(
@@ -205,7 +205,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (!displayContent.trim()) {
+    if (!displayContent) {
       return null;
     }
 
@@ -216,7 +216,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleCopy = () => {
-    if (!copyContent) {
+    if (!displayContent) {
       return;
     }
 
@@ -225,7 +225,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       return;
     }
 
-    void copyTextToClipboard(copyContent)
+    void copyTextToClipboard(displayContent)
       .then(() => {
         showToast(t('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
       })
@@ -259,7 +259,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderPlainActions = () => {
-    if (!canRenderActions || message.isStreaming || !copyContent || (!onCopy && !onSendToIM)) {
+    if (!canRenderActions || message.isStreaming || !displayContent || (!onCopy && !onSendToIM)) {
       return null;
     }
 
