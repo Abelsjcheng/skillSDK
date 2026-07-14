@@ -498,6 +498,35 @@ static NSInteger const WLAgentSkillsDefaultWeAgentListPageNumber = 1;
     return [self buildUnregisterSessionListenerResult];
 }
 
+#pragma mark - 10.1. sendWebSocketMessage
+
+- (void)sendWebSocketMessage:(WLAgentSkillsSendWebSocketMessageParams *)params
+                     success:(void (^)(WLAgentSkillsSendWebSocketMessageResult *result))success
+                     failure:(void (^)(NSError *error))failure {
+    if (params == nil || ![params.message isKindOfClass:[NSString class]]) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: message is required."];
+        return;
+    }
+    NSString *trimmedMessage =
+        [params.message stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmedMessage.length == 0) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: message is required."];
+        return;
+    }
+
+    BOOL accepted = [[WLAgentSkillsWebSocketManager sharedManager] sendMessageString:params.message];
+    if (!accepted) {
+        [self dispatchFailure:failure code:6001 message:@"Failed to send websocket message."];
+        return;
+    }
+
+    if (success) {
+        WLAgentSkillsSendWebSocketMessageResult *result = [[WLAgentSkillsSendWebSocketMessageResult alloc] init];
+        result.status = @"success";
+        success(result);
+    }
+}
+
 #pragma mark - 11. sendMessage
 
 - (void)sendMessage:(WLAgentSkillsSendMessageParams *)params

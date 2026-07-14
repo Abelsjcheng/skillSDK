@@ -26,6 +26,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getSessionMessageHistory](#31-getsessionmessagehistory) | 游标查询会话历史消息 |
 | [registerSessionListener](#4-registersessionlistener) | 注册会话监听器 |
 | [unregisterSessionListener](#5-unregistersessionlistener) | 移除会话监听器 |
+| [sendWebSocketMessage](#51-sendwebsocketmessage) | 发送通用 WebSocket message |
 | [sendMessage](#6-sendmessage) | 发送消息内容 |
 | [stopSkill](#7-stopskill) | 停止当前轮技能生成 |
 | [replyPermission](#8-replypermission) | 权限确认回复 |
@@ -690,6 +691,95 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'unregister
 ```javascript
 window.HWH5EXT.unregisterSessionListener({
   welinkSessionId: '42'
+});
+```
+
+---
+
+## 5.1 sendWebSocketMessage
+
+### 接口说明
+
+通过既有 WebSocket 长连接发送通用 message 字符串。调用方负责将业务 JSON 序列化为字符串；SDK 不解析或校验 `action` 等业务字段。该接口不是 REST 查询接口；Promise resolve 只表示 message 已发送成功或已被 SDK 接受发送，不同 `action` 的业务结果仍通过 `registerSessionListener` 的 `onMessage` 回调返回。
+
+例如发送 `{ "action": "custom_action", "welinkSessionId": "42" }` 后，业务结果通过服务端约定的 WebSocket 事件返回。建议页面先调用 `registerSessionListener`，再调用 `sendWebSocketMessage`。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.sendWebSocketMessage(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'sendWebSocketMessage', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| message | string | 是 | 要通过 WebSocket 发送的完整 message 字符串，通常为已序列化的 JSON |
+
+### 返回值
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定为 `success`，表示 WebSocket message 已发送成功或已被 SDK 接受发送 |
+
+### WebSocket Message 示例
+
+```json
+{
+  "action": "custom_action",
+  "welinkSessionId": "42"
+}
+```
+
+### 结果事件
+
+```json
+{
+  "type": "custom_result",
+  "seq": 135,
+  "welinkSessionId": "42",
+  "data": {
+    "status": "ok"
+  }
+}
+```
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 `message` 或 `message` 为空字符串 |
+| 5000 | SDK 未初始化 | SDK 尚未初始化或 WebSocket 未配置 |
+| 6000 | WebSocket 连接失败 | 无法建立 WebSocket 连接 |
+| 6001 | WebSocket message 发送失败 | WebSocket message 发送失败 |
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.registerSessionListener({
+  welinkSessionId: '42',
+  onMessage: (message) => {
+    if (message.type === 'custom_result') {
+      console.log('WebSocket result:', message.raw || message);
+    }
+  }
+});
+
+window.HWH5EXT.sendWebSocketMessage({
+  message: JSON.stringify({
+    action: 'custom_action',
+    welinkSessionId: '42'
+  })
+}).then((result) => {
+  console.log('WebSocket message 已发送:', result.status);
+}).catch((error) => {
+  console.error('发送 WebSocket message 失败:', error.errorCode, error.errorMessage);
 });
 ```
 

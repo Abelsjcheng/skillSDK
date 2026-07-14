@@ -138,6 +138,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @implementation WLAgentSkillsUnregisterSessionListenerParams
 @end
 
+@implementation WLAgentSkillsSendWebSocketMessageParams
+@end
+
 @implementation WLAgentSkillsSendMessageParams
 @end
 
@@ -966,6 +969,16 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsUnregisterSessionListenerResult
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"status" : self.status ?: @""
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsSendWebSocketMessageResult
 
 - (NSDictionary *)toDictionary {
     return @{

@@ -20,6 +20,7 @@
 
 @property (nonatomic, strong, nullable) SRWebSocket *webSocket;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSocketListener *> *listeners;
+@property (nonatomic, strong) NSMutableArray<NSString *> *pendingMessages;
 @property (nonatomic, assign, readwrite) BOOL isConnected;
 @property (nonatomic, assign) BOOL isConnecting;
 
@@ -40,6 +41,7 @@
     self = [super init];
     if (self) {
     _listeners = [NSMutableDictionary dictionary];
+    _pendingMessages = [NSMutableArray array];
     _isConnected = NO;
     _isConnecting = NO;
     }
@@ -74,6 +76,7 @@
     self.webSocket = nil;
     self.isConnected = NO;
     self.isConnecting = NO;
+    [self.pendingMessages removeAllObjects];
     }
 }
 
@@ -166,12 +169,59 @@
     }
 }
 
+- (BOOL)sendMessageString:(NSString *)message {
+    if (![message isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+    NSString *trimmedMessage =
+        [message stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmedMessage.length == 0) {
+        return NO;
+    }
+    return [self sendCommandString:message];
+}
+
+- (BOOL)sendCommandString:(NSString *)jsonString {
+    SRWebSocket *socket = nil;
+    BOOL shouldConnect = NO;
+    @synchronized(self) {
+    if (self.isConnected && self.webSocket != nil) {
+        socket = self.webSocket;
+    } else {
+        [self.pendingMessages addObject:jsonString];
+        shouldConnect = !self.isConnecting;
+    }
+    }
+    if (socket == nil) {
+    if (shouldConnect) {
+        [self connectIfNeeded];
+    }
+    return YES;
+    }
+
+    @try {
+    [socket send:jsonString];
+    return YES;
+    } @catch (__unused NSException *exception) {
+    return NO;
+    }
+}
+
 #pragma mark - SRWebSocketDelegate
 
 - (void)webSocketDidOpen:(SRWebSocket *)webSocket {
+    NSArray<NSString *> *pendingMessages = nil;
     @synchronized(self) {
     self.isConnecting = NO;
     self.isConnected = YES;
+    pendingMessages = [self.pendingMessages copy];
+    [self.pendingMessages removeAllObjects];
+    }
+    for (NSString *message in pendingMessages) {
+    @try {
+        [webSocket send:message];
+    } @catch (__unused NSException *exception) {
+    }
     }
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidConnect)]) {
     [self.delegate webSocketManagerDidConnect];

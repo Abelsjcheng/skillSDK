@@ -1,6 +1,7 @@
 package com.opencode.skill.model;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonArray;
@@ -434,4 +435,5 @@ public class StreamMessage {
     public void setParts(@Nullable JsonArray parts) {
         this.parts = parts;
     }
+
 }

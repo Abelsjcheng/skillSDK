@@ -45,6 +45,8 @@ export {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SessionError,
   SessionListener,
   SessionMessage,

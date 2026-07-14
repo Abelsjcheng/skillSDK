@@ -199,6 +199,22 @@ public final class WebSocketManager {
         }
     }
 
+    public boolean sendMessage(@NonNull String message) {
+        if (!connected || webSocket == null || message.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            return webSocket.send(buildMessagePayload(message));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    @NonNull
+    static String buildMessagePayload(@NonNull String message) {
+        return message;
+    }
+
     public synchronized void shutdown() {
         disconnect();
         clearAllListeners();

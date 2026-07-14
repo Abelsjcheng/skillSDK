@@ -55,6 +55,8 @@ import com.opencode.skill.model.SendMessageParams;
 import com.opencode.skill.model.SendMessageResult;
 import com.opencode.skill.model.SendMessageToIMParams;
 import com.opencode.skill.model.SendMessageToIMResult;
+import com.opencode.skill.model.SendWebSocketMessageParams;
+import com.opencode.skill.model.SendWebSocketMessageResult;
 import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SessionMessage;
 import com.opencode.skill.model.SessionMessagePart;
@@ -659,6 +661,36 @@ public final class SkillSDK {
             webSocketManager.unregisterListener(params.getWelinkSessionId(), binding.sessionListener);
         }
         return new UnregisterSessionListenerResult("success");
+    }
+
+    // 10.1 sendWebSocketMessage
+    public void sendWebSocketMessage(@NonNull SendWebSocketMessageParams params,
+            @NonNull SkillCallback<SendWebSocketMessageResult> callback) {
+        if (!isInitialized()) {
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (isBlank(params.getMessage())) {
+            callback.onError(error(1000, "message is required"));
+            return;
+        }
+
+        ensureConnected(new SkillCallback<Boolean>() {
+            @Override
+            public void onSuccess(@Nullable Boolean result) {
+                boolean sent = webSocketManager.sendMessage(params.getMessage());
+                if (!sent) {
+                    callback.onError(error(6001, "Failed to send websocket message"));
+                    return;
+                }
+                callback.onSuccess(new SendWebSocketMessageResult("success"));
+            }
+
+            @Override
+            public void onError(@NonNull Throwable error) {
+                callback.onError(wrapError(error));
+            }
+        });
     }
 
     // 11. sendMessage

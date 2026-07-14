@@ -49,6 +49,8 @@ import {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SetIsShowWeAgentParams,
   SetIsShowWeAgentResult,
   SessionMessage,
@@ -437,6 +439,19 @@ export class SkillSDK {
     Validator.requireString(params.welinkSessionId, 'welinkSessionId');
     this.wsManager.unregisterSessionListener(params.welinkSessionId);
     return { status: 'success' };
+  }
+
+  // 10.1 sendWebSocketMessage
+  async sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketMessageResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requireString(params.message, 'message');
+      await this.ensureWebSocketConnected();
+      await this.wsManager.sendMessage(params.message);
+      return { status: 'success' };
+    } catch (error) {
+      throw this.normalizeError('sendWebSocketMessage', error);
+    }
   }
 
   // 11. sendMessage

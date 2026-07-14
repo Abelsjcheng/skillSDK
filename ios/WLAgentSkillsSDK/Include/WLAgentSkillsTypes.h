@@ -118,6 +118,10 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
+@interface WLAgentSkillsSendWebSocketMessageParams : NSObject
+@property (nonatomic, copy) NSString *message;
+@end
+
 @interface WLAgentSkillsSendMessageParams : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
 @property (nonatomic, copy) NSString *content;
@@ -437,6 +441,7 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @property (nonatomic, copy, nullable) NSString *title;
 @property (nonatomic, copy, nullable) NSString *header;
 @property (nonatomic, copy, nullable) NSString *question;
+@property (nonatomic, copy, nullable) NSString *questionId;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;
 @property (nonatomic, copy, nullable) NSString *fileName;
 @property (nonatomic, copy, nullable) NSString *fileUrl;
@@ -491,6 +496,12 @@ typedef void (^WLAgentSkillsAssistantDetailUpdatedCallback)(WLAgentSkillsAssista
 @end
 
 @interface WLAgentSkillsUnregisterSessionListenerResult : NSObject
+@property (nonatomic, copy) NSString *status;
+
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsSendWebSocketMessageResult : NSObject
 @property (nonatomic, copy) NSString *status;
 
 - (NSDictionary *)toDictionary;

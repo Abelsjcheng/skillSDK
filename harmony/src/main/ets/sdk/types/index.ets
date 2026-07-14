@@ -32,7 +32,7 @@ export type BusinessSessionDomain = string;
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export type MessageContentType = 'plain' | 'markdown';
 
-export type StreamMessageType =
+export type KnownStreamMessageType =
   | 'text.delta'
   | 'text.done'
   | 'thinking.delta'
@@ -52,6 +52,8 @@ export type StreamMessageType =
   | 'error'
   | 'snapshot'
   | 'streaming';
+
+export type StreamMessageType = KnownStreamMessageType | (string & {});
 
 // ---------------------------
 // SDK Config and Error
@@ -384,6 +386,14 @@ export interface UnregisterSessionListenerParams {
 }
 
 export interface UnregisterSessionListenerResult {
+  status: 'success';
+}
+
+export interface SendWebSocketMessageParams {
+  message: string;
+}
+
+export interface SendWebSocketMessageResult {
   status: 'success';
 }
 
