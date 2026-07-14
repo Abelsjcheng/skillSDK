@@ -1,3 +1,7 @@
+export type {
+  HiddenQuestionAnswerUserMessage,
+  SendUserMessageOptions,
+} from '../components/chat';
 import type { Message, PendingAssistantPreview, QuestionAnswerSubmission, SessionStatus } from '../index';
 import type { WeAgentDetails } from '../bridge';
 import type { SlashCommandItem } from '../slashCommand';

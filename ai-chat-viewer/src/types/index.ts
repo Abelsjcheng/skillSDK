@@ -54,8 +54,11 @@ export interface QuestionOption {
   description?: string;
 }
 
+export type QuestionAnswerMatrix = string[][];
+
 export interface QuestionAnswerSubmission {
-  answer: string;
+  answer: QuestionAnswerMatrix;
+  displayContent: string;
   messageId?: string;
   toolCallId?: string;
   questionId?: string;
@@ -68,6 +71,14 @@ export interface QuestionItemInput {
   header?: string;
   question?: string;
   options?: QuestionOptionInput[] | null;
+  multiSelect?: boolean | null;
+}
+
+export interface QuestionItem {
+  header?: string;
+  question: string;
+  options: QuestionOption[];
+  multiSelect: boolean;
 }
 
 interface ToolPartFields<TValue, TStatus> {
@@ -80,13 +91,13 @@ interface ToolPartFields<TValue, TStatus> {
   title?: TValue;
 }
 
-interface QuestionPartFields<TValue, TOptions> {
+interface QuestionPartFields<TValue, TOptions, TQuestions> {
   header?: TValue;
   question?: TValue;
   questionId?: TValue;
   options?: TOptions;
   multiSelect?: boolean | null;
-  questions?: QuestionItemInput[] | null;
+  questions?: TQuestions;
   extParam?: object | null;
 }
 
@@ -109,7 +120,7 @@ interface FilePartFields<TValue> {
 /** StreamMessage delivered from SessionListener onMessage callback. */
 export interface StreamMessage
   extends ToolPartFields<string | null, PartStatus | string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[] | null>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   // transport-level fields
@@ -174,7 +185,7 @@ export interface SessionMessage {
 
 export interface SessionMessagePart
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[] | null>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   partId: string;
@@ -192,7 +203,7 @@ export interface SessionMessagePart
 /** A structured part within an assistant message */
 export interface MessagePart
   extends ToolPartFields<string, PartStatus>,
-  QuestionPartFields<string, QuestionOption[]>,
+  QuestionPartFields<string, QuestionOption[], QuestionItem[]>,
   PermissionPartFields<string, PermissionResponse | string>,
   FilePartFields<string> {
   partId: string;
@@ -251,7 +262,7 @@ export interface SessionMessageSnapshot {
 /** Part snapshot for streaming recovery */
 export interface MessagePartSnapshot
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[] | null>,
   PermissionPartFields<string | null, string | null>,
   FilePartFields<string | null> {
   partId: string;

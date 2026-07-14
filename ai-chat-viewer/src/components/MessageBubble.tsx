@@ -22,7 +22,9 @@ import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
+  formatQuestionAnswerDisplay,
   normalizeRole,
+  parseQuestionAnswerMatrix,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
 } from '../utils/message';
@@ -99,7 +101,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
   const isPlainVariant = variant === 'plain';
   const canRenderActions = showActions && !isUser;
-  const copyContent = message.content.trim();
+  const displayContent = useMemo(() => {
+    if (!isUser) {
+      return message.content?.trim() ?? '';
+    }
+    const questionAnswerMatrix = parseQuestionAnswerMatrix(message.content);
+    return questionAnswerMatrix
+      ? formatQuestionAnswerDisplay([], questionAnswerMatrix, { showQuestionTitle: false })
+      : message.content?.trim() ?? '';
+  }, [isUser, message.content]);
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -195,27 +205,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (!message.content.trim()) {
+    if (!displayContent) {
       return null;
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content);
+      return renderMarkdown(displayContent);
     }
-    return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{displayContent}</span>;
   };
 
   const handleCopy = () => {
-    if (!copyContent) {
+    if (!displayContent) {
       return;
     }
 
     if (onCopy) {
-      void onCopy(copyContent);
+      void onCopy(displayContent);
       return;
     }
 
-    void copyTextToClipboard(copyContent)
+    void copyTextToClipboard(displayContent)
       .then(() => {
         showToast(t('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
       })
@@ -226,11 +236,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleSendToIM = () => {
-    void onSendToIM?.(message.content);
+    void onSendToIM?.(displayContent);
   };
 
   const renderWeAgentActions = () => {
-    if (!canRenderActions || message.isStreaming || !copyContent || !onCopy) {
+    if (!canRenderActions || message.isStreaming || !displayContent || !onCopy) {
       return null;
     }
 
@@ -249,7 +259,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderPlainActions = () => {
-    if (!canRenderActions || message.isStreaming || !copyContent || (!onCopy && !onSendToIM)) {
+    if (!canRenderActions || message.isStreaming || !displayContent || (!onCopy && !onSendToIM)) {
       return null;
     }
 
