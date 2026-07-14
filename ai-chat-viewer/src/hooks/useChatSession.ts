@@ -25,6 +25,7 @@ import {
   registerSessionListener,
   sendMessage as sendMessageApi,
   sendMessageToIM,
+  sendWebSocketMessage,
   stopSkill,
   unregisterSessionListener,
 } from '../utils/hwext';
@@ -35,6 +36,8 @@ import { reportFlowTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
 import { reportSendMessageClick } from '../utils/uemUtil';
+import { normalizeSlashCommands } from '../utils/slashCommand';
+import type { SlashCommandItem } from '../types/slashCommand';
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -79,6 +82,7 @@ export function useChatSession({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
+  const [slashCommands, setSlashCommands] = useState<SlashCommandItem[]>([]);
 
   const streamingAssemblersRef = useRef(new Map<string, StreamAssembler>());
   const latestStreamingMsgIdRef = useRef<string | null>(null);
@@ -129,6 +133,7 @@ export function useChatSession({
     setHasMoreHistory(false);
     setIsLoadingHistory(false);
     setSessionStatus('idle');
+    setSlashCommands([]);
     hidePendingAssistantPreview();
   }, [hidePendingAssistantPreview]);
 
@@ -432,6 +437,9 @@ export function useChatSession({
       }
 
       switch (msg.type) {
+        case 'slash_commands_result':
+          setSlashCommands(normalizeSlashCommands(msg.slashCommands ?? []));
+          break;
         case 'text.delta':
         case 'text.done':
         case 'thinking.delta':
@@ -778,6 +786,22 @@ export function useChatSession({
     }
   }, [mode, welinkSessionId]);
 
+  const onRequestSlashCommands = useCallback(async () => {
+    if (!welinkSessionId) return;
+
+    try {
+      await sendWebSocketMessage({
+        message: JSON.stringify({
+          action: 'query_slash_commands',
+          welinkSessionId,
+        }),
+      });
+    } catch (err) {
+      WeLog(`useChatSession sendWebSocketMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, action: 'query_slash_commands' })} | error=${JSON.stringify(err)}`);
+      throw err;
+    }
+  }, [mode, welinkSessionId]);
+
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
@@ -803,7 +827,9 @@ export function useChatSession({
     isLoadingHistory,
     hasMoreHistory,
     scrollToBottomSignal,
+    slashCommands,
     onLoadMoreHistory: loadMoreHistory,
+    onRequestSlashCommands,
     onQuestionAnswered: handleQuestionAnswered,
     onSend,
     onStop,
@@ -825,6 +851,8 @@ export function useChatSession({
     resetTransientState,
     scrollToBottomSignal,
     sessionStatus,
+    slashCommands,
     welinkSessionId,
+    onRequestSlashCommands,
   ]);
 }

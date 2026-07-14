@@ -70,6 +70,14 @@ export interface SendMessageParams {
   subagentSessionId?: string;
 }
 
+export interface SendWebSocketMessageParams {
+  message: string;
+}
+
+export interface SendWebSocketMessageResult {
+  status: 'success';
+}
+
 export interface GetSessionMessageParams {
   welinkSessionId: string;
   page?: number;
@@ -353,6 +361,7 @@ export interface HWH5EXT {
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
+  sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketMessageResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
@@ -398,6 +407,13 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  fetch?: (url: string, options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+  }) => Promise<unknown> | unknown;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,

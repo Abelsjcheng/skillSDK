@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import type { SkillSession, WeAgentDetails } from '../bridge/hwext';
 import type { AssistantItem } from '../assistant';
 import type { DigitalTwinBasicInfoPayload } from '../digitalTwin';
+import type { SlashCommandItem } from '../slashCommand';
 
 export interface AssistantDetailDeleteModalProps {
   open: boolean;
@@ -101,6 +102,9 @@ export interface ShortcutOption {
 export interface WeAgentCUIFooterProps {
   isPcMiniApp?: boolean;
   mode: 'generate' | 'generating' | 'regenerate';
+  partnerAccount?: string;
+  slashCommands?: SlashCommandItem[];
+  onRequestSlashCommands?: () => Promise<void> | void;
   onSend: (message: string) => void;
   onStop: () => void;
   onInputFocus?: () => void;
