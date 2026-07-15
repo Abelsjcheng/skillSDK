@@ -7,7 +7,7 @@ import { useChatSession } from '../hooks/useChatSession';
 import { useIosKeyboardLift } from '../hooks/useIosKeyboardLift';
 import type { SkillCUIProps } from '../types/pages';
 import { getQueryParam } from '../utils/hwext';
-import { installBrowserJsErrorTelemetry } from '../utils/telemetry';
+import { installBrowserJsErrorTelemetry, reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import '../styles/App.less';
 import '../styles/SkillCUI.less';
@@ -29,9 +29,19 @@ const SkillCUI: React.FC<SkillCUIProps> = ({ welinkSessionId: welinkSessionIdPro
 
     if (!emptySessionToastShownRef.current) {
       showToast('缺少 welinkSessionId');
+      void reportCoreFlowError(
+        'flow_skillcui_missing_param_error',
+        'SkillCUI 缺少会话参数',
+        new Error('missing welinkSessionId'),
+        {
+          page: 'skillCUI',
+          stage: 'missingWelinkSessionId',
+          isPc,
+        },
+      );
       emptySessionToastShownRef.current = true;
     }
-  }, [welinkSessionId]);
+  }, [isPc, welinkSessionId]);
 
   useEffect(() => installBrowserJsErrorTelemetry(() => ({
     page: 'skillCUI',

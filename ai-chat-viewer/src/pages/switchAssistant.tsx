@@ -13,6 +13,7 @@ import {
   resolveSelectableAssistantId,
 } from '../utils/assistantSelection';
 import { WeLog } from '../utils/logger';
+import { reportCoreFlowError } from '../utils/telemetry';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getQueryParam,
@@ -73,14 +74,31 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     try {
       const opened = await openAssistantByPartnerAccount(assistantList, selectedPartnerAccount);
       if (!opened) {
+        void reportCoreFlowError(
+          'flow_open_weagent_error',
+          '打开 WeAgentCUI 失败',
+          new Error('openAssistantByPartnerAccount returned false'),
+          {
+            page: 'switchAssistant',
+            stage: 'openAssistantByPartnerAccount',
+            selectedPartnerAccount,
+            isPc,
+          },
+        );
         return;
       }
       window.HWH5.close();
     } catch (error) {
       WeLog(`SwitchAssistant openWeAgentCUI failed | extra=${JSON.stringify({ selectedPartnerAccount })} | error=${JSON.stringify(error)}`);
+      void reportCoreFlowError('flow_open_weagent_error', '打开 WeAgentCUI 失败', error, {
+        page: 'switchAssistant',
+        stage: 'openAssistantByPartnerAccount',
+        selectedPartnerAccount,
+        isPc,
+      });
       showToast(t('switchAssistant.openFailed'));
     }
-  }, [assistantList, selectedPartnerAccount, t]);
+  }, [assistantList, isPc, selectedPartnerAccount, t]);
 
   const handleRightButtonClick = useCallback(async () => {
     reportSwitchAssistantClick();
@@ -92,6 +110,12 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
         await getWeAgentDetails({ partnerAccounts: [selectedPartnerAccount] });
         dispatchSwitchAssistantConfirmEvent(selectedPartnerAccount);
       } catch (error) {
+        void reportCoreFlowError('flow_open_weagent_error', '打开 WeAgentCUI 失败', error, {
+          page: 'switchAssistant',
+          stage: 'getWeAgentDetailsBeforePcSwitch',
+          selectedPartnerAccount,
+          isPc,
+        });
         dispatchSwitchAssistantConfirmEvent({});
       }
       return;

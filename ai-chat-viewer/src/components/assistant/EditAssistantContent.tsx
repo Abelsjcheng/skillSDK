@@ -18,6 +18,7 @@ import {
   updateWeAgent,
 } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
+import { reportCoreFlowError } from '../../utils/telemetry';
 import { showToast } from '../../utils/toast';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import '../../styles/DigitalTwinCreator.less';
@@ -98,6 +99,13 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
           partnerAccount: normalizedPartnerAccount,
           isPcMiniApp,
         })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_edit_assistant_error', '编辑助手流程失败', error, {
+          page: 'editAssistant',
+          stage: 'getWeAgentDetails',
+          source,
+          partnerAccount: normalizedPartnerAccount,
+          isPc: isPcMiniApp,
+        });
         showToast(t('editAssistant.loadFailed'));
         if (!cancelled) {
           setDetail(initialDetail);
@@ -110,7 +118,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [initialDetail, isPcMiniApp, partnerAccount, t]);
+  }, [initialDetail, isPcMiniApp, partnerAccount, source, t]);
 
   const initialValue = useMemo(() => (detail ? resolveInitialValue(detail) : null), [detail]);
 
@@ -144,6 +152,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
       });
     },
     [detail, onClose, onSuccess, partnerAccount, runWithSubmitLock, source, t],
+
   );
 
   return (

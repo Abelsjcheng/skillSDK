@@ -44,6 +44,7 @@ import {
   resolveAssistantTag,
   UNIVERSAL_ASSISTANT_BIZ_TAG,
 } from '../utils/assistantTag';
+import { reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
@@ -134,6 +135,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handl
         }
       } catch (error) {
         WeLog(`AssistantDetail getWeAgentDetails failed | extra=${JSON.stringify({ resolvedPartnerAccount })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_edit_assistant_error', '编辑助手流程失败', error, {
+          page: 'assistantDetail',
+          stage: 'getWeAgentDetails',
+          partnerAccount: resolvedPartnerAccount,
+          isPc,
+        });
         showToast(t('assistantDetail.loadFailed'));
         if (!cancelled) {
           setDetail(null);
@@ -146,7 +153,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handl
     return () => {
       cancelled = true;
     };
-  }, [resolvedPartnerAccount, t]);
+  }, [isPc, resolvedPartnerAccount, t]);
 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
@@ -260,6 +267,17 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handl
     const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount ?? '').trim();
 
     if (!targetPartnerAccount) {
+      void reportCoreFlowError(
+        'flow_delete_assistant_error',
+        '删除助手流程失败',
+        new Error('missing delete target'),
+        {
+          page: 'assistantDetail',
+          stage: 'missingTarget',
+          partnerAccount: targetPartnerAccount,
+          isPc,
+        },
+      );
       showToast(t('assistantDetail.deleteFailed'));
       return;
     }
@@ -277,10 +295,16 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handl
         WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
           partnerAccount: targetPartnerAccount,
         })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_delete_assistant_error', '删除助手流程失败', error, {
+          page: 'assistantDetail',
+          stage: 'deleteWeAgent',
+          partnerAccount: targetPartnerAccount,
+          isPc,
+        });
         showToast(t('assistantDetail.deleteFailed'));
       }
     });
-  }, [detail?.partnerAccount, partnerAccount, runDeleteWithSubmitLock, t]);
+  }, [detail?.partnerAccount, isPc, partnerAccount, runDeleteWithSubmitLock, t]);
 
     const handleRequestDeleteAssistant = useCallback(() => {
     setIsPcMenuOpen(false);

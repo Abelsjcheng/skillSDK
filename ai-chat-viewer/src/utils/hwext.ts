@@ -468,7 +468,7 @@ export function registerAppLanguageListener(listener: (language: 'zh' | 'en') =>
       listener(language);
     })
   }
-  window?.HWH5?.addEventListener({
+  window?.HWH5?.addEventListener?.({
     type: 'welinkConfig',
     func: (data: string) => {
       try {

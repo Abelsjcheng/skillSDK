@@ -15,6 +15,7 @@ import {
   resolveSelectableAssistantId,
 } from '../utils/assistantSelection';
 import { WeLog } from '../utils/logger';
+import { reportCoreFlowError } from '../utils/telemetry';
 import {
   CUSTOMER_SERVICE_WEBVIEW_URI,
   getWeAgentList,
@@ -61,14 +62,31 @@ const SelectAssistant: React.FC = () => {
     try {
       const opened = await openAssistantByPartnerAccount(assistantList, selectedAssistantId);
       if (!opened) {
+        void reportCoreFlowError(
+          'flow_open_weagent_error',
+          '打开 WeAgentCUI 失败',
+          new Error('openAssistantByPartnerAccount returned false'),
+          {
+            page: 'selectAssistant',
+            stage: 'openAssistantByPartnerAccount',
+            selectedAssistantId,
+            isPc,
+          },
+        );
         return;
       }
       window.HWH5.close();
     } catch (error) {
       WeLog(`SelectAssistant openWeAgentCUI failed | extra=${JSON.stringify({ selectedAssistantId })} | error=${JSON.stringify(error)}`);
+      void reportCoreFlowError('flow_open_weagent_error', '打开 WeAgentCUI 失败', error, {
+        page: 'selectAssistant',
+        stage: 'openAssistantByPartnerAccount',
+        selectedAssistantId,
+        isPc,
+      });
       showToast(t('selectAssistant.openFailed'));
     }
-  }, [assistantList, selectedAssistantId, t]);
+  }, [assistantList, isPc, selectedAssistantId, t]);
 
   const handleServiceClick = useCallback(() => {
     if (isPc) {
