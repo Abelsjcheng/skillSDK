@@ -63,6 +63,7 @@ export interface QuestionCardProps {
 
 export interface ThinkingBlockProps {
   part: MessagePart;
+  defaultExpanded?: boolean;
 }
 
 export interface MessageBubbleProps {

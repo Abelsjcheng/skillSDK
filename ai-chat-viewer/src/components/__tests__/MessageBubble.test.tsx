@@ -4,7 +4,7 @@ import type { Message, MessagePart } from '../../types';
 
 jest.mock('react-markdown', () => ({
   __esModule: true,
-  default: ({ children }: { children: string }) => {
+  default: ({ children }: { children: React.ReactNode }) => {
     const React = require('react');
     const content = String(children ?? '');
     const listLines = content
@@ -56,6 +56,17 @@ function createHistoryAssistantMessage(parts: MessagePart[]): Message {
     timestamp: Date.now(),
     isStreaming: false,
     isHistory: true,
+    parts,
+  };
+}
+
+function createCurrentAssistantMessage(parts: MessagePart[]): Message {
+  return {
+    id: 'current-message-1',
+    role: 'assistant',
+    content: '',
+    timestamp: Date.now(),
+    isStreaming: true,
     parts,
   };
 }
@@ -116,6 +127,78 @@ describe('MessageBubble', () => {
     const button = container.querySelector('.question-card__option') as HTMLButtonElement | null;
     expect(button).toBeInTheDocument();
     expect(button).not.toBeDisabled();
+  });
+
+  it('keeps history thinking content collapsed by default', () => {
+    const thinkingPart: MessagePart = {
+      partId: 'thinking-part-1',
+      type: 'thinking',
+      content: '历史思考内容默认不可见',
+      isStreaming: false,
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createHistoryAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    expect(container.querySelector('.thinking-block')).toBeInTheDocument();
+    expect(container.querySelector('.thinking-block__content')).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent('历史思考内容默认不可见');
+  });
+
+  it('expands current streaming thinking content by default', () => {
+    const thinkingPart: MessagePart = {
+      partId: 'thinking-part-2',
+      type: 'thinking',
+      content: '当前思考内容默认可见',
+      isStreaming: true,
+    };
+
+    const { container } = render(
+      <MessageBubble
+        message={createCurrentAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
+    expect(container).toHaveTextContent('当前思考内容默认可见');
+  });
+
+  it('allows current streaming thinking content to be collapsed and expanded manually', () => {
+    const thinkingPart: MessagePart = {
+      partId: 'thinking-part-3',
+      type: 'thinking',
+      content: '当前思考内容可手动折叠',
+      isStreaming: true,
+    };
+
+    const { container, rerender } = render(
+      <MessageBubble
+        message={createCurrentAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+
+    const header = container.querySelector('.thinking-block__header') as HTMLElement;
+    expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(container.querySelector('.thinking-block__content')).not.toBeInTheDocument();
+
+    rerender(
+      <MessageBubble
+        message={createCurrentAssistantMessage([thinkingPart])}
+        welinkSessionId="session-1"
+      />,
+    );
+    expect(container.querySelector('.thinking-block__content')).not.toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(container.querySelector('.thinking-block__content')).toBeInTheDocument();
   });
 
   it('keeps unresolved history permission interactive after reload', () => {
