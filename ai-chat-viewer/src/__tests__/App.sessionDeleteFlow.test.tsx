@@ -9,7 +9,6 @@ import {
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
-  registerEventListener,
 } from '../utils/hwext';
 import { useChatSession } from '../hooks/useChatSession';
 
@@ -42,7 +41,6 @@ jest.mock('../utils/hwext', () => ({
   getHistorySessionsList: jest.fn(),
   getUserInfo: jest.fn(),
   getWeAgentDetails: jest.fn(),
-  registerEventListener: jest.fn(),
 }));
 
 jest.mock('../utils/logger', () => ({
@@ -68,7 +66,6 @@ const mockCreateNewSession = createNewSession as jest.MockedFunction<typeof crea
 const mockGetHistorySessionsList = getHistorySessionsList as jest.MockedFunction<typeof getHistorySessionsList>;
 const mockGetUserInfo = getUserInfo as jest.MockedFunction<typeof getUserInfo>;
 const mockGetWeAgentDetails = getWeAgentDetails as jest.MockedFunction<typeof getWeAgentDetails>;
-const mockRegisterEventListener = registerEventListener as jest.MockedFunction<typeof registerEventListener>;
 const mockUseChatSession = useChatSession as jest.MockedFunction<typeof useChatSession>;
 
 function createSession(id: string): SkillSession {
@@ -119,7 +116,6 @@ describe('App session delete flow', () => {
       totalPages: 1,
     });
     mockCreateNewSession.mockImplementation(async () => createSession(`fallback-${mockCreateNewSession.mock.calls.length}`));
-    mockRegisterEventListener.mockResolvedValue(undefined);
     mockUseChatSession.mockImplementation((options): UseChatSessionResult => {
       latestChatSessionOptions = options;
       return {

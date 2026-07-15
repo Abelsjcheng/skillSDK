@@ -94,6 +94,4 @@ async function canUseByMinVersion(minVersion: MinVersionMap): Promise<boolean> {
 
 export const canIUse = {
   qrcodeCreateAssistant: () => canUseByMinVersion(QRCODE_CREATE_ASSISTANT_MIN_VERSION),
-  assistantEdit: () => canUseByMinVersion(ASSISTANT_EDIT_MIN_VERSION),
-  harmonySplitLayout: () => canUseByMinVersion(HARMONY_SPLIT_LAYOUT_MIN_VERSION),
 };

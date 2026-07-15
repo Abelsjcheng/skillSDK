@@ -274,32 +274,34 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       const currentAssistantAccount = assistantAccountRef.current.trim();
-      const matchedEvent = payload.data.find((event) =>
+      const matchedEvent = payload.data.find((event) => 
         event.type === 'update' &&
-        event.data?.partnerAccount?.trim() === currentAssistantAccount
-      ) as Extract<WeAgentUpdatedEventPayload, { type: 'update' }> | undefined;
+      event.data?.partnerAccount?.trim() === currentAssistantAccount
+      ) as Extract<WeAgentUpdatedEventPayload, { type: 'update'}> | undefined;
       if (!matchedEvent) {
         return;
       }
 
       WeLog(`handleWeAgentUpdated offline_notify matched assistant: ${matchedEvent.data.partnerAccount}`, 'info');
 
+      // 复用现有更新逻辑
       const updatedDetail = matchedEvent.data;
       const currentDetail = assistantDetailRef.current;
-      const nextDetail = {
-        ...currentDetail,
-        ...updatedDetail,
-        desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
-      } as WeAgentDetails;
-      assistantDetailRef.current = nextDetail;
-      setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
-      setWeAgentAssistantDescription(
-        updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
-      );
-      setWeAgentAssistantAvatar(
-        resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
-      );
-      return;
+          const nextDetail = {
+      ...currentDetail,
+      ...updatedDetail,
+      desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    } as WeAgentDetails;
+        assistantDetailRef.current = nextDetail;
+    setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
+    setWeAgentAssistantDescription(
+      updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    );
+    setWeAgentAssistantAvatar(
+      resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
+    );
+    return
+
     }
     const updatedDetail = payload.data;
     const currentAssistantAccount = assistantAccountRef.current.trim();
@@ -327,11 +329,11 @@ function App({ assistantAccount = '' }: AppProps) {
 
   useEffect(() => {
     void registerEventListener({
-      type: 'agentskills.agentUpdated',
+      type: 'agentskills_agentUpdated',
       func: handleWeAgentUpdated,
     }).catch((error) => {
       WeLog(`App registerEventListener failed | extra=${JSON.stringify({
-        type: 'agentskills.agentUpdated',
+        type: 'agentskills_agentUpdated',
       })} | error=${JSON.stringify(error)}`);
     });
   }, [handleWeAgentUpdated]);
@@ -468,6 +470,140 @@ function App({ assistantAccount = '' }: AppProps) {
     session.resetTransientState();
     setWelinkSessionId(normalizedSessionId);
   }, [session, welinkSessionId]);
+
+  const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return null;
+    }
+
+    const historyResult = await getHistorySessionsList({
+      assistantAccount: currentAssistantAccount,
+      businessSessionDomain: 'miniapp',
+      page: 0,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+    });
+    const nextCache = createHistorySessionsCache(historyResult);
+    setHistorySessionsCache(nextCache);
+    setHistorySessionsLoaded(true);
+    return nextCache;
+  }, []);
+
+  const createAndSelectFallbackSession = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return;
+    }
+
+    let detail = assistantDetailRef.current;
+    if (!detail || detail.partnerAccount !== currentAssistantAccount) {
+      detail = await resolveAssistantDetail(currentAssistantAccount);
+    }
+
+    const newSession = ensureSessionTimestamps(
+      await createSessionForAssistant(currentAssistantAccount, detail.appKey),
+    );
+    setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
+    setWelinkSessionId(newSession.welinkSessionId);
+  }, [createSessionForAssistant, resolveAssistantDetail]);
+
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    shouldCreateFallback: boolean,
+  ) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (!normalizedDeletedSessionId) {
+      return;
+    }
+
+    const previousCache = historySessionsCacheRef.current;
+    const isDeletingCurrentSession = welinkSessionIdRef.current === normalizedDeletedSessionId;
+    const nextSession = previousCache
+      ? resolveNextSessionAfterDelete(previousCache.content, normalizedDeletedSessionId)
+      : null;
+
+    setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+
+    if (isDeletingCurrentSession) {
+      setIsSwitchingSessionAfterDelete(true);
+      session.resetTransientState();
+      if (nextSession) {
+        setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!shouldCreateFallback) {
+        setWelinkSessionId(null);
+        setIsSwitchingSessionAfterDelete(false);
+      } else {
+        try {
+          await createAndSelectFallbackSession();
+        } catch (error) {
+          WeLog(`App create fallback session after delete failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+          showToast(t('weAgent.createSessionFailed'));
+        } finally {
+          setIsSwitchingSessionAfterDelete(false);
+        }
+      }
+    }
+
+    if (refreshAfterDelete) {
+      try {
+        const refreshedCache = await refreshHistorySessionsFirstPage();
+        const refreshedCacheWithoutDeletedSession = removeSessionFromHistoryCache(
+          refreshedCache,
+          normalizedDeletedSessionId,
+        );
+        setHistorySessionsCache(refreshedCacheWithoutDeletedSession);
+        if (isDeletingCurrentSession && !shouldCreateFallback) {
+          const refreshedNextSession = refreshedCacheWithoutDeletedSession
+            ? getLatestAvailableSessionByUpdatedAt(refreshedCacheWithoutDeletedSession.content)
+            : null;
+          if (refreshedNextSession) {
+            setWelinkSessionId(refreshedNextSession.welinkSessionId);
+          }
+        }
+      } catch (error) {
+        WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+      }
+    }
+  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
+
+  const handleSessionDeleteStart = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeleteFailed = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeletedFromAction = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    try {
+      await handleSessionDeleted(deletedSessionId, false, true);
+    } finally {
+      if (normalizedDeletedSessionId) {
+        pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      }
+    }
+  }, [handleSessionDeleted]);
+
+  const handleSessionDeletedFromPush = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId && pendingActionDeleteSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      return;
+    }
+    await handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
+
+  useEffect(() => {
+    handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
+  }, [handleSessionDeletedFromPush]);
 
   const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
     const currentAssistantAccount = assistantAccountRef.current;

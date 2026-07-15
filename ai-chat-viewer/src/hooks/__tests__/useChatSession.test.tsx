@@ -423,7 +423,7 @@ describe('useChatSession', () => {
 
     await act(async () => {
       await result.current.onQuestionAnswered({
-        answer: [['Android']],
+        answer: 'Android',
         messageId: result.current.messages[0].id,
         toolCallId: questionPart?.toolCallId,
         questionId: questionPart?.questionId,

@@ -444,7 +444,6 @@ export function useChatSession({
         welinkSessionId,
         content: trimmedContent,
         ...(toolCallId ? { toolCallId } : {}),
-        ...(questionId ? { questionId } : {}),
         ...(subagentSessionId ? { subagentSessionId } : {}),
         ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
       });
@@ -758,6 +757,7 @@ export function useChatSession({
           if (msg.sessionStatus === 'idle') {
             finalizeStreamingMessageById(latestStreamingMsgIdRef.current);
             setSessionStatus('idle');
+            finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {

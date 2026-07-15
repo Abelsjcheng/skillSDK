@@ -88,7 +88,6 @@ function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'exte
   Object.defineProperty(window, 'HWH5', {
     value: {
       addEventListener: jest.fn(),
-      getAppInfo: jest.fn(async () => ({ language: 'zh', versionName: '5.85.0' })),
       navigateBack: jest.fn(),
       openWebview: jest.fn(),
     },
@@ -118,14 +117,15 @@ describe('AssistantDetail', () => {
     expect(screen.getByText(i18n.t('assistantDetail.title'))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: i18n.t('common.back') })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: i18n.t('common.service') })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('assistantDetail.editAction') })).toBeInTheDocument();
 
     expect(await screen.findByText('Assistant A')).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: i18n.t('assistantDetail.editAction') })).toBeInTheDocument();
-    expect(await screen.findAllByText('Staff Assistant')).toHaveLength(1);
+    expect(await screen.findAllByText('Staff Assistant')).toHaveLength(2);
     expect(screen.getByText(i18n.t('assistantDetail.introTitle'))).toBeInTheDocument();
     expect(screen.getByText('Internal assistant description')).toBeInTheDocument();
     expect(screen.getByText(i18n.t('assistantDetail.creator'))).toBeInTheDocument();
     expect(screen.getByText('creator-zh creator_w3')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('assistantDetail.capabilityProvider'))).toBeInTheDocument();
   });
 
   it('uses creatorNameEn with creatorW3Account when current language is english', async () => {

@@ -131,7 +131,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     onTabForUpdate: () => undefined,
     registerEventListener: (params) => {
-      const validEventTypes = ['agentskills.agentUpdated', 'agentskills_agentUpdated'];
+      const validEventTypes = ['agentskills_agentUpdated'];
       if (!validEventTypes.includes(params.type)) {
         return;
       }

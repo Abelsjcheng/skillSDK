@@ -47,12 +47,6 @@ function renderEditAssistant(initialEntry: {
   );
 }
 
-function createFetchFullMock(): jest.Mock {
-  return jest.fn(async () => ({
-    json: async () => ({ data: [mockDetail] }),
-  }));
-}
-
 describe('EditAssistant', () => {
   beforeEach(async () => {
     window.localStorage.setItem('language', '2052');
@@ -68,13 +62,15 @@ describe('EditAssistant', () => {
   });
 
   it('loads details by partnerAccount and updates without notify callback', async () => {
-    const fetchFull = createFetchFullMock();
+    const getAssistantDetails = jest.fn(async () => ({
+      weAgentDetailsArray: [mockDetail],
+    }));
     const updateWeAgent = jest.fn(async () => ({ updateResult: 'success' }));
     const navigateBack = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails: jest.fn(async () => ({ weAgentDetailsArray: [mockDetail] })),
+        getAssistantDetails,
         updateWeAgent,
       },
       configurable: true,
@@ -83,7 +79,6 @@ describe('EditAssistant', () => {
     Object.defineProperty(window, 'HWH5', {
       value: {
         addEventListener: jest.fn(),
-        fetchFull,
         navigateBack,
       },
       configurable: true,
@@ -96,10 +91,7 @@ describe('EditAssistant', () => {
     });
 
     expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
-    expect(fetchFull).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/robot-partners/x00_1'),
-      expect.objectContaining({ method: 'GET' }),
-    );
+    expect(getAssistantDetails).toHaveBeenCalledWith({ partnerAccount: 'x00_1' });
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: i18n.t('createAssistant.confirm') }));
@@ -115,14 +107,16 @@ describe('EditAssistant', () => {
     });
   });
 
-  it('loads details when opened from assistant detail', async () => {
-    const fetchFull = createFetchFullMock();
+  it('uses getAssistantDetails when opened from assistant detail', async () => {
+    const getAssistantDetails = jest.fn(async () => ({
+      weAgentDetailsArray: [mockDetail],
+    }));
     const updateWeAgent = jest.fn(async () => ({ updateResult: 'success' }));
     const navigateBack = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails: jest.fn(async () => ({ weAgentDetailsArray: [mockDetail] })),
+        getAssistantDetails,
         updateWeAgent,
       },
       configurable: true,
@@ -131,7 +125,6 @@ describe('EditAssistant', () => {
     Object.defineProperty(window, 'HWH5', {
       value: {
         addEventListener: jest.fn(),
-        fetchFull,
         navigateBack,
       },
       configurable: true,
@@ -148,10 +141,7 @@ describe('EditAssistant', () => {
     });
 
     expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
-    expect(fetchFull).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/robot-partners/x00_1'),
-      expect.objectContaining({ method: 'GET' }),
-    );
+    expect(getAssistantDetails).toHaveBeenCalledWith({ partnerAccount: 'x00_1' });
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: i18n.t('createAssistant.confirm') }));
@@ -168,13 +158,13 @@ describe('EditAssistant', () => {
   });
 
   it('uses the create-assistant PC layout for the packaged edit route', async () => {
-    const getWeAgentDetails = jest.fn(async () => ({
+    const getAssistantDetails = jest.fn(async () => ({
       weAgentDetailsArray: [mockDetail],
     }));
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails,
+        getAssistantDetails,
         updateWeAgent: jest.fn(async () => ({ updateResult: 'success' })),
       },
       configurable: true,
@@ -208,7 +198,6 @@ describe('EditAssistant', () => {
       <EditAssistantContent
         isPcMiniApp
         source="external"
-        initialDetail={mockDetail}
         partnerAccount="x00_1"
         onClose={jest.fn()}
       />,
