@@ -193,18 +193,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @implementation WLAgentSkillsOpenAssistantEditPageParams
 @end
 
-@implementation WLAgentSkillsNotifyAssistantDetailUpdatedParams
-
-- (id)description {
-    return self.descriptionValue;
-}
-
-- (void)setDescription:(id)description {
-    self.descriptionValue = description;
-}
-
-@end
-
 @implementation WLAgentSkillsQueryQrcodeInfoParams
 @end
 
@@ -292,6 +280,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _bizRobotName = WLAgentSkillsStringValue(dictionary[@"bizRobotName"], @"");
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
         _bizRobotTag = WLAgentSkillsStringValue(dictionary[@"bizRobotTag"], @"");
+        _tagName = WLAgentSkillsStringValue(dictionary[@"tagName"], @"");
+        _tagNameEn = WLAgentSkillsStringValue(dictionary[@"tagNameEn"], @"");
         _robotId = WLAgentSkillsStringValue(dictionary[@"robotId"], @"");
     }
     return self;
@@ -306,6 +296,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"bizRobotName" : self.bizRobotName ?: @"",
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
         @"bizRobotTag" : self.bizRobotTag ?: @"",
+        @"tagName" : self.tagName ?: @"",
+        @"tagNameEn" : self.tagNameEn ?: @"",
         @"robotId" : self.robotId ?: @""
     };
 }
@@ -340,6 +332,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         _bizRobotNameEn = WLAgentSkillsStringValue(dictionary[@"bizRobotNameEn"], @"");
         _bizRobotTag = WLAgentSkillsStringValue(dictionary[@"bizRobotTag"], @"");
         _bizRobotId = WLAgentSkillsStringValue(dictionary[@"bizRobotId"], @"");
+        _tagName = WLAgentSkillsStringValue(dictionary[@"tagName"], @"");
+        _tagNameEn = WLAgentSkillsStringValue(dictionary[@"tagNameEn"], @"");
         _weCodeUrl = WLAgentSkillsStringValue(dictionary[@"weCodeUrl"], @"");
     }
     return self;
@@ -370,6 +364,8 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"bizRobotNameEn" : self.bizRobotNameEn ?: @"",
         @"bizRobotTag" : self.bizRobotTag ?: @"",
         @"bizRobotId" : self.bizRobotId ?: @"",
+        @"tagName" : self.tagName ?: @"",
+        @"tagNameEn" : self.tagNameEn ?: @"",
         @"weCodeUrl" : self.weCodeUrl ?: @""
     };
 }
@@ -383,32 +379,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"weAgentUri" : self.weAgentUri ?: @"",
         @"assistantDetailUri" : self.assistantDetailUri ?: @"",
         @"switchAssistantUri" : self.switchAssistantUri ?: @""
-    };
-}
-
-@end
-
-@implementation WLAgentSkillsAssistantDetailUpdatedPayload
-
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
-    self = [super init];
-    if (self) {
-        _name = WLAgentSkillsStringValue(dictionary[@"name"], @"");
-        _icon = WLAgentSkillsStringValue(dictionary[@"icon"], @"");
-        _descriptionValue = WLAgentSkillsStringValue(dictionary[@"description"], @"");
-    }
-    return self;
-}
-
-- (NSString *)description {
-    return self.descriptionValue ?: @"";
-}
-
-- (NSDictionary *)toDictionary {
-    return @{
-        @"name" : self.name ?: @"",
-        @"icon" : self.icon ?: @"",
-        @"description" : self.descriptionValue ?: @""
     };
 }
 
@@ -444,6 +414,38 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
+@implementation WLAgentSkillsQuestionItem
+
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [super init];
+    if (self) {
+        _header = WLAgentSkillsStringValue(dictionary[@"header"], nil);
+        _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
+        _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+        _multiSelect = WLAgentSkillsNumberValue(dictionary[@"multiSelect"], nil);
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
+    if (self.header != nil && self.header.length > 0) {
+        dictionary[@"header"] = self.header;
+    }
+    if (self.question != nil && self.question.length > 0) {
+        dictionary[@"question"] = self.question;
+    }
+    if (self.options != nil && self.options.count > 0) {
+        dictionary[@"options"] = self.options;
+    }
+    if (self.multiSelect != nil) {
+        dictionary[@"multiSelect"] = self.multiSelect;
+    }
+    return dictionary;
+}
+
+@end
+
 @implementation WLAgentSkillsSessionMessagePart
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
@@ -473,6 +475,16 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
     _questionId = WLAgentSkillsStringValue(dictionary[@"questionId"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+    if ([dictionary[@"questions"] isKindOfClass:[NSArray class]]) {
+        NSMutableArray<WLAgentSkillsQuestionItem *> *questions = [NSMutableArray array];
+        for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"questions"])) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [questions addObject:[[WLAgentSkillsQuestionItem alloc] initWithDictionary:item]];
+        }
+        _questions = [questions copy];
+    }
     _permissionId = WLAgentSkillsStringValue(dictionary[@"permissionId"], nil);
     _permType = WLAgentSkillsStringValue(dictionary[@"permType"], nil);
     _metadata = [dictionary[@"metadata"] isKindOfClass:[NSDictionary class]] ? dictionary[@"metadata"] : nil;
@@ -532,6 +544,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     }
     if (self.options != nil && self.options.count > 0) {
     dictionary[@"options"] = self.options;
+    }
+    if (self.questions != nil && self.questions.count > 0) {
+    dictionary[@"questions"] = WLAgentSkillsSerializeModelArray(self.questions);
     }
     if (self.permissionId != nil && self.permissionId.length > 0) {
     dictionary[@"permissionId"] = self.permissionId;
@@ -823,6 +838,16 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     _question = WLAgentSkillsStringValue(dictionary[@"question"], nil);
     _questionId = WLAgentSkillsStringValue(dictionary[@"questionId"], nil);
     _options = [dictionary[@"options"] isKindOfClass:[NSArray class]] ? dictionary[@"options"] : nil;
+    if ([dictionary[@"questions"] isKindOfClass:[NSArray class]]) {
+        NSMutableArray<WLAgentSkillsQuestionItem *> *questions = [NSMutableArray array];
+        for (NSDictionary *item in WLAgentSkillsArrayValue(dictionary[@"questions"])) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [questions addObject:[[WLAgentSkillsQuestionItem alloc] initWithDictionary:item]];
+        }
+        _questions = [questions copy];
+    }
     _fileName = WLAgentSkillsStringValue(dictionary[@"fileName"], nil);
     _fileUrl = WLAgentSkillsStringValue(dictionary[@"fileUrl"], nil);
     _fileMime = WLAgentSkillsStringValue(dictionary[@"fileMime"], nil);
@@ -867,6 +892,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
         @"question" : WLAgentSkillsNullObject(self.question),
         @"questionId" : WLAgentSkillsNullObject(self.questionId),
         @"options" : WLAgentSkillsNullObject(self.options),
+        @"questions" : self.questions != nil
+            ? WLAgentSkillsSerializeModelArray(self.questions)
+            : [NSNull null],
         @"fileName" : WLAgentSkillsNullObject(self.fileName),
         @"fileUrl" : WLAgentSkillsNullObject(self.fileUrl),
         @"fileMime" : WLAgentSkillsNullObject(self.fileMime),
@@ -1157,16 +1185,6 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @end
 
 @implementation WLAgentSkillsOpenAssistantEditPageResult
-
-- (NSDictionary *)toDictionary {
-    return @{
-        @"status" : self.status ?: @""
-    };
-}
-
-@end
-
-@implementation WLAgentSkillsNotifyAssistantDetailUpdatedResult
 
 - (NSDictionary *)toDictionary {
     return @{

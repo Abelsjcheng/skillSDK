@@ -17,7 +17,7 @@ export class WeAgentStore {
   private readonly userId: string;
   private context: common.UIAbilityContext | undefined;
   private prefInstance: preferences.Preferences | null = null;
-  private readonly fallback: Record<string, string> = {};
+  private readonly fallback: Map<string, string> = new Map();
 
   constructor(context?: common.UIAbilityContext, userId?: string) {
     this.userId = userId ?? MOCK_USER_ID;
@@ -88,15 +88,48 @@ export class WeAgentStore {
     return value;
   }
 
+  /**
+   * 合并详情缓存键与当前助理账号，按首次出现顺序去重后返回冷启动补偿账号。
+   */
+  getCachedWeAgentPartnerAccounts(): string[] {
+    const accounts: string[] = [];
+    Object.keys(this.loadDetailsCache()).forEach((key: string) => {
+      const normalized = this.normalize(key);
+      if (normalized !== undefined && !accounts.includes(normalized)) {
+        accounts.push(normalized);
+      }
+    });
+    const currentPartnerAccount = this.normalize(this.loadCurrentDetail()?.partnerAccount);
+    if (currentPartnerAccount !== undefined && !accounts.includes(currentPartnerAccount)) {
+      accounts.push(currentPartnerAccount);
+    }
+    return accounts;
+  }
+
+  /**
+   * 仅覆盖已存在的详情缓存；若目标也是当前助理，则同步覆盖当前详情。
+   *
+   * 不创建新缓存，避免迟到的更新通知恢复已删除助理。
+   */
+  replaceCachedDetailsIfPresent(partnerAccount: string, detail: WeAgentDetails): void {
+    const cache = this.loadDetailsCache();
+    if (cache[partnerAccount] !== undefined) {
+      cache[partnerAccount] = detail;
+      this.putJson(KEY_DETAILS_CACHE, cache);
+    }
+    if (this.matchesDetail(this.loadCurrentDetail(), partnerAccount)) {
+      this.saveCurrentDetail(detail);
+    }
+  }
+
   updateCachedDetails(
     partnerAccount: string | undefined,
-    robotId: string | undefined,
     name: string,
     icon: string,
     description: string
   ): void {
     const currentDetail = this.loadCurrentDetail();
-    if (currentDetail !== null && this.matchesDetail(currentDetail, partnerAccount, robotId)) {
+    if (currentDetail !== null && this.matchesDetail(currentDetail, partnerAccount)) {
       currentDetail.name = name;
       currentDetail.icon = icon;
       currentDetail.desc = description;
@@ -107,29 +140,53 @@ export class WeAgentStore {
     let updated = false;
     if (partnerAccount !== undefined) {
       const cachedDetail = cache[partnerAccount];
-      if (cachedDetail !== undefined && this.matchesDetail(cachedDetail, partnerAccount, undefined)) {
+      if (cachedDetail !== undefined && this.matchesDetail(cachedDetail, partnerAccount)) {
         cachedDetail.name = name;
         cachedDetail.icon = icon;
         cachedDetail.desc = description;
         updated = true;
       }
-    } else if (robotId !== undefined) {
-      Object.keys(cache).some((key: string): boolean => {
-        const cachedDetail = cache[key];
-        if (!this.matchesDetail(cachedDetail, undefined, robotId)) {
-          return false;
-        }
-        cachedDetail.name = name;
-        cachedDetail.icon = icon;
-        cachedDetail.desc = description;
-        updated = true;
-        return true;
-      });
     }
 
     if (updated) {
       this.putJson(KEY_DETAILS_CACHE, cache);
     }
+  }
+
+  /**
+   * 按 partnerAccount 幂等删除详情缓存，账号无效或目标不存在时不写存储。
+   */
+  removeDetailsByPartnerAccount(partnerAccount: string): void {
+    const normalized = this.normalize(partnerAccount);
+    if (normalized === undefined) {
+      return;
+    }
+    const cache = this.loadDetailsCache();
+    if (cache[normalized] === undefined) {
+      return;
+    }
+    const nextCache: Record<string, WeAgentDetails> = {};
+    Object.keys(cache).forEach((key: string) => {
+      if (key !== normalized) {
+        nextCache[key] = cache[key];
+      }
+    });
+    this.putJson(KEY_DETAILS_CACHE, nextCache);
+  }
+
+  /**
+   * 从已有列表缓存中过滤指定账号并回写；没有列表缓存时保持原状态。
+   */
+  removeFromList(partnerAccount: string): void {
+    if (!this.hasListCache()) {
+      return;
+    }
+    const normalized = this.normalize(partnerAccount);
+    if (normalized === undefined) {
+      return;
+    }
+    const nextList = this.loadList().filter((item: WeAgent): boolean => this.normalize(item.partnerAccount) !== normalized);
+    this.saveList(nextList);
   }
 
   saveAssistantGraySingle(partnerAccount: string, value: boolean): void {
@@ -163,7 +220,7 @@ export class WeAgentStore {
         // Fall back to in-memory cache.
       }
     }
-    this.fallback[key] = encoded;
+    this.fallback.set(key, encoded);
   }
 
   private removeValue(key: string): void {
@@ -176,7 +233,7 @@ export class WeAgentStore {
         // Fall back to in-memory cache.
       }
     }
-    delete this.fallback[key];
+    this.fallback.delete(key);
   }
 
   private getString(key: string): string | null {
@@ -194,10 +251,13 @@ export class WeAgentStore {
         // Ignore and use fallback.
       }
     }
-    return this.fallback[key] ?? null;
+    return this.fallback.get(key) ?? null;
   }
 
-  private loadDetailsCache(): Record<string, WeAgentDetails> {
+  /**
+   * 读取并校验完整助理详情缓存，供冷启动补偿和缓存更新逻辑复用。
+   */
+  loadDetailsCache(): Record<string, WeAgentDetails> {
     const raw = this.getString(KEY_DETAILS_CACHE);
     if (raw === null || raw.trim() === '') {
       return {};
@@ -245,16 +305,12 @@ export class WeAgentStore {
 
   private matchesDetail(
     detail: WeAgentDetails | null | undefined,
-    partnerAccount: string | undefined,
-    robotId: string | undefined
+    partnerAccount: string | undefined
   ): boolean {
     if (detail === null || detail === undefined) {
       return false;
     }
-    if (partnerAccount !== undefined) {
-      return this.normalize(detail.partnerAccount) === partnerAccount;
-    }
-    return robotId !== undefined && this.normalize(detail.id) === robotId;
+    return partnerAccount !== undefined && this.normalize(detail.partnerAccount) === partnerAccount;
   }
 
   private normalize(value: string | undefined): string | undefined {

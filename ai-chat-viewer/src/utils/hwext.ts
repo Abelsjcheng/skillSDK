@@ -16,6 +16,9 @@ import type {
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteHistorySessionParams,
+  DeleteHistorySessionResponse,
+  DeleteHistorySessionResult,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
   GetHistorySessionsListParams,
@@ -28,19 +31,20 @@ import type {
   HWH5EXT,
   HWH5UserInfo,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   Pedestal,
   QueryQrcodeInfoParams,
   QueryQrcodeInfoResult,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ResolveRobotIdOptions,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -55,6 +59,7 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
+import { buildDeleteHistorySessionUrl } from './apiEndpoints';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -125,6 +130,16 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     onTabForUpdate: () => undefined,
+    registerEventListener: (params) => {
+      const validEventTypes = ['agentskills_agentUpdated'];
+      if (!validEventTypes.includes(params.type)) {
+        return;
+      }
+      window.addEventListener(params.type, (e: any) => {
+        const data = e.detail;
+        params.func && params.func(data)
+      })
+    },
     registerSessionListener: (params) => {
       if (isPcMiniApp()) {
         listenerParams = params;
@@ -148,6 +163,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
+    sendWebSocketMessage: (params) => call<SendWebSocketMessageResult>('sendWebSocketMessage', params),
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
     controlSkillWeCode: (params) => {
@@ -165,7 +181,6 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     deleteWeAgent: (params) => assistantCall<DeleteWeAgentResult>('deleteWeAgent', params),
     queryQrcodeInfo: (params) => assistantCall<QueryQrcodeInfoResult>('queryQrcodeInfo', params),
     updateQrcodeInfo: (params) => assistantCall<UpdateQrcodeInfoResult>('updateQrcodeInfo', params),
-    notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
     openWeAgentCUI: (params) => call<OpenWeAgentCUIResult>('openWeAgentCUI', params),
@@ -402,6 +417,7 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   return {
     ...deviceInfo,
     statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
+    safeAreaInsetBottom: toPositiveNumber(deviceInfo.safeAreaInsetBottom),
   };
 }
 
@@ -581,6 +597,12 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
   }
 }
 
+export async function sendWebSocketMessage(
+  params: SendWebSocketMessageParams,
+): Promise<SendWebSocketMessageResult> {
+  return getJsApiOrThrow().sendWebSocketMessage(params);
+}
+
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
   return trackApiStopSkill(params, getJsApiOrThrow().stopSkill(params));
 }
@@ -603,6 +625,10 @@ export async function createNewSession(params: CreateNewSessionParams): Promise<
 
 export async function getAccountInfoUid(): Promise<string> {
   return (await getUserInfo()).uid;
+}
+
+export async function registerEventListener(params: RegisterEventListenerParams): Promise<void> {
+  await getJsApiOrThrow().registerEventListener(params);
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {
@@ -633,18 +659,57 @@ export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<Delete
   return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
 }
 
+async function deleteHistorySessionWithHWH5FetchFull(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    throw new Error('HWH5.fetchFull is not available.');
+  }
+
+  const response = await window.HWH5.fetchFull<DeleteHistorySessionResponse>(
+    buildDeleteHistorySessionUrl(sessionId),
+    {
+      method: 'delete',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  const reply = await response.json();
+  if (reply?.code !== 0 || !reply.data) {
+    throw reply;
+  }
+  return reply.data;
+}
+
+async function deleteHistorySessionWithPcBridge(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  // PC 端删除会话后续如需切换桥接方法，只需要替换这个函数内部实现。
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
+}
+
+export async function deleteHistorySession(
+  params: DeleteHistorySessionParams,
+): Promise<DeleteHistorySessionResult> {
+  const sessionId = String(params?.welinkSessionId ?? '').trim();
+  if (!sessionId) {
+    throw new Error('welinkSessionId is required.');
+  }
+
+  if (isPcMiniApp()) {
+    return deleteHistorySessionWithPcBridge(sessionId);
+  }
+
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
+}
+
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
   return trackApiQueryQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().queryQrcodeInfo(params)));
 }
 
 export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
   return trackApiUpdateQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().updateQrcodeInfo(params)));
-}
-
-export async function notifyAssistantDetailUpdated(
-  params: NotifyAssistantDetailUpdatedParams,
-): Promise<NotifyAssistantDetailUpdatedResult> {
-  return getJsApiOrThrow().notifyAssistantDetailUpdated(params);
 }
 
 export async function getHistorySessionsList(

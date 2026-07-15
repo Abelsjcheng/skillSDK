@@ -9,6 +9,10 @@
   background: #f4f7fd url('../imgs/assistant-bg.png') center top / cover no-repeat;
 }
 
+.switch-assistant--pc {
+  width: 320px;
+}
+
 .switch-assistant__content {
   flex: 1;
   min-height: 0;
@@ -151,6 +155,10 @@
   text-overflow: ellipsis;
 }
 
+.switch-assistant--pc .switch-assistant__summary {
+  color: rgb(153, 153, 153);
+}
+
 .switch-assistant__actions {
   width: 100%;
   height: 68px;
@@ -182,6 +190,16 @@
   font-size: 14px;
   line-height: 20px;
   cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.switch-assistant__action-btn:focus,
+.switch-assistant__action-btn:focus-visible,
+.switch-assistant__action-btn:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .switch-assistant__action-btn--cancel {

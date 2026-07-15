@@ -220,16 +220,21 @@ public class ApiClient {
         });
     }
 
+    /**
+     * 使用 partnerAccount 定位助理并提交名称、头像和描述更新。
+     *
+     * <p>方法组装更新请求体，复用统一 JSON 入队与响应解析流程，将服务端结果转换为
+     * {@link UpdateWeAgentResult} 后回调。</p>
+     */
     public void updateWeAgent(
-            @Nullable String partnerAccount,
-            @Nullable String robotId,
+            @NonNull String partnerAccount,
             @NonNull String name,
             @NonNull String icon,
             @NonNull String description,
             @NonNull SkillCallback<UpdateWeAgentResult> callback
     ) {
         AssistantApiService service = requireAssistantApiService();
-        enqueueJson(service.updateWeAgent(new UpdateWeAgentBody(partnerAccount, robotId, name, icon, description)),
+        enqueueJson(service.updateWeAgent(new UpdateWeAgentBody(partnerAccount, name, icon, description)),
                 new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {
@@ -247,17 +252,21 @@ public class ApiClient {
         });
     }
 
+    /**
+     * 使用唯一 partnerAccount 调用助理删除接口。
+     *
+     * <p>账号会先去除首尾空白，再作为删除查询参数发送；响应由统一解析流程转换为
+     * {@link DeleteWeAgentResult}。</p>
+     */
     public void deleteWeAgent(
-            @Nullable String partnerAccount,
-            @Nullable String robotId,
+            @NonNull String partnerAccount,
             @NonNull SkillCallback<DeleteWeAgentResult> callback
     ) {
         AssistantApiService service = requireAssistantApiService();
         String normalizedPartnerAccount = partnerAccount == null ? null : partnerAccount.trim();
-        String normalizedRobotId = robotId == null ? null : robotId.trim();
         enqueueJson(service.deleteWeAgent(
                 normalizedPartnerAccount == null || normalizedPartnerAccount.isEmpty() ? null : normalizedPartnerAccount,
-                normalizedRobotId == null || normalizedRobotId.isEmpty() ? null : normalizedRobotId
+                null
         ), new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement result) {

@@ -30,12 +30,52 @@ export interface UnregisterSessionListenerParams {
   welinkSessionId: string;
 }
 
+export type WeAgentUpdatedEventPayload =
+  | {
+    type: 'update';
+    data: Omit<WeAgentDetails, 'desc'> & {
+      desc?: string;
+      description?: string;
+    };
+    extraData?: {
+      source?: 'server' | 'local';
+    };
+  }
+  | {
+    type: 'delete';
+    data?: {
+      partnerAccount?: string;
+      robotId?: string;
+    };
+    extraData?: {
+      source?: 'server' | 'local';
+    };
+  }
+  | {
+    type: 'offline_notify',
+    data?: Extract<WeAgentUpdatedEventPayload, { type: 'update'} | { type: 'delete'}>[]
+  }
+  ;
+
+export interface RegisterEventListenerParams {
+  type: string;
+  func: (payload: WeAgentUpdatedEventPayload) => void;
+}
+
 export interface SendMessageParams {
   welinkSessionId: string;
   content: string;
   toolCallId?: string;
   questionId?: string;
   subagentSessionId?: string;
+}
+
+export interface SendWebSocketMessageParams {
+  message: string;
+}
+
+export interface SendWebSocketMessageResult {
+  status: 'success';
 }
 
 export interface GetSessionMessageParams {
@@ -138,6 +178,8 @@ export interface WeAgentListItem {
   icon: string;
   description: string;
   partnerAccount: string;
+  tagName?: string;
+  tagNameEn?: string;
   bizRobotName: string;
   bizRobotNameEn: string;
   bizRobotTag: string;
@@ -155,8 +197,7 @@ export interface GetWeAgentDetailsPcParams {
 export type GetWeAgentDetailsParams = GetWeAgentDetailsMobileParams | GetWeAgentDetailsPcParams;
 
 export interface UpdateWeAgentParams {
-  partnerAccount?: string;
-  robotId?: string;
+  partnerAccount: string;
   name: string;
   icon: string;
   description: string;
@@ -167,12 +208,25 @@ export interface UpdateWeAgentResult {
 }
 
 export interface DeleteWeAgentParams {
-  partnerAccount?: string;
-  robotId?: string;
+  partnerAccount: string;
 }
 
 export interface DeleteWeAgentResult {
   deleteResult: string;
+}
+
+export interface DeleteHistorySessionParams {
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResult {
+  status: string;
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResponse {
+  code: number;
+  data: DeleteHistorySessionResult;
 }
 
 export interface QueryQrcodeInfoParams {
@@ -200,18 +254,6 @@ export interface UpdateQrcodeInfoResult {
   status: string;
 }
 
-export interface NotifyAssistantDetailUpdatedParams {
-  name: string;
-  icon: string;
-  description: string;
-  partnerAccount?: string;
-  robotId?: string;
-}
-
-export interface NotifyAssistantDetailUpdatedResult {
-  status: string;
-}
-
 export interface WeAgentDetails {
   name: string;
   icon: string;
@@ -234,6 +276,8 @@ export interface WeAgentDetails {
   id: string;
   bizRobotId: string;
   bizRobotTag: string;
+  tagName?: string;
+  tagNameEn?: string;
   bizRobotName?: string;
   bizRobotNameEn?: string;
   weCodeUrl: string;
@@ -306,7 +350,8 @@ export interface HWH5AddEventListenerParams {
 }
 
 export interface FetchFullOptions {
-  method: string;
+  method?: string;
+  body?: string;
   headers: Record<string, string>;
 }
 
@@ -326,9 +371,11 @@ export interface HWH5EXT {
   getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse>;
   getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<GetSessionMessageHistoryResponse>;
   onTabForUpdate?: (callback: () => void) => void;
+  registerEventListener(params: RegisterEventListenerParams): void;
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
+  sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketMessageResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
@@ -341,9 +388,6 @@ export interface HWH5EXT {
   deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> | DeleteWeAgentResult;
   queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> | QueryQrcodeInfoResult;
   updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> | UpdateQrcodeInfoResult;
-  notifyAssistantDetailUpdated(
-    params: NotifyAssistantDetailUpdatedParams,
-  ): Promise<NotifyAssistantDetailUpdatedResult> | NotifyAssistantDetailUpdatedResult;
   getHistorySessionsList(params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> | HistorySessionsListResult;
   getWeAgentUri(): Promise<WeAgentUriResult> | WeAgentUriResult;
   openWeAgentCUI(params: OpenWeAgentCUIParams): Promise<OpenWeAgentCUIResult> | OpenWeAgentCUIResult;
@@ -377,6 +421,13 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  fetch?: (url: string, options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+  }) => Promise<unknown> | unknown;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,
@@ -392,6 +443,8 @@ export interface HWH5Bridge {
 }
 
 export interface HWH5DeviceInfo {
+  osType?: string;
+  isFullScreen?: number;
   statusBarHeight: number;
   safeAreaInsetBottom: number;
   [key: string]: unknown;
@@ -411,3 +464,7 @@ export interface HWH5UserInfo {
   corpUserId: string;
   [key: string]: unknown;
 }
+
+export type AssistantDetailsFetchResult = {
+  data?: WeAgentDetails[];
+};

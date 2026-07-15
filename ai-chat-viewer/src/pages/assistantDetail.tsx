@@ -42,11 +42,14 @@ import {
 import {
   EXCLUSIVE_ASSISTANT_BIZ_TAG,
   resolveAssistantTag,
+  UNIVERSAL_ASSISTANT_BIZ_TAG,
 } from '../utils/assistantTag';
 import { reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import '../styles/AssistantDetail.less';
 import { handleServiceClickPc } from '../utils/assistantPcHandle';
+import { canIUse } from '../utils/versionCheck';
+import { useSubmitLock } from '../hooks/useSubmitLock';
 
 const DetailInfoRow: React.FC<DetailInfoRowProps> = ({ label, value = '', valueNode }) => (
   <div className='assistant-detail__info-row'>
@@ -62,7 +65,7 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .filter(Boolean)
     .join(' ');
 
-const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => {
+const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handlePcDelete, onEditAssistant }) => {
   const { t, i18n } = useTranslation();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
@@ -70,17 +73,50 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const [overlay, setOverlay] = useState<AssistantDetailOverlay>('none');
   const [pcView, setPcView] = useState<AssistantDetailPcView>('detail');
   const [isPcMenuOpen, setIsPcMenuOpen] = useState<boolean>(false);
+  const [assistantEditSupported, setAssistantEditSupported] = useState<boolean>(isPc);
   const [pcMenuPosition, setPcMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const { submitting: deleteSubmitting, runWithSubmitLock: runDeleteWithSubmitLock } = useSubmitLock();
   const pageRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  const routePartnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
   const resolvedPartnerAccount = isPc
     ? (partnerAccount?.trim() ?? '')
-    : useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+    : routePartnerAccount;
 
   useEffect(() => {
     void ensureLanguageInitialized();
   }, []);
+
+  useEffect(() => {
+    if (isPc) {
+      setAssistantEditSupported(true);
+      return;
+    }
+
+    let cancelled = false;
+    setAssistantEditSupported(false);
+
+    const checkAssistantEditSupported = async () => {
+      try {
+        const supported = await canIUse.assistantEdit();
+        if (!cancelled) {
+          setAssistantEditSupported(supported);
+        }
+      } catch (error) {
+        WeLog(`AssistantDetail assistantEdit version check failed | error=${JSON.stringify(error)}`);
+        if (!cancelled) {
+          setAssistantEditSupported(false);
+        }
+      }
+    };
+
+    void checkAssistantEditSupported();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPc]);
 
   useEffect(() => {
     if (!resolvedPartnerAccount) {
@@ -122,7 +158,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const displayName = detail?.name ?? '';
   const displayIcon = resolveAssistantIconUrl(detail?.icon);
   const bizRobotTag = detail?.bizRobotTag?.trim() ?? '';
-  const displayTag = resolveAssistantTag(detail);
+  const displayTag = resolveAssistantTag(detail, i18n.resolvedLanguage ?? i18n.language);
   const displayDescription = detail?.desc ?? '';
   const creatorDisplayName = (i18n.resolvedLanguage ?? i18n.language) === 'en'
     ? detail?.creatorNameEn
@@ -131,11 +167,14 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
   const isInternalAssistant = Boolean(detail?.bizRobotId?.trim());
   const isExclusiveAssistant = isInternalAssistant && bizRobotTag === EXCLUSIVE_ASSISTANT_BIZ_TAG;
+  const shouldShowAppCredential = bizRobotTag
+    ? bizRobotTag !== EXCLUSIVE_ASSISTANT_BIZ_TAG && bizRobotTag !== UNIVERSAL_ASSISTANT_BIZ_TAG
+    : !isInternalAssistant;
   const secret = detail?.appSecret ?? '';
   const displaySecret = isSecretVisible ? secret : maskSecret(secret);
 
-  const orgLabel = isInternalAssistant ? t('assistantDetail.capabilityProvider') : t('assistantDetail.appId');
-  const orgValue = isInternalAssistant ? displayTag : (detail?.appKey ?? '');
+  const orgLabel = t('assistantDetail.appId');
+  const orgValue = detail?.appKey ?? '';
   const ownerLabel = t('assistantDetail.secret');
   const ownerValue = displaySecret;
   const hasDescription = Boolean(displayDescription.trim());
@@ -143,15 +182,15 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const hasOrgValue = Boolean(orgValue.trim());
   const hasSecretValue = Boolean(secret.trim());
   const showCreatorRow = !isExclusiveAssistant && hasCreator;
-  const showOrgRow = !isExclusiveAssistant && hasOrgValue;
-  const showSecretRow = !isInternalAssistant && hasSecretValue;
+  const showOrgRow = shouldShowAppCredential && hasOrgValue;
+  const showSecretRow = shouldShowAppCredential && hasSecretValue;
   const showIntroCard = hasDescription || showCreatorRow;
   const showOrgCard = showOrgRow || showSecretRow;
 
   const toggleSecretVisible = useCallback(() => {
-    if (isInternalAssistant) return;
+    if (!shouldShowAppCredential) return;
     setIsSecretVisible((previous) => !previous);
-  }, [isInternalAssistant]);
+  }, [shouldShowAppCredential]);
 
   const handleCopy = useCallback(async (content: string, successMessage: string) => {
     if (!content) {
@@ -168,7 +207,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
 
   useEffect(() => {
     setIsSecretVisible(false);
-  }, [isInternalAssistant, detail?.partnerAccount]);
+  }, [detail?.partnerAccount, shouldShowAppCredential]);
 
   const handleClosePage = useCallback(() => {
     dispatchAssistantCloseEvent();
@@ -214,38 +253,20 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   const handleEditAssistant = useCallback(() => {
     setIsPcMenuOpen(false);
 
-    const targetPartnerAccount = (detail?.partnerAccount ?? resolvedPartnerAccount).trim();
-
     if (isPc) {
       setPcView('edit');
       return;
     }
 
     setOverlay('none');
-    const nextSearch = new URLSearchParams();
-    if (targetPartnerAccount) {
-      nextSearch.set('partnerAccount', targetPartnerAccount);
-    }
-    nextSearch.set('source', 'assistantDetail');
-    window.location.hash = nextSearch.toString() ? `#/editAssistant?${nextSearch.toString()}` : '#/editAssistant';
-  }, [detail, isPc, resolvedPartnerAccount]);
+    onEditAssistant?.(detail);
+  }, [detail, isPc, onEditAssistant]);
 
-  const handleRequestDeleteAssistant = useCallback(() => {
-    setIsPcMenuOpen(false);
-
-    if (isPc) {
-      // Reserved for future implementation.
-      return;
-    }
-
-    setOverlay('delete-modal');
-  }, [isPc]);
 
   const handleConfirmDelete = useCallback(async () => {
     const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount ?? '').trim();
-    const targetRobotId = (detail?.id ?? '').trim();
 
-    if (!targetPartnerAccount && !targetRobotId) {
+    if (!targetPartnerAccount) {
       void reportCoreFlowError(
         'flow_delete_assistant_error',
         '删除助手流程失败',
@@ -254,7 +275,6 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           page: 'assistantDetail',
           stage: 'missingTarget',
           partnerAccount: targetPartnerAccount,
-          robotId: targetRobotId,
           isPc,
         },
       );
@@ -262,28 +282,42 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
       return;
     }
 
-    try {
-      await deleteWeAgent({
-        ...(targetPartnerAccount ? { partnerAccount: targetPartnerAccount } : {}),
-        ...(targetRobotId ? { robotId: targetRobotId } : {}),
-      });
-      setOverlay('none');
-      window.HWH5.close();
-    } catch (error) {
-      WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
-        partnerAccount: targetPartnerAccount,
-        robotId: targetRobotId,
-      })} | error=${JSON.stringify(error)}`);
-      void reportCoreFlowError('flow_delete_assistant_error', '删除助手流程失败', error, {
-        page: 'assistantDetail',
-        stage: 'deleteWeAgent',
-        partnerAccount: targetPartnerAccount,
-        robotId: targetRobotId,
-        isPc,
-      });
-      showToast(t('assistantDetail.deleteFailed'));
+    await runDeleteWithSubmitLock(async () => {
+      try {
+        await deleteWeAgent({
+          partnerAccount: targetPartnerAccount,
+        });
+        setOverlay('none');
+        if (!isPc) {
+          window.HWH5.close();
+        }
+      } catch (error) {
+        WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
+          partnerAccount: targetPartnerAccount,
+        })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_delete_assistant_error', '删除助手流程失败', error, {
+          page: 'assistantDetail',
+          stage: 'deleteWeAgent',
+          partnerAccount: targetPartnerAccount,
+          isPc,
+        });
+        showToast(t('assistantDetail.deleteFailed'));
+      }
+    });
+  }, [detail?.partnerAccount, isPc, partnerAccount, runDeleteWithSubmitLock, t]);
+
+    const handleRequestDeleteAssistant = useCallback(() => {
+    setIsPcMenuOpen(false);
+
+    if (isPc) {
+      handlePcDelete && handlePcDelete(detail, () => {
+        handleConfirmDelete()
+      })
+      return;
     }
-  }, [detail?.id, detail?.partnerAccount, isPc, partnerAccount, t]);
+
+    setOverlay('delete-modal');
+  }, [isPc, handleConfirmDelete]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {
@@ -320,20 +354,25 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   }, []);
 
   const pcLeftActions = useMemo<AssistantPageHeaderAction[]>(
-    () => [
-      {
+    () => {
+      const actions: AssistantPageHeaderAction[] = [{
         label: t('common.service'),
         icon: customerIcon,
         onClick: handleServiceClick,
-      },
-      {
-        label: t('assistantDetail.editAction'),
-        icon: moreIcon,
-        onClick: handleTogglePcMenu,
-        buttonRef: moreButtonRef,
-      },
-    ],
-    [handleServiceClick, handleTogglePcMenu, t],
+      }];
+
+      if (detail && !isExclusiveAssistant) {
+        actions.push({
+          label: t('assistantDetail.editAction'),
+          icon: moreIcon,
+          onClick: handleTogglePcMenu,
+          buttonRef: moreButtonRef,
+        });
+      }
+
+      return actions;
+    },
+    [detail, handleServiceClick, handleTogglePcMenu, isExclusiveAssistant, t],
   );
 
   const pcRightActions = useMemo<AssistantPageHeaderAction[]>(
@@ -363,7 +402,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
   ), []);
 
   const orgValueNode = showOrgRow ? (
-    isInternalAssistant || !isPc ? (
+    !isPc ? (
       <span className="assistant-detail__org-value">{orgValue}</span>
     ) : (
       <div className="assistant-detail__value-with-actions">
@@ -436,8 +475,8 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         title={t('assistantDetail.title')}
         isPcMiniApp={isPc}
         onService={handleServiceClick}
-        mobileRightActionIcon={!isPc ? editIcon : undefined}
-        mobileRightActionLabel={!isPc ? t('assistantDetail.editAction') : undefined}
+        mobileRightActionIcon={!isPc && assistantEditSupported && detail && !isExclusiveAssistant ? editIcon : undefined}
+        mobileRightActionLabel={!isPc && assistantEditSupported && detail && !isExclusiveAssistant ? t('assistantDetail.editAction') : undefined}
         onMobileRightAction={handleOpenActionSheet}
         pcLeftActions={isPc ? pcLeftActions : undefined}
         pcRightActions={isPc ? pcRightActions : undefined}
@@ -490,7 +529,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
         ) : null}
       </main>
 
-      {isPc ? (
+      {isPc && detail && !isExclusiveAssistant ? (
         <AssistantDetailPcMenu
           open={isPcMenuOpen}
           top={pcMenuPosition.top}
@@ -501,7 +540,7 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           editLabel={t('assistantDetail.editInfo')}
           deleteLabel={t('assistantDetail.deleteAssistant')}
         />
-      ) : (
+      ) : !isPc && assistantEditSupported && detail && !isExclusiveAssistant ? (
         <>
           <AssistantDetailActionSheet
             open={overlay === 'action-sheet'}
@@ -512,11 +551,12 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount }) => 
           <AssistantDetailDeleteModal
             open={overlay === 'delete-modal'}
             assistantName={displayName}
+            submitting={deleteSubmitting}
             onClose={handleCloseOverlay}
             onConfirm={handleConfirmDelete}
           />
         </>
-      )}
+      ) : null}
     </div>
   );
 };

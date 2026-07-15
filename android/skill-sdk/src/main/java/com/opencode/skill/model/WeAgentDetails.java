@@ -54,6 +54,10 @@ public class WeAgentDetails {
     @NonNull
     private String bizRobotId = "";
     @NonNull
+    private String tagName = "";
+    @NonNull
+    private String tagNameEn = "";
+    @NonNull
     private String weCodeUrl = "";
 
     @NonNull
@@ -261,6 +265,24 @@ public class WeAgentDetails {
 
     public void setBizRobotId(@NonNull String bizRobotId) {
         this.bizRobotId = Objects.requireNonNull(bizRobotId, "bizRobotId == null");
+    }
+
+    @NonNull
+    public String getTagName() {
+        return tagName;
+    }
+
+    public void setTagName(@NonNull String tagName) {
+        this.tagName = Objects.requireNonNull(tagName, "tagName == null");
+    }
+
+    @NonNull
+    public String getTagNameEn() {
+        return tagNameEn;
+    }
+
+    public void setTagNameEn(@NonNull String tagNameEn) {
+        this.tagNameEn = Objects.requireNonNull(tagNameEn, "tagNameEn == null");
     }
 
     @NonNull

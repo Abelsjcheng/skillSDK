@@ -15,6 +15,16 @@ const QRCODE_CREATE_ASSISTANT_MIN_VERSION: MinVersionMap = {
   harmony: '1.29.0',
 };
 
+const ASSISTANT_EDIT_MIN_VERSION: MinVersionMap = {
+  android: '5.85.0',
+  ios: '5.85.0',
+  harmony: '1.31.0',
+};
+
+const HARMONY_SPLIT_LAYOUT_MIN_VERSION: MinVersionMap = {
+  harmony: '1.30.0',
+};
+
 export function compareVersion(newVersion: string, oldVersion: string): number {
   const v1 = newVersion.split('.');
   const v2 = oldVersion.split('.');

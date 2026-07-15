@@ -3,7 +3,9 @@
 - 方案日期：`2026-06-04`
 - 目标工程：`ai-chat-viewer`
 - 参考文档：`docs/plans/技术方案模板.md`、`docs/plans/2026-05-20-ai-chat-viewer-telemetry-plan.md`、`docs/requirements.md`
-- 方案类型：`前端交互增强 / HWH5.fetch 接口接入 / 埋码补充`
+- 方案类型：`前端交互增强 / WebSocket slash 命令查询 / 埋码补充`
+
+> 2026-06-26 变更说明：slash 命令列表获取链路已由 `HWH5.fetch` REST 请求调整为 `HWH5EXT.sendWebSocketMessage` WebSocket 消息链路。前端通过 `sendWebSocketMessage({ message: { action: 'query_slash_commands', welinkSessionId } })` 发起查询，并在 `useChatSession` 中消费 `slash_commands_result` 事件的 `slashCommands` 字段作为命令列表数据源；原 `querySlashCommands` / `/api/v1/slash-commands/query` / `ak` 入参方案不再作为实现依据。
 
 ## 1. 背景
 
@@ -31,10 +33,11 @@
 6. 当前没有命令时不展示面板；从服务端获取异常或响应结构异常时，前端只降级读取一次本地存储数据，本次读取忽略 10 分钟过期标识，仍无可用命令则不展示面板，不阻断输入与发送。
 7. slash 命令列表本地存储 10 分钟，移动端使用 `HWH5.getStorage` / `HWH5.setStorage`，PC 端写入 DB；存储 key 使用 `partnerAccount`，不使用 `ak`。
 8. slash 命令作为整体 token 删除，提升命令编辑体验。
-9. UI 适配移动端与 PC 端显示，并支持浅色与暗黑模式。
-10. 频繁输入 `/` 或反复进入 slash 触发态时，需要对 slash list 请求做节流、in-flight 复用和存储命中保护，避免短时间重复请求。
-11. slash list 面板支持 Enter 选择、ArrowUp / ArrowDown 上下移动高亮、Escape 关闭弹窗。
-12. 补充 slash 面板触发数、slash 命令选择次数、slash list 接口成功/失败埋码。
+9. 选中的 slash 命令需要在输入区中呈现为独立 token，命令文本颜色为 `#0D94FF`；选中后自动追加一个空格，删除时先删除空格，再将 slash 命令整体删除。
+10. UI 适配移动端与 PC 端显示，并支持浅色与暗黑模式。
+11. 频繁输入 `/` 或反复进入 slash 触发态时，需要对 slash list 请求做节流、in-flight 复用和存储命中保护，避免短时间重复请求。
+12. slash list 面板支持 Enter 选择、ArrowUp / ArrowDown 上下移动高亮、Escape 关闭弹窗。
+13. 补充 slash 面板触发数、slash 命令选择次数、slash list 接口成功/失败埋码。
 
 ### 1.3 非目标
 
@@ -69,12 +72,14 @@ flowchart TD
     I -->|否| H
     J --> K["按命令名前缀实时过滤"]
     K --> L["键盘/点击选择命令"]
-    L --> M["填充 command + 空格并隐藏面板"]
+    L --> M["写入 slash token + 空格并隐藏面板"]
+    M --> Q["输入区将 token 以 #0D94FF 展示"]
+    Q --> R["Backspace 先删空格<br/>再整体删除 token"]
 ```
 
 ### 2.2 方案核心
 
-在 `WeAgentCUIFooter` 中引入 slash 命令输入控制器、`HWH5.fetch` 命令列表请求、跨端持久化存储和联想面板；请求接口仍使用 `ak`，命令列表存储按 `partnerAccount` 维度隔离 10 分钟，接口耗时控制交给服务端。服务端获取异常时，前端只做一次忽略过期标识的本地存储降级读取，避免在服务端和存储之间循环拉取。
+在 `WeAgentCUIFooter` 中引入 slash 命令输入控制器、`HWH5.fetch` 命令列表请求、跨端持久化存储、联想面板和可渲染 token 的输入区；请求接口仍使用 `ak`，命令列表存储按 `partnerAccount` 维度隔离 10 分钟，接口耗时控制交给服务端。服务端获取异常时，前端只做一次忽略过期标识的本地存储降级读取，避免在服务端和存储之间循环拉取。选中命令后将 `/command` 作为独立 token 展示，颜色固定为 `#0D94FF`，发送时仍转换为普通文本。
 
 ## 3. 时序图
 
@@ -127,9 +132,9 @@ sequenceDiagram
     Footer->>Panel: 按 command 前缀过滤
     Panel-->>User: 默认命中第一条匹配命令
     User->>Footer: 按 Enter 或点击
-    Footer->>Footer: 将当前 slash 片段替换为 /new + 空格
+    Footer->>Footer: 将当前 slash 片段替换为 /new token + 空格
     Footer->>UEM: slash_command_select
-    Footer-->>User: 隐藏面板并保留焦点
+    Footer-->>User: 隐藏面板，/new 以 #0D94FF 展示并保留焦点
 ```
 
 ## 4. 技术细节
@@ -152,17 +157,18 @@ sequenceDiagram
    - 移动端：使用 `HWH5.getStorage` / `HWH5.setStorage`。
    - PC 端：写入 PC DB，具体 DB JSAPI 或封装方法待确认。
    - 存储值包含 `expiresAt`、`partnerAccount` 与标准化后的命令列表。
-5. 新增 `src/hooks/useSlashCommandSuggest.ts`，封装触发检测、存储读取、请求节流、in-flight 复用、服务端异常后一次性本地存储降级读取、本地过滤、键盘高亮、选择回填、整体删除 token 元数据。
+5. 新增 `src/hooks/useSlashCommandSuggest.ts`，封装触发检测、存储读取、请求节流、in-flight 复用、服务端异常后一次性本地存储降级读取、本地过滤、键盘高亮和选择回填。
 6. 新增 `src/components/assistant/SlashCommandPanel.tsx`，负责展示最多 10 行的命令联想面板、滚动、hover、click、aria 状态、浅色/暗黑样式 class。
-7. 改造 `src/components/assistant/WeAgentCUIFooter.tsx`：
+7. 新增或改造 `src/components/assistant/SlashCommandComposer.tsx`，负责可渲染 token 的输入区、selection 管理、placeholder、纯文本序列化、IME 组合输入、Backspace / Delete 删除规则和移动/PC 两套尺寸表现。
+8. 改造 `src/components/assistant/WeAgentCUIFooter.tsx`：
    - 接收或读取 `ak`，作为 slash list 查询入参。
    - 接收或读取 `partnerAccount`，作为 slash list 存储 key 和隔离维度。
-   - 将移动端 `input` 和 PC 端 `textarea` 的输入变更接入 slash hook。
+   - 将移动端 `input` 和 PC 端 `textarea` 升级为可渲染 slash token 的 composer 输入区，或抽取新的 `SlashCommandComposer` 组件承载文本节点、slash token、光标和键盘行为。
    - 在 `onKeyDown` 中优先处理 slash 面板的 Enter / ArrowUp / ArrowDown / Escape，再处理发送快捷键。
-   - 在 Backspace / Delete 中处理已选 slash token 的整体删除。
-8. `src/App.tsx` 或页面入口补充 `ak`、`partnerAccount` 获取与透传路径，若当前工程已有 appkey 和助理账号来源，应复用既有来源。
-9. `src/styles/WeAgentCUIFooter.less` 或组件样式文件新增移动端、PC 端、暗黑模式下的面板样式。
-10. `src/mocks/installJsApiMock.ts` 可补充 `HWH5.fetch` mock 或在 slash API 封装层提供可替换 fetcher，保障本地调试。
+   - 在 Backspace / Delete 中处理空格与已选 slash token 的分段删除：先删除 token 后方空格，再整体删除 token。
+9. `src/App.tsx` 或页面入口补充 `ak`、`partnerAccount` 获取与透传路径，若当前工程已有 appkey 和助理账号来源，应复用既有来源。
+10. `src/styles/WeAgentCUIFooter.less` 或组件样式文件新增移动端、PC 端、暗黑模式下的面板样式，以及 slash token 的 `#0D94FF` 文本样式。
+11. `src/mocks/installJsApiMock.ts` 可补充 `HWH5.fetch` mock 或在 slash API 封装层提供可替换 fetcher，保障本地调试。
 
 ### 4.2 核心实现方式
 
@@ -218,7 +224,7 @@ sequenceDiagram
 2. `errormsg` 只在成功结构中兼容读取；失败结构以 `message` 作为错误说明。
 3. `command` 必须为非空字符串；无效项过滤掉，不让单条脏数据影响整个面板。
 4. `description` 非字符串时按空字符串处理。
-5. 服务端可能返回重复命令时，前端按 `command` 去重，保留第一条，避免面板重复展示。
+5. 服务端可能返回重复命令时，前端不按 `command` 去重；fetch 到多少条有效数据就缓存多少条、展示多少条，保持与服务端配置一致。渲染列表时使用 `command + index` 或服务端唯一 id 作为 key，避免重复 command 造成 React key 冲突。
 6. `command` 推荐保留服务端返回的 `/` 前缀；若服务端未来返回无 `/` 前缀，前端展示和回填时补齐 `/`。
 
 #### 4.2.2 HWH5.fetch 封装
@@ -278,7 +284,7 @@ sequenceDiagram
 面板定位在输入框上方，移动端、PC 端与暗黑模式分别处理：
 
 1. 移动端：面板宽度跟随 footer 内容区，左右保留安全边距；底部避让键盘抬起和安全区，最大高度不超过可视区域的 40%。
-2. PC 端：面板宽度建议 320px 至 420px，靠输入框左侧或光标附近展示，不遮挡发送按钮；textarea 多行增长时，面板仍贴近输入区上方。
+2. PC 端：面板宽度建议 320px 至 420px，靠 composer 左侧或光标附近展示，不遮挡发送按钮；composer 多行增长时，面板仍贴近输入区上方。
 3. 每行固定高度，建议 36px 至 40px；面板最大高度为 `10 * rowHeight`。
 4. `overflow-y: auto` 支持滚动查看更多，滚动条在 PC 可见，移动端沿用系统滚动体验。
 5. 命令名展示为 `command`；描述展示为 `description`。
@@ -289,16 +295,43 @@ sequenceDiagram
 10. 键盘交互：Enter 选择当前高亮命令；ArrowDown 移动到下一条，最后一条继续按时保持在最后一条或循环到第一条，推荐保持在最后一条以降低误选；ArrowUp 移动到上一条；Escape 关闭弹窗并保留输入内容和焦点。
 11. 键盘事件只在面板打开时拦截；面板关闭后恢复输入框原有 Enter 发送和方向键移动光标行为。
 
-#### 4.2.6 回填与整体删除
+#### 4.2.6 Token 输入区、回填与整体删除
 
-当前移动端 `input` 和 PC 端 `textarea` 只能显示纯文本，不能天然把 `/new` 渲染为一个富媒体 token。若要满足“slash 命令整体删除”，推荐采用两阶段方案：
+当前移动端 `input` 和 PC 端 `textarea` 只能显示纯文本，无法将 `/new` 局部渲染为 `#0D94FF`，也无法在浏览器原生编辑模型中稳定保证“命令作为整体节点删除”。为满足新的 UI 与删除要求，本期推荐将 `WeAgentCUIFooter` 的输入区升级为可渲染 token 的 composer 组件，优先采用 `contenteditable` 容器或等价的自定义输入层。
 
-1. 一期保留 `input` / `textarea`，在状态中维护 `selectedSlashToken` 元数据：`{ command, start, end }`。选中命令后把文本替换为 `/new `，并记录 token 边界。
-2. 在 `onKeyDown` 捕获 Backspace / Delete：当光标贴近 token 边界或选区覆盖 token 时，一次性删除整个 `/new ` 或 `/new`，再清空 token 元数据。
-3. 用户在 token 内部编辑、粘贴或移动光标修改命令文本时，判定 token 失效，退化为普通文本。
-4. 若后续需要像 Codex / opencode 那样将 slash 命令显示为独立 pill、支持多 token、参数 slot、富文本样式，则应升级为 `contenteditable` 或专用 composer 组件；普通 `input` 无法直接承载真正富媒体节点。
+推荐状态模型：
 
-本期推荐采用“一期保留原输入框 + token 元数据整体删除”的方案，改动小、风险可控，能满足整体删除语义；视觉上仍是纯文本 `/new `，不是富媒体 pill。
+```ts
+type ComposerSegment =
+  | { type: 'text'; text: string }
+  | { type: 'slashCommand'; command: string; description?: string };
+```
+
+核心规则：
+
+1. 选中命令后，将当前 slash 片段替换为一个 `slashCommand` segment，并在其后追加一个普通文本空格。展示层将 token 渲染为不可拆分节点，例如 `<span data-slash-token="/new">/new</span>`，文字颜色为 `#0D94FF`。
+2. 输入区内部可以维护 segment 模型，但对外 `value`、`onSend`、埋码和下游 `sendMessage` 仍使用纯文本序列化结果，例如 `/new 帮我创建会话`。
+3. Backspace 删除规则：
+   - 光标位于 slash token 后方空格之后时，第一次 Backspace 只删除普通空格。
+   - 空格被删除后，光标紧贴 slash token 右侧时，再次 Backspace 整体删除该 token。
+   - 光标位于 token 前方时按普通文本规则处理，不反向删除 token。
+4. Delete 删除规则：
+   - 光标位于 token 左侧时，一次 Delete 整体删除 token。
+   - 光标位于 token 右侧且后方为空格时，Delete 先删除空格；如果紧贴 token 的删除语义与 Backspace 有冲突，以平台原生直觉和测试结果为准，最终在组件内保持 PC 与移动端一致。
+5. 选区删除规则：
+   - 选区完整覆盖 slash token 时，删除整个 token。
+   - 选区部分覆盖 token 时，按覆盖整个 token 处理，避免留下 `/ne` 这类半截命令。
+6. 用户粘贴纯文本时，需要将粘贴内容插入为 text segment；若粘贴内容包含 `/new`，不自动转换为 token，只有通过 slash 面板选择的命令才成为 token。
+7. 用户在 token 内部点击或尝试编辑时，不允许将光标落入 token 内部；光标只能停在 token 前后，避免 token 被拆分。
+8. 空输入、placeholder、发送按钮禁用状态、Enter 发送快捷键、IME 组合输入需要继续保持现有行为。
+9. 如果最低版本或宿主 WebView 对 `contenteditable` selection 支持不足，可降级为纯文本输入框：保留 `/new ` 回填和发送，不展示蓝色 token，不启用整体 token 删除；该降级路径必须通过版本门禁控制。
+
+样式规则：
+
+1. slash token 颜色固定为 `#0D94FF`，不随浅色/暗黑主题变化。
+2. token 背景默认透明，避免破坏输入框视觉；如后续产品要求 pill 样式，可在不改变 segment 模型的前提下增加浅蓝背景和圆角。
+3. token 与后续文本之间的空格是普通文本，不属于 token 节点，保证删除时可以先删除空格。
+4. contenteditable 容器需要模拟原 `input` / `textarea` 的高度、placeholder、focus、disabled、滚动和多行表现，移动端保持单行体验，PC 端保持 textarea 式多行体验。
 
 ### 4.3 兼容与边界
 
@@ -374,14 +407,15 @@ UI 方面，面板最多渲染 10 条可见项，滚动区域固定高度，不�
 
 ### 8.1 直接影响
 
-1. `src/components/assistant/WeAgentCUIFooter.tsx`：输入控制、键盘事件、命令面板渲染、命令回填、整体删除。
+1. `src/components/assistant/WeAgentCUIFooter.tsx`：输入控制、键盘事件、命令面板渲染、命令回填、发送入口协调。
 2. `src/components/assistant/SlashCommandPanel.tsx`：新增命令面板组件。
-3. `src/hooks/useSlashCommandSuggest.ts`：新增 slash 命令联想状态管理。
-4. `src/utils/slashCommandApi.ts`：新增 `HWH5.fetch` slash list 接口封装。
-5. `src/utils/slashCommandStore.ts`：新增移动端 Storage、PC DB、内存降级和 10 分钟过期管理。
-6. `src/utils/uemUtil.ts`、`src/utils/telemetry.ts`：新增 slash 相关埋码封装。
-7. `src/App.tsx` 或 `WeAgentCUI` 页面入口：向 footer 传递 `ak`、`partnerAccount` 或提供读取路径。
-8. `src/styles/WeAgentCUIFooter.less`：新增移动端、PC 端、暗黑模式下的 slash 面板样式。
+3. `src/components/assistant/SlashCommandComposer.tsx`：新增可渲染 token 的输入区，负责 segment 模型、contenteditable 渲染、selection 映射、placeholder、纯文本序列化和删除规则。
+4. `src/hooks/useSlashCommandSuggest.ts`：新增 slash 命令联想状态管理。
+5. `src/utils/slashCommandApi.ts`：新增 `HWH5.fetch` slash list 接口封装。
+6. `src/utils/slashCommandStore.ts`：新增移动端 Storage、PC DB、内存降级和 10 分钟过期管理。
+7. `src/utils/uemUtil.ts`、`src/utils/telemetry.ts`：新增 slash 相关埋码封装。
+8. `src/App.tsx` 或 `WeAgentCUI` 页面入口：向 footer 传递 `ak`、`partnerAccount` 或提供读取路径。
+9. `src/styles/WeAgentCUIFooter.less`：新增移动端、PC 端、暗黑模式下的 slash 面板样式，以及 slash token `#0D94FF` 文本样式。
 
 ### 8.2 间接影响
 
@@ -413,21 +447,24 @@ UI 方面，面板最多渲染 10 条可见项，滚动区域固定高度，不�
 7. 当前没有命令时，输入 `/` 不展示面板。
 8. `/api/v1/slash-commands/query` 返回 `code: 200` 且 `data` 为数组时，正常解析 `command` 和 `description`。
 9. 接口返回 `{ code: 500, message: "查询失败：错误详情" }`、JSAPI reject 或结构异常时，降级读取一次本地存储数据，本次忽略 10 分钟过期标识；如果读到可用命令则展示，否则不展示面板。
-10. 服务端返回重复 `command` 时，面板去重展示。
-11. 选中 slash 命令后按 Backspace / Delete，命令作为整体删除；用户编辑命令内部字符后，token 失效并按普通文本删除。
-12. 面板打开时 Escape 关闭面板；ArrowUp / ArrowDown 移动高亮。
-13. 面板打开时 Enter 选择当前高亮命令；没有高亮时不误选，不破坏原发送逻辑。
-14. 频繁输入 `/`、删除后再次输入 `/`、焦点切换后重复触发时，同一 `partnerAccount` 的网络请求被节流或复用 in-flight promise。
-15. 移动端存储命中时从 `HWH5.getStorage` 读取并展示；请求成功后通过 `HWH5.setStorage` 写入。
-16. PC 端存储命中时从 DB 读取并展示；请求成功后写入 DB。
-17. 存储 key 使用 `partnerAccount`，不使用 `ak`；切换 `partnerAccount` 后不会复用上一助手命令。
-18. 服务端异常后的本地降级读取只执行一次，不因读到过期数据或空数据再次请求服务端，不形成服务端与存储之间的循环读取。
-19. 触发、选择和接口埋码只包含白名单字段，不包含输入框内容、查询串、命令描述、命令参数。
+10. 服务端返回重复 `command` 时，前端保留所有有效行，面板展示数量与缓存数量一致；React key 不因重复 command 冲突。
+11. 选中 slash 命令后，输入区展示 `#0D94FF` 的 slash token，并自动追加一个普通空格。
+12. 光标在 slash token 后方空格之后按 Backspace 时，第一次删除空格，第二次整体删除 slash token。
+13. 光标在 slash token 左侧按 Delete 时，整体删除 slash token；选区部分覆盖 token 时按删除整个 token 处理。
+14. token 不能被拆开编辑，点击或移动光标时只能停在 token 前后。
+15. 面板打开时 Escape 关闭面板；ArrowUp / ArrowDown 移动高亮。
+16. 面板打开时 Enter 选择当前高亮命令；没有高亮时不误选，不破坏原发送逻辑。
+17. 频繁输入 `/`、删除后再次输入 `/`、焦点切换后重复触发时，同一 `partnerAccount` 的网络请求被节流或复用 in-flight promise。
+18. 移动端存储命中时从 `HWH5.getStorage` 读取并展示；请求成功后通过 `HWH5.setStorage` 写入。
+19. PC 端存储命中时从 DB 读取并展示；请求成功后写入 DB。
+20. 存储 key 使用 `partnerAccount`，不使用 `ak`；切换 `partnerAccount` 后不会复用上一助手命令。
+21. 服务端异常后的本地降级读取只执行一次，不因读到过期数据或空数据再次请求服务端，不形成服务端与存储之间的循环读取。
+22. 触发、选择和接口埋码只包含白名单字段，不包含输入框内容、查询串、命令描述、命令参数。
 
 ### 9.2 兼容测试
 
-1. 移动端 `input` 场景：输入、过滤、回填、整体删除、发送按钮状态正常，面板避让键盘和安全区。
-2. PC 端 `textarea` 场景：Enter 选择命令与 Enter 发送快捷键不冲突；Ctrl/Cmd+Enter 发送逻辑保持。
+1. 移动端 composer 场景：输入、过滤、token 回填、空格优先删除、token 整体删除、发送按钮状态正常，面板避让键盘和安全区。
+2. PC 端 composer 场景：多行输入、Enter 选择命令与 Enter 发送快捷键不冲突；Ctrl/Cmd+Enter 发送逻辑保持。
 3. 浅色模式：面板背景、边框、hover、高亮、滚动条、命令名和描述文本可读。
 4. 暗黑模式：面板背景、边框、hover、高亮、滚动条、命令名和描述文本可读，不出现浅色硬编码残留。
 5. 中文 IME 组合输入期间不误触发选择或发送。
@@ -436,8 +473,9 @@ UI 方面，面板最多渲染 10 条可见项，滚动区域固定高度，不�
 8. `window.HWH5?.fetch` 不存在或返回异常时，页面不崩溃。
 9. 移动端 `HWH5.getStorage` / `HWH5.setStorage` 不存在时，退化为内存缓存或关闭 slash 联想，具体按最低版本门禁策略执行。
 10. PC DB 不可用或读写失败时，退化为内存缓存或关闭 slash 联想，具体按最低版本门禁策略执行。
-11. 低于 slash 联想最低版本、低于移动端 Storage 最低版本、低于 PC DB 最低版本时，按版本门禁降级，不出现 JS 错误。
-12. 数据安全开关或数据平台要求哈希标识时，`partnerAccount`、`ak`、`command` 可切换为哈希或聚合字段，不影响前端交互。
+11. contenteditable selection 在最低支持 WebView 上可用；低于最低版本时按版本门禁降级为纯文本或关闭 slash token 展示，不出现 JS 错误。
+12. 低于 slash 联想最低版本、低于移动端 Storage 最低版本、低于 PC DB 最低版本时，按版本门禁降级，不出现 JS 错误。
+13. 数据安全开关或数据平台要求哈希标识时，`partnerAccount`、`ak`、`command` 可切换为哈希或聚合字段，不影响前端交互。
 
 ### 9.3 文档一致性检查
 
@@ -449,4 +487,4 @@ UI 方面，面板最多渲染 10 条可见项，滚动区域固定高度，不�
 
 ## 10. 最终建议
 
-最终结论：推荐先在 `WeAgentCUIFooter` 落地 slash 命令联想，保留当前 `input` / `textarea` 作为输入载体，通过 `useSlashCommandSuggest` 管理命令查询、跨端存储、节流、过滤、高亮、回填和 token 整体删除；命令列表通过纯前端 `HWH5.fetch` 请求 `/api/v1/slash-commands/query`，入参固定为 `{ "ak": "appkey" }`，成功解析 `data[].command` 与 `data[].description`。前端不再做固定时长展示窗口，接口耗时控制由服务端负责；服务端获取异常时只降级读取一次本地存储数据，并忽略本次读取的 10 分钟过期标识，仍无可用命令则静默降级不展示。命令列表存储 key 使用 `partnerAccount`，移动端读写 `HWH5.getStorage` / `HWH5.setStorage`，PC 端写 DB，并通过最低版本门禁保证旧客户端降级安全。该方案能以较小改动满足 10 分钟存储、频繁触发节流、异常后单次本地旧数据降级、最多 10 行滚动、Enter/上下箭头/Escape 键盘操作、描述省略、移动/PC/暗黑适配和整体删除等核心要求。需要取舍的是，本期 slash 命令视觉仍是纯文本，不做富媒体 pill；如果后续要支持真正富媒体输入和复杂命令参数，应再升级为 `contenteditable` 或独立 composer 组件。
+最终结论：推荐先在 `WeAgentCUIFooter` 落地 slash 命令联想，并将当前 `input` / `textarea` 升级为可渲染 token 的 `SlashCommandComposer`。`useSlashCommandSuggest` 继续管理命令查询、跨端存储、节流、过滤、高亮和选择回填；composer 负责 segment 模型、`contenteditable` 渲染、`#0D94FF` slash token、纯文本序列化、空格优先删除和 token 整体删除。命令列表通过纯前端 `HWH5.fetch` 请求 `/api/v1/slash-commands/query`，入参固定为 `{ "ak": "appkey" }`，成功解析 `data[].command` 与 `data[].description`；服务端返回多少条有效命令，前端就缓存和展示多少条，不按 `command` 去重。前端不再做固定时长展示窗口，接口耗时控制由服务端负责；服务端获取异常时只降级读取一次本地存储数据，并忽略本次读取的 10 分钟过期标识，仍无可用命令则静默降级不展示。命令列表存储 key 使用 `partnerAccount`，移动端读写 `HWH5.getStorage` / `HWH5.setStorage`，PC 端写 DB，并通过最低版本门禁保证旧客户端降级安全。该方案能满足 10 分钟存储、频繁触发节流、异常后单次本地旧数据降级、最多 10 行滚动、Enter/上下箭头/Escape 键盘操作、描述省略、移动/PC/暗黑适配、命令蓝色 token 展示和分段删除等核心要求；主要取舍是 composer 改造比继续使用原生输入框风险更高，需要重点测试 selection、IME、移动端键盘和旧 WebView 兼容。

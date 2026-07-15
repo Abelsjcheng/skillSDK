@@ -27,7 +27,7 @@ import { reportSwitchAssistantClick } from '../utils/uemUtil';
 
 const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssistantId }) => {
   const isPc = isPcMiniApp();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
@@ -37,8 +37,8 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
     [defaultSelectedAssistantId],
   );
   const assistantItems = useMemo(
-    () => mapWeAgentListToAssistantItems(assistantList),
-    [assistantList],
+    () => mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language),
+    [assistantList, i18n.language, i18n.resolvedLanguage],
   );
 
   useEffect(() => {

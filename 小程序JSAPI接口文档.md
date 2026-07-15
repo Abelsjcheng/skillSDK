@@ -36,7 +36,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getWeAgentDetails](#13-getweagentdetails) | 获取并按需持久化助理详情 |
 | [updateWeAgent](#131-updateweagent) | 更新个人助理信息 |
 | [deleteWeAgent](#132-deleteweagent) | 删除个人助理 |
-| [notifyAssistantDetailUpdated](#133-notifyassistantdetailupdated) | 通知助理详情已更新 |
+| [getAssistantDetails](#133-getassistantdetails) | 获取指定助理缓存详情 |
 | [queryQrcodeInfo](#134-queryqrcodeinfo) | 查询二维码信息 |
 | [updateQrcodeInfo](#135-updateqrcodeinfo) | 更新二维码信息 |
 | [createNewSession](#14-createnewsession) | 创建新会话 |
@@ -44,6 +44,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [getWeAgentUri](#16-getweagenturi) | 获取当前助理相关页面 URI |
 | [openWeAgentCUI](#17-openweagentcui) | 打开助理 CUI |
 | [onTabForUpdate](#18-ontabforupdate) | 监听小程序更新事件 |
+| [querySlashCommands](#19-queryslashcommands) | 通过 WebSocket 查询 Slash Commands |
 
 ---
 
@@ -547,6 +548,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 | searchResults | object[] \| null | `search_result` 事件搜索结果列表 |
 | references | object[] \| null | `reference` 事件引用列表 |
 | askMoreQuestions | string[] \| null | `ask_more` 事件追问建议列表 |
+| slashCommands | Array<{ command: string; description?: string \| null }> \| null | `slash_commands_result` 事件返回的 Slash Commands 列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照 |
 | parts | array \| null | `streaming` 携带的进行中消息部件 |
 | subagentSessionId | string \| null | 子 agent 的真实会话 ID，仅出现在 Part 级事件及恢复态 part 中 |
@@ -554,12 +556,13 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'registerSe
 
 ### 事件类型
 
-`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
+`text.delta` / `text.done` / `thinking.delta` / `thinking.done` / `tool.update` / `question` / `file` / `step.start` / `step.done` / `session.status` / `session.title` / `session.error` / `permission.ask` / `permission.reply` / `message.user` / `agent.online` / `agent.offline` / `error` / `snapshot` / `streaming` / `planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more` / `slash_commands_result`
 
 恢复态说明：
 - 重连恢复时，服务端会先推送 `snapshot`，再推送 `streaming`。
 - 当 `streaming.sessionStatus = idle` 时，客户端应将当前所有 streaming part 视为已完成，避免残留流式展示状态。
 - `search_result` 的字段名严格是 `searchResults`，`ask_more` 的字段名严格是 `askMoreQuestions`。
+- `slash_commands_result` 的字段名严格是 `slashCommands`，该事件用于 Slash Commands 查询结果，不参与 `SessionMessage` 聚合。
 
 ### 行为说明
 
@@ -1177,6 +1180,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | bizRobotName | string | 助理对应业务机器人名称（中文） |
 | bizRobotNameEn | string | 助理对应业务机器人名称（英文） |
 | bizRobotTag | string | 大脑机器人 tag |
+| tagName | string | 助理标签中文名称 |
+| tagNameEn | string | 助理标签英文名称 |
 | robotId | string | 助理机器人 ID |
 
 ### 错误处理
@@ -1195,7 +1200,7 @@ window.HWH5EXT.getWeAgentList({
   pageNumber: 1
 }).then((result) => {
   result.content.forEach((item) => {
-    console.log(item.name, item.partnerAccount, item.bizRobotTag);
+    console.log(item.name, item.partnerAccount, item.bizRobotTag, item.tagName, item.tagNameEn);
   });
 }).catch((error) => {
   console.error('获取助理列表失败:', error.errorCode, error.errorMessage);
@@ -1207,7 +1212,7 @@ window.HWH5EXT.getWeAgentList({
 1. JSAPI 调用 SDK `getWeAgentList` 接口。
 2. SDK 调用服务端 `GET /v4-1/we-crew/list`，透传查询参数 `pageSize`、`pageNumber`。
 3. SDK 解析服务端返回 `data[]` 并组装为 `WeAgentList`。
-4. 服务端新增字段 `data[].bizRobotTag` 需同步透传到 JSAPI 出参 `content[].bizRobotTag`。
+4. 服务端字段 `data[].bizRobotTag`、`data[].tagName`、`data[].tagNameEn` 需同步透传到 JSAPI 出参 `content[].bizRobotTag`、`content[].tagName`、`content[].tagNameEn`。
 
 ---
 
@@ -1276,13 +1281,16 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 | bizRobotNameEn | string | 助理对应业务机器人名称（英文） |
 | bizRobotTag | string | 大脑机器人 tag |
 | bizRobotId | string | 助理对应业务机器人 ID |
+| tagName | string | 助理标签中文名称 |
+| tagNameEn | string | 助理标签英文名称 |
 | weCodeUrl | string | 助理 We 码地址 |
 
 ### 行为说明
 
 1. 移动端：传入 `partnerAccount` 时，SDK 调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；未传时，SDK 调用 `GET /v4-1/we-crew/my-agent` 获取当前主助理详情。
 2. PC端：保持原有实现，使用 `partnerAccounts` 数组入参获取详情列表。
-3. 当最终查询对象仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离），供 `getWeAgentUri` 使用。
+3. `GET /v1/robot-partners/{partnerAccount}` 返回的 `data[]` 详情对象，以及 `GET /v4-1/we-crew/my-agent` 返回的 `data` 主助理详情对象，均新增 `tagName`、`tagNameEn` 字段；SDK 需原样透传到 JSAPI 出参 `WeAgentDetails`。
+4. 当最终查询对象仅包含 1 个助理时，SDK 将对应详情写入 `current_we_agent_detail`（按 `userId` 隔离），供 `getWeAgentUri` 使用；写入详情需包含服务端返回的 `tagName`、`tagNameEn`。
 
 ### 错误处理
 
@@ -1299,7 +1307,7 @@ window.HWH5EXT.getWeAgentDetails({
   partnerAccount: 'x00_1'
 }).then((result) => {
   result.weAgentDetailsArray.forEach((detail) => {
-    console.log('助理详情:', detail.name, detail.weCodeUrl);
+    console.log('助理详情:', detail.name, detail.weCodeUrl, detail.tagName, detail.tagNameEn);
   });
 }).catch((error) => {
   console.error('获取助理详情失败:', error.errorCode, error.errorMessage);
@@ -1311,7 +1319,7 @@ window.HWH5EXT.getWeAgentDetails({
 ```javascript
 window.HWH5EXT.getWeAgentDetails({})
   .then((result) => {
-    console.log('当前主助理详情:', result.weAgentDetailsArray);
+    console.log('当前主助理详情:', result.weAgentDetailsArray[0]?.tagName, result.weAgentDetailsArray[0]?.tagNameEn);
   })
   .catch((error) => {
     console.error('获取当前主助理详情失败:', error.errorCode, error.errorMessage);
@@ -1338,8 +1346,8 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk', {
 更新个人助理信息。
 
 说明：
-- `partnerAccount` 与 `robotId` 至少传一个。
-- 若两者同时传入，JSAPI 按原样将两个参数都透传给 SDK。
+- 仅支持通过 `partnerAccount` 定位助理。
+- `partnerAccount`、`name`、`icon`、`description` 均需为非空有效字符串。
 
 ### 调用方式
 
@@ -1357,8 +1365,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateWeAg
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| partnerAccount | string | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
-| robotId | string | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
+| partnerAccount | string | 是 | 助理账号 ID；仅支持通过 `partnerAccount` 定位助理 |
 | name | string | 是 | 助理名称 |
 | icon | string | 是 | 助理头像地址 |
 | description | string | 是 | 助理简介 |
@@ -1375,8 +1382,19 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'updateWeAg
 
 1. JSAPI 调用 SDK `updateWeAgent` 接口。
 2. SDK 调用服务端 `PUT /v4-1/we-crew`。
-3. SDK 透传 `partnerAccount`、`robotId`、`name`、`icon`、`description`。
-4. SDK 从服务端响应中提取 `message`，并映射为 `updateResult` 返回。
+3. SDK 校验 `partnerAccount`、`name`、`icon`、`description` 均为非空有效字符串，并仅向服务端透传这些字段。
+4. 服务端返回 `code = 200` 时，SDK 返回 `{ updateResult: 'success' }`；否则抛出异常，并透传服务端 `code` 与 `message`。
+5. 更新成功后，SDK 仅更新本地已存在且 `partnerAccount` 匹配的 `current_we_agent_detail` 和 `we_agent_details` 缓存，不新增未命中的缓存。
+6. 更新成功后，SDK 通过 `GET /v1/robot-partners/{partnerAccount}` 补拉完整助理详情，并触发 `agentskills.agentUpdated` 更新广播；补拉失败时不触发更新广播。
+7. 补拉详情返回的 `tagName`、`tagNameEn` 需与其他 `WeAgentDetails` 字段一起透传到更新广播 payload 的 `data` 中。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `partnerAccount`、`name`、`icon` 或 `description` 缺失或格式错误 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 服务端 code | 服务端 message | 服务端返回 `code` 不为 `200` |
 
 ### 调用示例
 
@@ -1402,8 +1420,8 @@ window.HWH5EXT.updateWeAgent({
 删除个人助理。
 
 说明：
-- `partnerAccount` 与 `robotId` 至少传一个。
-- 若两者同时传入，JSAPI 按原样将两个参数都透传给 SDK。
+- 仅支持通过 `partnerAccount` 定位助理。
+- `partnerAccount` 需为非空有效字符串。
 
 ### 调用方式
 
@@ -1421,8 +1439,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'deleteWeAg
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| partnerAccount | string | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
-| robotId | string | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 至少传一个；若两者同时传入，则两个参数都透传 |
+| partnerAccount | string | 是 | 助理账号 ID；仅支持通过 `partnerAccount` 定位助理 |
 
 ### 返回值
 
@@ -1435,9 +1452,20 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'deleteWeAg
 ### 行为说明
 
 1. JSAPI 调用 SDK `deleteWeAgent` 接口。
-2. SDK 调用服务端 `DELETE /v4-1/we-crew`。
-3. SDK 校验 `partnerAccount` 与 `robotId` 至少传一个，并按原样透传删除标识参数。
-4. SDK 从服务端响应中提取 `message`，并映射为 `deleteResult` 返回。
+2. SDK 校验 `partnerAccount` 为非空有效字符串，并在请求前根据 `current_we_agent_detail` 判断删除目标是否为当前助理。
+3. SDK 调用服务端 `DELETE /v4-1/we-crew`，并仅透传 `partnerAccount`。
+4. 服务端返回 `code = 200` 时，SDK 返回 `{ deleteResult: 'success' }`；否则抛出异常，并透传服务端 `code` 与 `message`。
+5. 删除非当前助理成功后，SDK 从已有的 `we_agent_list_cache` 和 `we_agent_details` 中移除目标助理；不修改 `current_we_agent_detail`，也不触发当前助理切换。
+6. 删除当前助理成功后，SDK 清理列表、当前详情和详情缓存中的目标助理，并调用 `getWeAgentUri` 获取删除后的目标 URI 后执行跳转。
+7. 删除成功后，SDK 触发 `agentskills.agentUpdated` 删除广播，payload 为 `{ type: 'delete', data: { partnerAccount }, extraData: { source: 'local' } }`。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 服务端 code | 服务端 message | 服务端返回 `code` 不为 `200` |
 
 ### 调用示例
 
@@ -1453,65 +1481,75 @@ window.HWH5EXT.deleteWeAgent({
 
 ---
 
-## 13.3. notifyAssistantDetailUpdated
+## 13.3. getAssistantDetails
 
 ### 接口说明
 
-通知当前助理详情已更新，并触发已注册的详情更新回调。
+根据 `partnerAccount` 获取指定助理的详情缓存。
 
 说明：
-- 该接口为本地扩展接口，无对应服务端接口。
-- `partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount`。
+- 若本地已存在对应 `partnerAccount` 的助理详情缓存，SDK 先直接返回缓存内容。
+- 在返回缓存后，SDK 异步调用服务端接口 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情，并更新本地缓存。
+- 若本地不存在对应缓存，SDK 调用服务端接口获取详情，返回结果并写入本地缓存。
+- 缓存存储方式与 `getWeAgentDetails` 一致，需按 `userId` 隔离。
 
 ### 调用方式
 
 ```javascript
-window.HWH5EXT.notifyAssistantDetailUpdated(params)
+window.HWH5EXT.getAssistantDetails(params)
 ```
 
 ### PC端调用方式
 
 ```javascript
-window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'notifyAssistantDetailUpdated', params})
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getAssistantDetails', params})
 ```
 
 ### 参数说明
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| name | string | 是 | 助理名称 |
-| icon | string | 是 | 助理头像地址 |
-| description | string | 是 | 助理简介 |
-| partnerAccount | string | 否 | 助理账号 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
-| robotId | string | 否 | 助理机器人 ID，`partnerAccount` 与 `robotId` 二选一，优先使用 `partnerAccount` |
+| partnerAccount | string | 是 | 助理账号 ID |
 
 ### 返回值
 
-返回 Promise，resolve 数据：`NotifyAssistantDetailUpdatedResult`
+返回 Promise，resolve 数据：`WeAgentDetailsArray`
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| status | string | 固定返回 `success` |
+| weAgentDetailsArray | Array<WeAgentDetails> | 助理详情数组 |
+
+`WeAgentDetails` 对象字段定义与 `getWeAgentDetails` 返回保持一致。
 
 ### 行为说明
 
-1. JSAPI 调用 SDK `notifyAssistantDetailUpdated` 接口。
-2. SDK 根据与 `openAssistantEditPage` 一致的唯一 ID 规则定位已注册监听：优先使用 `partnerAccount`，否则使用 `robotId`。
-3. SDK 触发对应的 `onUpdated` 回调，并传出 `{ name, icon, description }`。
-4. SDK 返回 `{ status: 'success' }`。
+1. JSAPI 调用 SDK `getAssistantDetails` 接口。
+2. SDK 在按 `userId` 隔离的本地缓存中读取固定缓存 key `we_agent_details`，并从中按 `partnerAccount` 读取对应助理详情对象缓存。
+3. 若读取到对应缓存，则 SDK 将该对象组装为 `weAgentDetailsArray` 返回。
+4. 在返回缓存后，SDK 异步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 拉取最新详情；服务端返回的 `data[]` 详情对象新增 `tagName`、`tagNameEn` 字段，SDK 需与其他 `WeAgentDetails` 字段一起解析和缓存。若返回结果非空，则取首个助理详情对象写回 `we_agent_details[partnerAccount]`。
+5. 若未读取到缓存，则 SDK 同步调用服务端 `GET /v1/robot-partners/{partnerAccount}` 获取详情；服务端返回的 `tagName`、`tagNameEn` 需原样透传到 JSAPI 出参。若返回结果非空，则取首个助理详情对象写入 `we_agent_details[partnerAccount]`，并将完整结果组装为 `weAgentDetailsArray` 返回。
+6. 若服务端返回的助理详情为空，则 SDK 不设置新缓存，也不删除旧缓存。
+7. 当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `partnerAccount` 缺失或格式错误 |
+| 6000 | 网络错误 | 网络请求失败 |
+| 7000 | 服务端错误 | 服务端处理失败 |
 
 ### 调用示例
 
 ```javascript
-window.HWH5EXT.notifyAssistantDetailUpdated({
-  name: '更新名称',
-  icon: '/mocloud/xxx',
-  description: '更新简介',
+window.HWH5EXT.getAssistantDetails({
   partnerAccount: 'x00_1'
 }).then((result) => {
-  console.log('通知结果:', result.status);
+  result.weAgentDetailsArray.forEach((detail) => {
+    console.log('助理缓存详情:', detail.name, detail.weCodeUrl);
+  });
 }).catch((error) => {
-  console.error('通知助理详情更新失败:', error.errorCode, error.errorMessage);
+  console.error('获取助理缓存详情失败:', error.errorCode, error.errorMessage);
 });
 ```
 
@@ -1951,6 +1989,137 @@ window.HWH5EXT.onTabForUpdate(() => {
 
 ---
 
+## 19. querySlashCommands
+
+### 接口说明
+
+通过 Skill WebSocket 长连接查询当前会话可用的 Slash Commands。
+
+该接口不是 REST 查询接口。调用成功只表示 SDK 已向 WebSocket 发送查询命令，真实命令列表通过 `registerSessionListener` 的 `onMessage` 接收 `slash_commands_result` 事件。
+
+SDK 发送的 WebSocket 命令：
+
+```json
+{
+  "action": "query_slash_commands",
+  "welinkSessionId": "{string}"
+}
+```
+
+服务端推送的结果事件：
+
+```json
+{
+  "type": "slash_commands_result",
+  "seq": 135,
+  "emittedAt": "2026-06-15T00:00:00Z",
+  "messageId": "{string}",
+  "messageSeq": 6,
+  "role": "assistant",
+  "sourceMessageId": "{string}",
+  "partId": "{string}",
+  "partSeq": 4,
+  "status": "running",
+  "sessionID": "{string}",
+  "welinkSessionId": "{string}",
+  "slashCommands": [
+    {
+      "command": "/new",
+      "description": "新建会话"
+    },
+    {
+      "command": "/delete",
+      "description": "删除"
+    }
+  ]
+}
+```
+
+说明：
+- SDK 对外主会话字段统一使用 `welinkSessionId`。
+- 若服务端同时返回 `sessionID`，SDK 可保留在 `raw` 中；端侧业务不应依赖该字段作为主会话 ID。
+- `slash_commands_result` 不参与 `getSessionMessage` / `getSessionMessageHistory` 的消息聚合。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.querySlashCommands(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'querySlashCommands', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### 返回值
+
+返回 Promise，resolve 数据：
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定为 `success`，表示查询命令已发送 |
+
+### 结果事件字段
+
+`slash_commands_result` 事件沿用 `StreamMessage` 结构，并额外关注以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定为 `slash_commands_result` |
+| welinkSessionId | string | 所属会话 ID |
+| slashCommands | Array<SlashCommand> | Slash Commands 列表，可能为空数组 |
+| slashCommands[].command | string | Slash 命令，如 `/new` |
+| slashCommands[].description | string \| null | 命令描述 |
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+| 5000 | SDK 未初始化 | SDK 尚未完成初始化 |
+| 6000 | 网络错误 | WebSocket 连接或发送失败 |
+| 7000 | 服务端错误 | 服务端返回错误事件或无法处理查询命令 |
+
+### 实现方法
+
+1. 调用方先通过 `registerSessionListener` 注册当前 `welinkSessionId` 的消息监听。
+2. 调用 `querySlashCommands({ welinkSessionId })`。
+3. SDK 校验参数并确保 WebSocket 已连接。
+4. SDK 通过 `WebSocketManager` 发送 `query_slash_commands` 命令。
+5. 服务端异步推送 `slash_commands_result`。
+6. SDK 按 `welinkSessionId` 将事件分发给对应监听器。
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.registerSessionListener({
+  welinkSessionId: '42',
+  onMessage: (message) => {
+    if (message.type !== 'slash_commands_result') {
+      return;
+    }
+    console.log('Slash Commands:', message.slashCommands || []);
+  }
+});
+
+window.HWH5EXT.querySlashCommands({
+  welinkSessionId: '42'
+}).then((result) => {
+  console.log('查询命令已发送:', result.status);
+}).catch((error) => {
+  console.error('查询 Slash Commands 失败:', error.errorCode, error.errorMessage);
+});
+```
+
+---
+
 ## 错误码说明
 
 | 错误码 | 说明 |
@@ -1966,6 +2135,7 @@ window.HWH5EXT.onTabForUpdate(() => {
 | 4008 | 权限请求已过期 |
 | 4009 | 小程序不存在 |
 | 4010 | 操作失败 |
+| 5000 | SDK 未初始化 |
 | 6000 | 网络错误 |
 | 7000 | 服务端错误 |
 | 7001 | AI 网关错误 |

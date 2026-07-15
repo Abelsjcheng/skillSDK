@@ -8,6 +8,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^WLAgentSkillsWebSocketConnectCompletion)(NSError * _Nullable error);
+
 @protocol WLAgentSkillsWebSocketManagerDelegate <NSObject>
 @optional
 - (void)webSocketManagerDidConnect;
@@ -23,6 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)sharedManager;
 
 - (void)connectIfNeeded;
+- (void)ensureConnectedWithCompletion:(nullable WLAgentSkillsWebSocketConnectCompletion)completion;
 - (void)disconnect;
 
 - (BOOL)addListenerForSessionId:(NSString *)welinkSessionId

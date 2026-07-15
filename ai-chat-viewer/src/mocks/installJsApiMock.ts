@@ -13,6 +13,7 @@ import type {
   CreateNewSessionParams,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
+  GetAssistantDetailsParams,
   GetSessionMessageHistoryParams,
   GetHistorySessionsListParams,
   GetSessionMessageParams,
@@ -20,16 +21,17 @@ import type {
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   QueryQrcodeInfoResult,
   RegenerateAnswerParams,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   ReplyPermissionParams,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -46,6 +48,8 @@ import { WeLog } from '../utils/logger';
 
 interface MockHWH5Bridge {
   openWebview?: (payload: { uri: string }) => void;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
   addEventListener?: (params: { type: 'back'; func: () => boolean }) => Promise<unknown> | unknown;
@@ -60,7 +64,13 @@ interface MockHWH5Bridge {
   getAccountInfo?: () => Promise<string>;
   navigateBack: () => void;
   close: () => void;
+  fetchFull?: <T = unknown>(
+    url: string,
+    options: { method: string; headers: Record<string, string> },
+  ) => Promise<{ json: () => Promise<T> }> | { json: () => Promise<T> };
 }
+
+const hwh5StorageStore = new Map<string, unknown>();
 
 interface SessionRecord {
   session: SkillSession;
@@ -79,6 +89,13 @@ interface SessionListener {
 interface SubagentMockContext {
   subagentSessionId: string;
   subagentName: string;
+}
+
+interface MockQuestionItem {
+  header: string;
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect?: boolean;
 }
 
 type MockReplyScenario =
@@ -111,6 +128,8 @@ type MockReplyScenario =
     header: string;
     question: string;
     options: Array<{ label: string; description?: string }>;
+    multiSelect?: boolean;
+    questions?: MockQuestionItem[];
   }
   | {
     type: 'permission';
@@ -193,6 +212,10 @@ type MockReplyScenario =
 declare global {
   interface Window {
     __AI_CHAT_VIEWER_JSAPI_MOCK__?: boolean;
+    __AI_CHAT_VIEWER_MOCK__?: {
+      emitSessionDeleted: (sessionId: string) => boolean;
+      listSessionIds: () => string[];
+    };
   }
 }
 
@@ -377,6 +400,8 @@ function buildQuestionPart(
   options: Array<{ label: string; description?: string }>,
   partSeq = 1,
   subagent?: SubagentMockContext,
+  multiSelect?: boolean,
+  questions?: MockQuestionItem[],
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -389,6 +414,8 @@ function buildQuestionPart(
     header,
     question,
     options,
+    ...(multiSelect != null ? { multiSelect } : {}),
+    ...(questions ? { questions } : {}),
     ...(subagent
       ? {
         subagentSessionId: subagent.subagentSessionId,
@@ -713,6 +740,42 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
     };
   }
 
+  if (matchesMockKeyword(normalized, ['mock-multi-question', 'trigger-multi-question', '触发多题'])) {
+    const questions: MockQuestionItem[] = [
+      {
+        header: 'Platform priority',
+        question: 'Which platform should this requirement prioritize first?',
+        options: [
+          { label: 'Android', description: 'Focus on Java/Kotlin SDK changes' },
+          { label: 'iOS', description: 'Focus on Objective-C/Swift SDK changes' },
+          { label: 'HarmonyOS', description: 'Focus on ArkTS SDK changes' },
+        ],
+        multiSelect: false,
+      },
+      {
+        header: 'Implementation scope',
+        question: 'Which areas should be included in this pass?',
+        options: [
+          { label: 'Parsing', description: 'Normalize questions from history and streaming events' },
+          { label: 'Interaction', description: 'Support navigation, multi-select, and custom answers' },
+          { label: 'Transport', description: 'Serialize answers before sending to the service' },
+        ],
+        multiSelect: true,
+      },
+    ];
+
+    return {
+      type: 'question',
+      toolCallId: nextId('tool_call_multi_question'),
+      questionId: nextId('question_multi'),
+      header: questions[0].header,
+      question: questions[0].question,
+      options: questions[0].options,
+      multiSelect: questions[0].multiSelect,
+      questions,
+    };
+  }
+
   if (matchesMockKeyword(normalized, ['mock-question', 'trigger-question', '触发question'])) {
     return {
       type: 'question',
@@ -897,6 +960,46 @@ function emit(sessionId: string, payload: MockEmitPayload): void {
   }
 
   dispatchToSessionListener(listener, message);
+}
+
+function emitSessionDeleted(sessionId: string): boolean {
+  const normalizedSessionId = sessionId.trim();
+  if (!normalizedSessionId) {
+    return false;
+  }
+
+  const record = sessionStore.get(normalizedSessionId);
+  if (record) {
+    clearSessionTimers(record);
+    record.nextStreamSeq += 1;
+  }
+
+  const listener = listeners.get(normalizedSessionId);
+  const message = {
+    type: 'session.deleted',
+    welinkSessionId: normalizedSessionId,
+    sessionId: normalizedSessionId,
+    seq: record?.nextStreamSeq ?? null,
+    emittedAt: nowIso(),
+    content: {
+      welinkSessionId: normalizedSessionId,
+    },
+  } as StreamMessage;
+
+  sessionStore.delete(normalizedSessionId);
+
+  if (listener) {
+    dispatchToSessionListener(listener, message);
+  }
+
+  return Boolean(record || listener);
+}
+
+function installMockDebugTools(): void {
+  window.__AI_CHAT_VIEWER_MOCK__ = {
+    emitSessionDeleted: emitSessionDeleted,
+    listSessionIds: () => Array.from(sessionStore.keys()),
+  };
 }
 
 function clearSessionTimers(record: SessionRecord): void {
@@ -1570,6 +1673,8 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         header: scenario.header,
         question: scenario.question,
         options: scenario.options,
+        ...(scenario.multiSelect != null ? { multiSelect: scenario.multiSelect } : {}),
+        ...(scenario.questions ? { questions: scenario.questions } : {}),
         status: 'running',
       });
     });
@@ -1584,6 +1689,9 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
           scenario.question,
           scenario.options,
           1,
+          undefined,
+          scenario.multiSelect,
+          scenario.questions,
         ),
       ]);
       emit(sessionId, {
@@ -2219,6 +2327,16 @@ function ensureMockHWH5Bridge(): void {
     };
   }
 
+  if (typeof hwh5.getStorage !== 'function') {
+    hwh5.getStorage = async (key) => ({ data: hwh5StorageStore.get(key) ?? null });
+  }
+
+  if (typeof hwh5.setStorage !== 'function') {
+    hwh5.setStorage = async ({ key, data }) => {
+      hwh5StorageStore.set(key, data);
+    };
+  }
+
   if (typeof hwh5.reboot !== 'function') {
     hwh5.reboot = async () => undefined;
   }
@@ -2257,6 +2375,36 @@ function ensureMockHWH5Bridge(): void {
   if (typeof hwh5.close !== 'function') {
     hwh5.close = () => {
       // no-op for browser mock
+    };
+  }
+
+  if (typeof hwh5.fetchFull !== 'function') {
+    hwh5.fetchFull = async <T = unknown>(url: string, options: { method: string }) => {
+      const method = options.method.toLowerCase();
+      const parsedUrl = new URL(url, 'https://ai-chat-viewer.mock.local');
+      const matchedDeleteSession = parsedUrl.pathname.match(/^\/(?:mag\/)?api\/skill\/sessions\/([^/?#]+)$/);
+      if (method === 'delete' && matchedDeleteSession) {
+        const sessionId = decodeURIComponent(matchedDeleteSession[1]);
+        const existed = emitSessionDeleted(sessionId);
+        const reply = existed
+          ? {
+            code: 0,
+            data: {
+              status: 'deleted',
+              welinkSessionId: sessionId,
+            },
+          }
+          : {
+            code: 400,
+            message: 'Invalid session id',
+          };
+
+        return {
+          json: async () => reply as T,
+        };
+      }
+
+      throw new Error(`mock HWH5.fetchFull unsupported request: ${method.toUpperCase()} ${url}`);
     };
   }
 
@@ -2349,6 +2497,12 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
+    registerEventListener: (params: RegisterEventListenerParams): void => {
+      window.addEventListener(params.type, ((event: Event) => {
+        params.func((event as CustomEvent).detail);
+      }) as EventListener);
+    },
+
     registerSessionListener: (params: RegisterSessionListenerParams): void => {
       listeners.set(params.welinkSessionId, {
         onMessage: params.onMessage,
@@ -2377,6 +2531,50 @@ function buildMockApi(): HWH5EXT {
       }
       scheduleAssistantReply(record, params.content);
       return toSendMessageResponse(userMessage);
+    },
+
+    sendWebSocketMessage: async (
+      params: SendWebSocketMessageParams,
+    ): Promise<SendWebSocketMessageResult> => {
+      let message: Record<string, unknown> = {};
+      try {
+        const parsedMessage = JSON.parse(params.message);
+        message = parsedMessage && typeof parsedMessage === 'object' ? parsedMessage : {};
+      } catch (_error) {
+        message = {};
+      }
+      const action = message.action;
+      const welinkSessionId = typeof message.welinkSessionId === 'string'
+        ? message.welinkSessionId
+        : '';
+      if (action === 'query_slash_commands' && welinkSessionId) {
+        emit(welinkSessionId, {
+          type: 'slash_commands_result',
+          messageId: nextId('slash_commands'),
+          role: 'assistant',
+          status: 'running',
+          slashCommands: [
+            { command: '/new', description: '新建会话' },
+            { command: '/help', description: '查看可用命令' },
+            { command: '/clear', description: '清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文清空当前上下文' },
+            { command: '/clear1', description: '清空当前上下文' },
+            { command: '/clear2', description: '清空当前上下文' },
+            { command: '/clear3', description: '清空当前上下文' },
+            { command: '/clear4', description: '清空当前上下文' },
+            { command: '/clear5', description: '清空当前上下文' },
+            { command: '/clear6', description: '清空当前上下文' },
+            { command: '/clear7', description: '清空当前上下文' },
+            { command: '/clear8', description: '清空当前上下文' },
+            { command: '/clear9', description: '清空当前上下文' },
+            { command: '/clear10', description: '清空当前上下文' },
+            { command: '/clear11', description: '清空当前上下文' },
+            { command: '/clear12', description: '清空当前上下文' },
+            { command: '/clear13', description: '清空当前上下文' },
+            { command: '/clear14', description: '清空当前上下文' },
+          ],
+        });
+      }
+      return { status: 'success' };
     },
 
     stopSkill: async (params: StopSkillParams) => {
@@ -2516,6 +2714,13 @@ function buildMockApi(): HWH5EXT {
       };
     },
 
+    getAssistantDetails: async (params: GetAssistantDetailsParams): Promise<WeAgentDetailsArrayResult> => {
+      const detail = assistantDetailsStore.get(params.partnerAccount);
+      return {
+        weAgentDetailsArray: detail ? [cloneAssistantDetail(detail)] : [],
+      };
+    },
+
     updateWeAgent: async (params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> => {
       const detail = findAssistantDetail(params);
       if (!detail) {
@@ -2564,15 +2769,6 @@ function buildMockApi(): HWH5EXT {
     updateQrcodeInfo: async (): Promise<UpdateQrcodeInfoResult> => ({
       status: 'success',
     }),
-
-    notifyAssistantDetailUpdated: async (
-      params: NotifyAssistantDetailUpdatedParams,
-    ): Promise<NotifyAssistantDetailUpdatedResult> => {
-      window.dispatchEvent(new CustomEvent('assistant-detail-updated', { detail: { ...params } }));
-      return {
-        status: 'success',
-      };
-    },
 
     getHistorySessionsList: async (params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> => {
       const page = Math.max(0, params.page ?? 0);
@@ -2659,6 +2855,7 @@ export function installJsApiMock(): void {
 
     seedMockData();
     ensureMockHWH5Bridge();
+    installMockDebugTools();
 
     if (!window.HWH5EXT || enableFromQuery) {
       window.HWH5EXT = buildMockApi();

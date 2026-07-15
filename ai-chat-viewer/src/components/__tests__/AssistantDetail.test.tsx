@@ -87,6 +87,7 @@ function installAssistantDetailMock(kind: 'internal' | 'internalMyAgent' | 'exte
   });
   Object.defineProperty(window, 'HWH5', {
     value: {
+      addEventListener: jest.fn(),
       navigateBack: jest.fn(),
       openWebview: jest.fn(),
     },
@@ -125,6 +126,12 @@ describe('AssistantDetail', () => {
     expect(screen.getByText(i18n.t('assistantDetail.creator'))).toBeInTheDocument();
     expect(screen.getByText('creator-zh creator_w3')).toBeInTheDocument();
     expect(screen.getByText(i18n.t('assistantDetail.capabilityProvider'))).toBeInTheDocument();
+  });
+
+  it('renders as an exported component without router context', async () => {
+    render(<AssistantDetail partnerAccount="x00_1" />);
+
+    expect(await screen.findByText('Assistant A')).toBeInTheDocument();
   });
 
   it('uses creatorNameEn with creatorW3Account when current language is english', async () => {

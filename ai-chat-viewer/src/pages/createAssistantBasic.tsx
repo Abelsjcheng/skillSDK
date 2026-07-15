@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StepBasicInfo } from '../components/createAssistant/StepBasicInfo';
-import { DEFAULT_AVATARS } from '../components/createAssistant/constants';
+import { DEFAULT_NEW_AVATARS } from '../components/createAssistant/constants';
 import { isPcMiniApp } from '../constants';
 import qrcodeExpiredNotice from '../imgs/qrcode_expired_notice.png';
 import type { CreateAssistantRouteState, CreateDigitalTwinParams, DigitalTwinBasicInfoPayload } from '../types/digitalTwin';
@@ -17,6 +17,7 @@ import { WeLog } from '../utils/logger';
 import { reportCoreFlowError } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
 import { canIUse } from '../utils/versionCheck';
+import { useSubmitLock } from '../hooks/useSubmitLock';
 import '../styles/DigitalTwinCreator.less';
 
 function isExpiredByExpireTime(expireTime: string): boolean {
@@ -38,6 +39,7 @@ const CreateAssistantBasicPage: React.FC = () => {
   const [qrcodeLoaded, setQrcodeLoaded] = useState(!isQrcodeScene);
   const [qrcodeExpired, setQrcodeExpired] = useState(false);
   const [qrcodeExpiredMessage, setQrcodeExpiredMessage] = useState('');
+  const { submitting, runWithSubmitLock } = useSubmitLock();
 
   const showQrcodeExpired = useCallback((message: string) => {
     setQrcodeExpired(true);
@@ -174,75 +176,77 @@ const CreateAssistantBasicPage: React.FC = () => {
       return;
     }
 
-    try {
-      const qrcodeInfo = await queryQrcodeInfo({ qrcode });
-      if (isExpiredByExpireTime(qrcodeInfo.expireTime)) {
-        showQrcodeExpired(t('createAssistant.qrcodeInvalid'));
+    await runWithSubmitLock(async () => {
+      try {
+        const qrcodeInfo = await queryQrcodeInfo({ qrcode });
+        if (isExpiredByExpireTime(qrcodeInfo.expireTime)) {
+          showQrcodeExpired(t('createAssistant.qrcodeInvalid'));
+          return;
+        }
+      } catch (error) {
+        WeLog(`CreateAssistantBasicPage queryQrcodeInfo before create failed | extra=${JSON.stringify({
+          qrcode,
+        })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
+          page: 'createAssistant',
+          stage: 'validateQrcodeBeforeCreate',
+          from,
+          qrcode,
+          isPc,
+        });
+        showToast(t('createAssistant.queryQrcodeInfoFailed'));
         return;
       }
-    } catch (error) {
-      WeLog(`CreateAssistantBasicPage queryQrcodeInfo before create failed | extra=${JSON.stringify({
+
+      const params: CreateDigitalTwinParams = {
+        name: payload.name,
+        icon: payload.icon,
+        description: payload.description,
         qrcode,
-      })} | error=${JSON.stringify(error)}`);
-      void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
-        page: 'createAssistant',
-        stage: 'validateQrcodeBeforeCreate',
-        from,
-        qrcode,
-        isPc,
-      });
-      showToast(t('createAssistant.queryQrcodeInfoFailed'));
-      return;
-    }
+      };
 
-    const params: CreateDigitalTwinParams = {
-      name: payload.name,
-      icon: payload.icon,
-      description: payload.description,
-      qrcode,
-    };
+      try {
+        const createResult = await createDigitalTwin(params);
+        const partnerAccount = resolvePartnerAccount(createResult);
 
-    try {
-      const createResult = await createDigitalTwin(params);
-      const partnerAccount = resolvePartnerAccount(createResult);
+        if (!partnerAccount) {
+          WeLog(`CreateAssistantBasicPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
+            createResult,
+          })}`);
+          void reportCoreFlowError(
+            'flow_create_assistant_error',
+            '创建助手流程失败',
+            new Error('createDigitalTwin returned missing partnerAccount'),
+            {
+              page: 'createAssistant',
+              stage: 'missingPartnerAccount',
+              from,
+              qrcode,
+              isPc,
+            },
+          );
+          showToast(t('createAssistant.createFailed'));
+          return;
+        }
 
-      if (!partnerAccount) {
-        WeLog(`CreateAssistantBasicPage createDigitalTwin returned invalid result | extra=${JSON.stringify({
-          createResult,
-        })}`);
-        void reportCoreFlowError(
-          'flow_create_assistant_error',
-          '创建助手流程失败',
-          new Error('createDigitalTwin returned missing partnerAccount'),
-          {
-            page: 'createAssistant',
-            stage: 'missingPartnerAccount',
-            from,
-            qrcode,
-            isPc,
-          },
-        );
+        shouldUpdateQrcodeStatusRef.current = false;
+        await handleCreateForOtherScene(createResult);
+      } catch (error) {
+        WeLog(`CreateAssistantBasicPage createDigitalTwin failed | extra=${JSON.stringify({
+          from,
+          qrcode,
+        })} | error=${JSON.stringify(error)}`);
+        void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
+          page: 'createAssistant',
+          stage: 'createDigitalTwinOrOpenHost',
+          from,
+          qrcode,
+          isPc,
+        });
         showToast(t('createAssistant.createFailed'));
-        return;
       }
-
-      shouldUpdateQrcodeStatusRef.current = false;
-      await handleCreateForOtherScene(createResult);
-    } catch (error) {
-      WeLog(`CreateAssistantBasicPage createDigitalTwin failed | extra=${JSON.stringify({
-        from,
-        qrcode,
-      })} | error=${JSON.stringify(error)}`);
-      void reportCoreFlowError('flow_create_assistant_error', '创建助手流程失败', error, {
-        page: 'createAssistant',
-        stage: 'createDigitalTwinOrOpenHost',
-        from,
-        qrcode,
-        isPc,
-      });
-      showToast(t('createAssistant.createFailed'));
-    }
-  }, [from, isPc, isQrcodeScene, location.search, navigate, qrcode, showQrcodeExpired, t]);
+    });
+  }, [from, isPc, isQrcodeScene, location.search, navigate, qrcode, runWithSubmitLock, showQrcodeExpired, t]);
 
   if (isQrcodeScene && !qrcodeLoaded) {
     return <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()} />;
@@ -252,7 +256,7 @@ const CreateAssistantBasicPage: React.FC = () => {
     <div className={`digital-twin-creator ${isPc ? 'is-pc' : 'is-mobile'}`.trim()}>
       <StepBasicInfo
         isPcMiniApp={isPc}
-        defaultAvatars={DEFAULT_AVATARS}
+        defaultAvatars={DEFAULT_NEW_AVATARS}
         initialValue={initialValue}
         expired={qrcodeExpired}
         expiredImageSrc={qrcodeExpiredNotice}
@@ -261,6 +265,7 @@ const CreateAssistantBasicPage: React.FC = () => {
         onClose={handleClose}
         onMobileBack={handleMobileBack}
         onNext={handleNext}
+        submitting={submitting}
         submitLabel={isQrcodeScene && !qrcodeExpired ? t('common.confirm') : undefined}
       />
     </div>

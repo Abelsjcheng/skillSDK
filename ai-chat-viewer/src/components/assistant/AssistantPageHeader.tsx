@@ -97,11 +97,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
             type="button"
             className="assistant-page-header__icon-btn assistant-page-header__icon-btn--right"
             aria-label={mobileRightActionLabel}
-            onClick={(event) => {
-              runButtonClickWithDebounce(event, () => {
-                onMobileRightAction();
-              });
-            }}
+            onClick={onMobileRightAction}
           >
             <img src={mobileRightActionIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
           </button>
