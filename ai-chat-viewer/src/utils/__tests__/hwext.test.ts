@@ -1,4 +1,4 @@
-import { buildOpenWeAgentCUIParams, sendWebSocketMessage, deleteHistorySession } from '../hwext';
+import { buildOpenWeAgentCUIParams, sendWebSocketMessage, deleteHistorySession, getDeviceInfo } from '../hwext';
 
 describe('deleteHistorySession', () => {
   beforeEach(() => {
@@ -96,5 +96,32 @@ describe('sendWebSocketMessage', () => {
         welinkSessionId: '42',
       }),
     });
+  });
+});
+
+describe('getDeviceInfo', () => {
+  const originalHWH5 = window.HWH5;
+
+  afterEach(() => {
+    window.HWH5 = originalHWH5;
+  });
+
+  it('normalizes status bar and safe area heights from the host device info', async () => {
+    window.HWH5 = {
+      ...(originalHWH5 ?? {}),
+      getDeviceInfo: jest.fn().mockResolvedValue({
+        osType: 'Harmony',
+        isFullScreen: 0,
+        statusBarHeight: '24',
+        safeAreaInsetBottom: '18',
+      }),
+    } as typeof window.HWH5;
+
+    await expect(getDeviceInfo()).resolves.toEqual(expect.objectContaining({
+      osType: 'Harmony',
+      isFullScreen: 0,
+      statusBarHeight: 24,
+      safeAreaInsetBottom: 18,
+    }));
   });
 });

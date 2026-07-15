@@ -443,6 +443,8 @@ export interface HWH5Bridge {
 }
 
 export interface HWH5DeviceInfo {
+  osType?: string;
+  isFullScreen?: number;
   statusBarHeight: number;
   safeAreaInsetBottom: number;
   [key: string]: unknown;

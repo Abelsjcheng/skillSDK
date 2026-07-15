@@ -21,6 +21,10 @@ const ASSISTANT_EDIT_MIN_VERSION: MinVersionMap = {
   harmony: '1.31.0',
 };
 
+const HARMONY_SPLIT_LAYOUT_MIN_VERSION: MinVersionMap = {
+  harmony: '1.30.0',
+};
+
 export function compareVersion(newVersion: string, oldVersion: string): number {
   const v1 = newVersion.split('.');
   const v2 = oldVersion.split('.');
@@ -89,8 +93,5 @@ async function canUseByMinVersion(minVersion: MinVersionMap): Promise<boolean> {
 }
 
 export const canIUse = {
-  // 助理详情页移动端编辑入口版本判断。
-  assistantEdit: () => canUseByMinVersion(ASSISTANT_EDIT_MIN_VERSION),
-  // 扫码创建助理流程版本判断。
   qrcodeCreateAssistant: () => canUseByMinVersion(QRCODE_CREATE_ASSISTANT_MIN_VERSION),
 };

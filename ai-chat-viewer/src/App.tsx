@@ -17,11 +17,12 @@ import type {
   WeAgentUpdatedEventPayload,
 } from './types/bridge';
 import type { HWH5UserInfo } from './types/bridge/hwext';
-import type { AppProps, HistorySessionsCache } from './types/components';
+import type { AppProps, HarmonySplitLayoutState, HistorySessionsCache } from './types/components';
 import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import {
   createNewSession,
+  getDeviceInfo,
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
@@ -41,6 +42,7 @@ import {
 import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
+import { canIUse } from './utils/versionCheck';
 
 function sortSessionsByUpdatedAt(sessions: SkillSession[]): SkillSession[] {
   return [...sessions].sort(
@@ -134,6 +136,12 @@ function updateSessionActivityInCache(
   return changed ? { ...cache, content: sortSessionsByUpdatedAt(nextContent) } : cache;
 }
 
+const DEFAULT_HARMONY_SPLIT_LAYOUT: HarmonySplitLayoutState = {
+  enabled: false,
+  statusBarHeight: 0,
+  safeAreaInsetBottom: 0,
+};
+
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
   const { keyboardContainerStyle } = useIosKeyboardLift({ viewportOffset: 49 });
@@ -151,6 +159,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
   const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
+  const [harmonySplitLayout, setHarmonySplitLayout] = useState<HarmonySplitLayoutState>(DEFAULT_HARMONY_SPLIT_LAYOUT);
 
   const assistantAccountRef = useRef(assistantAccount);
   const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);
@@ -192,6 +201,49 @@ function App({ assistantAccount = '' }: AppProps) {
   useEffect(() => {
     welinkSessionIdRef.current = welinkSessionId;
   }, [welinkSessionId]);
+
+  useEffect(() => {
+    if (isPc) {
+      setHarmonySplitLayout(DEFAULT_HARMONY_SPLIT_LAYOUT);
+      return;
+    }
+
+    let disposed = false;
+
+    const resolveHarmonySplitLayout = async () => {
+      try {
+        const deviceInfo = await getDeviceInfo();
+        if (disposed) {
+          return;
+        }
+
+        const isHarmonySplit = deviceInfo.osType === 'Harmony' && deviceInfo.isFullScreen === 0;
+        const isHarmonySplitLayoutSupported = isHarmonySplit && await canIUse.harmonySplitLayout();
+        if (disposed) {
+          return;
+        }
+
+        setHarmonySplitLayout(isHarmonySplit && isHarmonySplitLayoutSupported
+          ? {
+            enabled: true,
+            statusBarHeight: deviceInfo.statusBarHeight,
+            safeAreaInsetBottom: deviceInfo.safeAreaInsetBottom,
+          }
+          : DEFAULT_HARMONY_SPLIT_LAYOUT);
+      } catch (err) {
+        WeLog(`App getDeviceInfo failed | error=${JSON.stringify(err)}`);
+        if (!disposed) {
+          setHarmonySplitLayout(DEFAULT_HARMONY_SPLIT_LAYOUT);
+        }
+      }
+    };
+
+    void resolveHarmonySplitLayout();
+
+    return () => {
+      disposed = true;
+    };
+  }, [isPc]);
 
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
@@ -553,18 +605,174 @@ function App({ assistantAccount = '' }: AppProps) {
     handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
   }, [handleSessionDeletedFromPush]);
 
+  const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return null;
+    }
+
+    const historyResult = await getHistorySessionsList({
+      assistantAccount: currentAssistantAccount,
+      businessSessionDomain: 'miniapp',
+      page: 0,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+    });
+    const nextCache = createHistorySessionsCache(historyResult);
+    setHistorySessionsCache(nextCache);
+    setHistorySessionsLoaded(true);
+    return nextCache;
+  }, []);
+
+  const createAndSelectFallbackSession = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return;
+    }
+
+    let detail = assistantDetailRef.current;
+    if (!detail || detail.partnerAccount !== currentAssistantAccount) {
+      detail = await resolveAssistantDetail(currentAssistantAccount);
+    }
+
+    const newSession = ensureSessionTimestamps(
+      await createSessionForAssistant(currentAssistantAccount, detail.appKey),
+    );
+    setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
+    setWelinkSessionId(newSession.welinkSessionId);
+  }, [createSessionForAssistant, resolveAssistantDetail]);
+
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    shouldCreateFallback: boolean,
+  ) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (!normalizedDeletedSessionId) {
+      return;
+    }
+
+    const previousCache = historySessionsCacheRef.current;
+    const isDeletingCurrentSession = welinkSessionIdRef.current === normalizedDeletedSessionId;
+    const nextSession = previousCache
+      ? resolveNextSessionAfterDelete(previousCache.content, normalizedDeletedSessionId)
+      : null;
+
+    setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+
+    if (isDeletingCurrentSession) {
+      setIsSwitchingSessionAfterDelete(true);
+      session.resetTransientState();
+      if (nextSession) {
+        setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!shouldCreateFallback) {
+        setWelinkSessionId(null);
+        setIsSwitchingSessionAfterDelete(false);
+      } else {
+        try {
+          await createAndSelectFallbackSession();
+        } catch (error) {
+          WeLog(`App create fallback session after delete failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+          showToast(t('weAgent.createSessionFailed'));
+        } finally {
+          setIsSwitchingSessionAfterDelete(false);
+        }
+      }
+    }
+
+    if (refreshAfterDelete) {
+      try {
+        const refreshedCache = await refreshHistorySessionsFirstPage();
+        const refreshedCacheWithoutDeletedSession = removeSessionFromHistoryCache(
+          refreshedCache,
+          normalizedDeletedSessionId,
+        );
+        setHistorySessionsCache(refreshedCacheWithoutDeletedSession);
+        if (isDeletingCurrentSession && !shouldCreateFallback) {
+          const refreshedNextSession = refreshedCacheWithoutDeletedSession
+            ? getLatestAvailableSessionByUpdatedAt(refreshedCacheWithoutDeletedSession.content)
+            : null;
+          if (refreshedNextSession) {
+            setWelinkSessionId(refreshedNextSession.welinkSessionId);
+          }
+        }
+      } catch (error) {
+        WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+      }
+    }
+  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
+
+  const handleSessionDeleteStart = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeleteFailed = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeletedFromAction = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    try {
+      await handleSessionDeleted(deletedSessionId, false, true);
+    } finally {
+      if (normalizedDeletedSessionId) {
+        pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      }
+    }
+  }, [handleSessionDeleted]);
+
+  const handleSessionDeletedFromPush = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId && pendingActionDeleteSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      return;
+    }
+    await handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
+
+  useEffect(() => {
+    handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
+  }, [handleSessionDeletedFromPush]);
+
+  const harmonySplitStyle = harmonySplitLayout.enabled
+    ? {
+      '--we-agent-cui-title-bar-height': '44px',
+      ...(harmonySplitLayout.statusBarHeight > 0
+        ? { '--we-agent-cui-status-bar-height': `${harmonySplitLayout.statusBarHeight}px` }
+        : {}),
+      ...(harmonySplitLayout.safeAreaInsetBottom > 0
+        ? { '--we-agent-cui-safe-area-bottom': `${harmonySplitLayout.safeAreaInsetBottom}px` }
+        : {}),
+    } as React.CSSProperties
+    : {};
+
   return (
     <div
       className={[
         'app-container',
         isPc ? 'pc-mode' : '',
         'app-container--we-agent-cui',
+        harmonySplitLayout.enabled ? 'is-harmony-split' : '',
         isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
       ].filter(Boolean).join(' ')}
-      style={keyboardContainerStyle}
+      style={{
+        ...keyboardContainerStyle,
+        ...harmonySplitStyle,
+      }}
     >
       <div className="we-agent-cui-main">
         <div className="we-agent-cui-chat-panel">
+          {harmonySplitLayout.enabled ? (
+            <div className="we-agent-cui-titlebar" role="heading" aria-level={1}>
+              <div className="we-agent-cui-titlebar__title">{weAgentAssistantName}</div>
+            </div>
+          ) : null}
+
           <div className="content-wrapper">
             <Content
               messages={session.messages}
