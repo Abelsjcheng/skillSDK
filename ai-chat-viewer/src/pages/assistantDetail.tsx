@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import AvatarImage from '../components/AvatarImage';
 import AssistantDetailActionSheet from '../components/assistant/AssistantDetailActionSheet';
 import AssistantDetailDeleteModal from '../components/assistant/AssistantDetailDeleteModal';
@@ -65,9 +64,8 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .filter(Boolean)
     .join(' ');
 
-const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handlePcDelete }) => {
+const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handlePcDelete, onEditAssistant }) => {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
   const [isSecretVisible, setIsSecretVisible] = useState<boolean>(false);
@@ -80,9 +78,10 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handl
   const pageRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  const routePartnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
   const resolvedPartnerAccount = isPc
     ? (partnerAccount?.trim() ?? '')
-    : useMemo(() => getQueryParam('partnerAccount') ?? '', []);
+    : routePartnerAccount;
 
   useEffect(() => {
     void ensureLanguageInitialized();
@@ -253,18 +252,8 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handl
     }
 
     setOverlay('none');
-    navigate(
-      {
-        pathname: '/editAssistant',
-      },
-      {
-        state: {
-          source: 'assistantDetail',
-          detail,
-        },
-      },
-    );
-  }, [detail, isPc, navigate]);
+    onEditAssistant?.(detail);
+  }, [detail, isPc, onEditAssistant]);
 
 
   const handleConfirmDelete = useCallback(async () => {

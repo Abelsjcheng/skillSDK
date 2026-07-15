@@ -4,7 +4,7 @@ import ConfirmModal from '../components/system/ConfirmModal';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ensureLanguageInitialized } from '../i18n/config';
 import ActivateAssistant from '../pages/activateAssistant';
-import AssistantDetail from '../pages/assistantDetail';
+import AssistantDetailRoute from '../pages/assistantDetailRoute';
 import CreateAssistantBasicPage from '../pages/createAssistantBasic';
 import EditAssistant from '../pages/editAssistant';
 import SelectAssistant from '../pages/selectAssistant';
@@ -80,7 +80,7 @@ export const AppRouter: React.FC = () => {
           path="/assistantDetail"
           element={(
             <div style={FULL_PAGE_ROUTE_STYLE}>
-              <AssistantDetail />
+              <AssistantDetailRoute />
             </div>
           )}
         />

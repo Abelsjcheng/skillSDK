@@ -10,6 +10,7 @@ export interface DetailInfoRowProps {
 export interface AssistantDetailProps {
   partnerAccount?: string;
   handlePcDelete?: (detail: WeAgentDetails | null, cb: () => void) => void;
+  onEditAssistant?: (detail: WeAgentDetails | null) => void;
 }
 
 export interface SkillCUIProps {
