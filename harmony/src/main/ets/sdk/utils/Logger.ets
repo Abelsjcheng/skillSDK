@@ -14,27 +14,27 @@ export class Logger {
     this.enabled = enabled;
   }
 
-  info(message: string, ...args: Object[]): void {
+  info(message: string): void {
     if (this.enabled) {
-      console.info(`[${this.prefix}] ${message}`, ...args);
+      console.info(`[${this.prefix}] ${message}`);
     }
   }
 
-  warn(message: string, ...args: Object[]): void {
+  warn(message: string): void {
     if (this.enabled) {
-      console.warn(`[${this.prefix}] ${message}`, ...args);
+      console.warn(`[${this.prefix}] ${message}`);
     }
   }
 
-  error(message: string, ...args: Object[]): void {
+  error(message: string): void {
     if (this.enabled) {
-      console.error(`[${this.prefix}] ${message}`, ...args);
+      console.error(`[${this.prefix}] ${message}`);
     }
   }
 
-  debug(message: string, ...args: Object[]): void {
+  debug(message: string): void {
     if (this.enabled) {
-      console.debug(`[${this.prefix}] ${message}`, ...args);
+      console.debug(`[${this.prefix}] ${message}`);
     }
   }
 }

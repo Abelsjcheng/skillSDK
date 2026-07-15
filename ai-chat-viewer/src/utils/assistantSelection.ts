@@ -17,11 +17,11 @@ export const DEFAULT_ASSISTANT_LIST_QUERY = {
   pageNumber: 1,
 };
 
-export function mapWeAgentListToAssistantItems(list: WeAgentListItem[]): AssistantItem[] {
+export function mapWeAgentListToAssistantItems(list: WeAgentListItem[], language?: string): AssistantItem[] {
   return list.map((assistant) => ({
     id: assistant.partnerAccount,
     name: assistant.name ?? '',
-    tag: resolveAssistantTag(assistant),
+    tag: resolveAssistantTag(assistant, language),
     description: assistant.description ?? '',
     icon: resolveAssistantIconUrl(assistant.icon),
   }));

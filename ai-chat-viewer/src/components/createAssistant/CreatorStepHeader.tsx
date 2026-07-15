@@ -26,7 +26,7 @@ export const CreatorStepHeader: React.FC<CreatorStepHeaderProps> = ({
     }
     window.HWH5.navigateBack();
   }, [onMobileBack]);
-  window.document.title = t('createAssistant.title')
+  window.document.title = pcTitle ?? t('createAssistant.title');
   return (
     <header className={[
       "digital-twin__header",

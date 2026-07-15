@@ -31,7 +31,8 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
-| `onSessionStatusChange` / `onSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
+| `querySlashCommands` | `ws://{host}/ws/skill/stream` | 通过 WebSocket 发送 `query_slash_commands` 命令，结果通过 `slash_commands_result` 事件返回 |
+| `onSessionStatusChange` / `onSkillWecodeStatusChange` / `offSkillWecodeStatusChange` / `regenerateAnswer` / `controlSkillWeCode` | 组合封装能力 | 基于 REST/WS 与本地状态派生，不新增服务端接口 |
 
 > 说明：服务端 API-3（查询单会话）与 API-10（在线 Agent 列表）当前未作为 SDK V1 对外接口暴露。
 
@@ -45,6 +46,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | 3 | `stopSkill` | 停止当前轮回答 |
 | 4 | `onSessionStatusChange` | 会话状态变更回调 |
 | 5 | `onSkillWecodeStatusChange` | 小程序状态变更回调 |
+| 5.1 | `offSkillWecodeStatusChange` | 取消小程序状态变更回调 |
 | 6 | `regenerateAnswer` | 重新生成问答 |
 | 7 | `sendMessageToIM` | 将 AI 结果发送到 IM |
 | 8 | `getSessionMessage` | 获取当前会话消息列表 |
@@ -54,7 +56,8 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | 11 | `replyPermission` | 权限确认 |
 | 12 | `controlSkillWeCode` | 小程序控制 |
 | 13 | `createNewSession` | 创建新会话 |
-| 14 | `getHistorySessionsList` | 获取历史会话列表 |
+| 15 | `getHistorySessionsList` | 获取历史会话列表 |
+| 16 | `querySlashCommands` | 通过 WebSocket 查询 Slash Commands |
 
 ## 1. 创建会话接口
 
@@ -480,7 +483,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void
+onSkillWecodeStatusChange(callback: function): void
 ```
 
 ### 入参
@@ -511,21 +514,80 @@ onSkillWecodeStatusChange(params: OnSkillWecodeStatusChangeParams): void
 
 ```typescript
 try {
-  onSkillWecodeStatusChange({
-    callback: (result) => {
-      switch (result.status) {
-        case SkillWecodeStatus.CLOSED:
-          console.log("小程序已关闭");
-          break;
-        case SkillWecodeStatus.MINIMIZED:
-          console.log("小程序已最小化");
-          break;
-      }
+  onSkillWecodeStatusChange((result) => {
+    switch (result.status) {
+      case SkillWecodeStatus.CLOSED:
+        console.log("小程序已关闭");
+        break;
+      case SkillWecodeStatus.MINIMIZED:
+        console.log("小程序已最小化");
+        break;
     }
   });
 } catch (error) {
   console.error("注册小程序状态回调失败:", error.errorCode, error.errorMessage);
 }
+```
+
+---
+
+## 5.1. 取消小程序状态变更回调接口
+### 调用方
+
+IM 客户端调用
+### 接口说明
+
+取消通过 `onSkillWecodeStatusChange` 注册的小程序状态变更回调。接口直接接收注册时使用的同一个 `callback` 引用，并仅取消该回调对应的监听。
+
+### 接口名
+
+```typescript
+offSkillWecodeStatusChange(callback: function): void
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| callback | function | 是 | 需要取消监听的回调函数；必须与 `onSkillWecodeStatusChange` 注册时传入的 callback 引用一致 |
+
+### 出参
+
+无。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | 缺少 `callback` 参数 |
+
+若传入的 `callback` 未注册，SDK 按成功语义处理，不抛出异常。
+
+### 组合调用场景
+
+在与其他接口组合调用时：
+1. 建议在小程序页面卸载、IM 容器销毁或不再需要监听小程序状态时调用。
+2. 必须传入与 `onSkillWecodeStatusChange` 注册时相同的 `callback` 引用，否则无法匹配并移除原监听。
+3. 调用后再次需要监听小程序状态时，可重新调用 `onSkillWecodeStatusChange` 注册回调。
+
+### 调用示例
+
+```typescript
+try {
+  offSkillWecodeStatusChange(handleSkillWecodeStatusChange);
+} catch (error) {
+  console.error("取消小程序状态回调失败:", error.errorCode, error.errorMessage);
+}
+```
+
+```typescript
+const handleSkillWecodeStatusChange = (result) => {
+  console.log("小程序状态:", result.status);
+};
+
+onSkillWecodeStatusChange(handleSkillWecodeStatusChange);
+
+offSkillWecodeStatusChange(handleSkillWecodeStatusChange);
 ```
 
 ---
@@ -1042,13 +1104,14 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 #### 字段对齐说明（重要）
 
 - WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外**没有外层 envelope**
+- 服务端 WebSocket `onmessage` 中 `question` 事件新增 `questions` 字段；字段格式为 `QuestionItem[]`，用于一次返回多组问题。
 - `snapshot.messages[].id` 类型为 `string`（稳定消息 ID）
 - `snapshot.messages[].seq` 类型为 `number | null`（数据库排序序号，用户消息可能为 `null`）
 - `snapshot.messages[].messageSeq` 类型为 `number | null`（会话内消息序号）
 - `snapshot.messages[].contentType` 类型为 `string`（`plain` / `markdown`）
 - `streaming.messageId` 类型为 `string | null`（仅 `parts` 非空时出现）
 - `streaming.parts[].status` 为工具状态字段（字段名为 `status`）
-- `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
+- `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `questions`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
 - `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
 - `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
 - `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
@@ -1138,7 +1201,7 @@ try {
         break;
       case "question":
         if (message.status === "running") {
-          console.log("AI提问:", message.question, message.options);
+          console.log("AI提问:", message.question, message.options, message.questions);
         } else {
           console.log("AI提问已完成:", message.toolCallId, message.output);
         }
@@ -1825,6 +1888,131 @@ try {
 }
 ```
 
+## 16. 查询 Slash Commands 接口
+
+### 调用方
+
+Skill 小程序 / JSAPI bridge 调用
+
+### 接口说明
+
+通过既有 Skill WebSocket 长连接查询当前会话可用的 Slash Commands。
+
+该接口不是 REST 接口。SDK 方法返回只表示 WebSocket 查询命令已发送，真实命令列表由服务端异步推送 `slash_commands_result` 事件，并通过 `registerSessionListener` 的 `onMessage` 回调返回给调用方。
+
+### 接口名
+
+```typescript
+querySlashCommands(params: QuerySlashCommandsParams): Promise<QuerySlashCommandsResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### WebSocket 发送命令
+
+```json
+{
+  "action": "query_slash_commands",
+  "welinkSessionId": "42"
+}
+```
+
+### 出参
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 固定为 `success`，表示查询命令已发送 |
+
+### 结果事件
+
+服务端通过 WebSocket 推送平铺的 `StreamMessage`：
+
+```json
+{
+  "type": "slash_commands_result",
+  "seq": 135,
+  "emittedAt": "2026-06-15T00:00:00Z",
+  "messageId": "{string}",
+  "messageSeq": 6,
+  "role": "assistant",
+  "sourceMessageId": "{string}",
+  "partId": "{string}",
+  "partSeq": 4,
+  "status": "running",
+  "sessionID": "{string}",
+  "welinkSessionId": "42",
+  "slashCommands": [
+    {
+      "command": "/new",
+      "description": "新建会话"
+    },
+    {
+      "command": "/delete",
+      "description": "删除"
+    }
+  ]
+}
+```
+
+字段说明：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定为 `slash_commands_result` |
+| welinkSessionId | string | 所属会话 ID |
+| slashCommands | Array<SlashCommand> | Slash Commands 列表，可能为空数组 |
+| slashCommands[].command | string | Slash 命令，如 `/new` |
+| slashCommands[].description | string \| null | 命令描述 |
+
+说明：
+- SDK 对外主会话字段统一使用 `welinkSessionId`。
+- 若服务端返回 `sessionID`，SDK 可在 `raw` 中保留该字段，但不作为 SDK 对外主字段。
+- `slash_commands_result` 不进入本地流式消息缓存，不参与 `getSessionMessage` 的历史消息聚合。
+
+### 实现方法
+
+1. SDK 校验 `welinkSessionId`，为空时返回 `1000`。
+2. SDK 确保 WebSocket 已连接；未连接时先建立连接。
+3. SDK 通过 `WebSocketManager` 发送 `query_slash_commands` 命令。
+4. 服务端异步推送 `slash_commands_result`。
+5. WebSocketManager 按 `welinkSessionId` 将事件分发给已注册的会话监听器。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+| 5000 | SDK 未初始化 | SDK 尚未完成初始化 |
+| 6000 | 网络错误 | WebSocket 连接或发送失败 |
+| 7000 | 服务端错误 | 服务端返回错误事件或无法处理查询命令 |
+
+### 组合调用场景
+
+1. 建议调用方先调用 `registerSessionListener`，再调用 `querySlashCommands`。
+2. 若调用方未注册监听器，查询命令仍可发送成功，但端侧无法消费异步结果事件。
+3. 页面卸载时调用 `unregisterSessionListener`，避免结果事件投递到已销毁页面。
+
+### 调用示例
+
+```typescript
+registerSessionListener({
+  welinkSessionId: "42",
+  onMessage: (message: StreamMessage) => {
+    if (message.type === "slash_commands_result") {
+      console.log("Slash Commands:", message.slashCommands ?? []);
+    }
+  }
+});
+
+await querySlashCommands({
+  welinkSessionId: "42"
+});
+```
+
 ## 数据类型定义
 
 > 说明：
@@ -1861,12 +2049,6 @@ try {
 |------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
 | callback | function | 是 | 状态变更回调函数 |
-
-### OnSkillWecodeStatusChangeParams
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| callback | function | 是 | 小程序状态变更回调函数 |
 
 ### GetSessionMessageParams
 
@@ -1940,6 +2122,21 @@ try {
 > 说明：
 > - `content` 为可选入参；若传入则建议使用最终确认后的完整文本内容
 > - `chatId` 为可选入参并对外暴露。SDK 不会从当前会话 `imGroupId` 自动获取 `chatId`，仅按入参透传给服务端。
+
+### QuerySlashCommandsParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| welinkSessionId | string | 是 | 会话 ID |
+
+### SlashCommand
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| command | string | Slash 命令，如 `/new` |
+| description | string \| null | 命令描述 |
+
+### RegisterSessionListenerParams
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -2018,6 +2215,7 @@ try {
 | question | string \| null | 问题正文（`question` 类型） |
 | questionId | string \| null | 问题 ID（`question` 类型）；服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
 | options | string[] \| null | 问题选项（`question` 类型） |
+| questions | QuestionItem[] \| null | 多题结构（`question` 类型）；服务端 WebSocket `onmessage` 新增字段 |
 | permissionId | string \| null | 权限请求 ID（`permission` 类型） |
 | permType | string \| null | 权限类型（`permission` 类型） |
 | metadata | object \| null | 权限元数据（`permission` 类型） |
@@ -2035,6 +2233,30 @@ try {
 |------|------|------|
 | subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议客户端作为子任务分组主键 |
 | subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
+
+### QuestionItem
+
+`questions` 字段中的单个问题对象，用于 WebSocket `question` 事件、`SessionMessagePart.questions`、`streaming.parts[].questions` 等多题结构。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| header | string | 问题分组标题 |
+| question | string | 问题正文 |
+| options | string[] | 问题选项 |
+| multiSelect | boolean | 是否支持多选 |
+
+示例：
+
+```json
+[
+  {
+    "header": "编程",
+    "question": "问题1",
+    "options": ["python", "java"],
+    "multiSelect": false
+  }
+]
+```
 
 ### SessionStatusResult
 
@@ -2103,8 +2325,22 @@ try {
 | partId | string \| null | Part 唯一 ID（仅 part 类事件出现） |
 | partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现；`permission.ask` / `permission.reply` 可能缺失） |
 
+#### Question事件字段（`type = question`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| header | string \| null | 问题分组标题；`running` 阶段可返回 |
+| question | string \| null | 问题正文；`running` 阶段可返回 |
+| options | string[] \| null | 问题选项；`running` 阶段可返回 |
+| questions | QuestionItem[] \| null | 多题结构；服务端 WebSocket `onmessage` 新增字段，`running` 阶段可返回 |
+| questionId | string \| null | 问题 ID；服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId` |
+| status | string \| null | question 状态：`running` / `completed` / `error` |
+| toolName | string \| null | 工具名 |
+| toolCallId | string \| null | 工具调用 ID |
+| output | string \| null | `completed` 阶段返回的输出 |
+
 > 说明：
-> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam` / `questionId`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId`。
+> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `questions` / `questionId`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。服务端协议文档中的 `requestId` 为错误口径，SDK 对外统一使用 `questionId`。
 > - `permission.reply` 为极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
 
 #### StreamMessage 的 Subagent 扩展字段
@@ -2158,9 +2394,7 @@ try {
 | parts[].header | string | question 分组标题（可选） |
 | parts[].question | string | question 正文（可选） |
 | parts[].options | string[] | question 选项（可选） |
-| parts[].multiSelect | boolean | question 是否多选（可选） |
-| parts[].questions | object[] | question 多题结构（可选） |
-| parts[].extParam | object | question 云端透传字段（可选） |
+| parts[].questions | QuestionItem[] | question 多题结构（可选） |
 | parts[].permissionId | string | 权限请求 ID（可选） |
 | parts[].permType | string | 权限类型（可选） |
 | parts[].metadata | object | 权限元数据（可选） |
@@ -2181,7 +2415,7 @@ try {
 | `thinking.delta` | 思维链增量 | `content` |
 | `thinking.done` | 思维链完成 | `content` |
 | `tool.update` | 工具调用状态更新 | `toolName` `toolCallId` `status` `input` `output` `error` `title` |
-| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` `multiSelect` `questions` `extParam` |
+| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` `questions` |
 | `file` | 文件或图片附件 | `fileName` `fileUrl` `fileMime` |
 | `step.start` | 推理步骤开始 | 无额外必填字段 |
 | `step.done` | 推理步骤结束 | `tokens` `cost` `reason` |
@@ -2202,6 +2436,7 @@ try {
 | `search_result` | 搜索结果（云端扩展） | `searchResults` |
 | `reference` | 引用列表（云端扩展） | `references` |
 | `ask_more` | 追问建议（云端扩展） | `askMoreQuestions` |
+| `slash_commands_result` | Slash Commands 查询结果 | `slashCommands` |
 
 #### Subagent 事件处理约定
 
@@ -2274,6 +2509,7 @@ try {
 | permType | string \| null | 权限类型 |
 | metadata | object \| null | 权限请求详情 |
 | response | string \| null | 权限回复值：`once` / `always` / `reject` |
+| slashCommands | Array<SlashCommand> \| null | `slash_commands_result` 事件返回的 Slash Commands 列表 |
 | messages | array \| null | `snapshot` 携带的已完成消息快照，元素结构见上文 `snapshot` 事件字段 |
 | parts | array \| null | `streaming` 携带的进行中消息部件，元素结构见上文 `streaming` 事件字段 |
 
@@ -2336,6 +2572,12 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | success | boolean | 发送是否成功（服务端字段） |
+
+### QuerySlashCommandsResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 固定为 `success`，表示 WebSocket 查询命令已发送 |
 
 ### Session
 ```typescript

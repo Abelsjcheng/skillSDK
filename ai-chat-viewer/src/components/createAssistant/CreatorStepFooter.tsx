@@ -4,7 +4,6 @@ import type {
   CreatorStepFooterProps,
   FooterButtonVariant,
 } from '../../types/components';
-import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
 
 function getStateActionButtonClassName(
   baseClassName: string,
@@ -40,11 +39,7 @@ function renderButton(button: CreatorStepFooterButton, includeMobilePrimary = fa
       type="button"
       className={resolveButtonClassName(button, includeMobilePrimary)}
       disabled={!isEnabled}
-      onClick={(event) => {
-        runButtonClickWithDebounce(event, () => {
-          button.onClick();
-        });
-      }}
+      onClick={button.onClick}
     >
       {button.label}
     </button>

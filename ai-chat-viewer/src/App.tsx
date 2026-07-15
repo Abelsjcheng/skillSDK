@@ -10,7 +10,12 @@ import { useIosKeyboardLift } from './hooks/useIosKeyboardLift';
 import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
-import type { HistorySessionsListResult, SkillSession, WeAgentDetails } from './types/bridge';
+import type {
+  HistorySessionsListResult,
+  SkillSession,
+  WeAgentDetails,
+  WeAgentUpdatedEventPayload,
+} from './types/bridge';
 import type { HWH5UserInfo } from './types/bridge/hwext';
 import type { AppProps, HarmonySplitLayoutState, HistorySessionsCache } from './types/components';
 import { buildCorpUserAvatar } from './utils/avatar';
@@ -21,6 +26,7 @@ import {
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
+  registerEventListener,
 } from './utils/hwext';
 import { WeLog } from './utils/logger';
 import {
@@ -29,6 +35,10 @@ import {
   getSessionUpdatedAtTimestamp,
   HISTORY_SESSIONS_PAGE_SIZE,
 } from './utils/session';
+import {
+  removeSessionFromHistoryCache,
+  resolveNextSessionAfterDelete,
+} from './utils/sessionDelete';
 import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
@@ -148,12 +158,16 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantName, setWeAgentAssistantName] = useState('');
   const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
+  const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
   const [harmonySplitLayout, setHarmonySplitLayout] = useState<HarmonySplitLayoutState>(DEFAULT_HARMONY_SPLIT_LAYOUT);
 
   const assistantAccountRef = useRef(assistantAccount);
+  const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);
+  const welinkSessionIdRef = useRef<string | null>(null);
   const assistantDetailRef = useRef<WeAgentDetails | null>(null);
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
+  const pendingActionDeleteSessionIdsRef = useRef<Set<string>>(new Set());
 
   initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
 
@@ -167,13 +181,26 @@ function App({ assistantAccount = '' }: AppProps) {
     onSessionActivity: (sessionId, updatedAt) => {
       setHistorySessionsCache((prev) => updateSessionActivityInCache(prev, sessionId, updatedAt));
     },
+    onSessionDeleted: (sessionId) => {
+      void handleSessionDeletedFromPushRef.current?.(sessionId);
+    },
   });
+
+  const handleSessionDeletedFromPushRef = useRef<((sessionId: string) => Promise<void>) | null>(null);
 
   useEffect(() => installBrowserJsErrorTelemetry(() => ({
     page: 'weAgentCUI',
     assistantAccount: assistantAccountRef.current,
     welinkSessionId: welinkSessionId ?? undefined,
   })), [welinkSessionId]);
+
+  useEffect(() => {
+    historySessionsCacheRef.current = historySessionsCache;
+  }, [historySessionsCache]);
+
+  useEffect(() => {
+    welinkSessionIdRef.current = welinkSessionId;
+  }, [welinkSessionId]);
 
   useEffect(() => {
     if (isPc) {
@@ -236,6 +263,81 @@ function App({ assistantAccount = '' }: AppProps) {
     return detail;
   }, []);
 
+  const handleWeAgentUpdated = useCallback((payload: WeAgentUpdatedEventPayload) => {
+    if (payload?.type !== 'update' && payload?.type !== 'offline_notify') {
+      WeLog(`handleWeAgentUpdated type failed type=${payload?.type}`)
+      return;
+    }
+    if (payload.type === 'offline_notify') {
+      if (!payload.data || !Array.isArray(payload.data) || payload.data.length === 0) {
+        return;
+      }
+
+      const currentAssistantAccount = assistantAccountRef.current.trim();
+      const matchedEvent = payload.data.find((event) => 
+        event.type === 'update' &&
+      event.data?.partnerAccount?.trim() === currentAssistantAccount
+      ) as Extract<WeAgentUpdatedEventPayload, { type: 'update'}> | undefined;
+      if (!matchedEvent) {
+        return;
+      }
+
+      WeLog(`handleWeAgentUpdated offline_notify matched assistant: ${matchedEvent.data.partnerAccount}`, 'info');
+
+      // 复用现有更新逻辑
+      const updatedDetail = matchedEvent.data;
+      const currentDetail = assistantDetailRef.current;
+          const nextDetail = {
+      ...currentDetail,
+      ...updatedDetail,
+      desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    } as WeAgentDetails;
+        assistantDetailRef.current = nextDetail;
+    setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
+    setWeAgentAssistantDescription(
+      updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    );
+    setWeAgentAssistantAvatar(
+      resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
+    );
+    return
+
+    }
+    const updatedDetail = payload.data;
+    const currentAssistantAccount = assistantAccountRef.current.trim();
+    const updatedPartnerAccount = updatedDetail?.partnerAccount?.trim();
+    if (!updatedDetail || !currentAssistantAccount || updatedPartnerAccount !== currentAssistantAccount) {
+      return;
+    }
+
+    const currentDetail = assistantDetailRef.current;
+    const nextDetail = {
+      ...currentDetail,
+      ...updatedDetail,
+      desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    } as WeAgentDetails;
+
+    assistantDetailRef.current = nextDetail;
+    setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
+    setWeAgentAssistantDescription(
+      updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+    );
+    setWeAgentAssistantAvatar(
+      resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
+    );
+  }, []);
+
+  useEffect(() => {
+    void registerEventListener({
+      type: 'agentskills_agentUpdated',
+      func: handleWeAgentUpdated,
+    }).catch((error) => {
+      WeLog(`App registerEventListener failed | extra=${JSON.stringify({
+        type: 'agentskills_agentUpdated',
+      })} | error=${JSON.stringify(error)}`);
+    });
+  }, [handleWeAgentUpdated]);
+
   const createSessionForAssistant = useCallback(async (
     currentAssistantAccount: string,
     appKey: string,
@@ -254,6 +356,7 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantAccountRef.current = assistantAccount;
     assistantDetailRef.current = null;
     userInfoRef.current = null;
+    pendingActionDeleteSessionIdsRef.current.clear();
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setIsHistorySidebarVisible(isPc);
@@ -368,6 +471,274 @@ function App({ assistantAccount = '' }: AppProps) {
     setWelinkSessionId(normalizedSessionId);
   }, [session, welinkSessionId]);
 
+  const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return null;
+    }
+
+    const historyResult = await getHistorySessionsList({
+      assistantAccount: currentAssistantAccount,
+      businessSessionDomain: 'miniapp',
+      page: 0,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+    });
+    const nextCache = createHistorySessionsCache(historyResult);
+    setHistorySessionsCache(nextCache);
+    setHistorySessionsLoaded(true);
+    return nextCache;
+  }, []);
+
+  const createAndSelectFallbackSession = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return;
+    }
+
+    let detail = assistantDetailRef.current;
+    if (!detail || detail.partnerAccount !== currentAssistantAccount) {
+      detail = await resolveAssistantDetail(currentAssistantAccount);
+    }
+
+    const newSession = ensureSessionTimestamps(
+      await createSessionForAssistant(currentAssistantAccount, detail.appKey),
+    );
+    setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
+    setWelinkSessionId(newSession.welinkSessionId);
+  }, [createSessionForAssistant, resolveAssistantDetail]);
+
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    shouldCreateFallback: boolean,
+  ) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (!normalizedDeletedSessionId) {
+      return;
+    }
+
+    const previousCache = historySessionsCacheRef.current;
+    const isDeletingCurrentSession = welinkSessionIdRef.current === normalizedDeletedSessionId;
+    const nextSession = previousCache
+      ? resolveNextSessionAfterDelete(previousCache.content, normalizedDeletedSessionId)
+      : null;
+
+    setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+
+    if (isDeletingCurrentSession) {
+      setIsSwitchingSessionAfterDelete(true);
+      session.resetTransientState();
+      if (nextSession) {
+        setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!shouldCreateFallback) {
+        setWelinkSessionId(null);
+        setIsSwitchingSessionAfterDelete(false);
+      } else {
+        try {
+          await createAndSelectFallbackSession();
+        } catch (error) {
+          WeLog(`App create fallback session after delete failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+          showToast(t('weAgent.createSessionFailed'));
+        } finally {
+          setIsSwitchingSessionAfterDelete(false);
+        }
+      }
+    }
+
+    if (refreshAfterDelete) {
+      try {
+        const refreshedCache = await refreshHistorySessionsFirstPage();
+        const refreshedCacheWithoutDeletedSession = removeSessionFromHistoryCache(
+          refreshedCache,
+          normalizedDeletedSessionId,
+        );
+        setHistorySessionsCache(refreshedCacheWithoutDeletedSession);
+        if (isDeletingCurrentSession && !shouldCreateFallback) {
+          const refreshedNextSession = refreshedCacheWithoutDeletedSession
+            ? getLatestAvailableSessionByUpdatedAt(refreshedCacheWithoutDeletedSession.content)
+            : null;
+          if (refreshedNextSession) {
+            setWelinkSessionId(refreshedNextSession.welinkSessionId);
+          }
+        }
+      } catch (error) {
+        WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+      }
+    }
+  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
+
+  const handleSessionDeleteStart = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeleteFailed = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeletedFromAction = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    try {
+      await handleSessionDeleted(deletedSessionId, false, true);
+    } finally {
+      if (normalizedDeletedSessionId) {
+        pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      }
+    }
+  }, [handleSessionDeleted]);
+
+  const handleSessionDeletedFromPush = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId && pendingActionDeleteSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      return;
+    }
+    await handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
+
+  useEffect(() => {
+    handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
+  }, [handleSessionDeletedFromPush]);
+
+  const refreshHistorySessionsFirstPage = useCallback(async (): Promise<HistorySessionsCache | null> => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return null;
+    }
+
+    const historyResult = await getHistorySessionsList({
+      assistantAccount: currentAssistantAccount,
+      businessSessionDomain: 'miniapp',
+      page: 0,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+    });
+    const nextCache = createHistorySessionsCache(historyResult);
+    setHistorySessionsCache(nextCache);
+    setHistorySessionsLoaded(true);
+    return nextCache;
+  }, []);
+
+  const createAndSelectFallbackSession = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current;
+    if (!currentAssistantAccount) {
+      return;
+    }
+
+    let detail = assistantDetailRef.current;
+    if (!detail || detail.partnerAccount !== currentAssistantAccount) {
+      detail = await resolveAssistantDetail(currentAssistantAccount);
+    }
+
+    const newSession = ensureSessionTimestamps(
+      await createSessionForAssistant(currentAssistantAccount, detail.appKey),
+    );
+    setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
+    setWelinkSessionId(newSession.welinkSessionId);
+  }, [createSessionForAssistant, resolveAssistantDetail]);
+
+  const handleSessionDeleted = useCallback(async (
+    deletedSessionId: string,
+    refreshAfterDelete: boolean,
+    shouldCreateFallback: boolean,
+  ) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (!normalizedDeletedSessionId) {
+      return;
+    }
+
+    const previousCache = historySessionsCacheRef.current;
+    const isDeletingCurrentSession = welinkSessionIdRef.current === normalizedDeletedSessionId;
+    const nextSession = previousCache
+      ? resolveNextSessionAfterDelete(previousCache.content, normalizedDeletedSessionId)
+      : null;
+
+    setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+
+    if (isDeletingCurrentSession) {
+      setIsSwitchingSessionAfterDelete(true);
+      session.resetTransientState();
+      if (nextSession) {
+        setWelinkSessionId(nextSession.welinkSessionId);
+        setIsSwitchingSessionAfterDelete(false);
+      } else if (!shouldCreateFallback) {
+        setWelinkSessionId(null);
+        setIsSwitchingSessionAfterDelete(false);
+      } else {
+        try {
+          await createAndSelectFallbackSession();
+        } catch (error) {
+          WeLog(`App create fallback session after delete failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+          showToast(t('weAgent.createSessionFailed'));
+        } finally {
+          setIsSwitchingSessionAfterDelete(false);
+        }
+      }
+    }
+
+    if (refreshAfterDelete) {
+      try {
+        const refreshedCache = await refreshHistorySessionsFirstPage();
+        const refreshedCacheWithoutDeletedSession = removeSessionFromHistoryCache(
+          refreshedCache,
+          normalizedDeletedSessionId,
+        );
+        setHistorySessionsCache(refreshedCacheWithoutDeletedSession);
+        if (isDeletingCurrentSession && !shouldCreateFallback) {
+          const refreshedNextSession = refreshedCacheWithoutDeletedSession
+            ? getLatestAvailableSessionByUpdatedAt(refreshedCacheWithoutDeletedSession.content)
+            : null;
+          if (refreshedNextSession) {
+            setWelinkSessionId(refreshedNextSession.welinkSessionId);
+          }
+        }
+      } catch (error) {
+        WeLog(`App refresh history after session.deleted failed | extra=${JSON.stringify({ welinkSessionId: normalizedDeletedSessionId })} | error=${JSON.stringify(error)}`);
+      }
+    }
+  }, [createAndSelectFallbackSession, refreshHistorySessionsFirstPage, session, t]);
+
+  const handleSessionDeleteStart = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.add(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeleteFailed = useCallback((deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId) {
+      pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+    }
+  }, []);
+
+  const handleSessionDeletedFromAction = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    try {
+      await handleSessionDeleted(deletedSessionId, false, true);
+    } finally {
+      if (normalizedDeletedSessionId) {
+        pendingActionDeleteSessionIdsRef.current.delete(normalizedDeletedSessionId);
+      }
+    }
+  }, [handleSessionDeleted]);
+
+  const handleSessionDeletedFromPush = useCallback(async (deletedSessionId: string) => {
+    const normalizedDeletedSessionId = deletedSessionId.trim();
+    if (normalizedDeletedSessionId && pendingActionDeleteSessionIdsRef.current.has(normalizedDeletedSessionId)) {
+      return;
+    }
+    await handleSessionDeleted(deletedSessionId, true, false);
+  }, [handleSessionDeleted]);
+
+  useEffect(() => {
+    handleSessionDeletedFromPushRef.current = handleSessionDeletedFromPush;
+  }, [handleSessionDeletedFromPush]);
+
   const harmonySplitStyle = harmonySplitLayout.enabled
     ? {
       '--we-agent-cui-title-bar-height': '44px',
@@ -407,11 +778,13 @@ function App({ assistantAccount = '' }: AppProps) {
               messages={session.messages}
               pendingAssistantPreview={session.pendingAssistantPreview}
               welinkSessionId={session.welinkSessionId}
+              showMessageActions
               scrollToBottomSignal={session.scrollToBottomSignal}
               isLoadingHistory={session.isLoadingHistory}
               hasMoreHistory={session.hasMoreHistory}
               onLoadMoreHistory={session.onLoadMoreHistory}
               onQuestionAnswered={session.onQuestionAnswered}
+              onCopy={session.onCopy}
               weAgentUserName={weAgentUserName}
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}
@@ -451,6 +824,9 @@ function App({ assistantAccount = '' }: AppProps) {
                   setHistorySessionsLoaded(true);
                 }}
                 onSessionSelect={handleSwitchWeAgentSession}
+                onSessionDeleteStart={handleSessionDeleteStart}
+                onSessionDeleteFailed={handleSessionDeleteFailed}
+                onSessionDeleted={handleSessionDeletedFromAction}
                 onVisibilityChange={setIsHistorySidebarVisible}
               />
             </div>
@@ -459,10 +835,19 @@ function App({ assistantAccount = '' }: AppProps) {
               <WeAgentCUIFooter
                 isPcMiniApp={isPc}
                 mode={session.isGenerating ? 'generating' : 'generate'}
+                partnerAccount={assistantAccount}
+                slashCommands={session.slashCommands}
+                onRequestSlashCommands={session.onRequestSlashCommands}
                 onSend={(content) => {
+                  if (isSwitchingSessionAfterDelete) {
+                    return;
+                  }
                   void session.onSend(content);
                 }}
                 onStop={() => {
+                  if (isSwitchingSessionAfterDelete) {
+                    return;
+                  }
                   void session.onStop();
                 }}
               />

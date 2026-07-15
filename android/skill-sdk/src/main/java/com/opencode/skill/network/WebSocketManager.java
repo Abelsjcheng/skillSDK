@@ -10,6 +10,7 @@ import com.google.gson.JsonParser;
 import com.opencode.skill.SkillSDKConfig;
 import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SkillCallback;
+import com.opencode.skill.model.QuestionItem;
 import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.StreamMessage;
@@ -283,7 +284,9 @@ public final class WebSocketManager {
         message.setTitle(getString(json, "title"));
         message.setHeader(getString(json, "header"));
         message.setQuestion(getString(json, "question"));
+        message.setQuestionId(getString(json, "questionId"));
         message.setOptions(getStringList(json, "options"));
+        message.setQuestions(getQuestionItems(json, "questions"));
         message.setFileName(getString(json, "fileName"));
         message.setFileUrl(getString(json, "fileUrl"));
         message.setFileMime(getString(json, "fileMime"));
@@ -465,6 +468,15 @@ public final class WebSocketManager {
         return value.getAsDouble();
     }
 
+    @Nullable
+    private static Boolean getBoolean(@NonNull JsonObject json, @NonNull String key) {
+        JsonElement value = getElement(json, key);
+        if (value == null || !value.isJsonPrimitive()) {
+            return null;
+        }
+        return value.getAsBoolean();
+    }
+
     @NonNull
     private static List<String> getStringList(@NonNull JsonObject json, @NonNull String key) {
         JsonArray array = getArray(json, key);
@@ -476,6 +488,28 @@ public final class WebSocketManager {
             if (element != null && element.isJsonPrimitive()) {
                 result.add(element.getAsString());
             }
+        }
+        return result;
+    }
+
+    @NonNull
+    private static List<QuestionItem> getQuestionItems(@NonNull JsonObject json, @NonNull String key) {
+        JsonArray array = getArray(json, key);
+        if (array == null) {
+            return Collections.emptyList();
+        }
+        List<QuestionItem> result = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (element == null || !element.isJsonObject()) {
+                continue;
+            }
+            JsonObject item = element.getAsJsonObject();
+            QuestionItem questionItem = new QuestionItem();
+            questionItem.setHeader(getString(item, "header"));
+            questionItem.setQuestion(getString(item, "question"));
+            questionItem.setOptions(getStringList(item, "options"));
+            questionItem.setMultiSelect(getBoolean(item, "multiSelect"));
+            result.add(questionItem);
         }
         return result;
     }

@@ -16,8 +16,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * SharedPreferences-backed storage for V2 assistant data.
@@ -118,16 +120,57 @@ public final class WeAgentStorage {
         return details;
     }
 
+    @NonNull
+    /**
+     * 汇总详情缓存键和当前助理账号，按首次出现顺序去重后返回冷启动补偿查询账号。
+     */
+    public synchronized List<String> getCachedWeAgentPartnerAccounts() {
+        Set<String> accounts = new LinkedHashSet<>();
+        for (String key : loadWeAgentDetailsCache().keySet()) {
+            String normalized = normalize(key);
+            if (normalized != null) {
+                accounts.add(normalized);
+            }
+        }
+        WeAgentDetails currentDetail = getCurrentWeAgentDetail();
+        if (currentDetail != null) {
+            String currentPartnerAccount = normalize(currentDetail.getPartnerAccount());
+            if (currentPartnerAccount != null) {
+                accounts.add(currentPartnerAccount);
+            }
+        }
+        return new ArrayList<>(accounts);
+    }
+
+    /**
+     * 仅在目标详情已缓存时用完整详情覆盖它；若目标同时是当前助理，也同步覆盖当前详情。
+     *
+     * <p>该方法不会创建新的详情缓存，避免迟到的更新通知恢复已经删除的助理。</p>
+     */
+    public synchronized void replaceCachedWeAgentDetailsIfPresent(
+            @NonNull String partnerAccount,
+            @NonNull WeAgentDetails details
+    ) {
+        SharedPreferences prefs = resolveSharedPreferencesIfNeeded();
+        Map<String, WeAgentDetails> cache = loadWeAgentDetailsCache();
+        if (cache.containsKey(partnerAccount)) {
+            cache.put(partnerAccount, details);
+            persistWeAgentDetailsCache(prefs, cache);
+        }
+        if (matchesDetail(getCurrentWeAgentDetail(), partnerAccount)) {
+            saveCurrentWeAgentDetail(details);
+        }
+    }
+
     public synchronized void updateCachedWeAgentDetails(
             @Nullable String partnerAccount,
-            @Nullable String robotId,
             @NonNull String name,
             @NonNull String icon,
             @NonNull String description
     ) {
         SharedPreferences prefs = resolveSharedPreferencesIfNeeded();
         WeAgentDetails currentDetail = getCurrentWeAgentDetail();
-        if (matchesDetail(currentDetail, partnerAccount, robotId)) {
+        if (matchesDetail(currentDetail, partnerAccount)) {
             applyUpdatedBasicFields(currentDetail, name, icon, description);
             saveCurrentWeAgentDetail(currentDetail);
         }
@@ -140,20 +183,43 @@ public final class WeAgentStorage {
                 applyUpdatedBasicFields(cachedDetail, name, icon, description);
                 updated = true;
             }
-        } else if (robotId != null) {
-            for (Map.Entry<String, WeAgentDetails> entry : cache.entrySet()) {
-                WeAgentDetails cachedDetail = entry.getValue();
-                if (!matchesDetail(cachedDetail, null, robotId)) {
-                    continue;
-                }
-                applyUpdatedBasicFields(cachedDetail, name, icon, description);
-                updated = true;
-                break;
-            }
         }
 
         if (updated) {
             persistWeAgentDetailsCache(prefs, cache);
+        }
+    }
+
+    /**
+     * 按 partnerAccount 幂等删除详情缓存；目标不存在时不写入存储。
+     */
+    public synchronized void removeWeAgentDetails(@NonNull String partnerAccount) {
+        SharedPreferences prefs = resolveSharedPreferencesIfNeeded();
+        Map<String, WeAgentDetails> cache = loadWeAgentDetailsCache();
+        if (cache.remove(partnerAccount) != null) {
+            persistWeAgentDetailsCache(prefs, cache);
+        }
+    }
+
+    /**
+     * 从已有列表缓存中移除指定账号的全部条目。
+     *
+     * <p>没有列表缓存或未命中目标时不回写，命中后统一保存过滤后的列表。</p>
+     */
+    public synchronized void removeWeAgentFromList(@NonNull String partnerAccount) {
+        if (!hasWeAgentListCache()) {
+            return;
+        }
+        List<WeAgent> list = getWeAgentList();
+        boolean removed = false;
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (partnerAccount.equals(normalize(list.get(i).getPartnerAccount()))) {
+                list.remove(i);
+                removed = true;
+            }
+        }
+        if (removed) {
+            saveWeAgentList(list);
         }
     }
 
@@ -248,8 +314,11 @@ public final class WeAgentStorage {
         }
     }
 
+    /**
+     * 读取并反序列化完整助理详情缓存，供冷启动补偿和缓存更新逻辑复用。
+     */
     @NonNull
-    private Map<String, WeAgentDetails> loadWeAgentDetailsCache() {
+    public synchronized Map<String, WeAgentDetails> loadWeAgentDetailsCache() {
         String raw = readValue(resolveSharedPreferencesIfNeeded(), KEY_WE_AGENT_DETAILS);
         if (raw == null || raw.trim().isEmpty()) {
             return new HashMap<>();
@@ -278,18 +347,11 @@ public final class WeAgentStorage {
         putValue(prefs, KEY_WE_AGENT_DETAILS, gson.toJson(cache));
     }
 
-    private boolean matchesDetail(
-            @Nullable WeAgentDetails details,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
+    private boolean matchesDetail(@Nullable WeAgentDetails details, @Nullable String partnerAccount) {
         if (details == null) {
             return false;
         }
-        if (partnerAccount != null) {
-            return partnerAccount.equals(normalize(details.getPartnerAccount()));
-        }
-        return robotId != null && robotId.equals(normalize(details.getId()));
+        return partnerAccount != null && partnerAccount.equals(normalize(details.getPartnerAccount()));
     }
 
     private void applyUpdatedBasicFields(

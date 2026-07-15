@@ -168,24 +168,19 @@
        failure:failure];
 }
 
-- (void)updateWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
-                                robotId:(nullable NSString *)robotId
+/// 组装仅包含 partnerAccount 和可编辑基础字段的请求体，并提交助理更新请求。
+- (void)updateWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                    name:(NSString *)name
                                    icon:(NSString *)icon
                             description:(NSString *)description
                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                 failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [@{
+    NSDictionary *parameters = @{
+        @"partnerAccount" : partnerAccount,
         @"name" : name,
         @"icon" : icon,
         @"description" : description
-    } mutableCopy];
-    if (partnerAccount != nil && partnerAccount.length > 0) {
-        parameters[@"partnerAccount"] = partnerAccount;
-    }
-    if (robotId != nil && robotId.length > 0) {
-        parameters[@"robotId"] = robotId;
-    }
+    };
 
     [self PUT:@"/v4-1/we-crew"
     parameters:parameters
@@ -194,17 +189,11 @@
          failure:failure];
 }
 
-- (void)deleteWeAgentWithPartnerAccount:(nullable NSString *)partnerAccount
-                                robotId:(nullable NSString *)robotId
+/// 以 partnerAccount 作为唯一查询参数调用删除接口，并透传网络层成功或失败回调。
+- (void)deleteWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                 success:(WLAgentSkillsHTTPSuccessBlock)success
                                 failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
-    if (partnerAccount != nil && partnerAccount.length > 0) {
-        parameters[@"partnerAccount"] = partnerAccount;
-    }
-    if (robotId != nil && robotId.length > 0) {
-        parameters[@"robotId"] = robotId;
-    }
+    NSDictionary *parameters = @{ @"partnerAccount" : partnerAccount };
 
     [self DELETE:@"/v4-1/we-crew"
      parameters:parameters

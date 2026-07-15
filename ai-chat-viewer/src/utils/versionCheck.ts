@@ -15,6 +15,12 @@ const QRCODE_CREATE_ASSISTANT_MIN_VERSION: MinVersionMap = {
   harmony: '1.29.0',
 };
 
+const ASSISTANT_EDIT_MIN_VERSION: MinVersionMap = {
+  android: '5.85.0',
+  ios: '5.85.0',
+  harmony: '1.31.0',
+};
+
 const HARMONY_SPLIT_LAYOUT_MIN_VERSION: MinVersionMap = {
   harmony: '1.30.0',
 };
@@ -87,6 +93,5 @@ async function canUseByMinVersion(minVersion: MinVersionMap): Promise<boolean> {
 }
 
 export const canIUse = {
-  harmonySplitLayout: () => canUseByMinVersion(HARMONY_SPLIT_LAYOUT_MIN_VERSION),
   qrcodeCreateAssistant: () => canUseByMinVersion(QRCODE_CREATE_ASSISTANT_MIN_VERSION),
 };

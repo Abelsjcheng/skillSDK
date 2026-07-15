@@ -10,7 +10,6 @@ import { WeAgentStore } from './utils/WeAgentStore';
 import {
   AgentType,
   AgentTypeList,
-  AssistantDetailUpdatedPayload,
   CloseSkillResult,
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
@@ -25,8 +24,6 @@ import {
   GetSessionMessageHistoryParams,
   GetIsShowWeAgentResult,
   HistorySessionsParams,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OnSessionStatusChangeParams,
   OnSkillWecodeStatusChangeParams,
   OpenAssistantEditPageParams,
@@ -74,17 +71,8 @@ import {
   UnregisterSessionListenerResult
 } from './types';
 
-interface DeleteTransitionPlan {
-  updatedList: WeAgent[];
-  nextPartnerAccount?: string;
-}
-
 interface DeleteWeAgentContext {
   partnerAccount?: string;
-  robotId?: string;
-  deletingCurrentWeAgent: boolean;
-  hasListCache: boolean;
-  transitionPlan?: DeleteTransitionPlan;
 }
 
 /**
@@ -95,9 +83,8 @@ export class SkillSDK {
   private static instance: SkillSDK | null = null;
   private static readonly ASSISTANT_H5_URI = 'h5://S008623/index.html';
   private static readonly WE_AGENT_CUI_APPID = 'S008623';
-  private static readonly DEFAULT_WE_AGENT_LIST_PAGE_SIZE = 100;
-  private static readonly DEFAULT_WE_AGENT_LIST_PAGE_NUMBER = 1;
-
+  private static readonly WE_AGENT_EVENT_NAME = 'agentskills.agentUpdated';
+  private static readonly IM_NOTIFY_MODULE = 'welink-athena';
   private config: SkillSDKConfig;
   private readonly logger: Logger;
   private readonly httpClient: HttpClient;
@@ -105,7 +92,7 @@ export class SkillSDK {
   private readonly sessionStateManager: SessionStateManager;
   private readonly weCodeStateManager: WeCodeStateManager;
   private readonly weAgentStore: WeAgentStore;
-  private readonly assistantDetailUpdatedCallbacks: Map<string, (payload: AssistantDetailUpdatedPayload) => void>;
+  private weAgentCacheMutationTail: Promise<void> = Promise.resolve();
 
   private constructor(config: SkillSDKConfig) {
     this.validateConfig(config);
@@ -121,11 +108,11 @@ export class SkillSDK {
     this.sessionStateManager = new SessionStateManager(this.config.enableLog);
     this.weCodeStateManager = new WeCodeStateManager(this.config.enableLog);
     this.weAgentStore = new WeAgentStore(this.config.context);
-    this.assistantDetailUpdatedCallbacks = new Map();
 
     this.wsManager.setMessageHandler((message: StreamMessage) => {
       this.sessionStateManager.onStreamMessage(message);
     });
+    void this.refreshWeAgentsOnColdStart();
   }
 
   static getInstance(config?: SkillSDKConfig): SkillSDK {
@@ -147,7 +134,6 @@ export class SkillSDK {
       SkillSDK.instance.wsManager.clearAllListeners();
       SkillSDK.instance.sessionStateManager.clearAll();
       SkillSDK.instance.weCodeStateManager.clearAll();
-      SkillSDK.instance.assistantDetailUpdatedCallbacks.clear();
       WebSocketManager.destroyInstance();
     } finally {
       SkillSDK.instance = null;
@@ -251,7 +237,6 @@ export class SkillSDK {
       this.wsManager.clearAllListeners();
       this.sessionStateManager.clearAll();
       this.weCodeStateManager.clearAll();
-      this.assistantDetailUpdatedCallbacks.clear();
       return { status: 'success' };
     } catch (error) {
       throw this.normalizeError('closeSkill', error);
@@ -752,6 +737,34 @@ export class SkillSDK {
     }
   }
 
+  /**
+   * 读取当前助理完整详情。
+   *
+   * 方法只读取 current_we_agent_detail，不触发网络请求或缓存写入；返回值会复制缓存中的全部字段，
+   * 并仅对缺失的 tagName、tagNameEn 分别使用“助手”和“Agent”兜底。
+   */
+  getWeAgentInfo(): WeAgentDetails {
+    try {
+      const cachedDetail = this.weAgentStore.loadCurrentDetail();
+      const detailPayload = cachedDetail === null
+        ? {}
+        : this.toRecord(cachedDetail as Object) ?? {};
+      const detail = this.normalizeWeAgentDetails(detailPayload);
+      detail.tagName = this.normalizeOptionalString(detail.tagName) ?? '助手';
+      detail.tagNameEn = this.normalizeOptionalString(detail.tagNameEn) ?? 'Agent';
+      this.logger.info(
+        `getWeAgentInfo succeeded, partnerAccount=${detail.partnerAccount}, tagName=${detail.tagName}, tagNameEn=${detail.tagNameEn}`
+      );
+      return detail;
+    } catch (error) {
+      this.logger.error(`getWeAgentInfo cache read failed, error=${JSON.stringify(error)}`);
+      const fallback = this.normalizeWeAgentDetails({});
+      fallback.tagName = '助手';
+      fallback.tagNameEn = 'Agent';
+      return fallback;
+    }
+  }
+
   // 20. getWeAgentUri
   async getWeAgentUri(): Promise<WeAgentUriResult> {
     try {
@@ -765,35 +778,36 @@ export class SkillSDK {
   async updateWeAgent(params: UpdateWeAgentParams): Promise<UpdateWeAgentResult> {
     try {
       Validator.requireObject(params, 'params');
-      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
-      const robotId = this.normalizeOptionalString(params.robotId);
-      this.resolveAssistantIdentityKey(partnerAccount, robotId);
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
       const name = TypeConverter.toRequiredString(params.name, 'name');
       const icon = TypeConverter.toRequiredString(params.icon, 'icon');
       const description = TypeConverter.toRequiredString(params.description, 'description');
 
       const payload: Record<string, Object> = {
+        partnerAccount,
         name,
         icon,
         description
       };
-      if (partnerAccount !== undefined) {
-        payload.partnerAccount = partnerAccount;
-      }
-      if (robotId !== undefined) {
-        payload.robotId = robotId;
-      }
 
-      const result = await this.httpClient.put<Record<string, Object>>(
+      await this.httpClient.put<Record<string, Object>>(
         '/v4-1/we-crew',
         payload,
         { expectEnvelope: false, useAssistantBaseUrl: true }
       );
-      this.weAgentStore.updateCachedDetails(partnerAccount, robotId, name, icon, description);
+      this.logger.info(`updateWeAgent request succeeded, enqueue cache mutation, partnerAccount=${partnerAccount}`);
+      await this.enqueueWeAgentCacheMutation(async (): Promise<void> => {
+        this.weAgentStore.updateCachedDetails(partnerAccount, name, icon, description);
+        await this.broadcastWeAgentEvent(
+          SkillSDK.WE_AGENT_EVENT_NAME,
+          this.buildWeAgentPayload('update', payload, 'local')
+        );
+      });
       return {
         updateResult: 'success'
       };
     } catch (error) {
+      this.logger.error(`updateWeAgent failed, error=${JSON.stringify(error)}`);
       throw this.normalizeError('updateWeAgent', error);
     }
   }
@@ -802,19 +816,46 @@ export class SkillSDK {
   async deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
     try {
       Validator.requireObject(params, 'params');
-      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
-      const robotId = this.normalizeOptionalString(params.robotId);
-      this.resolveAssistantIdentityKey(partnerAccount, robotId);
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
 
-      const context = await this.prepareDeleteWeAgentContext(
-        this.buildDeleteWeAgentContext(partnerAccount, robotId)
-      );
+      const context = this.buildDeleteWeAgentContext(partnerAccount);
       await this.requestDeleteWeAgent(context);
-      await this.handleDeleteWeAgentResult(context, 'success');
+      this.logger.info(`deleteWeAgent request succeeded, enqueue cache mutation, partnerAccount=${partnerAccount}`);
+      await this.enqueueWeAgentCacheMutation(
+        async (): Promise<void> => this.handleDeleteWeAgentResult(context, 'success')
+      );
       return { deleteResult: 'success' };
     } catch (error) {
+      this.logger.error(`deleteWeAgent failed, error=${JSON.stringify(error)}`);
       throw this.normalizeError('deleteWeAgent', error);
     }
+  }
+
+  /**
+   * 接收宿主透传的 IM 助理变更通知。
+   *
+   * 先校验通知模块为 welink-athena，再把 notifyData 转成业务对象；
+   * 无关模块、缺失字段或无法解析的载荷会被安全忽略。
+   */
+  handleWeAgentImNotifyBroadcast(payload: Record<string, Object>): void {
+    if (payload === null || payload === undefined) {
+      this.logger.error('ignore we-agent IM notification: payload is empty');
+      return;
+    }
+    const notifyModule = this.safeOptionalString(payload.notifyModuleId, 'notifyModuleId');
+    if (notifyModule !== SkillSDK.IM_NOTIFY_MODULE) {
+      return;
+    }
+    this.logger.info('ignore we-agent IM notification: notify_module match');
+    const notifyData = this.toRecord(payload.notifyData);
+    if (notifyData === undefined) {
+      this.logger.error('ignore we-agent IM notification: notifyData parse failed');
+      return;
+    }
+    this.logger.info('we-agent IM notification parsed, enqueue server mutation');
+    void this.enqueueWeAgentCacheMutation(async (): Promise<void> => {
+      await this.handleWeAgentNotifyData(notifyData, 'server');
+    }).catch((error) => this.logger.error(`handle server we-agent notification failed, error=${JSON.stringify(error)}`));
   }
 
   // 23. setIsShowWeAgent
@@ -892,18 +933,14 @@ export class SkillSDK {
   async openAssistantEditPage(params: OpenAssistantEditPageParams): Promise<OpenAssistantEditPageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireFunction(params.onUpdated, 'onUpdated');
-      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
-      const robotId = this.normalizeOptionalString(params.robotId);
-      const identityKey = this.resolveAssistantIdentityKey(partnerAccount, robotId);
+      const partnerAccount = TypeConverter.toRequiredString(params.partnerAccount, 'partnerAccount');
       const context = this.config.context;
       if (context === undefined) {
         throw new SkillSdkException(5000, 'context is required');
       }
 
-      this.assistantDetailUpdatedCallbacks.set(identityKey, params.onUpdated);
       await context.startAbility({
-        uri: this.buildAssistantEditPageUri(partnerAccount, robotId)
+        uri: this.buildAssistantEditPageUri(partnerAccount)
       });
       return {
         status: 'success'
@@ -913,36 +950,7 @@ export class SkillSDK {
     }
   }
 
-  // 27. notifyAssistantDetailUpdated
-  async notifyAssistantDetailUpdated(
-    params: NotifyAssistantDetailUpdatedParams
-  ): Promise<NotifyAssistantDetailUpdatedResult> {
-    try {
-      Validator.requireObject(params, 'params');
-      const name = TypeConverter.toRequiredString(params.name, 'name');
-      const icon = TypeConverter.toRequiredString(params.icon, 'icon');
-      const description = TypeConverter.toRequiredString(params.description, 'description');
-      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
-      const robotId = this.normalizeOptionalString(params.robotId);
-      const identityKey = this.resolveAssistantIdentityKey(partnerAccount, robotId);
-
-      const callback = this.assistantDetailUpdatedCallbacks.get(identityKey);
-      if (callback !== undefined) {
-        callback({
-          name,
-          icon,
-          description
-        });
-      }
-      return {
-        status: 'success'
-      };
-    } catch (error) {
-      throw this.normalizeError('notifyAssistantDetailUpdated', error);
-    }
-  }
-
-  // 28. queryQrcodeInfo
+  // 27. queryQrcodeInfo
   async queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo> {
     try {
       Validator.requireObject(params, 'params');
@@ -957,7 +965,7 @@ export class SkillSDK {
     }
   }
 
-  // 29. updateQrcodeInfo
+  // 28. updateQrcodeInfo
   async updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
     try {
       Validator.requireObject(params, 'params');
@@ -985,7 +993,7 @@ export class SkillSDK {
     }
   }
 
-  // 27. queryAssistantGraySingle
+  // 29. queryAssistantGraySingle
   async queryAssistantGraySingle(
     params: QueryAssistantGraySingleParams
   ): Promise<QueryAssistantGraySingleResult> {
@@ -1092,6 +1100,273 @@ export class SkillSDK {
     }
   }
 
+  /**
+   * 冷启动时批量查询缓存中的助理账号，使本地缓存与服务端状态收敛。
+   *
+   * 服务端缺失的助理会进入统一删除流程，完成缓存清理、当前助理 URI 处理和 delete 广播；
+   * 返回且与本地有差异的详情只覆盖已有缓存并广播 update。请求失败不修改缓存。
+   */
+  private async refreshWeAgentsOnColdStart(): Promise<void> {
+    await this.enqueueWeAgentCacheMutation(
+      async (): Promise<void> => this.performColdStartWeAgentRefresh()
+    );
+  }
+
+  /**
+   * 在缓存处理队列中执行冷启动批量补偿，确保请求、缓存变更和广播作为一个完整事件串行完成。
+   */
+  private async performColdStartWeAgentRefresh(): Promise<void> {
+    const partnerAccounts = this.weAgentStore.getCachedWeAgentPartnerAccounts();
+    if (partnerAccounts.length === 0) {
+      this.logger.info('cold-start we-agent refresh skipped: no cached partnerAccount');
+      return;
+    }
+    this.logger.info(`cold-start we-agent refresh started, accountCount=${partnerAccounts.length}`);
+    const cachedDetails = this.weAgentStore.loadDetailsCache();
+    const currentDetail = this.weAgentStore.loadCurrentDetail();
+    try {
+      const payload = await this.httpClient.get<Object>(
+        `/v1/robot-partners/${partnerAccounts.join(',')}`,
+        undefined,
+        { useAssistantBaseUrl: true }
+      );
+      const remoteDetails = this.parseWeAgentDetailsList(payload);
+      this.logger.info(`cold-start we-agent detail request succeeded, remoteCount=${remoteDetails.length}`);
+      const remoteDetailsByAccount: Record<string, WeAgentDetails> = {};
+      remoteDetails.forEach((detail: WeAgentDetails) => {
+        const partnerAccount = this.normalizeOptionalString(detail.partnerAccount);
+        if (partnerAccount !== undefined) {
+          remoteDetailsByAccount[partnerAccount] = detail;
+        }
+      });
+
+      for (const partnerAccount of partnerAccounts) {
+        const remoteDetail = remoteDetailsByAccount[partnerAccount];
+        if (remoteDetail === undefined) {
+          this.logger.info(`cold-start detected deleted we-agent, partnerAccount=${partnerAccount}`);
+          try {
+            await this.handleDeletedWeAgent(
+              partnerAccount,
+              { partnerAccount },
+              'server'
+            );
+          } catch (_error) {
+            this.logger.error(`cold-start we-agent delete compensation failed, error=${JSON.stringify(_error)}`);
+          }
+          continue;
+        }
+
+        const cachedDetail = cachedDetails[partnerAccount];
+        const currentMatches = this.matchesWeAgentDetail(currentDetail, partnerAccount);
+        const changed = (cachedDetail !== undefined && !this.weAgentDetailsEqual(cachedDetail, remoteDetail))
+          || (currentMatches && !this.weAgentDetailsEqual(currentDetail, remoteDetail));
+        if (!changed) {
+          continue;
+        }
+        this.logger.info(`cold-start detected updated we-agent, partnerAccount=${partnerAccount}`);
+        this.weAgentStore.replaceCachedDetailsIfPresent(partnerAccount, remoteDetail);
+        const remoteData = this.toRecord(remoteDetail as Object);
+        if (remoteData === undefined) {
+          continue;
+        }
+        this.dispatchHostBroadcast(
+          SkillSDK.WE_AGENT_EVENT_NAME,
+          this.buildWeAgentPayload('update', remoteData, 'server')
+        );
+      }
+      this.logger.info(`cold-start we-agent refresh completed, accountCount=${partnerAccounts.length}`);
+    } catch (_error) {
+      this.logger.error(`cold-start we-agent compensation failed, error=${JSON.stringify(_error)}`);
+    }
+  }
+
+  /**
+   * 比较两个完整助理详情的序列化内容，用于判断冷启动补偿是否产生实际差异。
+   */
+  private weAgentDetailsEqual(left: WeAgentDetails | null, right: WeAgentDetails | null): boolean {
+    if (left === null || right === null) {
+      return left === right;
+    }
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  /**
+   * 解析业务通知并执行更新或删除同步。
+   *
+   * update 仅修改已存在缓存的基础字段，之后补拉完整详情再广播；
+   * delete 复用统一删除流程处理缓存、当前助理跳转和广播。必要字段缺失时终止处理。
+   */
+  private async handleWeAgentNotifyData(
+    notifyData: Record<string, Object>,
+    source: 'server' | 'local'
+  ): Promise<void> {
+    const action = this.safeOptionalString(notifyData.action, 'action');
+    const weCrew = this.toRecord(notifyData.weCrew);
+    if (action === undefined || weCrew === undefined) {
+      this.logger.error('ignore we-agent notification: action or weCrew is missing');
+      return;
+    }
+    const partnerAccount = this.safeOptionalString(weCrew.partnerAccount, 'partnerAccount');
+    if (action === 'update') {
+      if (partnerAccount === undefined) {
+        this.logger.error('ignore we-agent update notification: partnerAccount is missing');
+        return;
+      }
+      this.logger.info(`process server we-agent update, partnerAccount=${partnerAccount}`);
+      this.updateCachedBasicFieldsIfPresent(partnerAccount, weCrew);
+      await this.broadcastWeAgentEvent(
+        SkillSDK.WE_AGENT_EVENT_NAME,
+        this.buildWeAgentPayload('update', weCrew, source)
+      );
+      return;
+    }
+    if (action === 'delete') {
+      if (partnerAccount === undefined) {
+        this.logger.error('ignore we-agent delete notification: partnerAccount is missing');
+        return;
+      }
+      this.logger.info(`process server we-agent delete, partnerAccount=${partnerAccount}`);
+      await this.handleDeletedWeAgent(partnerAccount, weCrew, source);
+    }
+  }
+
+  /**
+   * 从通知中读取名称、头像和描述，并更新已命中的助理缓存。
+   *
+   * 描述兼容 description 与 desc；任一基础字段缺失时不更新，也不会创建新缓存。
+   */
+  private updateCachedBasicFieldsIfPresent(partnerAccount: string, data: Record<string, Object>): void {
+    const name = this.safeOptionalString(data.name, 'name');
+    const icon = this.safeOptionalString(data.icon, 'icon');
+    const description = this.safeOptionalString(data.description ?? data.desc, 'description');
+    if (name === undefined || icon === undefined || description === undefined) {
+      return;
+    }
+    this.weAgentStore.updateCachedDetails(partnerAccount, name, icon, description);
+  }
+
+  /**
+   * 构造三端统一的助理广播结构：type、data 和 extraData.source。
+   */
+  private buildWeAgentPayload(
+    type: 'update' | 'delete',
+    data: Record<string, Object>,
+    source: 'server' | 'local'
+  ): Record<string, Object> {
+    return {
+      type,
+      data,
+      extraData: {
+        source
+      }
+    };
+  }
+
+  /**
+   * 按同步方案发送助理事件。
+   *
+   * update 必须先按 partnerAccount 补拉完整详情，并用完整详情替换 data 后广播；
+   * 缺少账号、详情为空或请求失败时不广播。delete 不需要补拉，直接发送。
+   */
+  private async broadcastWeAgentEvent(eventName: string, payload: Record<string, Object>): Promise<void> {
+    if (payload.type === 'update') {
+      const data = this.toRecord(payload.data);
+      const partnerAccount = data === undefined
+        ? undefined
+        : this.safeOptionalString(data.partnerAccount, 'partnerAccount');
+      if (partnerAccount === undefined) {
+        this.logger.error('skip we-agent update broadcast: partnerAccount is missing');
+        return;
+      }
+      try {
+        const detailResult = await this.fetchAndCacheWeAgentDetails(partnerAccount, false);
+        if (detailResult.weAgentDetailsArray.length === 0) {
+          this.logger.error(`skip we-agent update broadcast: detail response is empty, partnerAccount=${partnerAccount}`);
+          return;
+        }
+        const finalPayload: Record<string, Object> = {};
+        Object.keys(payload).forEach((key: string) => {
+          finalPayload[key] = payload[key];
+        });
+        finalPayload.data = detailResult.weAgentDetailsArray[0] as Object;
+        this.dispatchHostBroadcast(eventName, finalPayload);
+        this.logger.info(`we-agent update broadcast completed, partnerAccount=${partnerAccount}`);
+      } catch (_error) {
+        // Per plan: update broadcast detail fetch failures do not emit a broadcast.
+        this.logger.error(`fetch detail before update broadcast failed, partnerAccount=${partnerAccount}, `
+          + `error=${JSON.stringify(_error)}`);
+      }
+      return;
+    }
+    this.dispatchHostBroadcast(eventName, payload);
+    this.logger.info('we-agent delete broadcast completed');
+  }
+
+  /**
+   * 宿主广播能力的统一适配出口，接入 WeBroadCast 后在此透传事件名和载荷。
+   */
+  private dispatchHostBroadcast(eventName: string, payload: Record<string, Object>): void {
+    void eventName;
+    void payload;
+    // TODO: call host WeBroadCast(eventName, payload) when the host broadcast adapter is wired.
+  }
+
+  /**
+   * 将对象或 JSON 字符串安全转换为普通键值对象。
+   *
+   * 空值、数组、非法 JSON 和非对象值返回 undefined，避免异常通知中断同步流程。
+   */
+  private toRecord(value: Object | undefined): Record<string, Object> | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, Object>;
+        }
+      } catch (_error) {
+        return undefined;
+      }
+      return undefined;
+    }
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, Object>;
+    }
+    return undefined;
+  }
+
+  /**
+   * 容错读取可选字符串；类型转换失败时返回 undefined，由上层按缺失字段降级处理。
+   */
+  private safeOptionalString(value: Object | undefined, fieldName: string): string | undefined {
+    try {
+      return this.normalizeOptionalString(TypeConverter.toOptionalString(value, fieldName));
+    } catch (_error) {
+      return undefined;
+    }
+  }
+
+  /**
+   * 将助理缓存变更任务追加到 FIFO Promise 链。
+   *
+   * 当前任务完成缓存读写、必要网络请求和广播后才会执行下一任务；失败仅影响当前调用，
+   * 队列尾部会恢复为可继续执行状态，避免后续事件被永久阻塞。
+   */
+  private enqueueWeAgentCacheMutation(task: () => Promise<void>): Promise<void> {
+    this.logger.info('we-agent cache mutation enqueued');
+    const execution = this.weAgentCacheMutationTail.then(async (): Promise<void> => {
+      this.logger.info('we-agent cache mutation started');
+      await task();
+      this.logger.info('we-agent cache mutation completed');
+    });
+    this.weAgentCacheMutationTail = execution.catch((_error: object) => {
+      this.logger.error(`we-agent cache mutation failed, error=${JSON.stringify(_error)}`);
+    });
+    return execution;
+  }
+
   private wrapWeAgentDetail(detail: WeAgentDetails): WeAgentDetailsArray {
     return {
       weAgentDetailsArray: [detail]
@@ -1134,166 +1409,98 @@ export class SkillSDK {
     return this.normalizeWeAgentDetails(normalizedPayload);
   }
 
-  private async prepareDeleteWeAgentTransition(
-    partnerAccount: string | undefined,
-    robotId: string | undefined
-  ): Promise<DeleteTransitionPlan> {
-    let list = this.weAgentStore.loadList();
-    if (list.length === 0) {
-      const listResult = await this.getWeAgentList({
-        pageSize: SkillSDK.DEFAULT_WE_AGENT_LIST_PAGE_SIZE,
-        pageNumber: SkillSDK.DEFAULT_WE_AGENT_LIST_PAGE_NUMBER
-      });
-      list = listResult.content;
-    }
-    return this.buildDeleteTransitionPlan(list, partnerAccount, robotId);
-  }
-
-  private buildDeleteTransitionPlan(
-    snapshot: WeAgent[],
-    partnerAccount: string | undefined,
-    robotId: string | undefined
-  ): DeleteTransitionPlan {
-    const updatedList = [ ...snapshot ];
-    const deletedIndex = this.findWeAgentIndex(updatedList, partnerAccount, robotId);
-    if (deletedIndex < 0) {
-      return { updatedList };
-    }
-
-    updatedList.splice(deletedIndex, 1);
-    if (updatedList.length === 0) {
-      return { updatedList };
-    }
-
-    const nextIndex = deletedIndex < updatedList.length ? deletedIndex : 0;
-    const nextPartnerAccount = this.normalizeOptionalString(updatedList[nextIndex].partnerAccount);
-    return { updatedList, nextPartnerAccount };
-  }
-
-  private findWeAgentIndex(
-    list: WeAgent[],
-    partnerAccount: string | undefined,
-    robotId: string | undefined
-  ): number {
-    for (let index = 0; index < list.length; index += 1) {
-      const item = list[index];
-      if (partnerAccount !== undefined && this.normalizeOptionalString(item.partnerAccount) === partnerAccount) {
-        return index;
-      }
-      if (partnerAccount === undefined && robotId !== undefined
-        && this.normalizeOptionalString(item.robotId) === robotId) {
-        return index;
-      }
-    }
-    return -1;
-  }
-
-  private async resolveDeleteNextDetail(partnerAccount: string): Promise<WeAgentDetails | null> {
-    const cachedDetail = this.weAgentStore.loadDetailsByPartnerAccount(partnerAccount);
-    if (cachedDetail !== null) {
-      return cachedDetail;
-    }
-    const result = await this.fetchAndCacheWeAgentDetails(partnerAccount, false);
-    return result.weAgentDetailsArray.length > 0 ? result.weAgentDetailsArray[0] : null;
-  }
-
-  private buildDeleteWeAgentContext(
-    partnerAccount: string | undefined,
-    robotId: string | undefined
-  ): DeleteWeAgentContext {
+  /**
+   * 创建删除请求上下文，统一保存服务端删除接口所需的 partnerAccount。
+   */
+  private buildDeleteWeAgentContext(partnerAccount: string | undefined): DeleteWeAgentContext {
     return {
-      partnerAccount,
-      robotId,
-      deletingCurrentWeAgent: this.isCurrentWeAgent(partnerAccount, robotId),
-      hasListCache: this.weAgentStore.hasListCache()
+      partnerAccount
     };
   }
 
+  /**
+   * 校验上下文中的 partnerAccount，并调用服务端删除接口。
+   */
   private async requestDeleteWeAgent(context: DeleteWeAgentContext): Promise<string> {
-    const query = this.resolveAssistantIdentityQuery(context.partnerAccount, context.robotId);
+    const partnerAccount = TypeConverter.toRequiredString(context.partnerAccount, 'partnerAccount');
     await this.httpClient.delete<Record<string, Object>>(
       '/v4-1/we-crew',
-      query,
+      { partnerAccount },
       { expectEnvelope: false, useAssistantBaseUrl: true }
     );
     return 'success';
   }
 
-  private async prepareDeleteWeAgentContext(context: DeleteWeAgentContext): Promise<DeleteWeAgentContext> {
-    if (!context.deletingCurrentWeAgent) {
-      return context;
-    }
-    return {
-      ...context,
-      transitionPlan: await this.prepareDeleteWeAgentTransition(context.partnerAccount, context.robotId)
-    };
-  }
-
+  /**
+   * 处理本端删除成功后的缓存、跳转和广播。
+   *
+   * 所有删除先移除列表与详情缓存；非当前助理随后直接广播。当前助理还会清空当前详情，
+   * 调用 getWeAgentUri 计算后续页面，再发送删除广播。
+   */
   private async handleDeleteWeAgentResult(
     context: DeleteWeAgentContext,
     deleteResult: string
   ): Promise<void> {
-    if (!context.deletingCurrentWeAgent) {
-      this.handleDeleteNonCurrentWeAgentSuccess(context);
-      return;
-    }
-    await this.handleDeleteCurrentWeAgentSuccess(context, deleteResult);
-  }
-
-  private async handleDeleteCurrentWeAgentSuccess(
-    context: DeleteWeAgentContext,
-    deleteResult: string
-  ): Promise<void> {
-    const deletePlan = context.transitionPlan ?? { updatedList: [] };
-    this.weAgentStore.saveList(deletePlan.updatedList);
-
-    let nextUris: WeAgentUriResult;
-    if (deletePlan.nextPartnerAccount === undefined) {
-      this.weAgentStore.clearCurrentDetail();
-      nextUris = await this.buildWeAgentUriResult(null);
-    } else {
-      const nextDetail = await this.resolveDeleteNextDetail(deletePlan.nextPartnerAccount);
-      if (nextDetail === null) {
-        this.weAgentStore.clearCurrentDetail();
-        nextUris = await this.buildWeAgentUriResult(null);
-      } else {
-        this.weAgentStore.saveCurrentDetail(nextDetail);
-        nextUris = await this.buildWeAgentUriResult(nextDetail);
-      }
-    }
+    const partnerAccount = TypeConverter.toRequiredString(context.partnerAccount, 'partnerAccount');
+    await this.handleDeletedWeAgent(partnerAccount, { partnerAccount }, 'local');
     void deleteResult;
-    void nextUris;
-    // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
   }
 
-  private handleDeleteNonCurrentWeAgentSuccess(context: DeleteWeAgentContext): void {
-    if (!context.hasListCache) {
+  /**
+   * 统一处理冷启动补偿、服务端通知和本端接口触发的助理删除。
+   *
+   * 先判断目标是否为当前助理，再幂等清理列表和详情缓存。删除当前助理时会清空当前详情，
+   * 调用 getWeAgentUri 计算后续页面；无论 URI 计算成功或失败，三种来源最终均发送相同结构的删除广播。
+   */
+  private async handleDeletedWeAgent(
+    partnerAccount: string,
+    data: Record<string, Object>,
+    source: 'server' | 'local'
+  ): Promise<void> {
+    const deletingCurrentWeAgent = this.isCurrentWeAgent(partnerAccount);
+    this.logger.info(`handle we-agent delete mutation, partnerAccount=${partnerAccount}, source=${source}, `
+      + `deletingCurrent=${deletingCurrentWeAgent}`);
+    this.weAgentStore.removeFromList(partnerAccount);
+    this.weAgentStore.removeDetailsByPartnerAccount(partnerAccount);
+    if (!deletingCurrentWeAgent) {
+      await this.broadcastWeAgentEvent(
+        SkillSDK.WE_AGENT_EVENT_NAME,
+        this.buildWeAgentPayload('delete', data, source)
+      );
       return;
     }
-    const cachedList = this.weAgentStore.loadList();
-    const deletePlan = this.buildDeleteTransitionPlan(cachedList, context.partnerAccount, context.robotId);
-    this.weAgentStore.saveList(deletePlan.updatedList);
+    this.weAgentStore.clearCurrentDetail();
+    try {
+      const nextUris: WeAgentUriResult = await this.getWeAgentUri();
+      void nextUris;
+      this.logger.info(`resolved URI after deleting current we-agent, partnerAccount=${partnerAccount}`);
+    } catch (error) {
+      this.logger.error(`resolve URI after deleting current we-agent failed, partnerAccount=${partnerAccount}, `
+        + `error=${JSON.stringify(error)}`);
+    }
+
+    // TODO: call openWeAgentCUI with resolved URIs when navigation wiring is available.
+    await this.broadcastWeAgentEvent(
+      SkillSDK.WE_AGENT_EVENT_NAME,
+      this.buildWeAgentPayload('delete', data, source)
+    );
   }
 
-  private isCurrentWeAgent(
-    partnerAccount: string | undefined,
-    robotId: string | undefined
-  ): boolean {
-    return this.matchesWeAgentDetail(this.weAgentStore.loadCurrentDetail(), partnerAccount, robotId);
+  /**
+   * 判断指定 partnerAccount 是否与当前助理详情一致。
+   */
+  private isCurrentWeAgent(partnerAccount: string | undefined): boolean {
+    return this.matchesWeAgentDetail(this.weAgentStore.loadCurrentDetail(), partnerAccount);
   }
 
   private matchesWeAgentDetail(
     detail: WeAgentDetails | null,
-    partnerAccount: string | undefined,
-    robotId: string | undefined
+    partnerAccount: string | undefined
   ): boolean {
     if (detail === null) {
       return false;
     }
-    if (partnerAccount !== undefined) {
-      return this.normalizeOptionalString(detail.partnerAccount) === partnerAccount;
-    }
-    return robotId !== undefined && this.normalizeOptionalString(detail.id) === robotId;
+    return partnerAccount !== undefined && this.normalizeOptionalString(detail.partnerAccount) === partnerAccount;
   }
 
   private async buildWeAgentUriResult(details: WeAgentDetails | null): Promise<WeAgentUriResult> {
@@ -1499,6 +1706,8 @@ export class SkillSDK {
         bizRobotName: TypeConverter.toOptionalString(row.bizRobotName, 'bizRobotName') ?? '',
         bizRobotNameEn: TypeConverter.toOptionalString(row.bizRobotNameEn, 'bizRobotNameEn') ?? '',
         bizRobotTag: TypeConverter.toOptionalString(row.bizRobotTag, 'bizRobotTag') ?? '',
+        tagName: TypeConverter.toOptionalString(row.tagName, 'tagName') ?? '',
+        tagNameEn: TypeConverter.toOptionalString(row.tagNameEn, 'tagNameEn') ?? '',
         robotId: TypeConverter.toOptionalString(row.robotId, 'robotId') ?? ''
       });
     }
@@ -1549,6 +1758,8 @@ export class SkillSDK {
       bizRobotNameEn: TypeConverter.toOptionalString(payload.bizRobotNameEn, 'bizRobotNameEn') ?? '',
       bizRobotTag: TypeConverter.toOptionalString(payload.bizRobotTag, 'bizRobotTag') ?? '',
       bizRobotId: TypeConverter.toOptionalString(payload.bizRobotId, 'bizRobotId') ?? '',
+      tagName: TypeConverter.toOptionalString(payload.tagName, 'tagName') ?? '',
+      tagNameEn: TypeConverter.toOptionalString(payload.tagNameEn, 'tagNameEn') ?? '',
       weCodeUrl: TypeConverter.toOptionalString(payload.weCodeUrl, 'weCodeUrl') ?? ''
     };
   }
@@ -1560,43 +1771,12 @@ export class SkillSDK {
     return (this.normalizeOptionalString(detail.bizRobotTag) ?? '').toLowerCase() === 'myagent';
   }
 
-
-  private resolveAssistantIdentityKey(partnerAccount?: string, robotId?: string): string {
-    if (partnerAccount !== undefined) {
-      return partnerAccount;
-    }
-    if (robotId !== undefined) {
-      return robotId;
-    }
-    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
-  }
-
-  private resolveAssistantIdentityQuery(
-    partnerAccount?: string,
-    robotId?: string
-  ): Record<string, string> {
-    const query: Record<string, string> = {};
-    if (partnerAccount !== undefined) {
-      query.partnerAccount = partnerAccount;
-    }
-    if (robotId !== undefined) {
-      query.robotId = robotId;
-    }
-    if (Object.keys(query).length > 0) {
-      return query;
-    }
-    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
-  }
-
-  private buildAssistantEditPageUri(partnerAccount?: string, robotId?: string): string {
+  /**
+   * 构造助理编辑页 URI，仅使用必填 partnerAccount 定位助理。
+   */
+  private buildAssistantEditPageUri(partnerAccount: string): string {
     const baseUri = this.appendHashFragment(SkillSDK.ASSISTANT_H5_URI, 'editAssistant');
-    if (partnerAccount !== undefined) {
-      return this.appendQueryParam(baseUri, 'partnerAccount', partnerAccount);
-    }
-    if (robotId !== undefined) {
-      return this.appendQueryParam(baseUri, 'robotId', robotId);
-    }
-    throw new SkillSdkException(1000, 'partnerAccount or robotId is required');
+    return this.appendQueryParam(baseUri, 'partnerAccount', partnerAccount);
   }
 
   private clamp(value: number, min: number, max: number): number {
@@ -1766,7 +1946,7 @@ export class SkillSDK {
       }
       return new SkillSdkException(5000, error.message);
     }
-    this.logger.warn(`${method} failed with unexpected error`, error);
+    this.logger.warn(`${method} failed with unexpected error: ${JSON.stringify(error)}`);
     return new SkillSdkException(5000, 'Unexpected SDK error');
   }
 }

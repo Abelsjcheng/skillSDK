@@ -62,6 +62,7 @@ public class StreamMessage {
     private String questionId;
     @Nullable
     private List<String> options = new ArrayList<>();
+    private List<QuestionItem> questions = new ArrayList<>();
     @Nullable
     private String fileName;
     @Nullable
@@ -298,6 +299,15 @@ public class StreamMessage {
 
     public void setOptions(@Nullable List<String> options) {
         this.options = options;
+    }
+
+    @Nullable
+    public List<QuestionItem> getQuestions() {
+        return questions;
+    }
+
+    public void setQuestions(@Nullable List<QuestionItem> questions) {
+        this.questions = questions;
     }
 
     @Nullable
