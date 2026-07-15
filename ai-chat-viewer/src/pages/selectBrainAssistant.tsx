@@ -127,7 +127,7 @@ const SelectBrainAssistantPage: React.FC = () => {
     },
     [draft, from, isPc, location.search, navigate, runWithSubmitLock, t],
   );
-  
+
   useEffect(() => {
     if (draftExists) {
       return;

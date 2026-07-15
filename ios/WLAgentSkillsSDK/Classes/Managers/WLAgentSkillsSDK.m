@@ -1450,25 +1450,31 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
                                                     success:(void (^)(WLAgentSkillsSendMessageResult *result))success
                                                     failure:(void (^)(NSError *error))failure {
     [self setSendMessageTriggered:YES sessionId:welinkSessionId];
-    [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
-
     __weak typeof(self) weakSelf = self;
-    [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:welinkSessionId
-                                                                                                                        content:content
-                                                                                                                    toolCallId:toolCallId
-                                                                                                                    questionId:questionId
-                                                                                                            subagentSessionId:subagentSessionId
-                                                                                                              businessExtParam:businessExtParam
-                                                                                                                        success:^(id  _Nullable responseObject) {
-        NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
-        WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] initWithDictionary:data];
-        if (success) {
-            success(result);
+    [[WLAgentSkillsWebSocketManager sharedManager] ensureConnectedWithCompletion:^(NSError * _Nullable error) {
+        if (error != nil) {
+            [weakSelf setSendMessageTriggered:NO sessionId:welinkSessionId];
+            [weakSelf dispatchFailureObject:failure error:error];
+            return;
         }
-    }
-                                                                                                                            failure:^(NSError * _Nonnull error) {
-        [weakSelf setSendMessageTriggered:NO sessionId:welinkSessionId];
-        [weakSelf dispatchFailureObject:failure error:error];
+
+        [[WLAgentSkillsHTTPClient sharedClient] sendMessageWithSessionId:welinkSessionId
+                                                                                                                            content:content
+                                                                                                                        toolCallId:toolCallId
+                                                                                                                        questionId:questionId
+                                                                                                                subagentSessionId:subagentSessionId
+                                                                                                                  businessExtParam:businessExtParam
+                                                                                                                            success:^(id  _Nullable responseObject) {
+            NSDictionary *data = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : @{};
+            WLAgentSkillsSendMessageResult *result = [[WLAgentSkillsSendMessageResult alloc] initWithDictionary:data];
+            if (success) {
+                success(result);
+            }
+        }
+                                                                                                                                failure:^(NSError * _Nonnull error) {
+            [weakSelf setSendMessageTriggered:NO sessionId:welinkSessionId];
+            [weakSelf dispatchFailureObject:failure error:error];
+        }];
     }];
 }
 

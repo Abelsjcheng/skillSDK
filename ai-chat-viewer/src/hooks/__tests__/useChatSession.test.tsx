@@ -8,6 +8,7 @@ import {
   reportUemEvent,
   sendMessage,
   sendMessageToIM,
+  sendWebSocketMessage,
   stopSkill,
   unregisterSessionListener,
 } from '../../utils/hwext';
@@ -19,6 +20,7 @@ jest.mock('../../utils/hwext', () => ({
   reportUemEvent: jest.fn(),
   sendMessage: jest.fn(),
   sendMessageToIM: jest.fn(),
+  sendWebSocketMessage: jest.fn(),
   stopSkill: jest.fn(),
 }));
 
@@ -43,6 +45,7 @@ const mockUnregisterSessionListener = unregisterSessionListener as jest.MockedFu
 const mockReportUemEvent = reportUemEvent as jest.MockedFunction<typeof reportUemEvent>;
 const mockSendMessage = sendMessage as jest.MockedFunction<typeof sendMessage>;
 const mockSendMessageToIM = sendMessageToIM as jest.MockedFunction<typeof sendMessageToIM>;
+const mockSendWebSocketMessage = sendWebSocketMessage as jest.MockedFunction<typeof sendWebSocketMessage>;
 const mockStopSkill = stopSkill as jest.MockedFunction<typeof stopSkill>;
 
 function emitTextMessage(
@@ -85,6 +88,7 @@ describe('useChatSession', () => {
       parts: null,
     });
     mockSendMessageToIM.mockResolvedValue(undefined as never);
+    mockSendWebSocketMessage.mockResolvedValue({ status: 'success' });
     mockStopSkill.mockResolvedValue(undefined as never);
   });
 
@@ -260,6 +264,54 @@ describe('useChatSession', () => {
     });
   });
 
+  it('requests slash commands through websocket and stores slash command result events', async () => {
+    const { result } = renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      await result.current.onRequestSlashCommands();
+    });
+
+    expect(mockSendWebSocketMessage).toHaveBeenCalledWith({
+      message: JSON.stringify({
+        action: 'query_slash_commands',
+        welinkSessionId: 'session_1',
+      }),
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+    act(() => {
+      listener.onMessage({
+        type: 'slash_commands_result',
+        welinkSessionId: 'session_1',
+        seq: 135,
+        emittedAt: '2026-06-15T10:00:00.000Z',
+        messageId: 'message_1',
+        messageSeq: 6,
+        role: 'assistant',
+        sourceMessageId: 'source_1',
+        partId: 'part_1',
+        partSeq: 4,
+        status: 'running',
+        slashCommands: [
+          { command: '/new', description: '新建回话' },
+          { command: 'delete', description: '删除' },
+        ],
+      });
+    });
+
+    await waitFor(() => expect(result.current.slashCommands).toEqual([
+      { command: '/new', description: '新建回话' },
+      { command: '/delete', description: '删除' },
+    ]));
+  });
+
   it('reports session activity after sending a message successfully', async () => {
     const onSessionActivity = jest.fn();
     const { result } = renderHook(() => useChatSession({
@@ -273,6 +325,59 @@ describe('useChatSession', () => {
     });
 
     expect(onSessionActivity).toHaveBeenCalledWith('session_1', '2026-05-25T10:00:00.000Z');
+  });
+
+  it('notifies when the active session is deleted through websocket event', async () => {
+    const onSessionDeleted = jest.fn();
+
+    renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+      onSessionDeleted,
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+
+    act(() => {
+      listener.onMessage({
+        type: 'session.deleted',
+        welinkSessionId: 'session_1',
+        content: '{"welinkSessionId":"session_1"}',
+        seq: null,
+      } as any);
+    });
+
+    expect(onSessionDeleted).toHaveBeenCalledWith('session_1');
+  });
+
+  it('ignores session.deleted events for a different registered session', async () => {
+    const onSessionDeleted = jest.fn();
+
+    renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+      onSessionDeleted,
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+
+    act(() => {
+      listener.onMessage({
+        type: 'session.deleted',
+        welinkSessionId: 'session_2',
+        seq: null,
+      } as any);
+    });
+
+    expect(onSessionDeleted).not.toHaveBeenCalled();
   });
 
   it('preserves questionId from question events when answering question cards', async () => {

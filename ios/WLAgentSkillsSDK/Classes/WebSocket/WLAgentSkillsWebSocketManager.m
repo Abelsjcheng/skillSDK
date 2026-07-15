@@ -20,6 +20,7 @@
 
 @property (nonatomic, strong, nullable) SRWebSocket *webSocket;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, WLAgentSkillsSocketListener *> *listeners;
+@property (nonatomic, copy, nullable) WLAgentSkillsWebSocketConnectCompletion connectCompletion;
 @property (nonatomic, assign, readwrite) BOOL isConnected;
 @property (nonatomic, assign) BOOL isConnecting;
 
@@ -40,6 +41,7 @@
     self = [super init];
     if (self) {
     _listeners = [NSMutableDictionary dictionary];
+    _connectCompletion = nil;
     _isConnected = NO;
     _isConnecting = NO;
     }
@@ -47,26 +49,54 @@
 }
 
 - (void)connectIfNeeded {
+    [self ensureConnectedWithCompletion:nil];
+}
+
+- (void)ensureConnectedWithCompletion:(nullable WLAgentSkillsWebSocketConnectCompletion)completion {
+    NSError *connectError = nil;
+    BOOL shouldCompleteImmediately = NO;
+    BOOL shouldReturnImmediately = NO;
     @synchronized(self) {
-    if (self.isConnected || self.isConnecting) {
-        return;
+    if (self.isConnected) {
+        shouldCompleteImmediately = YES;
+    } else {
+        if (completion != nil) {
+            self.connectCompletion = [completion copy];
+        }
+        if (self.isConnecting) {
+            shouldReturnImmediately = YES;
+        } else {
+            NSString *wsURL = [WLAgentSkillsConfig sharedConfig].webSocketURL;
+            NSURL *url = [NSURL URLWithString:wsURL];
+            if (url == nil) {
+                connectError = [self webSocketErrorWithMessage:@"WebSocket URL is invalid."];
+                self.connectCompletion = nil;
+            } else {
+                self.isConnecting = YES;
+                self.webSocket = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:url]];
+                self.webSocket.delegate = self;
+                [self.webSocket open];
+            }
+        }
+    }
     }
 
-    NSString *wsURL = [WLAgentSkillsConfig sharedConfig].webSocketURL;
-    NSURL *url = [NSURL URLWithString:wsURL];
-    if (url == nil) {
-        return;
+    if (shouldReturnImmediately) {
+    return;
     }
 
-    self.isConnecting = YES;
-    self.webSocket = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:url]];
-    self.webSocket.delegate = self;
-    [self.webSocket open];
+    if (shouldCompleteImmediately && completion != nil) {
+    completion(nil);
+    }
+    if (connectError != nil && completion != nil) {
+    completion(connectError);
     }
 }
 
 - (void)disconnect {
+    WLAgentSkillsWebSocketConnectCompletion connectCompletion = nil;
     @synchronized(self) {
+    connectCompletion = [self consumeConnectCompletion];
     if (self.webSocket != nil) {
         [self.webSocket close];
     }
@@ -74,6 +104,9 @@
     self.webSocket = nil;
     self.isConnected = NO;
     self.isConnecting = NO;
+    }
+    if (connectCompletion != nil) {
+    connectCompletion([self webSocketErrorWithMessage:@"WebSocket is disconnected."]);
     }
 }
 
@@ -169,9 +202,14 @@
 #pragma mark - SRWebSocketDelegate
 
 - (void)webSocketDidOpen:(SRWebSocket *)webSocket {
+    WLAgentSkillsWebSocketConnectCompletion connectCompletion = nil;
     @synchronized(self) {
     self.isConnecting = NO;
     self.isConnected = YES;
+    connectCompletion = [self consumeConnectCompletion];
+    }
+    if (connectCompletion != nil) {
+    connectCompletion(nil);
     }
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidConnect)]) {
     [self.delegate webSocketManagerDidConnect];
@@ -179,9 +217,14 @@
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didFailWithError:(NSError *)error {
+    WLAgentSkillsWebSocketConnectCompletion connectCompletion = nil;
     @synchronized(self) {
     self.isConnecting = NO;
     self.isConnected = NO;
+    connectCompletion = [self consumeConnectCompletion];
+    }
+    if (connectCompletion != nil) {
+    connectCompletion(error ?: [self webSocketErrorWithMessage:@"WebSocket connect failed"]);
     }
 
     WLAgentSkillsSessionError *sessionError = [[WLAgentSkillsSessionError alloc] initWithCode:@"6000"
@@ -194,12 +237,17 @@
 }
 
 - (void)webSocket:(SRWebSocket *)webSocket didCloseWithCode:(NSInteger)code reason:(NSString *)reason wasClean:(BOOL)wasClean {
+    WLAgentSkillsWebSocketConnectCompletion connectCompletion = nil;
     @synchronized(self) {
     self.isConnecting = NO;
     self.isConnected = NO;
+    connectCompletion = [self consumeConnectCompletion];
     }
 
     NSString *closeReason = (reason != nil && reason.length > 0) ? reason : @"WebSocket closed";
+    if (connectCompletion != nil) {
+    connectCompletion([self webSocketErrorWithMessage:closeReason]);
+    }
     [self notifyAllClose:closeReason];
 
     if ([self.delegate respondsToSelector:@selector(webSocketManagerDidDisconnectWithError:)]) {
@@ -287,6 +335,20 @@
     }
     }
     return result;
+}
+
+- (nullable WLAgentSkillsWebSocketConnectCompletion)consumeConnectCompletion {
+    WLAgentSkillsWebSocketConnectCompletion completion = self.connectCompletion;
+    self.connectCompletion = nil;
+    return completion;
+}
+
+- (NSError *)webSocketErrorWithMessage:(NSString *)message {
+    return [NSError errorWithDomain:NSURLErrorDomain
+                               code:6000
+                           userInfo:@{
+        NSLocalizedDescriptionKey : message ?: @"WebSocket connect failed"
+    }];
 }
 
 @end

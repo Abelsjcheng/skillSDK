@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import type { SkillSession, WeAgentDetails } from '../bridge/hwext';
 import type { AssistantItem } from '../assistant';
 import type { DigitalTwinBasicInfoPayload } from '../digitalTwin';
+import type { SlashCommandItem } from '../slashCommand';
 
 export interface AssistantDetailDeleteModalProps {
   open: boolean;
@@ -21,6 +22,26 @@ export interface ConfirmModalProps {
   onConfirm: () => void;
   confirmTextColor?: string;
   confirmDisabled?: boolean;
+}
+
+export interface ResponsiveConfirmModalProps {
+  open: boolean;
+  headerTitle?: string;
+  title: string;
+  description?: string;
+  cancelText?: string;
+  confirmText?: string;
+  cancelTextColor?: string;
+  cancelBackgroundColor?: string;
+  confirmTextColor?: string;
+  confirmBackgroundColor?: string;
+  mobileCancelTextColor?: string;
+  mobileConfirmTextColor?: string;
+  showMask?: boolean;
+  confirmDisabled?: boolean;
+  onClose: () => void;
+  onCancel?: () => void;
+  onConfirm?: () => void;
 }
 
 export interface AssistantDetailActionSheetProps {
@@ -101,6 +122,9 @@ export interface ShortcutOption {
 export interface WeAgentCUIFooterProps {
   isPcMiniApp?: boolean;
   mode: 'generate' | 'generating' | 'regenerate';
+  partnerAccount?: string;
+  slashCommands?: SlashCommandItem[];
+  onRequestSlashCommands?: () => Promise<void> | void;
   onSend: (message: string) => void;
   onStop: () => void;
   onInputFocus?: () => void;
@@ -130,5 +154,8 @@ export interface WeAgentHistorySidebarProps {
   historyLoaded?: boolean;
   onHistoryLoaded?: (cache: HistorySessionsCache) => void;
   onSessionSelect?: (welinkSessionId: string) => void;
+  onSessionDeleteStart?: (welinkSessionId: string) => void;
+  onSessionDeleteFailed?: (welinkSessionId: string) => void;
+  onSessionDeleted?: (welinkSessionId: string) => void | Promise<void>;
   onVisibilityChange?: (visible: boolean) => void;
 }

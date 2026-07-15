@@ -64,7 +64,7 @@ const joinDisplayValue = (...values: Array<string | undefined | null>): string =
     .filter(Boolean)
     .join(' ');
 
-const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, onEditAssistant }) => {
+const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, handlePcDelete, onEditAssistant }) => {
   const { t, i18n } = useTranslation();
   const isPc = isPcMiniApp();
   const [detail, setDetail] = useState<WeAgentDetails | null>(null);
@@ -255,16 +255,6 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, onEdi
     onEditAssistant?.(detail);
   }, [detail, isPc, onEditAssistant]);
 
-  const handleRequestDeleteAssistant = useCallback(() => {
-    setIsPcMenuOpen(false);
-
-    if (isPc) {
-      // Reserved for future implementation.
-      return;
-    }
-
-    setOverlay('delete-modal');
-  }, [isPc]);
 
   const handleConfirmDelete = useCallback(async () => {
     const targetPartnerAccount = (detail?.partnerAccount ?? partnerAccount ?? '').trim();
@@ -280,7 +270,9 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, onEdi
           partnerAccount: targetPartnerAccount,
         });
         setOverlay('none');
-        window.HWH5.close();
+        if (!isPc) {
+          window.HWH5.close();
+        }
       } catch (error) {
         WeLog(`AssistantDetail deleteWeAgent failed | extra=${JSON.stringify({
           partnerAccount: targetPartnerAccount,
@@ -289,6 +281,19 @@ const AssistantDetail: React.FC<AssistantDetailProps> = ({ partnerAccount, onEdi
       }
     });
   }, [detail?.partnerAccount, partnerAccount, runDeleteWithSubmitLock, t]);
+
+    const handleRequestDeleteAssistant = useCallback(() => {
+    setIsPcMenuOpen(false);
+
+    if (isPc) {
+      handlePcDelete && handlePcDelete(detail, () => {
+        handleConfirmDelete()
+      })
+      return;
+    }
+
+    setOverlay('delete-modal');
+  }, [isPc, handleConfirmDelete]);
 
   const handleTogglePcMenu = useCallback(() => {
     if (!pageRef.current || !moreButtonRef.current) {

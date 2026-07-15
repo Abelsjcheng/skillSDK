@@ -16,6 +16,9 @@ import type {
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteHistorySessionParams,
+  DeleteHistorySessionResponse,
+  DeleteHistorySessionResult,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
   GetHistorySessionsListParams,
@@ -40,6 +43,8 @@ import type {
   ResolveRobotIdOptions,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -54,6 +59,7 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
+import { buildDeleteHistorySessionUrl } from './apiEndpoints';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -124,7 +130,16 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     onTabForUpdate: () => undefined,
-    registerEventListener: (params) => call<void>('registerEventListener', params),
+    registerEventListener: (params) => {
+      const validEventTypes = ['agentskills_agentUpdated'];
+      if (!validEventTypes.includes(params.type)) {
+        return;
+      }
+      window.addEventListener(params.type, (e: any) => {
+        const data = e.detail;
+        params.func && params.func(data)
+      })
+    },
     registerSessionListener: (params) => {
       if (isPcMiniApp()) {
         listenerParams = params;
@@ -148,6 +163,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
+    sendWebSocketMessage: (params) => call<SendWebSocketMessageResult>('sendWebSocketMessage', params),
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
     controlSkillWeCode: (params) => {
@@ -401,6 +417,7 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   return {
     ...deviceInfo,
     statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
+    safeAreaInsetBottom: toPositiveNumber(deviceInfo.safeAreaInsetBottom),
   };
 }
 
@@ -580,6 +597,12 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
   }
 }
 
+export async function sendWebSocketMessage(
+  params: SendWebSocketMessageParams,
+): Promise<SendWebSocketMessageResult> {
+  return getJsApiOrThrow().sendWebSocketMessage(params);
+}
+
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
   return trackApiStopSkill(params, getJsApiOrThrow().stopSkill(params));
 }
@@ -634,6 +657,51 @@ export async function updateWeAgent(params: UpdateWeAgentParams): Promise<Update
 
 export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<DeleteWeAgentResult> {
   return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
+}
+
+async function deleteHistorySessionWithHWH5FetchFull(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    throw new Error('HWH5.fetchFull is not available.');
+  }
+
+  const response = await window.HWH5.fetchFull<DeleteHistorySessionResponse>(
+    buildDeleteHistorySessionUrl(sessionId),
+    {
+      method: 'delete',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  const reply = await response.json();
+  if (reply?.code !== 0 || !reply.data) {
+    throw reply;
+  }
+  return reply.data;
+}
+
+async function deleteHistorySessionWithPcBridge(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  // PC 端删除会话后续如需切换桥接方法，只需要替换这个函数内部实现。
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
+}
+
+export async function deleteHistorySession(
+  params: DeleteHistorySessionParams,
+): Promise<DeleteHistorySessionResult> {
+  const sessionId = String(params?.welinkSessionId ?? '').trim();
+  if (!sessionId) {
+    throw new Error('welinkSessionId is required.');
+  }
+
+  if (isPcMiniApp()) {
+    return deleteHistorySessionWithPcBridge(sessionId);
+  }
+
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {

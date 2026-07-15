@@ -50,7 +50,12 @@ export type WeAgentUpdatedEventPayload =
     extraData?: {
       source?: 'server' | 'local';
     };
-  };
+  }
+  | {
+    type: 'offline_notify',
+    data?: Extract<WeAgentUpdatedEventPayload, { type: 'update'} | { type: 'delete'}>[]
+  }
+  ;
 
 export interface RegisterEventListenerParams {
   type: string;
@@ -63,6 +68,14 @@ export interface SendMessageParams {
   toolCallId?: string;
   questionId?: string;
   subagentSessionId?: string;
+}
+
+export interface SendWebSocketMessageParams {
+  message: string;
+}
+
+export interface SendWebSocketMessageResult {
+  status: 'success';
 }
 
 export interface GetSessionMessageParams {
@@ -200,6 +213,20 @@ export interface DeleteWeAgentParams {
 
 export interface DeleteWeAgentResult {
   deleteResult: string;
+}
+
+export interface DeleteHistorySessionParams {
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResult {
+  status: string;
+  welinkSessionId: string;
+}
+
+export interface DeleteHistorySessionResponse {
+  code: number;
+  data: DeleteHistorySessionResult;
 }
 
 export interface QueryQrcodeInfoParams {
@@ -344,10 +371,11 @@ export interface HWH5EXT {
   getSessionMessage(params: GetSessionMessageParams): Promise<GetSessionMessageResponse>;
   getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<GetSessionMessageHistoryResponse>;
   onTabForUpdate?: (callback: () => void) => void;
-  registerEventListener(params: RegisterEventListenerParams): Promise<void> | void;
+  registerEventListener(params: RegisterEventListenerParams): void;
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;
+  sendWebSocketMessage(params: SendWebSocketMessageParams): Promise<SendWebSocketMessageResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
@@ -393,6 +421,13 @@ export interface HWH5Bridge {
   getAppInfo?: () => Promise<unknown> | unknown;
   getUserInfo?: () => Promise<unknown> | unknown;
   getAccountInfo?: () => Promise<unknown> | unknown;
+  fetch?: (url: string, options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+  }) => Promise<unknown> | unknown;
+  getStorage?: (key: string) => Promise<unknown> | unknown;
+  setStorage?: (params: { key: string; data: unknown }) => Promise<unknown> | unknown;
   fetchFull: <T = unknown>(
     url: string,
     options: FetchFullOptions,
@@ -408,6 +443,8 @@ export interface HWH5Bridge {
 }
 
 export interface HWH5DeviceInfo {
+  osType?: string;
+  isFullScreen?: number;
   statusBarHeight: number;
   safeAreaInsetBottom: number;
   [key: string]: unknown;
