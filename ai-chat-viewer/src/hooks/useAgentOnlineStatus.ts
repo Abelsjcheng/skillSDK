@@ -3,8 +3,9 @@
  * 先从存储读取，再调用接口更新
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { getOnlineStatus } from '../utils/hwext';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { isPcMiniApp } from '../constants';
+import { getOnlineStatus, isOnlineStatusEnabled } from '../utils/hwext';
 import {
   readAgentOnlineStatusStore,
   writeAgentOnlineStatusStore,
@@ -15,6 +16,8 @@ type AgentStatusMap = Record<string, boolean>;
 export function useAgentOnlineStatus() {
   const [agentStatusMap, setAgentStatusMap] = useState<AgentStatusMap>({});
   const [isOpen, setIsOpen] = useState(false);
+  const [showOnlineStatus, setShowOnlineStatus] = useState(false);
+  const initializedRef = useRef(false);
 
   // 手动获取全量数据
   const fetchAllAgentStatus = useCallback(async () => {
@@ -29,43 +32,76 @@ export function useAgentOnlineStatus() {
     }
   }, []);
 
-  // 初始化：先从存储读取，再调用接口更新
-  useEffect(() => {
-    const init = async () => {
-      // 1. 先从存储读取
-      const stored = await readAgentOnlineStatusStore();
-      if (stored?.statuses) {
-        setAgentStatusMap(stored.statuses);
-      }
+  // 初始化/刷新：先查功能开关，再从存储读取，最后调接口更新
+  const initAgentOnlineStatus = useCallback(async () => {
+    // 防止移动端首次挂载时 useEffect 和 onShow 重复触发
+    if (initializedRef.current) {
+      return;
+    }
+    initializedRef.current = true;
 
-      // 2. 调用接口获取最新数据
-      await fetchAllAgentStatus();
+    // 1. 先查功能开关
+    const enabled = await isOnlineStatusEnabled();
+    setShowOnlineStatus(enabled);
 
-      // 3. 设置 isOpen=true
-      setIsOpen(true);
-    };
-    init();
+    if (!enabled) {
+      return; // 开关关闭，不拉数据
+    }
+
+    // 2. 从存储读取
+    const stored = await readAgentOnlineStatusStore();
+    if (stored?.statuses) {
+      setAgentStatusMap(stored.statuses);
+    }
+
+    // 3. 调用接口获取最新数据
+    await fetchAllAgentStatus();
+
+    // 4. 设置 isOpen=true
+    setIsOpen(true);
   }, [fetchAllAgentStatus]);
+
+  // 初始化
+  useEffect(() => {
+    void initAgentOnlineStatus();
+  }, [initAgentOnlineStatus]);
 
   // 注册 App 生命周期
   useEffect(() => {
-    window.HWH5?.app?.({
-      onShow: () => {
-        // onShow 时注册网络状态监听
-        window.HWH5?.onNetworkStatusChange?.((res) => {
-          if (res.isConnected) {
-            void fetchAllAgentStatus();
-          }
-        });
-      },
-      onHide: () => {
-        // onHide 时取消网络状态监听
-        window.HWH5?.unregisterNetworkListener?.().catch(() => {
-          // ignore error
-        });
-      },
-    });
-  }, [fetchAllAgentStatus]);
+    if (isPcMiniApp()) {
+      // PC 端监听自定义事件，允许多次触发直接拉数据
+      const handleAgentLogin = () => {
+        if (showOnlineStatus) {
+          void fetchAllAgentStatus();
+        }
+      };
+      window.addEventListener('agent_login', handleAgentLogin);
+      return () => {
+        window.removeEventListener('agent_login', handleAgentLogin);
+      };
+    } else {
+      // 移动端监听 onShow
+      window.HWH5?.app?.({
+        onShow: () => {
+          // 允许 onShow 后续重新初始化
+          initializedRef.current = false;
+          // 先重新初始化（查开关、读存储、拉数据）
+          void initAgentOnlineStatus();
+          // 再监听网络变化
+          window.HWH5?.onNetworkStatusChange?.((res) => {
+            if (res.isConnected && showOnlineStatus) {
+              void fetchAllAgentStatus();
+            }
+          });
+        },
+        onHide: () => {
+          window.HWH5?.unregisterNetworkListener?.().catch(() => {
+            // ignore error
+          });
+        },
+      });
+    }
+  }, [fetchAllAgentStatus, showOnlineStatus, initAgentOnlineStatus]);
 
   // 更新单个助手状态（写入存储）
   const updateAgentStatus = useCallback(
@@ -84,6 +120,7 @@ export function useAgentOnlineStatus() {
   return {
     agentStatusMap,
     isOpen,
+    showOnlineStatus,
     fetchAllAgentStatus,
     updateAgentStatus,
     resetIsOpen,

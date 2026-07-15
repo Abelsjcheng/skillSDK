@@ -24,6 +24,7 @@ import type {
   GetHistorySessionsListParams,
   GetOnlineStatusResponse,
   GetOnlineStatusResult,
+  IsOnlineStatusEnabledResponse,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
   GetWeAgentDetailsParams,
@@ -61,7 +62,7 @@ import type {
   WeAgentUriResult,
 } from '../types/bridge';
 import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
-import { buildDeleteHistorySessionUrl, buildOnlineStatusUrl } from './apiEndpoints';
+import { buildDeleteHistorySessionUrl, buildOnlineStatusUrl, buildOnlineStatusFeatureUrl } from './apiEndpoints';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -738,6 +739,40 @@ export async function getOnlineStatus(): Promise<GetOnlineStatusResult> {
   }
 
   return trackApiGetOnlineStatus(getOnlineStatusWithHWH5FetchFull());
+}
+
+async function isOnlineStatusEnabledWithHWH5FetchFull(): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    return false;
+  }
+
+  const response = await window.HWH5.fetchFull<IsOnlineStatusEnabledResponse>(
+    buildOnlineStatusFeatureUrl(),
+    {
+      method: 'get',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  const reply = await response.json();
+  if (reply?.code !== 0 || !reply.data) {
+    return false;
+  }
+  return reply.data.enabled ?? false;
+}
+
+async function isOnlineStatusEnabledWithPcBridge(): Promise<boolean> {
+  // PC 端暂不支持，默认返回 false
+  return false;
+}
+
+export async function isOnlineStatusEnabled(): Promise<boolean> {
+  if (isPcMiniApp()) {
+    return isOnlineStatusEnabledWithPcBridge();
+  }
+
+  return isOnlineStatusEnabledWithHWH5FetchFull();
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {

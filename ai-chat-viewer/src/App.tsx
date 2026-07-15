@@ -156,6 +156,7 @@ function App({ assistantAccount = '' }: AppProps) {
 
   const {
     isOpen,
+    showOnlineStatus,
     fetchAllAgentStatus,
     updateAgentStatus,
     resetIsOpen,
@@ -190,7 +191,7 @@ function App({ assistantAccount = '' }: AppProps) {
       if (partnerAccount === currentAssistantAccount) {
         setIsCurrentAgentOnline(isOnline);
       }
-      if (!isOpen) {
+      if (!isOpen && showOnlineStatus) {
         void fetchAllAgentStatus().then(() => updateAgentStatus(partnerAccount, isOnline));
       } else {
         void updateAgentStatus(partnerAccount, isOnline);
@@ -606,7 +607,7 @@ function App({ assistantAccount = '' }: AppProps) {
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantDescription={weAgentAssistantDescription}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
-              showOnlineStatus={isOpen}
+              showOnlineStatus={showOnlineStatus}
               isOnline={isCurrentAgentOnline}
             />
           </div>

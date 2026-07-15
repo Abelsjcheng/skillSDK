@@ -239,6 +239,15 @@ export interface GetOnlineStatusResponse {
   data: GetOnlineStatusResult;
 }
 
+export interface IsOnlineStatusEnabledResult {
+  enabled: boolean;
+}
+
+export interface IsOnlineStatusEnabledResponse {
+  code: number;
+  data: IsOnlineStatusEnabledResult;
+}
+
 export interface QueryQrcodeInfoParams {
   qrcode: string;
 }
