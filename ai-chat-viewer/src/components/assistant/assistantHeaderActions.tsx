@@ -1,12 +1,12 @@
 import React from 'react';
-import closeIcon from '../../imgs/close_icon.svg';
-import serviceIcon from '../../imgs/icon-service.svg';
+import closeIcon from '../../imgs/close_icon.png';
+import customerIcon from '../../imgs/customer_icon.svg';
 import type { AssistantPageHeaderAction } from '../../types/components';
 import { dispatchAssistantCloseEvent } from '../../utils/assistantHostBridge';
 
 export const createDefaultPcServiceAction = (onService: () => void, label: string): AssistantPageHeaderAction => ({
   label,
-  icon: serviceIcon,
+  icon: customerIcon,
   onClick: onService,
 });
 

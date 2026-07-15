@@ -11,6 +11,7 @@
 }
 
 .assistant-detail--pc {
+  width: 320px;
   background: url('../imgs/assistant-bg.png') center top / cover no-repeat;
 }
 
@@ -44,6 +45,18 @@
   margin: 0 auto;
   border-radius: 19px;
   overflow: hidden;
+}
+
+.assistant-detail--pc .assistant-detail__avatar {
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0px 1px 6px 0px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.assistant-detail--pc .assistant-detail__avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .assistant-detail__avatar-img {
@@ -96,6 +109,17 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.assistant-detail--pc .assistant-detail__tag {
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.assistant-detail--pc .assistant-detail__section-title,
+.assistant-detail--pc .assistant-detail__info-label {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .assistant-detail__card--intro {
@@ -247,6 +271,16 @@
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.assistant-detail__icon-btn:focus,
+.assistant-detail__icon-btn:focus-visible,
+.assistant-detail__icon-btn:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .assistant-detail__icon {

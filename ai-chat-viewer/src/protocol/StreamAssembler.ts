@@ -1,5 +1,5 @@
 import type { StreamMessage, MessagePart, MessagePartSnapshot, PartStatus } from '../types';
-import { extractQuestionFields, normalizeQuestionOptions } from '../utils/message';
+import { normalizeQuestionItems, normalizeQuestionOptions } from '../utils/message';
 
 export class StreamAssembler {
   private parts = new Map<string, MessagePart>();
@@ -112,7 +112,15 @@ export class StreamAssembler {
         const questionPart = msg.parts?.find((p) =>
           msg.partId ? p.partId === msg.partId : p.type === 'question',
         );
-        const questionFields = extractQuestionFields(msg.input ?? questionPart?.input);
+        const questionItems = normalizeQuestionItems({
+          header: msg.header ?? questionPart?.header,
+          question: msg.question ?? questionPart?.question,
+          options: msg.options ?? questionPart?.options,
+          multiSelect: msg.multiSelect ?? questionPart?.multiSelect,
+          questions: msg.questions ?? questionPart?.questions,
+          content: msg.content ?? questionPart?.content,
+        });
+        const firstQuestion = questionItems?.[0];
         const id = msg.partId || questionPart?.partId || this.genPartId('question');
         const part = this.getOrCreatePart(id, 'question');
         this.syncSubagentFields(part, msg);
@@ -125,17 +133,17 @@ export class StreamAssembler {
           part.status = status;
         }
 
-        part.header = msg.header ?? questionFields.header ?? questionPart?.header ?? part.header;
-        part.question = msg.question ?? questionFields.question ?? questionPart?.question ?? part.question;
+        part.header = msg.header ?? firstQuestion?.header ?? questionPart?.header ?? part.header;
+        part.question = msg.question ?? firstQuestion?.question ?? questionPart?.question ?? part.question;
         if (msg.output != null) {
           part.output = msg.output;
         }
         part.options =
-          questionFields.options
+          (firstQuestion && firstQuestion.options.length > 0 ? firstQuestion.options : undefined)
           ?? normalizeQuestionOptions(msg.options ?? questionPart?.options)
           ?? part.options;
-        part.multiSelect = msg.multiSelect ?? questionPart?.multiSelect ?? part.multiSelect;
-        part.questions = msg.questions ?? questionPart?.questions ?? part.questions;
+        part.multiSelect = firstQuestion?.multiSelect ?? msg.multiSelect ?? questionPart?.multiSelect ?? part.multiSelect;
+        part.questions = questionItems ?? part.questions;
         part.extParam = msg.extParam ?? questionPart?.extParam ?? part.extParam;
         if (status === 'completed' || status === 'error') {
           part.answered = true;
@@ -260,7 +268,15 @@ export class StreamAssembler {
     this.parts.clear();
     this.partOrder = [];
     partSnapshots.forEach((partSnapshot) => {
-      const questionFields = extractQuestionFields(partSnapshot.input);
+      const questionItems = normalizeQuestionItems({
+        header: partSnapshot.header,
+        question: partSnapshot.question,
+        options: partSnapshot.options,
+        multiSelect: partSnapshot.multiSelect,
+        questions: partSnapshot.questions,
+        content: partSnapshot.content,
+      });
+      const firstQuestion = questionItems?.[0];
       const partId = partSnapshot.partId || this.genPartId(partSnapshot.type);
       const part = this.getOrCreatePart(partId, partSnapshot.type);
       part.content = partSnapshot.content ?? '';
@@ -272,18 +288,20 @@ export class StreamAssembler {
       if (partSnapshot.status) part.status = partSnapshot.status as unknown as PartStatus;
       if (partSnapshot.input) part.input = partSnapshot.input;
       if (partSnapshot.output != null) part.output = partSnapshot.output;
-      if (partSnapshot.header ?? questionFields.header) {
-        part.header = partSnapshot.header ?? questionFields.header ?? undefined;
+      if (partSnapshot.header ?? firstQuestion?.header) {
+        part.header = partSnapshot.header ?? firstQuestion?.header ?? undefined;
       }
-      if (partSnapshot.question ?? questionFields.question) {
-        part.question = partSnapshot.question ?? questionFields.question ?? undefined;
+      if (partSnapshot.question ?? firstQuestion?.question) {
+        part.question = partSnapshot.question ?? firstQuestion?.question ?? undefined;
       }
       if (partSnapshot.questionId) part.questionId = partSnapshot.questionId;
-      if (partSnapshot.options ?? questionFields.options) {
-        part.options = normalizeQuestionOptions(partSnapshot.options) ?? questionFields.options ?? undefined;
+      if (partSnapshot.options ?? firstQuestion?.options) {
+        part.options = firstQuestion && firstQuestion.options.length > 0
+          ? firstQuestion.options
+          : normalizeQuestionOptions(partSnapshot.options) ?? undefined;
       }
-      if (partSnapshot.multiSelect != null) part.multiSelect = partSnapshot.multiSelect;
-      if (partSnapshot.questions) part.questions = partSnapshot.questions;
+      if (firstQuestion) part.multiSelect = firstQuestion.multiSelect;
+      if (questionItems) part.questions = questionItems;
       if (partSnapshot.extParam) part.extParam = partSnapshot.extParam;
       if (partSnapshot.fileName) part.fileName = partSnapshot.fileName;
       if (partSnapshot.fileUrl) part.fileUrl = partSnapshot.fileUrl;

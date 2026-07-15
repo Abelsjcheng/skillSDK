@@ -50,6 +50,14 @@ function reportClickEvent(
   });
 }
 
+function hashTelemetryValue(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 export function reportSelectAssistantClick(): void {
   reportClickEvent('activate_select_assistant_click', '选择助理');
 }
@@ -79,6 +87,38 @@ export function reportCreateSessionClick(detail: WeAgentDetails | null, error?: 
     assistantAccount: detail?.partnerAccount ?? '',
     bizRobotTag: detail?.bizRobotTag ?? '',
     type: error ? 'error' : 'ok',
+  });
+}
+
+export function reportSlashCommandPanelTrigger(params: {
+  partnerAccount: string;
+  commandCount: number;
+  source: 'storage' | 'db' | 'memory' | 'network';
+  isPcMiniApp: boolean;
+}): void {
+  reportClickEvent('slash_command_panel_trigger', 'Slash命令面板展示', {
+    page: 'weAgentCUI',
+    partnerAccount: params.partnerAccount,
+    commandCount: params.commandCount,
+    source: params.source,
+    deviceType: params.isPcMiniApp ? 'pc' : 'mobile',
+  });
+}
+
+export function reportSlashCommandSelect(params: {
+  partnerAccount: string;
+  command: string;
+  queryLength: number;
+  selectMethod: 'enter' | 'click';
+  isPcMiniApp: boolean;
+}): void {
+  reportClickEvent('slash_command_select', 'Slash命令选择', {
+    page: 'weAgentCUI',
+    partnerAccount: params.partnerAccount,
+    commandNameHash: hashTelemetryValue(params.command),
+    queryLength: params.queryLength,
+    selectMethod: params.selectMethod,
+    deviceType: params.isPcMiniApp ? 'pc' : 'mobile',
   });
 }
 
@@ -474,7 +514,6 @@ export async function trackApiUpdateWeAgent(
     void reportApiSuccess('api_update_weagent', '更新助理接口', {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
         name: params.name,
         descriptionLength: params.description.length,
       },
@@ -487,7 +526,6 @@ export async function trackApiUpdateWeAgent(
     void reportApiError('api_update_weagent', '更新助理接口', error, {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
         name: params.name,
         descriptionLength: params.description.length,
       },
@@ -505,7 +543,6 @@ export async function trackApiDeleteWeAgent(
     void reportApiSuccess('api_delete_weagent', '删除助理接口', {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
       },
       response: {
         deleteResult: result.deleteResult,
@@ -516,7 +553,6 @@ export async function trackApiDeleteWeAgent(
     void reportApiError('api_delete_weagent', '删除助理接口', error, {
       request: {
         partnerAccount: params.partnerAccount,
-        robotId: params.robotId,
       },
     });
     throw error;

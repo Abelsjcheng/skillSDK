@@ -7,15 +7,15 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.opencode.skill.callback.AssistantDetailUpdatedCallback;
+import com.google.gson.Gson;
 import com.opencode.skill.callback.SessionListener;
 import com.opencode.skill.callback.SessionStatusCallback;
 import com.opencode.skill.callback.SkillCallback;
 import com.opencode.skill.callback.SkillWecodeStatusCallback;
-import com.opencode.skill.model.AssistantDetailUpdatedPayload;
 import com.opencode.skill.constant.MessageType;
 import com.opencode.skill.constant.SessionStatus;
 import com.opencode.skill.constant.SkillWecodeStatus;
+import com.opencode.skill.log.WeLinkLogger;
 import com.opencode.skill.model.AgentTypeListResult;
 import com.opencode.skill.model.CloseSkillResult;
 import com.opencode.skill.model.ControlSkillWeCodeParams;
@@ -31,10 +31,7 @@ import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.GetIsShowWeAgentResult;
 import com.opencode.skill.model.HistorySessionsParams;
-import com.opencode.skill.model.NotifyAssistantDetailUpdatedParams;
-import com.opencode.skill.model.NotifyAssistantDetailUpdatedResult;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
-import com.opencode.skill.model.OnSkillWecodeStatusChangeParams;
 import com.opencode.skill.model.OpenAssistantEditPageParams;
 import com.opencode.skill.model.OpenAssistantEditPageResult;
 import com.opencode.skill.model.OpenWeAgentParams;
@@ -57,7 +54,6 @@ import com.opencode.skill.model.SendMessageToIMParams;
 import com.opencode.skill.model.SendMessageToIMResult;
 import com.opencode.skill.model.SessionError;
 import com.opencode.skill.model.SessionMessage;
-import com.opencode.skill.model.SessionMessagePart;
 import com.opencode.skill.model.SessionStatusResult;
 import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.Session;
@@ -73,21 +69,25 @@ import com.opencode.skill.model.UpdateQrcodeInfoParams;
 import com.opencode.skill.model.UpdateQrcodeInfoResult;
 import com.opencode.skill.model.UpdateWeAgentParams;
 import com.opencode.skill.model.UpdateWeAgentResult;
-import com.opencode.skill.model.WeAgent;
 import com.opencode.skill.model.WeAgentDetailsArrayResult;
 import com.opencode.skill.model.WeAgentDetails;
 import com.opencode.skill.model.WeAgentListResult;
 import com.opencode.skill.model.WeAgentUriResult;
 import com.opencode.skill.network.ApiClient;
 import com.opencode.skill.network.WebSocketManager;
+import com.opencode.skill.util.ImNotifyManager;
+import com.opencode.skill.util.SdkStringUtils;
+import com.opencode.skill.util.SdkUriUtil;
+import com.opencode.skill.util.SessionMessageHelper;
 import com.opencode.skill.util.TypeConvertUtils;
+import com.opencode.skill.util.WeAgentManager;
 import com.opencode.skill.util.WeAgentStorage;
+import com.opencode.skill.util.WeAgentUriBunilder;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -99,18 +99,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class SkillSDK {
     private static volatile SkillSDK instance;
-    private static final String ASSISTANT_H5_URI = "h5://S008623/index.html";
-    private static final String WE_AGENT_CUI_APPID = "S008623";
-    private static final int DEFAULT_WE_AGENT_LIST_PAGE_SIZE = 100;
-    private static final int DEFAULT_WE_AGENT_LIST_PAGE_NUMBER = 1;
-
+    private static final String TAG = "SkillSDK";
+    @NonNull
+    private final Gson gson = new Gson();
     @NonNull
     private final ApiClient apiClient = new ApiClient();
     @NonNull
     private final WebSocketManager webSocketManager = WebSocketManager.getInstance();
     @NonNull
     private final WeAgentStorage weAgentStorage = new WeAgentStorage();
-
+    @NonNull
+    private final WeAgentManager weAgentManager = new WeAgentManager(gson, apiClient, weAgentStorage);
+    @NonNull
+    private final ImNotifyManager imNotifyManager = new ImNotifyManager(gson, weAgentManager);
     @NonNull
     private final Map<String, SessionStatusCallback> sessionStatusCallbacks = new ConcurrentHashMap<>();
     @NonNull
@@ -119,8 +120,6 @@ public final class SkillSDK {
     private final CopyOnWriteArrayList<SkillWecodeStatusCallback> wecodeStatusCallbacks = new CopyOnWriteArrayList<>();
     @NonNull
     private final Map<String, ListenerBinding> listenerBindings = new ConcurrentHashMap<>();
-    @NonNull
-    private final Map<String, AssistantDetailUpdatedCallback> assistantDetailUpdatedCallbacks = new ConcurrentHashMap<>();
     @NonNull
     private final Map<String, Boolean> awaitingExecutingBySession = new ConcurrentHashMap<>();
     @NonNull
@@ -169,6 +168,7 @@ public final class SkillSDK {
         weAgentStorage.configure(config.getContext());
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.addInternalListener(internalStreamListener);
+        weAgentManager.refreshWeAgentsOnColdStart();
     }
 
     public boolean isInitialized() {
@@ -322,7 +322,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId())) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
@@ -359,19 +359,30 @@ public final class SkillSDK {
     // 4. onSessionStatusChange
     public void onSessionStatusChange(@NonNull OnSessionStatusChangeParams params) {
         ensureInitializedForVoid();
-        if (isBlank(params.getWelinkSessionId()) || params.getCallback() == null) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId()) || params.getCallback() == null) {
             throw error(1000, "welinkSessionId and callback are required");
         }
         sessionStatusCallbacks.put(params.getWelinkSessionId(), params.getCallback());
     }
 
     // 5. onSkillWecodeStatusChange
-    public void onSkillWecodeStatusChange(@NonNull OnSkillWecodeStatusChangeParams params) {
+    public void onSkillWecodeStatusChange(@NonNull SkillWecodeStatusCallback callback) {
         ensureInitializedForVoid();
-        if (params.getCallback() == null) {
+        if (callback == null) {
             throw error(1000, "callback is required");
         }
-        wecodeStatusCallbacks.addIfAbsent(params.getCallback());
+        wecodeStatusCallbacks.addIfAbsent(callback);
+    }
+
+    // 5.1. offSkillWecodeStatusChange
+    public void offSkillWecodeStatusChange(@NonNull SkillWecodeStatusCallback callback) {
+        ensureInitializedForVoid();
+        if (callback == null) {
+            throw error(1000, "callback is required");
+        }
+        boolean removed = wecodeStatusCallbacks.remove(callback);
+        WeLinkLogger.i(TAG, "offSkillWecodeStatusChange remove callback, removed="
+                + removed + ", remaining=" + wecodeStatusCallbacks.size());
     }
 
     // 6. regenerateAnswer
@@ -380,7 +391,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId())) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
@@ -392,7 +403,7 @@ public final class SkillSDK {
                     @Override
                     public void onSuccess(@Nullable PageResult<SessionMessage> result) {
                         PageResult<SessionMessage> page = result == null ? new PageResult<>() : result;
-                        String latest = findLatestUserMessageContent(page.getContent());
+                        String latest = SessionMessageHelper.findLatestUserMessageContent(page.getContent());
                         if (latest == null || latest.trim().isEmpty()) {
                             callback.onError(error(4002, "No user message to regenerate"));
                             return;
@@ -429,12 +440,12 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId())) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
         String directContent = params.getContent();
-        String normalizedChatId = normalizeOptionalString(params.getChatId());
+        String normalizedChatId = SdkStringUtils.normalizeOptionalString(params.getChatId());
         if (directContent != null && directContent.trim().isEmpty()) {
             callback.onError(error(1000, "content is invalid"));
             return;
@@ -484,7 +495,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId())) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId())) {
             callback.onError(error(1000, "welinkSessionId is invalid"));
             return;
         }
@@ -497,7 +508,7 @@ public final class SkillSDK {
                 apiClient.getMessages(params.getWelinkSessionId(), page, size, new SkillCallback<PageResult<SessionMessage>>() {
                     @Override
                     public void onSuccess(@Nullable PageResult<SessionMessage> result) {
-                        PageResult<SessionMessage> serverPage = normalizeSessionMessagePage(result, page, size);
+                        PageResult<SessionMessage> serverPage = SessionMessageHelper.normalizeSessionMessagePage(result, page, size);
                         callback.onSuccess(serverPage);
                     }
 
@@ -550,7 +561,7 @@ public final class SkillSDK {
                         new SkillCallback<CursorResult<SessionMessage>>() {
                             @Override
                             public void onSuccess(@Nullable CursorResult<SessionMessage> result) {
-                                CursorResult<SessionMessage> cursorResult = normalizeSessionMessageCursor(result, size);
+                                CursorResult<SessionMessage> cursorResult = SessionMessageHelper.normalizeSessionMessageCursor(result, size);
                                 callback.onSuccess(cursorResult);
                                 if (beforeSeq == null) {
                                     // beforeSeq 为空视为首屏历史请求；历史成功返回后自动补发一次 resume。
@@ -573,47 +584,10 @@ public final class SkillSDK {
         });
     }
 
-    @NonNull
-    private static PageResult<SessionMessage> normalizeSessionMessagePage(@Nullable PageResult<SessionMessage> pageResult,
-            int requestPage, int requestSize) {
-        PageResult<SessionMessage> source = pageResult == null ? new PageResult<>() : pageResult;
-
-        int safePage = source.getPage() < 0 ? requestPage : source.getPage();
-        int safeSize = source.getSize() <= 0 ? requestSize : source.getSize();
-        List<SessionMessage> content = source.getContent() == null ? new ArrayList<>() : new ArrayList<>(source.getContent());
-        long safeTotal = source.getTotal() < 0 ? content.size() : source.getTotal();
-        int safeTotalPages = source.getTotalPages() < 0 ? 0 : source.getTotalPages();
-
-        PageResult<SessionMessage> normalized = new PageResult<>();
-        normalized.setContent(content);
-        normalized.setPage(safePage);
-        normalized.setSize(safeSize);
-        normalized.setTotal(safeTotal);
-        normalized.setTotalPages(safeTotalPages);
-        return normalized;
-    }
-
-    @NonNull
-    private static CursorResult<SessionMessage> normalizeSessionMessageCursor(
-            @Nullable CursorResult<SessionMessage> cursorResult,
-            int requestSize
-    ) {
-        CursorResult<SessionMessage> source = cursorResult == null ? new CursorResult<>() : cursorResult;
-        int safeSize = source.getSize() <= 0 ? requestSize : source.getSize();
-        List<SessionMessage> safeContent = new ArrayList<>(source.getContent());
-
-        CursorResult<SessionMessage> normalized = new CursorResult<>();
-        normalized.setContent(safeContent);
-        normalized.setSize(safeSize);
-        normalized.setHasMore(source.isHasMore());
-        normalized.setNextBeforeSeq(source.getNextBeforeSeq());
-        return normalized;
-    }
-
     // 9. registerSessionListener
     public RegisterSessionListenerResult registerSessionListener(@NonNull RegisterSessionListenerParams params) {
         ensureInitializedForVoid();
-        if (isBlank(params.getWelinkSessionId()) || params.getOnMessage() == null) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId()) || params.getOnMessage() == null) {
             throw error(1000, "welinkSessionId and onMessage are required");
         }
 
@@ -650,7 +624,7 @@ public final class SkillSDK {
     // 10. unregisterSessionListener
     public UnregisterSessionListenerResult unregisterSessionListener(@NonNull UnregisterSessionListenerParams params) {
         ensureInitializedForVoid();
-        if (isBlank(params.getWelinkSessionId())) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId())) {
             throw error(1000, "welinkSessionId is required");
         }
 
@@ -667,7 +641,7 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId()) || params.getContent().trim().isEmpty()) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId()) || params.getContent().trim().isEmpty()) {
             callback.onError(error(1000, "welinkSessionId and content are required"));
             return;
         }
@@ -700,11 +674,11 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        if (isBlank(params.getWelinkSessionId()) || params.getPermId().trim().isEmpty() || params.getResponse().trim().isEmpty()) {
+        if (SdkStringUtils.isBlank(params.getWelinkSessionId()) || params.getPermId().trim().isEmpty() || params.getResponse().trim().isEmpty()) {
             callback.onError(error(1000, "welinkSessionId, permId and response are required"));
             return;
         }
-        if (!isPermissionResponseValid(params.getResponse())) {
+        if (!SdkStringUtils.isPermissionResponseValid(params.getResponse())) {
             callback.onError(error(1000, "response must be once/always/reject"));
             return;
         }
@@ -854,7 +828,7 @@ public final class SkillSDK {
             return;
         }
 
-        if (status != null && !isSessionRecordStatusValid(status)) {
+        if (status != null && !SdkStringUtils.isSessionRecordStatusValid(status)) {
             callback.onError(error(1000, "status must be ACTIVE/IDLE/CLOSED"));
             return;
         }
@@ -922,7 +896,7 @@ public final class SkillSDK {
                     @Override
                     public void onSuccess(@Nullable CreateDigitalTwinResult result) {
                         CreateDigitalTwinResult resolved = result == null ? new CreateDigitalTwinResult() : result;
-                        if (isBlank(resolved.getMessage())) {
+                        if (SdkStringUtils.isBlank(resolved.getMessage())) {
                             resolved.setMessage("success");
                         }
                         callback.onSuccess(resolved);
@@ -979,8 +953,8 @@ public final class SkillSDK {
             callback.onError(error(1000, "pageSize and pageNumber must be positive integers"));
             return;
         }
-        final int safePageSize = clamp(pageSize, 1, 100);
-        final int safePageNumber = clamp(pageNumber, 1, 1000);
+        final int safePageSize = SdkStringUtils.clamp(pageSize, 1, 100);
+        final int safePageNumber = SdkStringUtils.clamp(pageNumber, 1, 1000);
 
         apiClient.getWeAgentList(safePageSize, safePageNumber, new SkillCallback<WeAgentListResult>() {
             @Override
@@ -1020,8 +994,8 @@ public final class SkillSDK {
         apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
             @Override
             public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
-                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
-                cacheWeAgentDetailsResult(partnerAccount, resolved);
+                WeAgentDetailsArrayResult resolved = WeAgentManager.resolveWeAgentDetailsResult(result);
+                weAgentManager.cacheWeAgentDetailsResult(partnerAccount, resolved);
                 callback.onSuccess(resolved);
             }
 
@@ -1054,17 +1028,17 @@ public final class SkillSDK {
 
         WeAgentDetails cached = weAgentStorage.getWeAgentDetails(partnerAccount);
         if (cached != null) {
-            WeAgentDetailsArrayResult cachedResult = wrapWeAgentDetail(cached);
+            WeAgentDetailsArrayResult cachedResult = WeAgentManager.wrapWeAgentDetail(cached);
             callback.onSuccess(cachedResult);
-            refreshAssistantDetailsCache(partnerAccount);
+            weAgentManager.refreshAssistantDetailsCache(partnerAccount);
             return;
         }
 
         apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
             @Override
             public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
-                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
-                cacheWeAgentDetailsResult(partnerAccount, resolved, false);
+                WeAgentDetailsArrayResult resolved = WeAgentManager.resolveWeAgentDetailsResult(result);
+                weAgentManager.cacheWeAgentDetailsResult(partnerAccount, resolved, false);
                 callback.onSuccess(resolved);
             }
 
@@ -1073,6 +1047,31 @@ public final class SkillSDK {
                 callback.onError(wrapError(error));
             }
         });
+    }
+
+    /**
+     * 读取当前助理完整详情。
+     *
+     * <p>方法仅访问本地 current_we_agent_detail 缓存，不发起网络请求或回写缓存。返回前复制缓存对象，
+     * 并仅对缺失的 tagName、tagNameEn 分别使用“助手”和“Agent”兜底。</p>
+     */
+    @NonNull
+    public WeAgentDetails getWeAgentInfo() {
+        WeAgentDetails cachedDetail = weAgentStorage.getCurrentWeAgentDetail();
+        WeAgentDetails result = cachedDetail == null
+                ? new WeAgentDetails()
+                : cachedDetail;
+        if (SdkStringUtils.normalizeOptionalString(result.getTagName()) == null) {
+            result.setTagName("助手");
+        }
+        if (SdkStringUtils.normalizeOptionalString(result.getTagNameEn()) == null) {
+            result.setTagNameEn("Agent");
+        }
+        WeLinkLogger.i(TAG, "getWeAgentInfo succeeded, partnerAccount="
+                + result.getPartnerAccount()
+                + ", tagName=" + result.getTagName()
+                + ", tagNameEn=" + result.getTagNameEn());
+        return result;
     }
 
     // 20. getWeAgentUri
@@ -1084,7 +1083,10 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        buildWeAgentUriResult(weAgentStorage.getCurrentWeAgentDetail(), callback);
+        weAgentManager.buildWeAgentUriResult(
+                weAgentStorage.getCurrentWeAgentDetail(),
+                callback
+        );
     }
 
     // 21. updateWeAgent
@@ -1099,10 +1101,11 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        if (partnerAccount == null && robotId == null) {
-            callback.onError(error(1000, "partnerAccount or robotId is required"));
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
             return;
         }
 
@@ -1118,15 +1121,48 @@ public final class SkillSDK {
             return;
         }
 
-        apiClient.updateWeAgent(partnerAccount, robotId, name, icon, description, new SkillCallback<UpdateWeAgentResult>() {
+        apiClient.updateWeAgent(partnerAccount, name, icon, description, new SkillCallback<UpdateWeAgentResult>() {
             @Override
             public void onSuccess(@Nullable UpdateWeAgentResult result) {
-                weAgentStorage.updateCachedWeAgentDetails(partnerAccount, robotId, name, icon, description);
-                callback.onSuccess(result);
+                WeLinkLogger.i(TAG, "updateWeAgent request succeeded, enqueue cache mutation, partnerAccount="
+                        + partnerAccount);
+                Map<String, Object> data = new HashMap<>();
+                data.put("partnerAccount", partnerAccount);
+                data.put("name", name);
+                data.put("icon", icon);
+                data.put("description", description);
+                WeAgentManager.enqueueWeAgentCacheMutation(completion -> {
+                    weAgentStorage.updateCachedWeAgentDetails(partnerAccount, name, icon, description);
+                    weAgentManager.broadcastWeAgentEvent(
+                            WeAgentManager.getWeAgentEventName(),
+                            WeAgentManager.buildWeAgentPayload("update", data, "local"),
+                            new SkillCallback<Void>() {
+                                @Override
+                                public void onSuccess(@Nullable Void ignored) {
+                                    try {
+                                        callback.onSuccess(result);
+                                    } finally {
+                                        completion.onSuccess(null);
+                                    }
+                                }
+
+                                @Override
+                                public void onError(@NonNull Throwable error) {
+                                    try {
+                                        callback.onError(error);
+                                    } finally {
+                                        completion.onError(error);
+                                    }
+                                }
+                            }
+                    );
+                });
             }
 
             @Override
             public void onError(@NonNull Throwable error) {
+                WeLinkLogger.e(TAG, "updateWeAgent request failed, partnerAccount=" + partnerAccount
+                        + ", error=" + error.getMessage());
                 callback.onError(wrapError(error));
             }
         });
@@ -1144,36 +1180,36 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        if (partnerAccount == null && robotId == null) {
-            callback.onError(error(1000, "partnerAccount or robotId is required"));
+        final String partnerAccount;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
+        } catch (SkillSdkException e) {
+            callback.onError(e);
             return;
         }
 
-        DeleteWeAgentContext context = buildDeleteWeAgentContext(partnerAccount, robotId);
-        prepareDeleteWeAgentContext(context, new SkillCallback<DeleteWeAgentContext>() {
+        WeAgentManager.DeleteWeAgentContext context = weAgentManager.buildDeleteWeAgentContext(partnerAccount);
+        weAgentManager.requestDeleteWeAgent(context, new SkillCallback<DeleteWeAgentResult>() {
             @Override
-            public void onSuccess(@Nullable DeleteWeAgentContext preparedContext) {
-                DeleteWeAgentContext resolvedContext = preparedContext == null ? context : preparedContext;
-                requestDeleteWeAgent(resolvedContext, new SkillCallback<DeleteWeAgentResult>() {
-                    @Override
-                    public void onSuccess(@Nullable DeleteWeAgentResult result) {
-                        handleDeleteWeAgentResult(resolvedContext, result, callback);
-                    }
-
-                    @Override
-                    public void onError(@NonNull Throwable error) {
-                        callback.onError(wrapError(error));
-                    }
-                });
+            public void onSuccess(@Nullable DeleteWeAgentResult result) {
+                WeLinkLogger.i(TAG, "deleteWeAgent request succeeded, enqueue cache mutation, partnerAccount="
+                        + partnerAccount);
+                WeAgentManager.enqueueWeAgentCacheMutation(
+                        completion -> weAgentManager.handleDeleteWeAgentResult(context, result, callback, completion)
+                );
             }
 
             @Override
             public void onError(@NonNull Throwable error) {
+                WeLinkLogger.e(TAG, "deleteWeAgent request failed, partnerAccount=" + partnerAccount
+                        + ", error=" + error.getMessage());
                 callback.onError(wrapError(error));
             }
         });
+    }
+
+    public void handleWeAgentImNotifyBroadcast(@NonNull Map<String, Object> payload) {
+        imNotifyManager.handleWeAgentImNotifyBroadcast(payload);
     }
 
     // 23. setIsShowWeAgent
@@ -1225,7 +1261,7 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
+        final String partnerAccount = SdkStringUtils.normalizeOptionalString(params.getPartnerAccount());
 
         // TODO: save isShowWeAgent = true by calling host saveSettings.
         // TODO: broadcast isShowWeAgent = true to host.
@@ -1233,7 +1269,7 @@ public final class SkillSDK {
             getAssistantDetails(new QueryWeAgentParams(partnerAccount), new SkillCallback<WeAgentDetailsArrayResult>() {
                 @Override
                 public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
-                    WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(result);
+                    WeAgentDetailsArrayResult resolved = WeAgentManager.resolveWeAgentDetailsResult(result);
                     WeAgentDetails targetDetail = resolved.getWeAgentDetailsArray().isEmpty()
                             ? null
                             : resolved.getWeAgentDetailsArray().get(0);
@@ -1241,13 +1277,13 @@ public final class SkillSDK {
                         callback.onError(error(7000, "getAssistantDetails returned empty detail"));
                         return;
                     }
-                    String weCodeUrl = normalizeOptionalString(targetDetail.getWeCodeUrl());
+                    String weCodeUrl = SdkStringUtils.normalizeOptionalString(targetDetail.getWeCodeUrl());
                     if (weCodeUrl == null) {
                         callback.onError(error(7000, "getAssistantDetails returned empty weCodeUrl"));
                         return;
                     }
                     weAgentStorage.saveCurrentWeAgentDetail(targetDetail);
-                    buildWeAgentUriResult(targetDetail, new SkillCallback<WeAgentUriResult>() {
+                    weAgentManager.buildWeAgentUriResult(targetDetail, new SkillCallback<WeAgentUriResult>() {
                         @Override
                         public void onSuccess(@Nullable WeAgentUriResult uris) {
                             // TODO: open we-agent tab by calling host capability.
@@ -1297,11 +1333,9 @@ public final class SkillSDK {
             return;
         }
 
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        final String identityKey;
+        final String partnerAccount;
         try {
-            identityKey = resolveAssistantIdentityKey(partnerAccount, robotId);
+            partnerAccount = TypeConvertUtils.requireString(params.getPartnerAccount(), "partnerAccount");
         } catch (SkillSdkException e) {
             callback.onError(e);
             return;
@@ -1313,10 +1347,8 @@ public final class SkillSDK {
             return;
         }
 
-        assistantDetailUpdatedCallbacks.put(identityKey, params.getOnUpdated());
-
         try {
-            String uri = buildAssistantEditPageUri(partnerAccount, robotId);
+            String uri = buildAssistantEditPageUri(partnerAccount);
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
@@ -1326,53 +1358,7 @@ public final class SkillSDK {
         }
     }
 
-    // 24. notifyAssistantDetailUpdated
-    public void notifyAssistantDetailUpdated(@NonNull NotifyAssistantDetailUpdatedParams params,
-            @NonNull SkillCallback<NotifyAssistantDetailUpdatedResult> callback) {
-        if (!isInitialized()) {
-            callback.onError(error(5000, "SkillSDK is not initialized"));
-            return;
-        }
-        if (params == null) {
-            callback.onError(error(1000, "params is required"));
-            return;
-        }
-
-        final String name;
-        final String icon;
-        final String description;
-        try {
-            name = TypeConvertUtils.requireString(params.getName(), "name");
-            icon = TypeConvertUtils.requireString(params.getIcon(), "icon");
-            description = TypeConvertUtils.requireString(params.getDescription(), "description");
-        } catch (SkillSdkException e) {
-            callback.onError(e);
-            return;
-        }
-
-        final String partnerAccount = normalizeOptionalString(params.getPartnerAccount());
-        final String robotId = normalizeOptionalString(params.getRobotId());
-        final String identityKey;
-        try {
-            identityKey = resolveAssistantIdentityKey(partnerAccount, robotId);
-        } catch (SkillSdkException e) {
-            callback.onError(e);
-            return;
-        }
-
-        AssistantDetailUpdatedCallback listener = assistantDetailUpdatedCallbacks.get(identityKey);
-        if (listener != null) {
-            try {
-                listener.onUpdated(new AssistantDetailUpdatedPayload(name, icon, description));
-            } catch (Throwable throwable) {
-                callback.onError(wrapError(throwable));
-                return;
-            }
-        }
-        callback.onSuccess(new NotifyAssistantDetailUpdatedResult("success"));
-    }
-
-    // 28. queryQrcodeInfo
+    // 27. queryQrcodeInfo
     public void queryQrcodeInfo(@NonNull QueryQrcodeInfoParams params,
             @NonNull SkillCallback<QrcodeInfo> callback) {
         if (!isInitialized()) {
@@ -1405,7 +1391,7 @@ public final class SkillSDK {
         });
     }
 
-    // 29. updateQrcodeInfo
+    // 28. updateQrcodeInfo
     public void updateQrcodeInfo(@NonNull UpdateQrcodeInfoParams params,
             @NonNull SkillCallback<UpdateQrcodeInfoResult> callback) {
         if (!isInitialized()) {
@@ -1418,7 +1404,7 @@ public final class SkillSDK {
         }
 
         final String qrcode;
-        final String robotId = normalizeOptionalString(params.getRobotId());
+        final String robotId = SdkStringUtils.normalizeOptionalString(params.getRobotId());
         final int status;
         try {
             qrcode = TypeConvertUtils.requireString(params.getQrcode(), "qrcode");
@@ -1441,7 +1427,7 @@ public final class SkillSDK {
         });
     }
 
-    // 27. queryAssistantGraySingle
+    // 29. queryAssistantGraySingle
     public void queryAssistantGraySingle(@NonNull QueryAssistantGraySingleParams params,
             @NonNull SkillCallback<QueryAssistantGraySingleResult> callback) {
         if (!isInitialized()) {
@@ -1464,7 +1450,7 @@ public final class SkillSDK {
         Boolean cached = weAgentStorage.getAssistantGraySingle(partnerAccount);
         if (cached != null) {
             callback.onSuccess(new QueryAssistantGraySingleResult(cached));
-            refreshAssistantGraySingleCache(partnerAccount);
+            weAgentManager.refreshAssistantGraySingleCache(partnerAccount);
             return;
         }
 
@@ -1488,469 +1474,13 @@ public final class SkillSDK {
         webSocketManager.shutdown();
         apiClient.shutdown();
         listenerBindings.clear();
-        assistantDetailUpdatedCallbacks.clear();
         sessionStatusCallbacks.clear();
         lastSessionStatusBySession.clear();
         wecodeStatusCallbacks.clear();
         awaitingExecutingBySession.clear();
         stoppedHoldingBySession.clear();
+        WeAgentManager.shutdown();
         config = null;
-    }
-
-    @NonNull
-    private WeAgentDetailsArrayResult resolveWeAgentDetailsResult(@Nullable WeAgentDetailsArrayResult result) {
-        return result == null ? new WeAgentDetailsArrayResult() : result;
-    }
-
-    private void cacheWeAgentDetailsResult(
-            @NonNull String partnerAccount,
-            @NonNull WeAgentDetailsArrayResult result
-    ) {
-        cacheWeAgentDetailsResult(partnerAccount, result, true);
-    }
-
-    private void cacheWeAgentDetailsResult(
-            @NonNull String partnerAccount,
-            @NonNull WeAgentDetailsArrayResult result,
-            boolean saveCurrentDetail
-    ) {
-        if (result.getWeAgentDetailsArray().isEmpty()) {
-            return;
-        }
-        WeAgentDetails cachedDetail = result.getWeAgentDetailsArray().get(0);
-        weAgentStorage.saveWeAgentDetails(partnerAccount, cachedDetail);
-        if (saveCurrentDetail) {
-            weAgentStorage.saveCurrentWeAgentDetail(cachedDetail);
-        }
-    }
-
-    private void refreshAssistantDetailsCache(@NonNull String partnerAccount) {
-        apiClient.getWeAgentDetails(partnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetailsArrayResult result) {
-                cacheWeAgentDetailsResult(partnerAccount, resolveWeAgentDetailsResult(result), false);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                // Ignore background refresh failures.
-            }
-        });
-    }
-
-    private void refreshAssistantGraySingleCache(@NonNull String partnerAccount) {
-        apiClient.queryAssistantGraySingle(partnerAccount, new SkillCallback<Boolean>() {
-            @Override
-            public void onSuccess(@Nullable Boolean result) {
-                if (result == null) {
-                    return;
-                }
-                weAgentStorage.saveAssistantGraySingle(partnerAccount, result);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                // Ignore async refresh failure and keep old cache.
-            }
-        });
-    }
-
-    @NonNull
-    private WeAgentDetailsArrayResult wrapWeAgentDetail(@NonNull WeAgentDetails detail) {
-        WeAgentDetailsArrayResult result = new WeAgentDetailsArrayResult();
-        List<WeAgentDetails> list = new ArrayList<>();
-        list.add(detail);
-        result.setWeAgentDetailsArray(list);
-        return result;
-    }
-
-    private void prepareDeleteWeAgentTransition(
-            @Nullable String partnerAccount,
-            @Nullable String robotId,
-            @NonNull SkillCallback<DeleteTransitionPlan> callback
-    ) {
-        List<WeAgent> cachedList = weAgentStorage.getWeAgentList();
-        if (!cachedList.isEmpty()) {
-            callback.onSuccess(buildDeleteTransitionPlan(cachedList, partnerAccount, robotId));
-            return;
-        }
-
-        apiClient.getWeAgentList(
-                DEFAULT_WE_AGENT_LIST_PAGE_SIZE,
-                DEFAULT_WE_AGENT_LIST_PAGE_NUMBER,
-                new SkillCallback<WeAgentListResult>() {
-                    @Override
-                    public void onSuccess(@Nullable WeAgentListResult result) {
-                        WeAgentListResult resolved = result == null ? new WeAgentListResult() : result;
-                        weAgentStorage.saveWeAgentList(resolved.getContent());
-                        callback.onSuccess(buildDeleteTransitionPlan(resolved.getContent(), partnerAccount, robotId));
-                    }
-
-                    @Override
-                    public void onError(@NonNull Throwable error) {
-                        callback.onError(error);
-                    }
-                }
-        );
-    }
-
-    @NonNull
-    private DeleteTransitionPlan buildDeleteTransitionPlan(
-            @NonNull List<WeAgent> snapshot,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        List<WeAgent> updatedList = new ArrayList<>(snapshot);
-        int deletedIndex = findWeAgentIndex(updatedList, partnerAccount, robotId);
-        if (deletedIndex < 0) {
-            return new DeleteTransitionPlan(updatedList, null);
-        }
-
-        updatedList.remove(deletedIndex);
-        if (updatedList.isEmpty()) {
-            return new DeleteTransitionPlan(updatedList, null);
-        }
-
-        int nextIndex = deletedIndex < updatedList.size() ? deletedIndex : 0;
-        String nextPartnerAccount = normalizeOptionalString(updatedList.get(nextIndex).getPartnerAccount());
-        return new DeleteTransitionPlan(updatedList, nextPartnerAccount);
-    }
-
-    private int findWeAgentIndex(
-            @NonNull List<WeAgent> list,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        for (int i = 0; i < list.size(); i++) {
-            WeAgent item = list.get(i);
-            String itemPartnerAccount = normalizeOptionalString(item.getPartnerAccount());
-            if (partnerAccount != null && partnerAccount.equals(itemPartnerAccount)) {
-                return i;
-            }
-            if (partnerAccount == null) {
-                String itemRobotId = normalizeOptionalString(item.getRobotId());
-                if (robotId != null && robotId.equals(itemRobotId)) {
-                    return i;
-                }
-            }
-        }
-        return -1;
-    }
-
-    @NonNull
-    private DeleteWeAgentContext buildDeleteWeAgentContext(
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        return new DeleteWeAgentContext(
-                partnerAccount,
-                robotId,
-                isCurrentWeAgent(partnerAccount, robotId),
-                weAgentStorage.hasWeAgentListCache(),
-                null
-        );
-    }
-
-    private void requestDeleteWeAgent(
-            @NonNull DeleteWeAgentContext context,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        apiClient.deleteWeAgent(context.partnerAccount, context.robotId, callback);
-    }
-
-    private void prepareDeleteWeAgentContext(
-            @NonNull DeleteWeAgentContext context,
-            @NonNull SkillCallback<DeleteWeAgentContext> callback
-    ) {
-        if (!context.deletingCurrentWeAgent) {
-            callback.onSuccess(context);
-            return;
-        }
-        prepareDeleteWeAgentTransition(context.partnerAccount, context.robotId, new SkillCallback<DeleteTransitionPlan>() {
-            @Override
-            public void onSuccess(@Nullable DeleteTransitionPlan plan) {
-                callback.onSuccess(context.withTransitionPlan(plan));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    private void handleDeleteWeAgentResult(
-            @NonNull DeleteWeAgentContext context,
-            @Nullable DeleteWeAgentResult result,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        if (!context.deletingCurrentWeAgent) {
-            handleDeleteNonCurrentWeAgentSuccess(context, result, callback);
-            return;
-        }
-        DeleteTransitionPlan resolvedPlan = context.transitionPlan == null
-                ? new DeleteTransitionPlan(new ArrayList<>(), null)
-                : context.transitionPlan;
-        handleDeleteWeAgentSuccess(resolvedPlan, result, callback);
-    }
-
-    private void handleDeleteWeAgentSuccess(
-            @NonNull DeleteTransitionPlan plan,
-            @Nullable DeleteWeAgentResult result,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        weAgentStorage.saveWeAgentList(plan.updatedList);
-        if (plan.nextPartnerAccount == null) {
-            weAgentStorage.saveCurrentWeAgentDetail(null);
-            callback.onSuccess(result);
-            return;
-        }
-
-        WeAgentDetails cachedDetail = weAgentStorage.getWeAgentDetails(plan.nextPartnerAccount);
-        if (cachedDetail != null) {
-            finalizeDeleteWeAgentTransition(result, cachedDetail, callback);
-            return;
-        }
-
-        apiClient.getWeAgentDetails(plan.nextPartnerAccount, new SkillCallback<WeAgentDetailsArrayResult>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetailsArrayResult detailResult) {
-                WeAgentDetailsArrayResult resolved = resolveWeAgentDetailsResult(detailResult);
-                cacheWeAgentDetailsResult(plan.nextPartnerAccount, resolved, false);
-                WeAgentDetails nextDetail = resolved.getWeAgentDetailsArray().isEmpty()
-                        ? null
-                        : resolved.getWeAgentDetailsArray().get(0);
-                finalizeDeleteWeAgentTransition(result, nextDetail, callback);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                finalizeDeleteWeAgentTransition(result, null, callback);
-            }
-        });
-    }
-
-    private void handleDeleteNonCurrentWeAgentSuccess(
-            @NonNull DeleteWeAgentContext context,
-            @Nullable DeleteWeAgentResult result,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        if (context.hasListCache) {
-            List<WeAgent> cachedList = weAgentStorage.getWeAgentList();
-            DeleteTransitionPlan plan = buildDeleteTransitionPlan(cachedList, context.partnerAccount, context.robotId);
-            weAgentStorage.saveWeAgentList(plan.updatedList);
-        }
-        callback.onSuccess(result);
-    }
-
-    private void finalizeDeleteWeAgentTransition(
-            @Nullable DeleteWeAgentResult result,
-            @Nullable WeAgentDetails nextDetail,
-            @NonNull SkillCallback<DeleteWeAgentResult> callback
-    ) {
-        if (nextDetail == null) {
-            weAgentStorage.saveCurrentWeAgentDetail(null);
-        } else {
-            weAgentStorage.saveCurrentWeAgentDetail(nextDetail);
-        }
-        buildWeAgentUriResult(nextDetail, new SkillCallback<WeAgentUriResult>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentUriResult nextUris) {
-                // TODO: call openWeAgentCUI with nextUris.weAgentUri, nextUris.assistantDetailUri and nextUris.switchAssistantUri.
-                callback.onSuccess(result);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(wrapError(error));
-            }
-        });
-    }
-
-    private boolean isCurrentWeAgent(@Nullable String partnerAccount, @Nullable String robotId) {
-        return matchesWeAgentDetails(weAgentStorage.getCurrentWeAgentDetail(), partnerAccount, robotId);
-    }
-
-    private boolean matchesWeAgentDetails(
-            @Nullable WeAgentDetails details,
-            @Nullable String partnerAccount,
-            @Nullable String robotId
-    ) {
-        if (details == null) {
-            return false;
-        }
-        if (partnerAccount != null) {
-            return partnerAccount.equals(normalizeOptionalString(details.getPartnerAccount()));
-        }
-        return robotId != null && robotId.equals(normalizeOptionalString(details.getId()));
-    }
-
-    private void buildWeAgentUriResult(
-            @Nullable WeAgentDetails details,
-            @NonNull SkillCallback<WeAgentUriResult> callback
-    ) {
-        if (details != null) {
-            if (normalizeOptionalString(details.getWeCodeUrl()) == null) {
-                callback.onSuccess(buildActivateAssistantFallbackUriResult());
-                return;
-            }
-            callback.onSuccess(isMyAgentDetail(details)
-                    ? buildMyAgentWeAgentUriResult(details)
-                    : buildLegacyWeAgentUriResult(details));
-            return;
-        }
-
-        resolveMyWeAgentDetail(new SkillCallback<WeAgentDetails>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetails myAgentDetail) {
-                if (myAgentDetail == null) {
-                    callback.onSuccess(buildActivateAssistantFallbackUriResult());
-                    return;
-                }
-                if (normalizeOptionalString(myAgentDetail.getWeCodeUrl()) == null) {
-                    callback.onSuccess(buildActivateAssistantFallbackUriResult());
-                    return;
-                }
-                callback.onSuccess(buildMyAgentWeAgentUriResult(myAgentDetail));
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onSuccess(buildActivateAssistantFallbackUriResult());
-            }
-        });
-    }
-
-    private void resolveMyWeAgentDetail(@NonNull SkillCallback<WeAgentDetails> callback) {
-        apiClient.getMyWeAgentDetail(new SkillCallback<WeAgentDetails>() {
-            @Override
-            public void onSuccess(@Nullable WeAgentDetails detail) {
-                if (detail != null) {
-                    cacheMyWeAgentDetail(detail);
-                }
-                callback.onSuccess(detail);
-            }
-
-            @Override
-            public void onError(@NonNull Throwable error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    private void cacheMyWeAgentDetail(@NonNull WeAgentDetails detail) {
-        WeAgentDetails currentDetail = weAgentStorage.getCurrentWeAgentDetail();
-        if (currentDetail == null || isMyAgentDetail(currentDetail)) {
-            weAgentStorage.saveCurrentWeAgentDetail(detail);
-        }
-    }
-
-    private boolean isMyAgentDetail(@Nullable WeAgentDetails detail) {
-        return detail != null
-                && "myagent".equalsIgnoreCase(normalizeOptionalString(detail.getBizRobotTag()));
-    }
-
-    @NonNull
-    private WeAgentUriResult buildActivateAssistantFallbackUriResult() {
-        String weAgentUri = appendQueryParameter(ASSISTANT_H5_URI, "wecodePlace", "weAgent");
-        weAgentUri = appendHashFragment(weAgentUri, "activateAssistant");
-        return new WeAgentUriResult(
-                weAgentUri == null ? "" : weAgentUri,
-                "",
-                ""
-        );
-    }
-
-    @NonNull
-    private WeAgentUriResult buildLegacyWeAgentUriResult(@NonNull WeAgentDetails details) {
-        String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
-        String weCodeUrl = normalizeOptionalString(details.getWeCodeUrl());
-        String detailId = normalizeOptionalString(details.getId());
-        String weCodeUrlHost = extractUriHost(weCodeUrl);
-
-        String baseWeAgentUri = appendQueryParameter(weCodeUrl, "wecodePlace", "weAgent");
-        String weAgentUri;
-        if (WE_AGENT_CUI_APPID.equalsIgnoreCase(weCodeUrlHost == null ? "" : weCodeUrlHost)) {
-            weAgentUri = appendQueryParameter(baseWeAgentUri, "assistantAccount", partnerAccount);
-        } else {
-            weAgentUri = appendQueryParameter(baseWeAgentUri, "robotId", detailId);
-        }
-
-        String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
-        assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
-
-        String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
-        switchAssistantUri = appendHashFragment(switchAssistantUri, "switchAssistant");
-
-        return new WeAgentUriResult(
-                weAgentUri == null ? "" : weAgentUri,
-                assistantDetailUri == null ? "" : assistantDetailUri,
-                switchAssistantUri == null ? "" : switchAssistantUri
-        );
-    }
-
-    @NonNull
-    private WeAgentUriResult buildMyAgentWeAgentUriResult(@NonNull WeAgentDetails details) {
-        String partnerAccount = normalizeOptionalString(details.getPartnerAccount());
-        String weAgentUri = appendQueryParameter(details.getWeCodeUrl(), "wecodePlace", "weAgent");
-        weAgentUri = appendQueryParameter(weAgentUri, "from", "weAgent");
-        String assistantDetailUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
-        assistantDetailUri = appendHashFragment(assistantDetailUri, "assistantDetail");
-        String switchAssistantUri = appendQueryParameter(ASSISTANT_H5_URI, "partnerAccount", partnerAccount);
-        switchAssistantUri = appendHashFragment(switchAssistantUri, "switchAssistant");
-        return new WeAgentUriResult(
-                weAgentUri == null ? "" : weAgentUri,
-                assistantDetailUri == null ? "" : assistantDetailUri,
-                switchAssistantUri == null ? "" : switchAssistantUri
-        );
-    }
-
-    private static final class DeleteTransitionPlan {
-        @NonNull
-        private final List<WeAgent> updatedList;
-        @Nullable
-        private final String nextPartnerAccount;
-
-        private DeleteTransitionPlan(@NonNull List<WeAgent> updatedList, @Nullable String nextPartnerAccount) {
-            this.updatedList = updatedList;
-            this.nextPartnerAccount = nextPartnerAccount;
-        }
-    }
-
-    private static final class DeleteWeAgentContext {
-        @Nullable
-        private final String partnerAccount;
-        @Nullable
-        private final String robotId;
-        private final boolean deletingCurrentWeAgent;
-        private final boolean hasListCache;
-        @Nullable
-        private final DeleteTransitionPlan transitionPlan;
-
-        private DeleteWeAgentContext(
-                @Nullable String partnerAccount,
-                @Nullable String robotId,
-                boolean deletingCurrentWeAgent,
-                boolean hasListCache,
-                @Nullable DeleteTransitionPlan transitionPlan
-        ) {
-            this.partnerAccount = partnerAccount;
-            this.robotId = robotId;
-            this.deletingCurrentWeAgent = deletingCurrentWeAgent;
-            this.hasListCache = hasListCache;
-            this.transitionPlan = transitionPlan;
-        }
-
-        @NonNull
-        private DeleteWeAgentContext withTransitionPlan(@Nullable DeleteTransitionPlan transitionPlan) {
-            return new DeleteWeAgentContext(
-                    partnerAccount,
-                    robotId,
-                    deletingCurrentWeAgent,
-                    hasListCache,
-                    transitionPlan
-            );
-        }
     }
 
     private void sendMessageInternal(
@@ -1988,7 +1518,7 @@ public final class SkillSDK {
 
     private void tryResolveSendToImContent(@NonNull SendMessageToIMParams params,
             @NonNull SkillCallback<String> callback) {
-        String directContent = normalizeOptionalString(params.getContent());
+        String directContent = SdkStringUtils.normalizeOptionalString(params.getContent());
         if (directContent != null) {
             callback.onSuccess(directContent);
             return;
@@ -1997,7 +1527,7 @@ public final class SkillSDK {
             @Override
             public void onSuccess(@Nullable CursorResult<SessionMessage> result) {
                 CursorResult<SessionMessage> page = result == null ? new CursorResult<>() : result;
-                String content = resolveSendToImContent(page.getContent());
+                String content = SessionMessageHelper.resolveSendToImContent(page.getContent());
                 if (content != null && !content.trim().isEmpty()) {
                     callback.onSuccess(content);
                     return;
@@ -2020,76 +1550,8 @@ public final class SkillSDK {
         webSocketManager.connect(callback);
     }
 
-    @Nullable
-    private static String findLatestUserMessageContent(@Nullable List<SessionMessage> messages) {
-        if (messages == null) {
-            return null;
-        }
-        for (SessionMessage message : messages) {
-            if (message == null) {
-                continue;
-            }
-            if (!"user".equalsIgnoreCase(normalizeOptionalString(message.getRole()))) {
-                continue;
-            }
-            String content = normalizeOptionalString(message.getContent());
-            if (content != null) {
-                return content;
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    private static String resolveSendToImContent(@Nullable List<SessionMessage> messages) {
-        if (messages == null) {
-            return null;
-        }
-        for (int index = messages.size() - 1; index >= 0; index--) {
-            SessionMessage message = messages.get(index);
-            if (message == null) {
-                continue;
-            }
-            String content = resolveMessageDisplayContent(message);
-            if (content != null) {
-                return content;
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    private static String resolveMessageDisplayContent(@NonNull SessionMessage message) {
-        String content = normalizeOptionalString(message.getContent());
-        if (content != null) {
-            return content;
-        }
-        List<SessionMessagePart> parts = message.getParts();
-        if (parts == null || parts.isEmpty()) {
-            return null;
-        }
-        StringBuilder builder = new StringBuilder();
-        for (SessionMessagePart part : parts) {
-            if (part == null) {
-                continue;
-            }
-            String partContent = normalizeOptionalString(part.getContent());
-            if (partContent == null) {
-                partContent = normalizeOptionalString(part.getOutput());
-            }
-            if (partContent == null) {
-                continue;
-            }
-            if (builder.length() > 0) {
-                builder.append('\n');
-            }
-            builder.append(partContent);
-        }
-        return builder.length() == 0 ? null : builder.toString();
-    }
-
     private void emitSessionStatusByEvent(@NonNull StreamMessage message) {
-        String sessionId = normalizeOptionalString(message.getWelinkSessionId());
+        String sessionId = SdkStringUtils.normalizeOptionalString(message.getWelinkSessionId());
         if (sessionId == null) {
             return;
         }
@@ -2165,15 +1627,6 @@ public final class SkillSDK {
                 .orElse(null);
     }
 
-    @Nullable
-    private static String normalizeOptionalString(@Nullable String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
     @NonNull
     private Instant safeUpdatedAt(@NonNull Session session) {
         try {
@@ -2202,110 +1655,17 @@ public final class SkillSDK {
         return new SkillSdkException(code, message);
     }
 
-    private static boolean isPermissionResponseValid(@NonNull String value) {
-        return "once".equalsIgnoreCase(value) || "always".equalsIgnoreCase(value) || "reject".equalsIgnoreCase(value);
-    }
-
-    private static boolean isSessionRecordStatusValid(@NonNull String value) {
-        return "ACTIVE".equalsIgnoreCase(value)
-                || "IDLE".equalsIgnoreCase(value)
-                || "CLOSED".equalsIgnoreCase(value);
-    }
-
     @NonNull
-    private String resolveAssistantIdentityKey(@Nullable String partnerAccount, @Nullable String robotId) {
-        if (!isBlank(partnerAccount)) {
-            return partnerAccount.trim();
-        }
-        if (!isBlank(robotId)) {
-            return robotId.trim();
-        }
-        throw error(1000, "partnerAccount or robotId is required");
-    }
-
-    @NonNull
-    private String buildAssistantEditPageUri(@Nullable String partnerAccount, @Nullable String robotId) {
-        String uri = appendHashFragment(ASSISTANT_H5_URI, "editAssistant");
-        if (!isBlank(partnerAccount)) {
-            String withPartnerAccount = appendQueryParameter(uri, "partnerAccount", partnerAccount.trim());
-            if (withPartnerAccount == null) {
-                throw error(5000, "Failed to build assistant edit page uri");
-            }
-            return withPartnerAccount;
-        }
-        String withRobotId = appendQueryParameter(uri, "robotId", robotId == null ? "" : robotId.trim());
-        if (withRobotId == null) {
+    /**
+     * 构造助理编辑页 URI，仅使用必填 partnerAccount 作为定位参数。
+     */
+    private String buildAssistantEditPageUri(@NonNull String partnerAccount) {
+        String uri = SdkUriUtil.appendHashFragment(WeAgentUriBunilder.getAssistantH5Uri(), "editAssistant");
+        String withPartnerAccount = SdkUriUtil.appendQueryParameter(uri, "partnerAccount", partnerAccount.trim());
+        if (withPartnerAccount == null) {
             throw error(5000, "Failed to build assistant edit page uri");
         }
-        return withRobotId;
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(value, max));
-    }
-
-    @Nullable
-    private static String appendQueryParameter(@Nullable String baseUrl, @NonNull String key, @Nullable String value) {
-        if (baseUrl == null) {
-            return null;
-        }
-        String trimmedBase = baseUrl.trim();
-        if (trimmedBase.isEmpty()) {
-            return null;
-        }
-        String fragment = null;
-        int hashIndex = trimmedBase.indexOf('#');
-        if (hashIndex >= 0) {
-            fragment = trimmedBase.substring(hashIndex + 1);
-            trimmedBase = trimmedBase.substring(0, hashIndex);
-        }
-        String encoded;
-        try {
-            encoded = URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8.name());
-        } catch (Exception ignored) {
-            encoded = value == null ? "" : value;
-        }
-        String connector;
-        if (trimmedBase.contains("?")) {
-            connector = trimmedBase.endsWith("?") || trimmedBase.endsWith("&") ? "" : "&";
-        } else {
-            connector = "?";
-        }
-        String result = trimmedBase + connector + key + "=" + encoded;
-        if (fragment == null || fragment.isEmpty()) {
-            return result;
-        }
-        return result + "#" + fragment;
-    }
-
-    @Nullable
-    private static String appendHashFragment(@Nullable String baseUrl, @NonNull String hash) {
-        if (baseUrl == null) {
-            return null;
-        }
-        String trimmedBase = baseUrl.trim();
-        if (trimmedBase.isEmpty()) {
-            return null;
-        }
-        int hashIndex = trimmedBase.indexOf('#');
-        String baseWithoutHash = hashIndex >= 0 ? trimmedBase.substring(0, hashIndex) : trimmedBase;
-        return baseWithoutHash + "#" + hash;
-    }
-
-    @Nullable
-    private static String extractUriHost(@Nullable String uri) {
-        if (isBlank(uri)) {
-            return null;
-        }
-        String host = Uri.parse(uri.trim()).getHost();
-        if (isBlank(host)) {
-            return null;
-        }
-        return host.trim();
-    }
-
-    private static boolean isBlank(@Nullable String value) {
-        return value == null || value.trim().isEmpty();
+        return withPartnerAccount;
     }
 
     private static final class ListenerBinding {

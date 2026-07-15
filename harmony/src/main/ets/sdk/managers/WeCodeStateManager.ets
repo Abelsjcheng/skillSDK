@@ -37,7 +37,7 @@ export class WeCodeStateManager {
       try {
         callback(payload);
       } catch (error) {
-        this.logger.warn('miniapp status callback failed', error);
+        this.logger.warn(`miniapp status callback failed: ${JSON.stringify(error)}`);
       }
     }
   }

@@ -1,19 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
+import ResponsiveConfirmModal from '../system/ResponsiveConfirmModal';
 import { isPcMiniApp } from '../../constants';
-import closeIcon from '../../imgs/close_icon.svg';
-import iconWeAgentHistory from '../../imgs/icon-we-agent-history.svg';
+import historySession from '../../imgs/historySession.svg';
+import closeIcon from '../../imgs/slider_close_icon.png';
+import iconWeAgentHistory from '../../imgs/no-history_icon.png';
+import deleteIcon from '../../imgs/delete_icon.png';
+import editIcon from '../../imgs/edit_icon.png';
 import type { SkillSession } from '../../types/bridge';
 import type {
   HistorySessionGroup,
   HistorySessionGroupKey,
-  HistorySessionsCache,
   WeAgentHistorySidebarProps,
+  HistorySessionsCache,
 } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
-import { getHistorySessionsList } from '../../utils/hwext';
+import { deleteHistorySession, getHistorySessionsList } from '../../utils/hwext';
 import { WeLog } from '../../utils/logger';
+import { removeSessionFromHistoryCache } from '../../utils/sessionDelete';
 import { HISTORY_SESSIONS_PAGE_SIZE } from '../../utils/session';
 import { showToast } from '../../utils/toast';
 import { reportViewHistoryClick } from '../../utils/uemUtil';
@@ -21,6 +26,17 @@ import { reportViewHistoryClick } from '../../utils/uemUtil';
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const HISTORY_SIDEBAR_ANIMATION_DURATION = 360;
 const HISTORY_SESSION_GROUP_ORDER: HistorySessionGroupKey[] = ['today', 'yesterday', 'threeDaysAgo'];
+const SESSION_ACTION_POPUP_OFFSET = 4;
+const SESSION_ACTION_POPUP_MIN_WIDTH = 100;
+const SESSION_ACTION_POPUP_HEIGHT = 44;
+const SESSION_ACTION_POPUP_VIEWPORT_PADDING = 8;
+const SHOW_RENAME_SESSION_ACTION = false;
+
+interface SessionActionPopupPosition {
+  top: number;
+  right: number;
+  placement: 'above' | 'below';
+}
 
 function getStartOfDayTimestamp(value: Date): number {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
@@ -88,6 +104,23 @@ function mergeHistorySessions(currentSessions: SkillSession[], nextSessions: Ski
   return mergedSessions;
 }
 
+function resolveSessionActionPopupPosition(target: HTMLElement): SessionActionPopupPosition {
+  const rect = target.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const shouldPlaceBelow = rect.bottom + SESSION_ACTION_POPUP_OFFSET + SESSION_ACTION_POPUP_HEIGHT
+    <= viewportHeight - SESSION_ACTION_POPUP_VIEWPORT_PADDING;
+  const maxRight = Math.max(viewportWidth - SESSION_ACTION_POPUP_MIN_WIDTH - SESSION_ACTION_POPUP_VIEWPORT_PADDING, 0);
+
+  return {
+    top: shouldPlaceBelow
+      ? rect.bottom + SESSION_ACTION_POPUP_OFFSET
+      : rect.top - SESSION_ACTION_POPUP_OFFSET,
+    right: Math.max(SESSION_ACTION_POPUP_VIEWPORT_PADDING, Math.min(viewportWidth - rect.right, maxRight)),
+    placement: shouldPlaceBelow ? 'below' : 'above',
+  };
+}
+
 const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   assistantAccount = '',
   currentWelinkSessionId = '',
@@ -95,6 +128,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   defaultOpen = false,
   historyLoaded = false,
   onHistoryLoaded,
+  onSessionDeleteFailed,
+  onSessionDeleteStart,
+  onSessionDeleted,
   onSessionSelect,
   onVisibilityChange,
 }) => {
@@ -105,17 +141,25 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [historySessions, setHistorySessions] = useState<SkillSession[]>([]);
+  const [deleteTargetSession, setDeleteTargetSession] = useState<SkillSession | null>(null);
+  const [sessionActionPopupPosition, setSessionActionPopupPosition] = useState<SessionActionPopupPosition | null>(null);
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState<SkillSession | null>(null);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
   const fetchRequestIdRef = useRef(0);
   const historySessionsRef = useRef<SkillSession[]>([]);
+  const actionPopupRef = useRef<HTMLDivElement | null>(null);
 
   const groupedHistorySessions = useMemo(
     () => groupHistorySessionsByUpdatedAt(historySessions),
     [historySessions],
   );
   const hasMoreHistorySessions = !isLoading && currentPage + 1 < totalPages;
+  const activePopupSessionId = deleteTargetSession?.welinkSessionId ?? '';
 
   const historyGroupLabels = useMemo<Record<HistorySessionGroupKey, string>>(() => ({
     today: t('weAgent.today'),
@@ -133,6 +177,10 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     setShouldRenderSidebar(defaultOpen);
     setIsLoading(false);
     setIsLoadingMore(false);
+    setDeleteTargetSession(null);
+    setSessionActionPopupPosition(null);
+    setConfirmDeleteSession(null);
+    setIsDeletingSession(false);
     historySessionsRef.current = [];
     setHistorySessions([]);
     setCurrentPage(0);
@@ -162,9 +210,34 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     historySessionsRef.current = historySessions;
   }, [historySessions]);
 
+  useEffect(() => {
+    if (!deleteTargetSession) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (target instanceof Node && actionPopupRef.current?.contains(target)) {
+        return;
+      }
+      setDeleteTargetSession(null);
+      setSessionActionPopupPosition(null);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, [deleteTargetSession]);
+
   useEffect(() => () => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
+    }
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
     }
   }, []);
 
@@ -265,6 +338,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
     }
 
     setIsVisible(false);
+    setDeleteTargetSession(null);
+    setSessionActionPopupPosition(null);
+    setConfirmDeleteSession(null);
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
     }
@@ -311,12 +387,112 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   }, [closeSidebar]);
 
   const handleSessionClick = useCallback((sessionId: string) => {
+    setDeleteTargetSession(null);
+    setSessionActionPopupPosition(null);
     onSessionSelect?.(sessionId);
     // PC 端侧边栏常驻展示；移动端仍沿用抽屉选择后关闭的交互。
     if (!isPc) {
       closeSidebar();
     }
   }, [closeSidebar, isPc, onSessionSelect]);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const showDeleteAction = useCallback((session: SkillSession, target: HTMLElement) => {
+    setDeleteTargetSession(session);
+    setSessionActionPopupPosition(resolveSessionActionPopupPosition(target));
+  }, []);
+
+  const handleSessionContextMenu = useCallback((event: React.MouseEvent, session: SkillSession) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showDeleteAction(session, event.currentTarget as HTMLElement);
+  }, [showDeleteAction]);
+
+  const handleTouchStart = useCallback((event: React.TouchEvent, session: SkillSession) => {
+    if (isPc) {
+      return;
+    }
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
+    const target = event.currentTarget as HTMLElement;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      showDeleteAction(session, target);
+    }, 520);
+  }, [clearLongPressTimer, isPc, showDeleteAction]);
+
+  const handleDeleteActionClick = useCallback((session: SkillSession) => {
+    setConfirmDeleteSession(session);
+    setDeleteTargetSession(null);
+    setSessionActionPopupPosition(null);
+  }, []);
+
+  const removeDeletedSessionLocally = useCallback((sessionId: string) => {
+    const previousSessions = historySessionsRef.current;
+    const nextSessions = previousSessions.filter((session) => session.welinkSessionId !== sessionId);
+    historySessionsRef.current = nextSessions;
+    setHistorySessions(nextSessions);
+
+    const baseCache: HistorySessionsCache = cachedCache ?? {
+      content: previousSessions,
+      page: currentPage,
+      size: HISTORY_SESSIONS_PAGE_SIZE,
+      total: previousSessions.length,
+      totalPages,
+    };
+    const nextCache = removeSessionFromHistoryCache(baseCache, sessionId);
+    if (nextCache) {
+      onHistoryLoaded?.(nextCache);
+      setCurrentPage(nextCache.page);
+      setTotalPages(nextCache.totalPages);
+    }
+  }, [cachedCache, currentPage, onHistoryLoaded, totalPages]);
+
+  const handleCancelDelete = useCallback(() => {
+    if (isDeletingSession) {
+      return;
+    }
+    setConfirmDeleteSession(null);
+  }, [isDeletingSession]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    const target = confirmDeleteSession;
+    if (!target || isDeletingSession) {
+      return;
+    }
+
+    const sessionId = target.welinkSessionId;
+    setIsDeletingSession(true);
+    onSessionDeleteStart?.(sessionId);
+    try {
+      await deleteHistorySession({ welinkSessionId: sessionId });
+      removeDeletedSessionLocally(sessionId);
+      await onSessionDeleted?.(sessionId);
+      setDeleteTargetSession(null);
+      setSessionActionPopupPosition(null);
+      setConfirmDeleteSession(null);
+    } catch (error) {
+      onSessionDeleteFailed?.(sessionId);
+      WeLog(`WeAgentHistorySidebar deleteHistorySession failed | extra=${JSON.stringify({ welinkSessionId: sessionId })} | error=${JSON.stringify(error)}`);
+      showToast(t('weAgent.deleteSessionFailed'));
+    } finally {
+      setIsDeletingSession(false);
+    }
+  }, [
+    confirmDeleteSession,
+    isDeletingSession,
+    onSessionDeleteFailed,
+    onSessionDeleteStart,
+    onSessionDeleted,
+    removeDeletedSessionLocally,
+    t,
+  ]);
 
   const handleLoadMore = useCallback(() => {
     if (isLoading || isLoadingMore || !hasMoreHistorySessions) {
@@ -373,24 +549,45 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                   const sessionId = session.welinkSessionId;
                   const sessionTitle = session.title?.trim() || t('weAgent.untitledSession');
                   const isSelected = currentWelinkSessionId === sessionId;
-
+                  const isActionTarget = activePopupSessionId === sessionId;
                   return (
-                    <button
+                    <div
                       key={sessionId}
-                      type="button"
-                      className={[
-                        'we-agent-history-sidebar__session-item',
-                        isSelected ? 'is-selected' : '',
-                      ].filter(Boolean).join(' ')}
-                      onClick={(event) => {
-                        runButtonClickWithDebounce(event, () => {
-                          handleSessionClick(sessionId);
-                        });
-                      }}
-                      title={sessionTitle}
+                      className="we-agent-history-sidebar__session-row"
                     >
-                      <span className="we-agent-history-sidebar__session-item-text">{sessionTitle}</span>
-                    </button>
+                      <button
+                        type="button"
+                        className={[
+                          'we-agent-history-sidebar__session-item',
+                          isSelected ? 'is-selected' : '',
+                          isActionTarget ? 'is-action-target' : '',
+                        ].filter(Boolean).join(' ')}
+                        onContextMenu={(event) => handleSessionContextMenu(event, session)}
+                        onTouchStart={(event) => handleTouchStart(event, session)}
+                        onTouchEnd={clearLongPressTimer}
+                        onTouchCancel={clearLongPressTimer}
+                        onTouchMove={clearLongPressTimer}
+                        onMouseLeave={() => {
+                          if (!isPc) {
+                            clearLongPressTimer();
+                          }
+                        }}
+                        onClick={(event) => {
+                          if (longPressTriggeredRef.current) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            longPressTriggeredRef.current = false;
+                            return;
+                          }
+                          runButtonClickWithDebounce(event, () => {
+                            handleSessionClick(sessionId);
+                          });
+                        }}
+                        title={sessionTitle}
+                      >
+                        <span className="we-agent-history-sidebar__session-item-text">{sessionTitle}</span>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -452,7 +649,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       >
         <img
           className="we-agent-cui-actions__icon"
-          src={iconWeAgentHistory}
+          src={historySession}
           alt=""
           draggable="false"
         />
@@ -460,6 +657,71 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
       {typeof document !== 'undefined' && sidebarNode
         ? createPortal(sidebarNode, document.body)
         : sidebarNode}
+      {deleteTargetSession && sessionActionPopupPosition && typeof document !== 'undefined'
+        ? createPortal(
+          <div
+            ref={actionPopupRef}
+            role="menu"
+            aria-label={t('weAgent.sessionActions')}
+            className={[
+              'we-agent-history-sidebar__action-popup',
+              sessionActionPopupPosition.placement === 'above' ? 'is-above' : 'is-below',
+            ].join(' ')}
+            style={{
+              top: `${sessionActionPopupPosition.top}px`,
+              right: `${sessionActionPopupPosition.right}px`,
+            }}
+          >
+            {SHOW_RENAME_SESSION_ACTION && (
+              <button
+                type="button"
+                role="menuitem"
+                className="we-agent-history-sidebar__action-item"
+              >
+                <span
+                  className="we-agent-history-sidebar__action-icon"
+                  style={{ WebkitMaskImage: `url(${editIcon})`, maskImage: `url(${editIcon})` }}
+                  aria-hidden="true"
+                />
+                <span className="we-agent-history-sidebar__action-text">{t('weAgent.renameSession')}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              className="we-agent-history-sidebar__action-item we-agent-history-sidebar__action-item--danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                runButtonClickWithDebounce(event, () => {
+                  handleDeleteActionClick(deleteTargetSession);
+                });
+              }}
+            >
+              <span
+                className="we-agent-history-sidebar__action-icon"
+                style={{ WebkitMaskImage: `url(${deleteIcon})`, maskImage: `url(${deleteIcon})` }}
+                aria-hidden="true"
+              />
+              <span className="we-agent-history-sidebar__action-text">{t('weAgent.deleteSession')}</span>
+            </button>
+          </div>,
+          document.body,
+        )
+        : null}
+      <ResponsiveConfirmModal
+        open={!!confirmDeleteSession}
+        title={t('weAgent.confirmDeleteSessionTitle')}
+        description={t('weAgent.confirmDeleteSessionDescription')}
+        cancelText={t('common.cancel')}
+        confirmText={t('weAgent.deleteSession')}
+        confirmBackgroundColor="#f36f64"
+        mobileConfirmTextColor="#f36f64"
+        confirmDisabled={isDeletingSession}
+        onClose={handleCancelDelete}
+        onConfirm={() => {
+          void handleConfirmDelete();
+        }}
+      />
     </>
   );
 };

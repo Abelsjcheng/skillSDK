@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EditAssistant from '../../pages/editAssistant';
+import EditAssistantContent from '../assistant/EditAssistantContent';
 import i18n from '../../i18n/config';
 import type { WeAgentDetails } from '../../types/bridge';
 
@@ -46,6 +47,12 @@ function renderEditAssistant(initialEntry: {
   );
 }
 
+function createFetchFullMock(): jest.Mock {
+  return jest.fn(async () => ({
+    json: async () => ({ data: [mockDetail] }),
+  }));
+}
+
 describe('EditAssistant', () => {
   beforeEach(async () => {
     window.localStorage.setItem('language', '2052');
@@ -55,29 +62,28 @@ describe('EditAssistant', () => {
   afterEach(() => {
     delete (window as any).HWH5EXT;
     delete (window as any).HWH5;
+    delete (window as any).Pedestal;
     window.localStorage.removeItem('language');
     jest.resetAllMocks();
   });
 
-  it('loads details by partnerAccount and notifies after external update', async () => {
-    const getWeAgentDetails = jest.fn(async () => ({
-      weAgentDetailsArray: [mockDetail],
-    }));
+  it('loads details by partnerAccount and updates without notify callback', async () => {
+    const fetchFull = createFetchFullMock();
     const updateWeAgent = jest.fn(async () => ({ updateResult: 'success' }));
-    const notifyAssistantDetailUpdated = jest.fn(async () => ({ status: 'success' }));
     const navigateBack = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails,
+        getWeAgentDetails: jest.fn(async () => ({ weAgentDetailsArray: [mockDetail] })),
         updateWeAgent,
-        notifyAssistantDetailUpdated,
       },
       configurable: true,
       writable: true,
     });
     Object.defineProperty(window, 'HWH5', {
       value: {
+        addEventListener: jest.fn(),
+        fetchFull,
         navigateBack,
       },
       configurable: true,
@@ -90,6 +96,10 @@ describe('EditAssistant', () => {
     });
 
     expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
+    expect(fetchFull).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/robot-partners/x00_1'),
+      expect.objectContaining({ method: 'GET' }),
+    );
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: i18n.t('createAssistant.confirm') }));
@@ -101,33 +111,27 @@ describe('EditAssistant', () => {
         icon: '',
         description: 'Assistant description',
       });
-      expect(notifyAssistantDetailUpdated).toHaveBeenCalledWith({
-        partnerAccount: 'x00_1',
-        name: 'AssistantA',
-        icon: '',
-        description: 'Assistant description',
-      });
       expect(navigateBack).toHaveBeenCalled();
     });
   });
 
-  it('uses route state detail and skips notify when opened from assistant detail', async () => {
-    const getWeAgentDetails = jest.fn();
+  it('loads details when opened from assistant detail', async () => {
+    const fetchFull = createFetchFullMock();
     const updateWeAgent = jest.fn(async () => ({ updateResult: 'success' }));
-    const notifyAssistantDetailUpdated = jest.fn(async () => ({ status: 'success' }));
     const navigateBack = jest.fn();
 
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
-        getWeAgentDetails,
+        getWeAgentDetails: jest.fn(async () => ({ weAgentDetailsArray: [mockDetail] })),
         updateWeAgent,
-        notifyAssistantDetailUpdated,
       },
       configurable: true,
       writable: true,
     });
     Object.defineProperty(window, 'HWH5', {
       value: {
+        addEventListener: jest.fn(),
+        fetchFull,
         navigateBack,
       },
       configurable: true,
@@ -144,7 +148,10 @@ describe('EditAssistant', () => {
     });
 
     expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
-    expect(getWeAgentDetails).not.toHaveBeenCalled();
+    expect(fetchFull).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/robot-partners/x00_1'),
+      expect.objectContaining({ method: 'GET' }),
+    );
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: i18n.t('createAssistant.confirm') }));
@@ -156,8 +163,61 @@ describe('EditAssistant', () => {
         icon: '',
         description: 'Assistant description',
       });
-      expect(notifyAssistantDetailUpdated).not.toHaveBeenCalled();
       expect(navigateBack).toHaveBeenCalled();
     });
+  });
+
+  it('uses the create-assistant PC layout for the packaged edit route', async () => {
+    const getWeAgentDetails = jest.fn(async () => ({
+      weAgentDetailsArray: [mockDetail],
+    }));
+
+    Object.defineProperty(window, 'HWH5EXT', {
+      value: {
+        getWeAgentDetails,
+        updateWeAgent: jest.fn(async () => ({ updateResult: 'success' })),
+      },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(window, 'HWH5', {
+      value: {
+        addEventListener: jest.fn(),
+        close: jest.fn(),
+      },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(window, 'Pedestal', {
+      value: {
+        callMethod: jest.fn(async (method: string) => {
+          if (method === 'method://agentSkillsDialog/getAssistantDetails') {
+            return { weAgentDetailsArray: [mockDetail] };
+          }
+          if (method === 'method://agentSkillsDialog/updateWeAgent') {
+            return { updateResult: 'success' };
+          }
+          return {};
+        }),
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    const { container } = render(
+      <EditAssistantContent
+        isPcMiniApp
+        source="external"
+        initialDetail={mockDetail}
+        partnerAccount="x00_1"
+        onClose={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByDisplayValue('AssistantA')).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass('digital-twin-creator', 'is-pc');
+    expect(container.firstElementChild).not.toHaveClass('digital-twin-creator--assistant-edit');
+    expect(screen.getByText('修改助手信息')).toHaveClass('digital-twin__title');
+    expect(screen.getByRole('button', { name: '确定' })).toBeInTheDocument();
   });
 });

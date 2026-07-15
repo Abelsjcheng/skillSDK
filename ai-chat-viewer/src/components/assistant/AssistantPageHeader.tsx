@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import backIcon from '../../imgs/back_icon.svg';
-import serviceIcon from '../../imgs/icon-service.svg';
+import customerIcon from '../../imgs/customer_icon.svg';
 import '../../styles/AssistantPageHeader.less';
 import type { AssistantPageHeaderAction, AssistantPageHeaderProps } from '../../types/components';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
@@ -87,7 +87,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
             });
           }}
         >
-          <img src={serviceIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
+          <img src={customerIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
         </button>
       </div>
       <span className="assistant-page-header__title">{title}</span>
@@ -97,11 +97,7 @@ const AssistantPageHeader: React.FC<AssistantPageHeaderProps> = ({
             type="button"
             className="assistant-page-header__icon-btn assistant-page-header__icon-btn--right"
             aria-label={mobileRightActionLabel}
-            onClick={(event) => {
-              runButtonClickWithDebounce(event, () => {
-                onMobileRightAction();
-              });
-            }}
+            onClick={onMobileRightAction}
           >
             <img src={mobileRightActionIcon} alt="" className="assistant-page-header__icon-img" aria-hidden="true" />
           </button>

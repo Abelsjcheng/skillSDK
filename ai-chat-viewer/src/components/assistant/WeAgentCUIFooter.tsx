@@ -1,29 +1,48 @@
-import React, { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import React, { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import checkIcon from '../../imgs/check.svg';
+import checkIcon from '../../imgs/check_icon.svg';
 import sendIcon from '../../imgs/send_icon.svg';
 import stopIcon from '../../imgs/stop_icon.svg';
 import '../../styles/WeAgentCUIFooter.less';
+import { useSlashCommandSuggest } from '../../hooks/useSlashCommandSuggest';
 import type {
   SendShortcutMode,
   ShortcutOption,
   WeAgentCUIFooterProps,
 } from '../../types/components';
+import type { SlashCommandItem } from '../../types/slashCommand';
 import { runButtonClickWithDebounce } from '../../utils/buttonDebounce';
+import SlashCommandPanel from './SlashCommandPanel';
+
+const PC_TEXTAREA_MIN_HEIGHT = 44;
+const PC_TEXTAREA_MAX_HEIGHT = 132;
 
 const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
   isPcMiniApp = false,
   mode,
+  partnerAccount = '',
+  slashCommands = [],
+  onRequestSlashCommands,
   onSend,
   onStop,
+  onInputFocus,
   leftActions,
 }) => {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [shortcutMode, setShortcutMode] = useState<SendShortcutMode>('enter');
   const [isShortcutPopupOpen, setIsShortcutPopupOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const sendWrapRef = useRef<HTMLDivElement | null>(null);
   const isGenerating = mode === 'generating';
+  const slashSuggest = useSlashCommandSuggest({
+    partnerAccount,
+    isPcMiniApp,
+    slashCommands,
+    onRequestCommands: onRequestSlashCommands,
+  });
+  const isSlashPanelOpen = slashSuggest.isOpen;
+  const closeSlashPanel = slashSuggest.close;
   const shortcutOptions = useMemo<ShortcutOption[]>(() => ([
     { mode: 'enter', label: t('weAgent.shortcut.enterSend') },
     { mode: 'ctrlEnter', label: t('weAgent.shortcut.ctrlEnterSend') },
@@ -66,6 +85,67 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     };
   }, [isPcMiniApp, isShortcutPopupOpen]);
 
+  useEffect(() => {
+    if (!isSlashPanelOpen) {
+      return;
+    }
+
+    const handleDocumentMouseDown = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (
+        target instanceof Element
+        && target.closest('.we-agent-cui-footer__slash-panel, .we-agent-cui-footer__input')
+      ) {
+        return;
+      }
+      closeSlashPanel();
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
+  }, [closeSlashPanel, isSlashPanelOpen]);
+
+  useEffect(() => {
+    if (!isPcMiniApp || !(inputRef.current instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    const textarea = inputRef.current;
+    const minHeightValue = `${PC_TEXTAREA_MIN_HEIGHT}px`;
+    if (value.trim().length === 0) {
+      if (textarea.style.height !== minHeightValue) {
+        textarea.style.height = minHeightValue;
+      }
+      if (textarea.style.overflowY !== 'hidden') {
+        textarea.style.overflowY = 'hidden';
+      }
+      return;
+    }
+
+    if (textarea.style.height !== minHeightValue) {
+      textarea.style.height = minHeightValue;
+    }
+
+    const nextHeight = Math.min(
+      Math.max(textarea.scrollHeight, PC_TEXTAREA_MIN_HEIGHT),
+      PC_TEXTAREA_MAX_HEIGHT,
+    );
+    const nextHeightValue = `${nextHeight}px`;
+    if (textarea.style.height !== nextHeightValue) {
+      textarea.style.height = nextHeightValue;
+    }
+
+    const nextOverflowY = textarea.scrollHeight > PC_TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+    if (textarea.style.overflowY !== nextOverflowY) {
+      textarea.style.overflowY = nextOverflowY;
+    }
+  }, [isPcMiniApp, value]);
+
   const handleSend = () => {
     const trimmedValue = value.trim();
     if (!trimmedValue) {
@@ -74,10 +154,70 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     onSend(trimmedValue);
     setValue('');
     setIsShortcutPopupOpen(false);
+    slashSuggest.close();
   };
 
-  const handleMobileKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  const handleInputValueChange = (nextValue: string) => {
+    setValue(nextValue);
+    slashSuggest.handleValueChange(nextValue);
+  };
+
+  const handleNativeInputChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const nextValue = event.target.value;
+    handleInputValueChange(nextValue);
+  };
+
+  const selectSlashCommand = (command?: SlashCommandItem) => {
+    const result = slashSuggest.selectCommand(command);
+    if (!result) {
+      return false;
+    }
+    setValue(result.value);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return true;
+  };
+
+  const handleSlashKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (!slashSuggest.isOpen) {
+      return false;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      slashSuggest.close();
+      return true;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      slashSuggest.moveHighlight(1);
+      return true;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      slashSuggest.moveHighlight(-1);
+      return true;
+    }
+
+    if (event.key === 'Enter' && slashSuggest.highlightedIndex >= 0) {
+      event.preventDefault();
+      return selectSlashCommand();
+    }
+
+    return false;
+  };
+
+  const handleMobileKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing || isGenerating) {
+      return;
+    }
+
+    if (handleSlashKeyDown(event)) {
       return;
     }
 
@@ -89,8 +229,12 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
     handleSend();
   };
 
-  const handlePcKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handlePcKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing || isGenerating) {
+      return;
+    }
+
+    if (handleSlashKeyDown(event)) {
       return;
     }
 
@@ -132,24 +276,40 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
       onClick={handleSendButtonClick}
       disabled={isGenerating ? false : !value.trim()}
       aria-label={sendButtonLabel}
+      data-tooltip={isPcMiniApp && isGenerating ? sendButtonLabel : undefined}
     >
       <img className="we-agent-cui-footer__send-icon" src={sendButtonIcon} alt="" draggable="false" />
     </button>
   );
 
+  const renderSlashPanel = () => (
+    isSlashPanelOpen ? (
+      <SlashCommandPanel
+        commands={slashSuggest.filteredCommands}
+        highlightedIndex={slashSuggest.highlightedIndex}
+        onSelect={(command) => {
+          selectSlashCommand(command);
+        }}
+      />
+    ) : null
+  );
+
   if (!isPcMiniApp) {
     return (
       <div className="we-agent-cui-footer">
+        {renderSlashPanel()}
         <input
+          ref={inputRef as React.RefObject<HTMLInputElement>}
           type="text"
           className="we-agent-cui-footer__input"
           placeholder={t('weAgent.inputPlaceholder')}
           value={value}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={handleNativeInputChange}
+          onFocus={onInputFocus}
           onKeyDown={handleMobileKeyDown}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
+          onDrop={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
             return false;
           }}
         />
@@ -160,16 +320,19 @@ const WeAgentCUIFooter: React.FC<WeAgentCUIFooterProps> = ({
 
   return (
     <div className="we-agent-cui-footer we-agent-cui-footer--pc">
+      {renderSlashPanel()}
       <textarea
+        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
         className="we-agent-cui-footer__input"
         placeholder={t('weAgent.inputPlaceholder')}
         value={value}
-        onChange={(event) => setValue(event.target.value)}
+        rows={2}
+        onChange={handleNativeInputChange}
+        onFocus={onInputFocus}
         onKeyDown={handlePcKeyDown}
-        rows={1}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
           return false;
         }}
       />

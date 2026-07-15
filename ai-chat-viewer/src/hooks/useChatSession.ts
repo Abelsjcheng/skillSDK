@@ -17,6 +17,7 @@ import {
   messageOperationToMessage,
   normalizeRole,
   sessionMessageToMessage,
+  serializeQuestionAnswerContent,
   snapshotMessageToMessage,
   updateLatestPart,
 } from '../utils/message';
@@ -25,6 +26,7 @@ import {
   registerSessionListener,
   sendMessage as sendMessageApi,
   sendMessageToIM,
+  sendWebSocketMessage,
   stopSkill,
   unregisterSessionListener,
 } from '../utils/hwext';
@@ -33,13 +35,102 @@ import { WeLog } from '../utils/logger';
 import { hasMoreHistoryByCursor } from '../utils/session';
 import { reportFlowTelemetry } from '../utils/telemetry';
 import { showToast } from '../utils/toast';
-import type { UseChatSessionOptions, UseChatSessionResult } from '../types/hooks/chatSession';
+import type {
+  HiddenQuestionAnswerUserMessage,
+  SendUserMessageOptions,
+  UseChatSessionOptions,
+  UseChatSessionResult,
+} from '../types/components';
 import { reportSendMessageClick } from '../utils/uemUtil';
+import { normalizeSlashCommands } from '../utils/slashCommand';
+import type { SlashCommandItem } from '../types/slashCommand';
 
 const HISTORY_PAGE_SIZE = 20;
+const MESSAGE_COPY_TOAST_OPTIONS = { toastClassName: 'toast toast--message-copy' } as const;
 
 function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
   return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
+}
+
+function collectKnownUserMessageIds(messages: Message[], suppressedMessageIds: Set<string>): Set<string> {
+  const ids = collectUserMessageIds(messages);
+  suppressedMessageIds.forEach((id) => ids.add(id));
+  return ids;
+}
+
+function collectQuestionAnswerOutputs(message: Message): Set<string> {
+  const outputs = new Set<string>();
+  if (normalizeRole(message.role) !== 'assistant') {
+    return outputs;
+  }
+
+  message.parts?.forEach((part) => {
+    if (part.type !== 'question') {
+      return;
+    }
+
+    const output = part.output?.trim();
+    if (output) {
+      outputs.add(output);
+    }
+  });
+
+  return outputs;
+}
+
+function filterQuestionAnswerUserMessages(messages: Message[]): {
+  messages: Message[];
+  hiddenUserMessageIds: Set<string>;
+} {
+  const hiddenUserMessageIds = new Set<string>();
+  const visibleMessages: Message[] = [];
+  let pendingQuestionAnswerOutputs = new Set<string>();
+
+  messages.forEach((message) => {
+    const role = normalizeRole(message.role);
+    const content = message.content.trim();
+
+    if (role === 'user' && content && pendingQuestionAnswerOutputs.has(content)) {
+      hiddenUserMessageIds.add(message.id);
+      pendingQuestionAnswerOutputs.delete(content);
+      return;
+    }
+
+    visibleMessages.push(message);
+
+    if (role === 'assistant') {
+      pendingQuestionAnswerOutputs = collectQuestionAnswerOutputs(message);
+      return;
+    }
+
+    pendingQuestionAnswerOutputs = new Set<string>();
+  });
+
+  return {
+    messages: visibleMessages,
+    hiddenUserMessageIds,
+  };
+}
+
+function optionalIdMatches(expected: string | undefined, actual: string | null | undefined): boolean {
+  return !expected || !actual || expected === actual;
+}
+
+function findHiddenQuestionAnswerUserMessageIndex(
+  messages: HiddenQuestionAnswerUserMessage[],
+  msg: StreamMessage,
+): number {
+  const content = (msg.content ?? '').trim();
+  if (!content) {
+    return -1;
+  }
+
+  return messages.findIndex((message) => (
+    message.content === content
+    && optionalIdMatches(message.toolCallId, msg.toolCallId)
+    && optionalIdMatches(message.questionId, msg.questionId)
+    && optionalIdMatches(message.subagentSessionId, msg.subagentSessionId)
+  ));
 }
 
 function buildUserMessage(msg: StreamMessage): Message | null {
@@ -64,6 +155,7 @@ export function useChatSession({
   assistantDetail,
   onSessionTitleChange,
   onSessionActivity,
+  onSessionDeleted,
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -79,12 +171,15 @@ export function useChatSession({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
+  const [slashCommands, setSlashCommands] = useState<SlashCommandItem[]>([]);
 
   const streamingAssemblersRef = useRef(new Map<string, StreamAssembler>());
   const latestStreamingMsgIdRef = useRef<string | null>(null);
   const listenerRegisteredRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const knownUserMessageIdsRef = useRef(new Set<string>());
+  const suppressedUserMessageIdsRef = useRef(new Set<string>());
+  const pendingHiddenQuestionAnswerUserMessagesRef = useRef<HiddenQuestionAnswerUserMessage[]>([]);
   const nextBeforeSeqRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(false);
   const isLoadingHistoryRef = useRef(false);
@@ -93,11 +188,12 @@ export function useChatSession({
   const agentOfflineHandledRef = useRef(false);
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const onSessionActivityRef = useRef(onSessionActivity);
+  const onSessionDeletedRef = useRef(onSessionDeleted);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
-  const agentOfflineTextRef = useRef('agent已离线');
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
   onSessionActivityRef.current = onSessionActivity;
+  onSessionDeletedRef.current = onSessionDeleted;
   aiReplyFailedTextRef.current = tRef.current('weAgent.aiReplyFailed');
 
   const showPendingAssistantPreview = useCallback((sessionId: string | null) => {
@@ -123,6 +219,8 @@ export function useChatSession({
     agentOfflineHandledRef.current = false;
     messagesRef.current = [];
     knownUserMessageIdsRef.current.clear();
+    suppressedUserMessageIdsRef.current.clear();
+    pendingHiddenQuestionAnswerUserMessagesRef.current = [];
     nextBeforeSeqRef.current = null;
     hasMoreHistoryRef.current = false;
     isLoadingHistoryRef.current = false;
@@ -130,6 +228,7 @@ export function useChatSession({
     setHasMoreHistory(false);
     setIsLoadingHistory(false);
     setSessionStatus('idle');
+    setSlashCommands([]);
     hidePendingAssistantPreview();
   }, [hidePendingAssistantPreview]);
 
@@ -292,8 +391,10 @@ export function useChatSession({
       const olderMessages = result.content.map((message) => sessionMessageToMessage(message));
       if (olderMessages.length > 0) {
         setMessages((prev) => {
-          const next = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
-          knownUserMessageIdsRef.current = collectUserMessageIds(next);
+          const combined = [...olderMessages.map((message) => ({ ...message, isHistory: true })), ...prev];
+          const { messages: next, hiddenUserMessageIds } = filterQuestionAnswerUserMessages(combined);
+          hiddenUserMessageIds.forEach((id) => suppressedUserMessageIdsRef.current.add(id));
+          knownUserMessageIdsRef.current = collectKnownUserMessageIds(next, suppressedUserMessageIdsRef.current);
           return next;
         });
       }
@@ -316,38 +417,77 @@ export function useChatSession({
     toolCallId?: string,
     questionId?: string,
     subagentSessionId?: string,
+    displayContent?: string,
+    options: SendUserMessageOptions = {},
   ) => {
     if (!welinkSessionId) {
       showToast(tRef.current('weAgent.sendMessageWithoutSessionFailed'));
       return null;
     }
 
-    const result = await sendMessageApi({
-      welinkSessionId,
-      content: content.trim(),
-      ...(toolCallId ? { toolCallId } : {}),
-      ...(questionId ? { questionId } : {}),
-      ...(subagentSessionId ? { subagentSessionId } : {}),
-      ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
-    });
-    // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
-    onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
-
-    const userMessage = messageOperationToMessage(result);
-    setMessages((prev) => {
-      if (prev.some((message) => message.id === userMessage.id)) {
-        return prev;
+    const trimmedContent = content.trim();
+    const hiddenQuestionAnswerUserMessage = options.suppressUserBubble
+      ? {
+        content: trimmedContent,
+        toolCallId,
+        questionId,
+        subagentSessionId,
       }
-      const next = [...prev, userMessage];
-      knownUserMessageIdsRef.current = collectUserMessageIds(next);
-      return next;
-    });
-    setScrollToBottomSignal((prev) => prev + 1);
-    return result;
-  }, [mode, welinkSessionId]);
+      : null;
+
+    if (hiddenQuestionAnswerUserMessage) {
+      pendingHiddenQuestionAnswerUserMessagesRef.current.push(hiddenQuestionAnswerUserMessage);
+    }
+
+    try {
+      const result = await sendMessageApi({
+        welinkSessionId,
+        content: trimmedContent,
+        ...(toolCallId ? { toolCallId } : {}),
+        ...(questionId ? { questionId } : {}),
+        ...(subagentSessionId ? { subagentSessionId } : {}),
+        ...(mode === 'skillCUI' ? { businessExtParam: { isSkillChat: false } } : {}),
+      });
+
+      // 发送成功后通知外层刷新会话活跃时间，驱动历史侧边栏即时重排。
+      onSessionActivityRef.current?.(welinkSessionId, result.createdAt || new Date().toISOString());
+
+      const userMessage = {
+        ...messageOperationToMessage(result),
+        ...(displayContent ? { content: displayContent } : {}),
+      };
+
+      if (options.suppressUserBubble) {
+        suppressedUserMessageIdsRef.current.add(userMessage.id);
+        knownUserMessageIdsRef.current.add(userMessage.id);
+        showPendingAssistantPreview(welinkSessionId);
+        setScrollToBottomSignal((prev) => prev + 1);
+        return result;
+      }
+
+      setMessages((prev) => {
+        if (prev.some((message) => message.id === userMessage.id)) {
+          return prev;
+        }
+        const next = [...prev, userMessage];
+        knownUserMessageIdsRef.current = collectKnownUserMessageIds(next, suppressedUserMessageIdsRef.current);
+        return next;
+      });
+      setScrollToBottomSignal((prev) => prev + 1);
+      return result;
+    } finally {
+      if (hiddenQuestionAnswerUserMessage) {
+        const index = pendingHiddenQuestionAnswerUserMessagesRef.current.indexOf(hiddenQuestionAnswerUserMessage);
+        if (index >= 0) {
+          pendingHiddenQuestionAnswerUserMessagesRef.current.splice(index, 1);
+        }
+      }
+    }
+  }, [mode, showPendingAssistantPreview, welinkSessionId]);
 
   const handleQuestionAnswered = useCallback(async ({
     answer,
+    displayContent,
     messageId,
     toolCallId,
     questionId,
@@ -356,7 +496,14 @@ export function useChatSession({
     setSessionStatus('busy');
 
     try {
-      await sendUserMessage(answer, toolCallId, questionId, subagentSessionId);
+      await sendUserMessage(
+        serializeQuestionAnswerContent(answer),
+        toolCallId,
+        questionId,
+        subagentSessionId,
+        displayContent,
+        { suppressUserBubble: true },
+      );
     } catch (err) {
       WeLog(`useChatSession sendMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, messageId, toolCallId, questionId, subagentSessionId })} | error=${JSON.stringify(err)}`);
       setSessionStatus('idle');
@@ -375,7 +522,7 @@ export function useChatSession({
       knownUserMessageIdsRef.current.clear();
       return;
     }
-    knownUserMessageIdsRef.current = collectUserMessageIds(messages);
+    knownUserMessageIdsRef.current = collectKnownUserMessageIds(messages, suppressedUserMessageIdsRef.current);
   }, [messages, welinkSessionId]);
 
   useEffect(() => {
@@ -398,7 +545,7 @@ export function useChatSession({
       if (
         (msg.type === 'question' || msg.type === 'tool.update')
         && (msg.status === 'completed' || msg.status === 'error')
-        && latestStreamingMsgIdRef.current === msg?.messageId
+        && latestStreamingMsgIdRef.current != msg?.messageId
       ) {
         const partType = msg.type === 'question' ? 'question' : 'tool';
         const hasMatchingPart = messagesRef.current.some((message) =>
@@ -406,7 +553,7 @@ export function useChatSession({
             part.type === partType
             && (
               (msg.partId != null && part.partId === msg.partId)
-              &&((msg.toolCallId != null && part.toolCallId === msg.toolCallId)||(msg.questionId != null && part.questionId === msg.questionId) )
+              && ((msg.toolCallId != null && part.toolCallId === msg.toolCallId) || (msg.questionId != null && part.questionId === msg.questionId))
             )
           )),
         );
@@ -417,14 +564,14 @@ export function useChatSession({
             partType,
             (part) => (
               (msg.partId != null && part.partId === msg.partId)
-              &&((msg.toolCallId != null && part.toolCallId === msg.toolCallId)||(msg.questionId != null && part.questionId === msg.questionId) )
+              && ((msg.toolCallId != null && part.toolCallId === msg.toolCallId) || (msg.questionId != null && part.questionId === msg.questionId))
             ),
             (part) => ({
               ...part,
               // 对 question 标记为已回答
               ...(partType === 'question' ? { answered: true } : {}),
               output: msg.output ?? part.output,
-              status: msg.status === 'completed' || msg.status === 'error' ? msg.status : part.status,
+              status: (msg.status === 'completed' || msg.status === 'error') ? msg.status : part.status,
               isStreaming: false,
             }),
           ));
@@ -433,6 +580,12 @@ export function useChatSession({
       }
 
       switch (msg.type) {
+        case 'slash_commands_result':
+          setSlashCommands(normalizeSlashCommands(msg.slashCommands ?? []));
+          break;
+        case 'session.deleted':
+          onSessionDeletedRef.current?.(activeWelinkSessionId);
+          break;
         case 'text.delta':
         case 'text.done':
         case 'thinking.delta':
@@ -472,7 +625,7 @@ export function useChatSession({
               welinkSessionId: activeWelinkSessionId,
               messageId,
               content: (currentText || msg.content || '')?.slice(-50),
-            })}`);
+            })}`, 'info');
           }
           break;
         }
@@ -481,10 +634,32 @@ export function useChatSession({
           if (!nextMessage) {
             break;
           }
+
+          const hiddenQuestionAnswerIndex = findHiddenQuestionAnswerUserMessageIndex(
+            pendingHiddenQuestionAnswerUserMessagesRef.current,
+            msg,
+          );
+          const shouldSuppressUserMessage = hiddenQuestionAnswerIndex >= 0
+            || suppressedUserMessageIdsRef.current.has(nextMessage.id);
+
           finalizeStreamingMessage();
           setSessionStatus('busy');
+
+          if (shouldSuppressUserMessage) {
+            if (hiddenQuestionAnswerIndex >= 0) {
+              pendingHiddenQuestionAnswerUserMessagesRef.current.splice(hiddenQuestionAnswerIndex, 1);
+            }
+            suppressedUserMessageIdsRef.current.add(nextMessage.id);
+            knownUserMessageIdsRef.current.add(nextMessage.id);
+            showPendingAssistantPreview(activeWelinkSessionIdRef.current);
+            break;
+          }
+
           setMessages((prev) => {
-            if (knownUserMessageIdsRef.current.has(nextMessage.id)) {
+            if (
+              knownUserMessageIdsRef.current.has(nextMessage.id)
+              || suppressedUserMessageIdsRef.current.has(nextMessage.id)
+            ) {
               return prev;
             }
 
@@ -578,12 +753,11 @@ export function useChatSession({
           }
           agentOfflineHandledRef.current = true;
           setSessionStatus('idle');
-          appendAssistantErrorBlock(agentOfflineTextRef.current, agentOfflineTextRef.current);
           break;
         case 'session.status':
           if (msg.sessionStatus === 'idle') {
+            finalizeStreamingMessageById(latestStreamingMsgIdRef.current);
             setSessionStatus('idle');
-            finalizeStreamingMessage();
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
           } else if (msg.sessionStatus === 'retry') {
@@ -692,8 +866,10 @@ export function useChatSession({
           ...sessionMessageToMessage(message),
           isHistory: true,
         }));
-        setMessages(mapped);
-        knownUserMessageIdsRef.current = collectUserMessageIds(mapped);
+        const { messages: visibleMessages, hiddenUserMessageIds } = filterQuestionAnswerUserMessages(mapped);
+        hiddenUserMessageIds.forEach((id) => suppressedUserMessageIdsRef.current.add(id));
+        setMessages(visibleMessages);
+        knownUserMessageIdsRef.current = collectKnownUserMessageIds(visibleMessages, suppressedUserMessageIdsRef.current);
         nextBeforeSeqRef.current = result.nextBeforeSeq ?? null;
         const nextHasMoreHistory = hasMoreHistoryByCursor(result);
         hasMoreHistoryRef.current = nextHasMoreHistory;
@@ -734,6 +910,7 @@ export function useChatSession({
     };
   }, [
     appendAssistantErrorBlock,
+    finalizeStreamingMessageById,
     getOrCreateStreamingAssembler,
     hidePendingAssistantPreview,
     mode,
@@ -774,19 +951,38 @@ export function useChatSession({
 
     try {
       await sendMessageToIM({ welinkSessionId, content });
-      showToast('已发送到IM');
     } catch (err) {
       WeLog(`useChatSession sendMessageToIM failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
+    }
+  }, [mode, welinkSessionId]);
+
+  const onRequestSlashCommands = useCallback(async () => {
+    if (!welinkSessionId) return;
+
+    try {
+      await sendWebSocketMessage({
+        message: JSON.stringify({
+          action: 'query_slash_commands',
+          welinkSessionId,
+        }),
+      });
+    } catch (err) {
+      WeLog(`useChatSession sendWebSocketMessage failed | extra=${JSON.stringify({ mode, welinkSessionId, action: 'query_slash_commands' })} | error=${JSON.stringify(err)}`);
+      throw err;
     }
   }, [mode, welinkSessionId]);
 
   const onCopy = useCallback(async (content: string) => {
     try {
       await copyTextToClipboard(content);
-      showToast(tRef.current('common.copySuccess'));
+      if (mode !== 'skillCUI') {
+        showToast(tRef.current('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
+      }
     } catch (err) {
       WeLog(`useChatSession copy failed | extra=${JSON.stringify({ mode, welinkSessionId })} | error=${JSON.stringify(err)}`);
-      showToast(tRef.current('assistantDetail.copyFailed'));
+      if (mode !== 'skillCUI') {
+        showToast(tRef.current('common.copyFailed'), MESSAGE_COPY_TOAST_OPTIONS);
+      }
     }
   }, [mode, welinkSessionId]);
 
@@ -801,7 +997,9 @@ export function useChatSession({
     isLoadingHistory,
     hasMoreHistory,
     scrollToBottomSignal,
+    slashCommands,
     onLoadMoreHistory: loadMoreHistory,
+    onRequestSlashCommands,
     onQuestionAnswered: handleQuestionAnswered,
     onSend,
     onStop,
@@ -823,6 +1021,8 @@ export function useChatSession({
     resetTransientState,
     scrollToBottomSignal,
     sessionStatus,
+    slashCommands,
     welinkSessionId,
+    onRequestSlashCommands,
   ]);
 }

@@ -13,6 +13,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onClose,
   onConfirm,
   confirmTextColor,
+  confirmDisabled = false,
 }) => {
   if (!open || typeof document === 'undefined') {
     return null;
@@ -46,6 +47,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <button
               type="button"
               className="confirm-modal__action"
+              disabled={confirmDisabled}
               style={confirmTextColor ? { color: confirmTextColor } : undefined}
               onClick={(event) => {
                 runButtonClickWithDebounce(event, onConfirm);

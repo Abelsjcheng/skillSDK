@@ -8,7 +8,7 @@ import type {
   RegenerateAnswerResponse,
   ControlSkillWeCodeResponse,
 } from '../types';
-import type { CreateDigitalTwinParams } from '../types/digitalTwin';
+import type { CreateDigitalTwinParams, GetFilePathResult, InternalAssistantOption, UploadTinyImageResult } from '../types/digitalTwin';
 import type {
   AgentTypeListResult,
   BuildOpenWeAgentCUIOptions,
@@ -16,6 +16,9 @@ import type {
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
+  DeleteHistorySessionParams,
+  DeleteHistorySessionResponse,
+  DeleteHistorySessionResult,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
   GetHistorySessionsListParams,
@@ -28,19 +31,20 @@ import type {
   HWH5EXT,
   HWH5UserInfo,
   HistorySessionsListResult,
-  NotifyAssistantDetailUpdatedParams,
-  NotifyAssistantDetailUpdatedResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
   Pedestal,
   QueryQrcodeInfoParams,
   QueryQrcodeInfoResult,
+  RegisterEventListenerParams,
   RegisterSessionListenerParams,
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ResolveRobotIdOptions,
   SendMessageParams,
   SendMessageToIMParams,
+  SendWebSocketMessageParams,
+  SendWebSocketMessageResult,
   SkillSession,
   StopSkillParams,
   UnregisterSessionListenerParams,
@@ -54,7 +58,8 @@ import type {
   WeAgentListResult,
   WeAgentUriResult,
 } from '../types/bridge';
-import { APP_ID, isPcMiniApp } from '../constants';
+import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
+import { buildDeleteHistorySessionUrl } from './apiEndpoints';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -78,7 +83,7 @@ const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
-export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
+const CREATE_ASSISTANT_WHITELIST_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 function tryGetPedestal(): Pedestal | null {
@@ -125,6 +130,16 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getSessionMessage: (params) => call<GetSessionMessageResponse>('getSessionMessage', params),
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     onTabForUpdate: () => undefined,
+    registerEventListener: (params) => {
+      const validEventTypes = ['agentskills.agentUpdated', 'agentskills_agentUpdated'];
+      if (!validEventTypes.includes(params.type)) {
+        return;
+      }
+      window.addEventListener(params.type, (e: any) => {
+        const data = e.detail;
+        params.func && params.func(data)
+      })
+    },
     registerSessionListener: (params) => {
       if (isPcMiniApp()) {
         listenerParams = params;
@@ -148,6 +163,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       });
     },
     sendMessage: (params) => call<SendMessageResponse>('sendMessage', params),
+    sendWebSocketMessage: (params) => call<SendWebSocketMessageResult>('sendWebSocketMessage', params),
     stopSkill: (params) => call<StopSkillResponse>('stopSkill', params),
     replyPermission: (params) => call<ReplyPermissionResponse>('replyPermission', params),
     controlSkillWeCode: (params) => {
@@ -165,7 +181,6 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     deleteWeAgent: (params) => assistantCall<DeleteWeAgentResult>('deleteWeAgent', params),
     queryQrcodeInfo: (params) => assistantCall<QueryQrcodeInfoResult>('queryQrcodeInfo', params),
     updateQrcodeInfo: (params) => assistantCall<UpdateQrcodeInfoResult>('updateQrcodeInfo', params),
-    notifyAssistantDetailUpdated: (params) => call<NotifyAssistantDetailUpdatedResult>('notifyAssistantDetailUpdated', params),
     getHistorySessionsList: (params) => call<HistorySessionsListResult>('getHistorySessionsList', params),
     getWeAgentUri: () => call<WeAgentUriResult>('getWeAgentUri', {}),
     openWeAgentCUI: (params) => call<OpenWeAgentCUIResult>('openWeAgentCUI', params),
@@ -301,7 +316,6 @@ export function getUrlHost(value: string): string {
   if (!normalizedValue) {
     return '';
   }
-
   const matched = normalizedValue.match(/^[a-zA-Z][a-zA-Z\d+.-]*:\/\/([^/?#]+)/);
   return matched?.[1]?.trim() ?? '';
 }
@@ -319,10 +333,6 @@ export function resolveWeCodeUrlForOpenWeAgentCUI(
   _partnerAccount: string,
 ): string {
   const normalizedWeCodeUrl = normalizeString(detail.weCodeUrl);
-
-  if (detail.bizRobotId?.trim()) {
-    return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
-  }
 
   return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
 }
@@ -407,6 +417,7 @@ export async function getDeviceInfo(): Promise<HWH5DeviceInfo> {
   return {
     ...deviceInfo,
     statusBarHeight: toPositiveNumber(deviceInfo.statusBarHeight),
+    safeAreaInsetBottom: toPositiveNumber(deviceInfo.safeAreaInsetBottom),
   };
 }
 
@@ -457,6 +468,19 @@ export function registerAppLanguageListener(listener: (language: 'zh' | 'en') =>
       listener(language);
     })
   }
+  window?.HWH5?.addEventListener({
+    type: 'welinkConfig',
+    func: (data: string) => {
+      try {
+        const configData = JSON.parse(data);
+        const type = configData?.type;
+        const language = toAppLanguage(configData?.welinkConfig[type]);
+        listener(language);
+      } catch (error) {
+        WeLog(`welinkConfig listener failed | error=${JSON.stringify(error)}`);
+      }
+    }
+  })
 }
 
 export function registerTabForUpdate(listener: () => void): void {
@@ -503,7 +527,7 @@ export async function reportUemEvent(
   }
 
   await Promise.resolve(window.HWH5.uem('event', {
-    type: 'info',
+    type: 'INFO',
     code: eventId,
     name: eventTitle,
     result: true,
@@ -562,7 +586,21 @@ export function unregisterSessionListener(params: UnregisterSessionListenerParam
 }
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
-  return trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+  try {
+    const result = await trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+    if (!result.id) {
+      return Promise.reject({ errorCode: 6000, errorMessage: '发送消息失败' })
+    }
+    return result;
+  } catch (error) {
+    return Promise.reject(error)
+  }
+}
+
+export async function sendWebSocketMessage(
+  params: SendWebSocketMessageParams,
+): Promise<SendWebSocketMessageResult> {
+  return getJsApiOrThrow().sendWebSocketMessage(params);
 }
 
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
@@ -587,6 +625,10 @@ export async function createNewSession(params: CreateNewSessionParams): Promise<
 
 export async function getAccountInfoUid(): Promise<string> {
   return (await getUserInfo()).uid;
+}
+
+export async function registerEventListener(params: RegisterEventListenerParams): Promise<void> {
+  await getJsApiOrThrow().registerEventListener(params);
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {
@@ -617,18 +659,57 @@ export async function deleteWeAgent(params: DeleteWeAgentParams): Promise<Delete
   return trackApiDeleteWeAgent(params, Promise.resolve(getJsApiOrThrow().deleteWeAgent(params)));
 }
 
+async function deleteHistorySessionWithHWH5FetchFull(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    throw new Error('HWH5.fetchFull is not available.');
+  }
+
+  const response = await window.HWH5.fetchFull<DeleteHistorySessionResponse>(
+    buildDeleteHistorySessionUrl(sessionId),
+    {
+      method: 'delete',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  const reply = await response.json();
+  if (reply?.code !== 0 || !reply.data) {
+    throw reply;
+  }
+  return reply.data;
+}
+
+async function deleteHistorySessionWithPcBridge(
+  sessionId: string,
+): Promise<DeleteHistorySessionResult> {
+  // PC 端删除会话后续如需切换桥接方法，只需要替换这个函数内部实现。
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
+}
+
+export async function deleteHistorySession(
+  params: DeleteHistorySessionParams,
+): Promise<DeleteHistorySessionResult> {
+  const sessionId = String(params?.welinkSessionId ?? '').trim();
+  if (!sessionId) {
+    throw new Error('welinkSessionId is required.');
+  }
+
+  if (isPcMiniApp()) {
+    return deleteHistorySessionWithPcBridge(sessionId);
+  }
+
+  return deleteHistorySessionWithHWH5FetchFull(sessionId);
+}
+
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {
   return trackApiQueryQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().queryQrcodeInfo(params)));
 }
 
 export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
   return trackApiUpdateQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().updateQrcodeInfo(params)));
-}
-
-export async function notifyAssistantDetailUpdated(
-  params: NotifyAssistantDetailUpdatedParams,
-): Promise<NotifyAssistantDetailUpdatedResult> {
-  return getJsApiOrThrow().notifyAssistantDetailUpdated(params);
 }
 
 export async function getHistorySessionsList(

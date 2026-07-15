@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isPcMiniApp } from '../constants';
-import lockIcon from '../imgs/lock_icon.png';
+import lockIcon from '../imgs/lock_icon.svg';
 import type { PermissionCardProps } from '../types/components';
 import type { MessagePart, PermissionResponse } from '../types';
 import { runButtonClickWithDebounce } from '../utils/buttonDebounce';
@@ -89,7 +89,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
   if (!resolved) {
     return (
       <div className="permission-card__actions">
-        <span className="permission-card__actions-label">edit</span>
+        <span className="permission-card__actions-label">{typeLabel}</span>
         <div className="permission-card__actions-buttons">
           <button
             className="permission-card__btn permission-card__btn--always"

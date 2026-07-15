@@ -1,5 +1,6 @@
 ﻿import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useTranslation } from 'react-i18next';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
@@ -8,8 +9,8 @@ import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
 import AvatarImage from './AvatarImage';
 import { copyTextToClipboard } from '../utils/clipboard';
-import copyIcon from '../imgs/icon-copy.svg';
-import sendImIcon from '../imgs/send_icon.svg';
+import copyIcon from '../imgs/copy_icon.svg';
+import sendImIcon from '../imgs/send_im_icon.png';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { QuestionCard } from './QuestionCard';
@@ -21,7 +22,9 @@ import type { Message, MessagePart } from '../types';
 import type { MessageBubbleProps } from '../types/components';
 import {
   groupMessagePartsForDisplay,
+  formatQuestionAnswerDisplay,
   normalizeRole,
+  parseQuestionAnswerMatrix,
   shouldRenderMessagePart,
   syncToolCallIdForQuestionParts,
 } from '../utils/message';
@@ -76,6 +79,7 @@ function isPermissionPartReadonly(part: MessagePart, readonly: boolean): boolean
 
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath];
 const MARKDOWN_REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
+const MESSAGE_COPY_TOAST_OPTIONS = { toastClassName: 'toast toast--message-copy' } as const;
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -90,12 +94,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
 }) => {
+  const { t } = useTranslation();
   const normalizedRole = normalizeRole(message.role);
   const isUser = normalizedRole === 'user';
   const isHistoryAssistantReadonly = Boolean(message.isHistory && normalizedRole === 'assistant');
   const hasCodeBlock = !isUser && messageContainsCodeBlock(message);
   const isPlainVariant = variant === 'plain';
   const canRenderActions = showActions && !isUser;
+  const displayContent = useMemo(() => {
+    if (!isUser) {
+      return message.content?.trim() ?? '';
+    }
+    const questionAnswerMatrix = parseQuestionAnswerMatrix(message.content);
+    return questionAnswerMatrix
+      ? formatQuestionAnswerDisplay([], questionAnswerMatrix, { showQuestionTitle: false })
+      : message.content?.trim() ?? '';
+  }, [isUser, message.content]);
 
   const markdownComponents: Components = useMemo(
     () => createMarkdownComponents(true),
@@ -197,55 +211,78 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    if (!message.content.trim()) {
+    if (!displayContent) {
       return null;
     }
 
     if (normalizedRole === 'assistant' || normalizedRole === 'tool') {
-      return renderMarkdown(message.content);
+      return renderMarkdown(displayContent);
     }
-    return <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>;
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{displayContent}</span>;
   };
 
   const handleCopy = () => {
-    if (onCopy) {
-      void onCopy(message.content);
+    if (!displayContent) {
       return;
     }
 
-    void copyTextToClipboard(message.content)
+    if (onCopy) {
+      void onCopy(displayContent);
+      return;
+    }
+
+    void copyTextToClipboard(displayContent)
       .then(() => {
-        showToast('复制成功');
+        showToast(t('common.copySuccess'), MESSAGE_COPY_TOAST_OPTIONS);
       })
       .catch((error) => {
         WeLog(`MessageBubble copy failed | error=${JSON.stringify(error)}`);
-        showToast('复制失败');
+        showToast(t('common.copyFailed'), MESSAGE_COPY_TOAST_OPTIONS);
       });
   };
 
   const handleSendToIM = () => {
-    void onSendToIM?.(message.content);
+    void onSendToIM?.(displayContent);
   };
 
-  const renderActions = () => {
-    if (!canRenderActions || message.isStreaming || !message.content) {
+  const renderWeAgentActions = () => {
+    if (!canRenderActions || message.isStreaming || !displayContent || !onCopy) {
       return null;
     }
 
     return (
-      <div className="message-actions">
+      <div className="message-actions message-actions--we-agent">
+        <button
+          type="button"
+          className="action-btn copy-btn"
+          onClick={handleCopy}
+          title={t('common.copyContent')}
+        >
+          <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderPlainActions = () => {
+    if (!canRenderActions || message.isStreaming || !displayContent || (!onCopy && !onSendToIM)) {
+      return null;
+    }
+
+    return (
+      <div className="message-actions message-actions--plain">
         {onCopy ? (
           <button
             type="button"
             className="action-btn copy-btn"
             onClick={handleCopy}
-            title="复制内容"
+            title={t('common.copyContent')}
           >
             <img className="action-btn__icon" src={copyIcon} alt="" aria-hidden="true" draggable="false" />
-            <span className="action-btn__text">复制</span>
+            <span className="action-btn__text">{t('common.copy')}</span>
           </button>
         ) : null}
-        {onSendToIM ? (
+        {onSendToIM && message.content ? (
           <button
             type="button"
             className="action-btn send-btn"
@@ -273,7 +310,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <div className={`message-block ${isUser ? 'message-user' : 'message-assistant'}`}>
         <div className="message-content">{messageContent}</div>
-        {renderActions()}
+        {renderPlainActions()}
       </div>
     );
   }
@@ -312,6 +349,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ].filter(Boolean).join(' ')}
         >
           <div className="message-content">{messageContent}</div>
+          {renderWeAgentActions()}
         </div>
       </div>
     </div>

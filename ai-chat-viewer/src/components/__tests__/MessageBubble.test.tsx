@@ -6,15 +6,16 @@ jest.mock('react-markdown', () => ({
   __esModule: true,
   default: ({ children }: { children: React.ReactNode }) => {
     const React = require('react');
-    const content = String(children || '');
-    if (content.trim().startsWith('- ')) {
+    const content = String(children ?? '');
+    const listLines = content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('- '));
+    if (listLines.length > 0) {
       return React.createElement(
         'ul',
         null,
-        content
-          .split('\n')
-          .filter((line) => line.trim().startsWith('- '))
-          .map((line, index) => React.createElement('li', { key: index }, line.replace(/^- /, ''))),
+        listLines.map((line, index) => React.createElement('li', { key: index }, line.slice(2))),
       );
     }
     return React.createElement(
@@ -27,16 +28,14 @@ jest.mock('react-markdown', () => ({
     );
   },
 }));
-jest.mock('remark-gfm', () => jest.fn());
-jest.mock('remark-breaks', () => jest.fn());
-jest.mock('remark-math', () => jest.fn());
-jest.mock('rehype-raw', () => jest.fn());
-jest.mock('rehype-katex', () => jest.fn());
-jest.mock('react-syntax-highlighter', () => ({
-  Prism: ({ children }: { children: React.ReactNode }) => <pre>{children}</pre>,
-}));
-jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({
-  oneLight: {},
+jest.mock('remark-gfm', () => ({}));
+jest.mock('remark-breaks', () => ({}));
+jest.mock('remark-math', () => ({}));
+jest.mock('rehype-raw', () => ({}));
+jest.mock('rehype-katex', () => ({}));
+jest.mock('../markdownComponents', () => ({
+  createMarkdownComponents: () => ({}),
+  normalizeMarkdownHtml: (content: string) => content,
 }));
 
 function createAssistantMessage(content: string): Message {
@@ -69,6 +68,17 @@ function createCurrentAssistantMessage(parts: MessagePart[]): Message {
     timestamp: Date.now(),
     isStreaming: true,
     parts,
+  };
+}
+
+function createCompletedAssistantMessage(overrides: Partial<Message>): Message {
+  return {
+    id: 'message-completed-1',
+    role: 'assistant',
+    content: '',
+    timestamp: Date.now(),
+    isStreaming: false,
+    ...overrides,
   };
 }
 
@@ -236,5 +246,148 @@ describe('MessageBubble', () => {
 
     expect(container.querySelector('.permission-card')).toBeInTheDocument();
     expect(container.querySelector('.permission-card__actions')).not.toBeInTheDocument();
+  });
+
+  it('renders weAgent copy action below assistant content and copies message content', () => {
+    const onCopy = jest.fn();
+    const message = createCompletedAssistantMessage({
+      content: '完整回复正文',
+      parts: [
+        {
+          partId: 'text-1',
+          type: 'text',
+          content: '第一段',
+          isStreaming: false,
+        },
+        {
+          partId: 'text-2',
+          type: 'text',
+          content: '第二段',
+          isStreaming: false,
+        },
+      ],
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="weAgent"
+        showActions
+        onCopy={onCopy}
+      />,
+    );
+
+    const actions = container.querySelector('.we-agent-message__bubble .message-actions');
+    const copyButton = container.querySelector('.copy-btn') as HTMLButtonElement | null;
+
+    expect(actions).toBeInTheDocument();
+    expect(copyButton).toBeInTheDocument();
+
+    fireEvent.click(copyButton!);
+
+    expect(onCopy).toHaveBeenCalledWith('完整回复正文');
+  });
+
+  it('renders weAgent copy action as icon-only without skillCUI send action', () => {
+    const message = createCompletedAssistantMessage({
+      content: '可复制正文',
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="weAgent"
+        showActions
+        onCopy={jest.fn()}
+        onSendToIM={jest.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.message-actions--we-agent')).toBeInTheDocument();
+    expect(container.querySelector('.copy-btn .action-btn__text')).not.toBeInTheDocument();
+    expect(container.querySelector('.send-btn')).not.toBeInTheDocument();
+  });
+
+  it('keeps skillCUI plain actions separate with text copy and send buttons', () => {
+    const message = createCompletedAssistantMessage({
+      content: '可发送正文',
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="plain"
+        showActions
+        onCopy={jest.fn()}
+        onSendToIM={jest.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.message-actions--plain')).toBeInTheDocument();
+    expect(container.querySelector('.copy-btn .action-btn__text')).toHaveTextContent('复制');
+    expect(container.querySelector('.send-btn .action-btn__text')).toHaveTextContent('发送');
+  });
+
+  it('does not show skillCUI actions for parts-only messages without message content', () => {
+    const message = createCompletedAssistantMessage({
+      content: '',
+      parts: [
+        {
+          partId: 'text-1',
+          type: 'text',
+          content: 'parts 正文',
+          isStreaming: false,
+        },
+      ],
+    });
+
+    const { container } = render(
+      <MessageBubble
+        message={message}
+        welinkSessionId="session-1"
+        variant="plain"
+        showActions
+        onCopy={jest.fn()}
+        onSendToIM={jest.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.copy-btn')).not.toBeInTheDocument();
+    expect(container.querySelector('.send-btn')).not.toBeInTheDocument();
+  });
+
+  it('does not render copy action for streaming assistant messages or user messages', () => {
+    const onCopy = jest.fn();
+    const streamingAssistant = createCompletedAssistantMessage({
+      content: '生成中',
+      isStreaming: true,
+    });
+    const userMessage = createCompletedAssistantMessage({
+      role: 'user',
+      content: '用户问题',
+    });
+
+    const { container: streamingContainer } = render(
+      <MessageBubble
+        message={streamingAssistant}
+        welinkSessionId="session-1"
+        showActions
+        onCopy={onCopy}
+      />,
+    );
+    const { container: userContainer } = render(
+      <MessageBubble
+        message={userMessage}
+        welinkSessionId="session-1"
+        showActions
+        onCopy={onCopy}
+      />,
+    );
+
+    expect(streamingContainer.querySelector('.copy-btn')).not.toBeInTheDocument();
+    expect(userContainer.querySelector('.copy-btn')).not.toBeInTheDocument();
   });
 });

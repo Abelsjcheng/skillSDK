@@ -2,6 +2,7 @@
 // StreamMessage Protocol Type Definitions
 // Based on 小程序JSAPI接口文档.md & SkillClientSdkInterfaceV1.md
 // ============================================================
+import type { SlashCommandItem } from './slashCommand';
 
 /** All supported StreamMessage type strings */
 export type StreamMessageType =
@@ -16,6 +17,7 @@ export type StreamMessageType =
   | 'step.done'
   | 'session.status'
   | 'session.title'
+  | 'session.deleted'
   | 'session.error'
   | 'permission.ask'
   | 'permission.reply'
@@ -30,7 +32,8 @@ export type StreamMessageType =
   | 'searching'
   | 'search_result'
   | 'reference'
-  | 'ask_more';
+  | 'ask_more'
+  | 'slash_commands_result';
 
 export type MessagePartType =
   | 'text'
@@ -52,8 +55,11 @@ export interface QuestionOption {
   description?: string;
 }
 
+export type QuestionAnswerMatrix = string[][];
+
 export interface QuestionAnswerSubmission {
-  answer: string;
+  answer: QuestionAnswerMatrix;
+  displayContent: string;
   messageId?: string;
   toolCallId?: string;
   questionId?: string;
@@ -66,6 +72,14 @@ export interface QuestionItemInput {
   header?: string;
   question?: string;
   options?: QuestionOptionInput[] | null;
+  multiSelect?: boolean | null;
+}
+
+export interface QuestionItem {
+  header?: string;
+  question: string;
+  options: QuestionOption[];
+  multiSelect: boolean;
 }
 
 interface ToolPartFields<TValue, TStatus> {
@@ -78,13 +92,13 @@ interface ToolPartFields<TValue, TStatus> {
   title?: TValue;
 }
 
-interface QuestionPartFields<TValue, TOptions> {
+interface QuestionPartFields<TValue, TOptions, TQuestions> {
   header?: TValue;
   question?: TValue;
   questionId?: TValue;
   options?: TOptions;
   multiSelect?: boolean | null;
-  questions?: QuestionItemInput[] | null;
+  questions?: TQuestions;
   extParam?: object | null;
 }
 
@@ -107,13 +121,14 @@ interface FilePartFields<TValue> {
 /** StreamMessage delivered from SessionListener onMessage callback. */
 export interface StreamMessage
   extends ToolPartFields<string | null, PartStatus | string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[] | null>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   // transport-level fields
   type: StreamMessageType;
   seq: number | null;
   welinkSessionId?: string | null;
+  sessionId?: string | null;
   emittedAt?: string | null;
   raw?: object;
 
@@ -148,6 +163,7 @@ export interface StreamMessage
   searchResults?: object[] | null;
   references?: object[] | null;
   askMoreQuestions?: string[] | null;
+  slashCommands?: SlashCommandItem[] | null;
   subagentSessionId?: string | null;
   subagentName?: string | null;
 }
@@ -171,7 +187,7 @@ export interface SessionMessage {
 
 export interface SessionMessagePart
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[] | null>,
   PermissionPartFields<string | null, PermissionResponse | string | null>,
   FilePartFields<string | null> {
   partId: string;
@@ -189,7 +205,7 @@ export interface SessionMessagePart
 /** A structured part within an assistant message */
 export interface MessagePart
   extends ToolPartFields<string, PartStatus>,
-  QuestionPartFields<string, QuestionOption[]>,
+  QuestionPartFields<string, QuestionOption[], QuestionItem[]>,
   PermissionPartFields<string, PermissionResponse | string>,
   FilePartFields<string> {
   partId: string;
@@ -248,7 +264,7 @@ export interface SessionMessageSnapshot {
 /** Part snapshot for streaming recovery */
 export interface MessagePartSnapshot
   extends ToolPartFields<string | null, string | null>,
-  QuestionPartFields<string | null, QuestionOptionInput[] | null>,
+  QuestionPartFields<string | null, QuestionOptionInput[] | null, QuestionItemInput[] | null>,
   PermissionPartFields<string | null, string | null>,
   FilePartFields<string | null> {
   partId: string;
