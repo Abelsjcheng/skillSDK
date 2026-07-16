@@ -139,6 +139,16 @@ export function useAgentOnlineStatus() {
 
   const resetIsOpen = useCallback(() => setIsOpen(false), []);
 
+  // PC 端通知状态变化
+  useEffect(() => {
+    if (isPcMiniApp() && showOnlineStatus && Object.keys(agentStatusMap).length > 0) {
+      window.Pedestal?.callMethod('method://pedestal/weAgentRequest', {
+        schema: 'method://agentSkill_weAgentWebview/agentStatusChange',
+        data: agentStatusMap,
+      });
+    }
+  }, [agentStatusMap, showOnlineStatus]);
+
   return {
     agentStatusMap,
     isOpen,
