@@ -168,6 +168,15 @@
        failure:failure];
 }
 
+- (void)getMyAgentUnreadMessageWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
+                                   failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    [self GET:@"/getMessageData"
+    parameters:nil
+  useAssistantBaseURL:YES
+       success:success
+       failure:failure];
+}
+
 /// 组装仅包含 partnerAccount 和可编辑基础字段的请求体，并提交助理更新请求。
 - (void)updateWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                    name:(NSString *)name
@@ -241,6 +250,25 @@
   useAssistantBaseURL:YES
          success:success
          failure:failure];
+}
+
+- (void)getWeAgentUnreadMessageWithAssistantAcount:(NSString *)assistantAcount
+                                         sessionIds:(nullable NSArray<NSString *> *)sessionIds
+                                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                                            failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSMutableDictionary *parameters = [@{ @"assistantAcount" : assistantAcount } mutableCopy];
+    if (sessionIds.count > 0) {
+        parameters[@"sessionIds"] = sessionIds;
+    }
+    [self POST:@"/api/skill/sessions/unread" parameters:parameters success:success failure:failure];
+}
+
+- (void)reportWeAgentSessionReadWithSessionId:(NSString *)welinkSessionId
+                                      readSeq:(NSNumber *)readSeq
+                                      success:(WLAgentSkillsHTTPSuccessBlock)success
+                                      failure:(WLAgentSkillsHTTPFailureBlock)failure {
+    NSString *path = [NSString stringWithFormat:@"/api/skill/sessions/%@/read", welinkSessionId];
+    [self POST:path parameters:@{ @"readSeq" : readSeq } success:success failure:failure];
 }
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId

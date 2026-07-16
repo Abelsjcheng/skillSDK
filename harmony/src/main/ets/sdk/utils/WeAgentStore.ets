@@ -1,6 +1,7 @@
 import preferences from '@ohos.data.preferences';
 import common from '@ohos.app.ability.common';
 import { WeAgent, WeAgentDetails, WeAgentDetailsArray } from '../types';
+import { TypeConverter } from './TypeConverter';
 
 const MOCK_USER_ID = 'mock_user_id';
 const STORE_NAME_PREFIX = 'skill_sdk_we_agent_';
@@ -94,12 +95,14 @@ export class WeAgentStore {
   getCachedWeAgentPartnerAccounts(): string[] {
     const accounts: string[] = [];
     Object.keys(this.loadDetailsCache()).forEach((key: string) => {
-      const normalized = this.normalize(key);
+      const normalized = TypeConverter.normalizeOptionalString(key);
       if (normalized !== undefined && !accounts.includes(normalized)) {
         accounts.push(normalized);
       }
     });
-    const currentPartnerAccount = this.normalize(this.loadCurrentDetail()?.partnerAccount);
+    const currentPartnerAccount = TypeConverter.normalizeOptionalString(
+      this.loadCurrentDetail()?.partnerAccount
+    );
     if (currentPartnerAccount !== undefined && !accounts.includes(currentPartnerAccount)) {
       accounts.push(currentPartnerAccount);
     }
@@ -157,7 +160,7 @@ export class WeAgentStore {
    * 按 partnerAccount 幂等删除详情缓存，账号无效或目标不存在时不写存储。
    */
   removeDetailsByPartnerAccount(partnerAccount: string): void {
-    const normalized = this.normalize(partnerAccount);
+    const normalized = TypeConverter.normalizeOptionalString(partnerAccount);
     if (normalized === undefined) {
       return;
     }
@@ -181,11 +184,13 @@ export class WeAgentStore {
     if (!this.hasListCache()) {
       return;
     }
-    const normalized = this.normalize(partnerAccount);
+    const normalized = TypeConverter.normalizeOptionalString(partnerAccount);
     if (normalized === undefined) {
       return;
     }
-    const nextList = this.loadList().filter((item: WeAgent): boolean => this.normalize(item.partnerAccount) !== normalized);
+    const nextList = this.loadList().filter((item: WeAgent): boolean =>
+      TypeConverter.normalizeOptionalString(item.partnerAccount) !== normalized
+    );
     this.saveList(nextList);
   }
 
@@ -310,15 +315,8 @@ export class WeAgentStore {
     if (detail === null || detail === undefined) {
       return false;
     }
-    return partnerAccount !== undefined && this.normalize(detail.partnerAccount) === partnerAccount;
-  }
-
-  private normalize(value: string | undefined): string | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
+    return partnerAccount !== undefined
+      && TypeConverter.normalizeOptionalString(detail.partnerAccount) === partnerAccount;
   }
 
   private getPreferencesInstance(): preferences.Preferences | null {

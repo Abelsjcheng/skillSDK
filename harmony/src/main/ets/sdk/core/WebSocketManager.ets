@@ -10,6 +10,7 @@ import {
 } from '../types';
 
 type MessageHandler = (message: StreamMessage) => void;
+const GLOBAL_BROADCAST_EVENTS: Set<string> = new Set(['session.deleted', 'agent.online', 'agent.offline']);
 
 /**
  * WebSocket 单例管理器。
@@ -184,6 +185,12 @@ export class WebSocketManager {
         this.messageHandler(parsed);
       }
 
+      // 这三类事件不关联具体会话，直接通过基座全局广播分发。
+      if (GLOBAL_BROADCAST_EVENTS.has(parsed.type)) {
+        this.broadcastGlobalWebSocketEvent(parsed);
+        return;
+      }
+
       const rawSessionId = parsed.welinkSessionId;
       if (rawSessionId === undefined || rawSessionId === null || String(rawSessionId) === '') {
         return;
@@ -212,6 +219,10 @@ export class WebSocketManager {
     socket.on('error', (error: BusinessError) => {
       this.broadcastError('WS_ERROR', error.message);
     });
+  }
+
+  private broadcastGlobalWebSocketEvent(_message: StreamMessage): void {
+    // 待接入：调用基座广播能力分发与会话无关的 WebSocket 事件。
   }
 
   private broadcastError(code: string, message: string): void {

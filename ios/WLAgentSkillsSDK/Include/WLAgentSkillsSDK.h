@@ -90,6 +90,21 @@ NS_ASSUME_NONNULL_BEGIN
                         success:(void (^)(WLAgentSkillsSessionPageResult *result))success
                         failure:(void (^)(NSError *error))failure;
 
+#pragma mark - WeAgent unread state
+- (void)getWeAgentUnreadMessage:(WLAgentSkillsGetWeAgentUnreadMessageParams *)params
+                         success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *result))success
+                         failure:(void (^)(NSError *error))failure;
+- (void)reportWeAgentSessionRead:(WLAgentSkillsReportWeAgentSessionReadParams *)params
+                          success:(void (^)(WLAgentSkillsReportWeAgentSessionReadResult *result))success
+                          failure:(void (^)(NSError *error))failure;
+- (void)onSessionViewing:(WLAgentSkillsOnSessionViewingParams *)params
+                  success:(void (^)(WLAgentSkillsOnSessionViewingResult *result))success
+                  failure:(void (^)(NSError *error))failure;
+- (void)onSessionViewingEnd:(WLAgentSkillsOnSessionViewingEndParams *)params
+                     success:(void (^)(WLAgentSkillsOnSessionViewingEndResult *result))success
+                     failure:(void (^)(NSError *error))failure;
+- (void)onAssistantChanged:(WLAgentSkillsOnAssistantChangedParams *)params;
+
 #pragma mark - 16. createDigitalTwin
 - (void)createDigitalTwin:(WLAgentSkillsCreateDigitalTwinParams *)params
                     success:(void (^)(WLAgentSkillsCreateDigitalTwinResult *result))success
@@ -133,8 +148,10 @@ NS_ASSUME_NONNULL_BEGIN
               failure:(void (^)(NSError *error))failure;
 
 #pragma mark - WeAgent IM notify payload handling
-/// 接收宿主透传的 IM 原始载荷，校验模块并分发助理更新或删除同步。
+/// 接收宿主透传的 IM 助理变更载荷，校验模块并分发助理更新或删除同步。
 - (void)handleWeAgentImNotifyBroadcastPayload:(NSDictionary *)payload;
+/// 接收宿主透传的 IM 未读载荷，仅分发未读状态同步。
+- (void)handleWeAgentUnreadImNotifyBroadcastPayload:(NSDictionary *)payload;
 
 #pragma mark - 23. setIsShowWeAgent
 - (void)setIsShowWeAgent:(WLAgentSkillsSetIsShowWeAgentParams *)params

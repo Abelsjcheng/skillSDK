@@ -127,6 +127,8 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   cachedCache = null,
   defaultOpen = false,
   historyLoaded = false,
+  redDotVisible = false,
+  sessionUnreadStateMap = {},
   onHistoryLoaded,
   onSessionDeleteFailed,
   onSessionDeleteStart,
@@ -157,6 +159,12 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
   const groupedHistorySessions = useMemo(
     () => groupHistorySessionsByUpdatedAt(historySessions),
     [historySessions],
+  );
+  const hasUnreadSession = useMemo(
+    () => Object.values(sessionUnreadStateMap).some((session) => (
+      session.welinkSessionId !== currentWelinkSessionId && session.hasUnRead
+    )),
+    [currentWelinkSessionId, sessionUnreadStateMap],
   );
   const hasMoreHistorySessions = !isLoading && currentPage + 1 < totalPages;
   const activePopupSessionId = deleteTargetSession?.welinkSessionId ?? '';
@@ -550,6 +558,7 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                   const sessionTitle = session.title?.trim() || t('weAgent.untitledSession');
                   const isSelected = currentWelinkSessionId === sessionId;
                   const isActionTarget = activePopupSessionId === sessionId;
+                  const showSessionUnreadRedDot = redDotVisible && Boolean(sessionUnreadStateMap[sessionId]?.hasUnRead);
                   return (
                     <div
                       key={sessionId}
@@ -586,6 +595,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
                         title={sessionTitle}
                       >
                         <span className="we-agent-history-sidebar__session-item-text">{sessionTitle}</span>
+                        {showSessionUnreadRedDot ? (
+                          <span className="we-agent-history-sidebar__session-item-red-dot" aria-hidden="true" />
+                        ) : null}
                       </button>
                     </div>
                   );
@@ -653,6 +665,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
           alt=""
           draggable="false"
         />
+        {redDotVisible && hasUnreadSession ? (
+          <span className="we-agent-cui-actions__red-dot" aria-hidden="true" />
+        ) : null}
       </button>
       {typeof document !== 'undefined' && sidebarNode
         ? createPortal(sidebarNode, document.body)

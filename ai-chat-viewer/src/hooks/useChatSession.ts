@@ -47,6 +47,7 @@ import type { SlashCommandItem } from '../types/slashCommand';
 
 const HISTORY_PAGE_SIZE = 20;
 const MESSAGE_COPY_TOAST_OPTIONS = { toastClassName: 'toast toast--message-copy' } as const;
+const GLOBAL_SESSION_EVENT_TYPES = ['session.deleted', 'agent.online', 'agent.offline'];
 
 function resolveTelemetryPage(mode: UseChatSessionOptions['mode']): 'weAgentCUI' | 'skillCUI' {
   return mode === 'skillCUI' ? 'skillCUI' : 'weAgentCUI';
@@ -535,7 +536,7 @@ export function useChatSession({
 
     const onMessage = (msg: StreamMessage) => {
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
-      if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
+      if (!GLOBAL_SESSION_EVENT_TYPES.includes(msg.type) && (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId)) {
         return;
       }
       const telemetryPage = resolveTelemetryPage(mode);
@@ -583,7 +584,7 @@ export function useChatSession({
           setSlashCommands(normalizeSlashCommands(msg.slashCommands ?? []));
           break;
         case 'session.deleted':
-          onSessionDeletedRef.current?.(activeWelinkSessionId);
+          onSessionDeletedRef.current?.(msg.welinkSessionId ?? '');
           break;
         case 'text.delta':
         case 'text.done':

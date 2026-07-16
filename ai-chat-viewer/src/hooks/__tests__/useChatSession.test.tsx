@@ -354,7 +354,7 @@ describe('useChatSession', () => {
     expect(onSessionDeleted).toHaveBeenCalledWith('session_1');
   });
 
-  it('ignores session.deleted events for a different registered session', async () => {
+  it('handles session.deleted events for a different registered session', async () => {
     const onSessionDeleted = jest.fn();
 
     renderHook(() => useChatSession({
@@ -377,7 +377,38 @@ describe('useChatSession', () => {
       } as any);
     });
 
-    expect(onSessionDeleted).not.toHaveBeenCalled();
+    expect(onSessionDeleted).toHaveBeenCalledWith('session_2');
+  });
+
+  it('handles agent.offline events for a different registered session', async () => {
+    const { result } = renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+    }));
+
+    await waitFor(() => {
+      expect(mockRegisterSessionListener).toHaveBeenCalledTimes(1);
+    });
+
+    const listener = mockRegisterSessionListener.mock.calls[0][0] as ListenerParams;
+    act(() => {
+      emitTextMessage(listener.onMessage, {
+        type: 'text.delta',
+        messageId: 'assistant_message_1',
+        content: 'Generating',
+      });
+    });
+    expect(result.current.sessionStatus).toBe('busy');
+
+    act(() => {
+      listener.onMessage({
+        type: 'agent.offline',
+        welinkSessionId: 'session_2',
+        seq: null,
+      } as StreamMessage);
+    });
+
+    expect(result.current.sessionStatus).toBe('idle');
   });
 
   it('preserves questionId from question events when answering question cards', async () => {

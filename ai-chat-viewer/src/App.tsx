@@ -11,13 +11,15 @@ import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
 import type {
+  GetWeAgentUnreadMessageResult,
   HistorySessionsListResult,
   SkillSession,
   WeAgentDetails,
   WeAgentUpdatedEventPayload,
 } from './types/bridge';
-import type { HWH5UserInfo } from './types/bridge/hwext';
+import type { HWH5UserInfo, OnVisiblePayload } from './types/bridge/hwext';
 import type { AppProps, HarmonySplitLayoutState, HistorySessionsCache } from './types/components';
+import type { WeAgentUnreadCache } from './types/weAgentUnread';
 import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import {
@@ -25,8 +27,13 @@ import {
   getDeviceInfo,
   getHistorySessionsList,
   getUserInfo,
+  getWeAgentUnreadMessage,
   getWeAgentDetails,
+  onSessionViewing,
+  onSessionViewingEnd,
   registerEventListener,
+  registerOnVisibleListener,
+  reportWeAgentSessionRead,
 } from './utils/hwext';
 import { WeLog } from './utils/logger';
 import {
@@ -43,6 +50,13 @@ import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
 import { canIUse } from './utils/versionCheck';
+import {
+  createEmptyWeAgentUnreadCache,
+  getWeAgentSessionUnreadState,
+  markWeAgentSessionRead,
+  normalizeWeAgentUnreadCacheResult,
+  unReadSessionDeleted,
+} from './utils/weAgentUnread';
 
 function sortSessionsByUpdatedAt(sessions: SkillSession[]): SkillSession[] {
   return [...sessions].sort(
@@ -160,6 +174,9 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
   const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
   const [harmonySplitLayout, setHarmonySplitLayout] = useState<HarmonySplitLayoutState>(DEFAULT_HARMONY_SPLIT_LAYOUT);
+  const [weAgentUnreadCache, setWeAgentUnreadCache] = useState<WeAgentUnreadCache>(
+    createEmptyWeAgentUnreadCache(),
+  );
 
   const assistantAccountRef = useRef(assistantAccount);
   const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);
@@ -168,8 +185,46 @@ function App({ assistantAccount = '' }: AppProps) {
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
   const pendingActionDeleteSessionIdsRef = useRef<Set<string>>(new Set());
+  const pageVisibleRef = useRef(true);
+  const lastReportedReadSeqBySessionRef = useRef<Record<string, number>>({});
 
   initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
+
+  const reportCurrentSessionRead = useCallback(async (sessionId: string, preferredSeq?: number) => {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId || !pageVisibleRef.current) {
+      return;
+    }
+
+    const unreadSessionState = getWeAgentSessionUnreadState(weAgentUnreadCache, normalizedSessionId);
+    const nextReadSeq = Math.max(
+      Number(preferredSeq) > 0 ? Number(preferredSeq) : 0,
+      unreadSessionState?.maxSeq ?? 0,
+    );
+
+    if (nextReadSeq <= 0) {
+      return;
+    }
+
+    const lastReportedReadSeq = lastReportedReadSeqBySessionRef.current[normalizedSessionId] ?? 0;
+    if (nextReadSeq <= lastReportedReadSeq) {
+      return;
+    }
+
+    try {
+      await reportWeAgentSessionRead({
+        welinkSessionId: normalizedSessionId,
+        readSeq: nextReadSeq,
+      });
+      lastReportedReadSeqBySessionRef.current[normalizedSessionId] = nextReadSeq;
+      setWeAgentUnreadCache((prev) => markWeAgentSessionRead(prev, normalizedSessionId, nextReadSeq));
+    } catch (error) {
+      WeLog(`[WeAgentUnreadCUI] reportWeAgentSessionRead failed | extra=${JSON.stringify({
+        welinkSessionId: normalizedSessionId,
+        readSeq: nextReadSeq,
+      })} | error=${JSON.stringify(error)}`);
+    }
+  }, [weAgentUnreadCache]);
 
   const session = useChatSession({
     mode: 'weAgentCUI',
@@ -245,6 +300,98 @@ function App({ assistantAccount = '' }: AppProps) {
     };
   }, [isPc]);
 
+  const refreshWeAgentUnreadCache = useCallback(async () => {
+    const currentAssistantAccount = assistantAccountRef.current.trim();
+    if (!currentAssistantAccount) {
+      return null;
+    }
+
+    const result = await getWeAgentUnreadMessage({
+      assistantAcount: currentAssistantAccount,
+    });
+
+    if (assistantAccountRef.current.trim() !== currentAssistantAccount) {
+      return result;
+    }
+
+    setWeAgentUnreadCache(normalizeWeAgentUnreadCacheResult(result));
+
+    return result;
+  }, []);
+
+  const startViewingSession = useCallback(async (sessionId: string | null) => {
+    const normalizedSessionId = sessionId?.trim() || '';
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    try {
+      await onSessionViewing({ welinkSessionId: normalizedSessionId });
+    } catch (error) {
+      WeLog(`[WeAgentUnreadCUI] onSessionViewing failed | extra=${JSON.stringify({
+        welinkSessionId: normalizedSessionId,
+      })} | error=${JSON.stringify(error)}`);
+    }
+  }, []);
+
+  const endViewingSession = useCallback(async (sessionId?: string | null) => {
+    const previousSessionId = sessionId?.trim() || welinkSessionIdRef.current?.trim() || '';
+    if (!previousSessionId) {
+      return;
+    }
+
+    try {
+      await onSessionViewingEnd({ welinkSessionId: previousSessionId });
+    } catch (error) {
+      WeLog(`[WeAgentUnreadCUI] onSessionViewingEnd failed | extra=${JSON.stringify({
+        welinkSessionId: previousSessionId,
+      })} | error=${JSON.stringify(error)}`);
+    }
+  }, []);
+
+  const handleOnVisible = useCallback((payload: OnVisiblePayload) => {
+    const isVisible = payload.visibility === 1;
+    pageVisibleRef.current = isVisible;
+    if (isVisible) {
+      const currentSessionId = welinkSessionIdRef.current;
+      startViewingSession(currentSessionId);
+      if (currentSessionId) {
+        reportCurrentSessionRead(currentSessionId);
+      }
+      return;
+    }
+
+    endViewingSession(welinkSessionIdRef.current);
+  }, [endViewingSession, reportCurrentSessionRead, startViewingSession]);
+
+  useEffect(() => {
+    if (!welinkSessionId) {
+      return;
+    }
+
+    void refreshWeAgentUnreadCache()
+      .then((result) => {
+        const currentSessionUnreadState = Array.isArray(result?.sessions)
+          ? result.sessions.find((sessionItem) => sessionItem.welinkSessionId?.trim() === welinkSessionId)
+          : undefined;
+        void reportCurrentSessionRead(welinkSessionId, currentSessionUnreadState?.maxSeq);
+      })
+      .catch((error) => {
+        WeLog(`[WeAgentUnreadCUI] refresh unread failed | error=${JSON.stringify(error)}`);
+      });
+  }, [reportCurrentSessionRead, refreshWeAgentUnreadCache, welinkSessionId]);
+
+  useEffect(() => {
+    if (!welinkSessionId) {
+      return;
+    }
+
+    void startViewingSession(welinkSessionId);
+    if (pageVisibleRef.current) {
+      void reportCurrentSessionRead(welinkSessionId);
+    }
+  }, [reportCurrentSessionRead, startViewingSession, welinkSessionId]);
+
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
   }, [shouldUseEnglishUserName]);
@@ -274,10 +421,10 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       const currentAssistantAccount = assistantAccountRef.current.trim();
-      const matchedEvent = payload.data.find((event) => 
+      const matchedEvent = payload.data.find((event) =>
         event.type === 'update' &&
-      event.data?.partnerAccount?.trim() === currentAssistantAccount
-      ) as Extract<WeAgentUpdatedEventPayload, { type: 'update'}> | undefined;
+        event.data?.partnerAccount?.trim() === currentAssistantAccount
+      ) as Extract<WeAgentUpdatedEventPayload, { type: 'update' }> | undefined;
       if (!matchedEvent) {
         return;
       }
@@ -287,20 +434,20 @@ function App({ assistantAccount = '' }: AppProps) {
       // 复用现有更新逻辑
       const updatedDetail = matchedEvent.data;
       const currentDetail = assistantDetailRef.current;
-          const nextDetail = {
-      ...currentDetail,
-      ...updatedDetail,
-      desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
-    } as WeAgentDetails;
-        assistantDetailRef.current = nextDetail;
-    setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
-    setWeAgentAssistantDescription(
-      updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
-    );
-    setWeAgentAssistantAvatar(
-      resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
-    );
-    return
+      const nextDetail = {
+        ...currentDetail,
+        ...updatedDetail,
+        desc: updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+      } as WeAgentDetails;
+      assistantDetailRef.current = nextDetail;
+      setWeAgentAssistantName(updatedDetail.name ?? currentDetail?.name ?? '');
+      setWeAgentAssistantDescription(
+        updatedDetail.desc ?? updatedDetail.description ?? currentDetail?.desc ?? '',
+      );
+      setWeAgentAssistantAvatar(
+        resolveAssistantIconUrl(updatedDetail.icon ?? currentDetail?.icon ?? ''),
+      );
+      return
 
     }
     const updatedDetail = payload.data;
@@ -327,16 +474,26 @@ function App({ assistantAccount = '' }: AppProps) {
     );
   }, []);
 
+  const handleWeAgentUnreadChanged = useCallback((payload: GetWeAgentUnreadMessageResult) => {
+    const currentAssistantAccount = assistantAccountRef.current.trim();
+    if (payload.partnerAccount?.trim() !== currentAssistantAccount) {
+      return;
+    }
+
+    setWeAgentUnreadCache(normalizeWeAgentUnreadCacheResult(payload));
+  }, []);
+
   useEffect(() => {
-    void registerEventListener({
+    registerEventListener({
       type: 'agentskills_agentUpdated',
       func: handleWeAgentUpdated,
-    }).catch((error) => {
-      WeLog(`App registerEventListener failed | extra=${JSON.stringify({
-        type: 'agentskills_agentUpdated',
-      })} | error=${JSON.stringify(error)}`);
     });
-  }, [handleWeAgentUpdated]);
+    registerEventListener<GetWeAgentUnreadMessageResult>({
+      type: 'agentskills_unreadChanged',
+      func: handleWeAgentUnreadChanged,
+    });
+    registerOnVisibleListener(handleOnVisible);
+  }, [handleOnVisible, handleWeAgentUnreadChanged, handleWeAgentUpdated]);
 
   const createSessionForAssistant = useCallback(async (
     currentAssistantAccount: string,
@@ -357,6 +514,8 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantDetailRef.current = null;
     userInfoRef.current = null;
     pendingActionDeleteSessionIdsRef.current.clear();
+    lastReportedReadSeqBySessionRef.current = {};
+    pageVisibleRef.current = true;
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setIsHistorySidebarVisible(isPc);
@@ -364,7 +523,12 @@ function App({ assistantAccount = '' }: AppProps) {
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
-  }, [assistantAccount, isPc]);
+    setWeAgentUnreadCache(createEmptyWeAgentUnreadCache());
+
+    return () => {
+      void endViewingSession(welinkSessionIdRef.current);
+    };
+  }, [assistantAccount, endViewingSession, isPc]);
 
   useEffect(() => {
     const userInfo = userInfoRef.current;
@@ -536,6 +700,8 @@ function App({ assistantAccount = '' }: AppProps) {
       : null;
 
     setHistorySessionsCache((prev) => removeSessionFromHistoryCache(prev, normalizedDeletedSessionId));
+    setWeAgentUnreadCache((prev) => unReadSessionDeleted(prev, normalizedDeletedSessionId));
+    delete lastReportedReadSeqBySessionRef.current[normalizedDeletedSessionId];
 
     if (isDeletingCurrentSession) {
       setIsSwitchingSessionAfterDelete(true);
@@ -685,6 +851,8 @@ function App({ assistantAccount = '' }: AppProps) {
                 cachedCache={historySessionsCache}
                 defaultOpen={isPc}
                 historyLoaded={historySessionsLoaded}
+                redDotVisible={weAgentUnreadCache.redDotVisible}
+                sessionUnreadStateMap={weAgentUnreadCache.sessionsById}
                 onHistoryLoaded={(cache) => {
                   setHistorySessionsCache(cache);
                   setHistorySessionsLoaded(true);

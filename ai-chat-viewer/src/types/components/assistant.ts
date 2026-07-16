@@ -3,6 +3,7 @@ import type { SkillSession, WeAgentDetails } from '../bridge/hwext';
 import type { AssistantItem } from '../assistant';
 import type { DigitalTwinBasicInfoPayload } from '../digitalTwin';
 import type { SlashCommandItem } from '../slashCommand';
+import type { WeAgentSessionUnreadState } from '../bridge';
 
 export interface AssistantDetailDeleteModalProps {
   open: boolean;
@@ -152,6 +153,8 @@ export interface WeAgentHistorySidebarProps {
   cachedCache?: HistorySessionsCache | null;
   defaultOpen?: boolean;
   historyLoaded?: boolean;
+  redDotVisible?: boolean;
+  sessionUnreadStateMap?: Record<string, WeAgentSessionUnreadState>;
   onHistoryLoaded?: (cache: HistorySessionsCache) => void;
   onSessionSelect?: (welinkSessionId: string) => void;
   onSessionDeleteStart?: (welinkSessionId: string) => void;

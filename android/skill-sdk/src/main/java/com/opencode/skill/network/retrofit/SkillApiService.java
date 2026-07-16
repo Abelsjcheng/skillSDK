@@ -10,6 +10,8 @@ import com.opencode.skill.network.retrofit.body.EmptyBody;
 import com.opencode.skill.network.retrofit.body.ReplyPermissionBody;
 import com.opencode.skill.network.retrofit.body.SendMessageBody;
 import com.opencode.skill.network.retrofit.body.SendMessageToImBody;
+import com.opencode.skill.network.retrofit.body.GetWeAgentUnreadMessageBody;
+import com.opencode.skill.network.retrofit.body.ReportWeAgentSessionReadBody;
 
 import retrofit2.Call;
 import retrofit2.http.Body;
@@ -20,6 +22,15 @@ import retrofit2.http.Query;
 
 @Keep
 public interface SkillApiService {
+    @POST("api/skill/sessions/unread")
+    Call<JsonElement> getWeAgentUnreadMessage(@Body GetWeAgentUnreadMessageBody body);
+
+    @POST("api/skill/sessions/{welinkSessionId}/read")
+    Call<JsonElement> reportWeAgentSessionRead(
+            @Path("welinkSessionId") String welinkSessionId,
+            @Body ReportWeAgentSessionReadBody body
+    );
+
     @POST("api/skill/sessions")
     Call<JsonElement> createSession(@Body CreateSessionBody body);
 

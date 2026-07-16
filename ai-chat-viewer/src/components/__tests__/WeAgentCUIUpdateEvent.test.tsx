@@ -41,11 +41,15 @@ jest.mock('../../hooks/useChatSession', () => ({
     scrollToBottomSignal: 0,
     isLoadingHistory: false,
     hasMoreHistory: false,
+    slashCommands: [],
     onLoadMoreHistory: jest.fn(),
+    onRequestSlashCommands: jest.fn(),
     onQuestionAnswered: jest.fn(),
     isGenerating: false,
     onSend: jest.fn(),
     onStop: jest.fn(),
+    onSendToIM: jest.fn(),
+    onCopy: jest.fn(),
     resetTransientState: jest.fn(),
   }),
 }));
@@ -78,14 +82,14 @@ const initialDetail: WeAgentDetails = {
 };
 
 describe('weAgentCUI assistant update event', () => {
-  let registeredListener: RegisterEventListenerParams | null;
+  let registeredListeners: Map<string, RegisterEventListenerParams>;
 
   beforeEach(() => {
-    registeredListener = null;
+    registeredListeners = new Map();
     Object.defineProperty(window, 'HWH5EXT', {
       value: {
         registerEventListener: jest.fn((params: RegisterEventListenerParams) => {
-          registeredListener = params;
+          registeredListeners.set(params.type, params);
         }),
         getWeAgentDetails: jest.fn(async () => ({
           weAgentDetailsArray: [initialDetail],
@@ -140,7 +144,8 @@ describe('weAgentCUI assistant update event', () => {
       expect(screen.getByTestId('assistant-name')).toHaveTextContent('Original Assistant');
     });
     await waitFor(() => {
-      expect(registeredListener?.type).toBe('agentskills.agentUpdated');
+      expect(registeredListeners.get('agentskills_agentUpdated')).toBeDefined();
+      expect(registeredListeners.get('agentskills_unreadChanged')).toBeDefined();
     });
 
     const updatedDetail: WeAgentDetails = {
@@ -151,7 +156,7 @@ describe('weAgentCUI assistant update event', () => {
     };
 
     act(() => {
-      registeredListener?.func({
+      registeredListeners.get('agentskills_agentUpdated')?.func({
         type: 'update',
         data: updatedDetail,
         extraData: { source: 'server' },
@@ -163,7 +168,7 @@ describe('weAgentCUI assistant update event', () => {
     expect(screen.getByTestId('assistant-avatar')).toHaveTextContent('https://example.com/updated.png');
 
     act(() => {
-      registeredListener?.func({
+      registeredListeners.get('agentskills_agentUpdated')?.func({
         type: 'delete',
         data: { partnerAccount: 'assistant_1' },
         extraData: { source: 'server' },

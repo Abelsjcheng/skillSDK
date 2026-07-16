@@ -14,15 +14,22 @@ import type {
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
+  GetWeAgentUnreadMessageParams,
+  GetWeAgentUnreadMessageResult,
   GetWeAgentDetailsParams,
   GetWeAgentListParams,
   HWH5EXT,
   HistorySessionsListResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
+  OnSessionViewingEndParams,
+  OnSessionViewingParams,
+  OnSessionViewingResult,
   QueryQrcodeInfoResult,
   RegisterEventListenerParams,
   RegisterSessionListenerParams,
+  ReportWeAgentSessionReadParams,
+  ReportWeAgentSessionReadResult,
   ReplyPermissionParams,
   SendMessageParams,
   SendMessageToIMParams,
@@ -592,6 +599,35 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
       }) as EventListener);
     },
 
+    async getWeAgentUnreadMessage(
+      _params: GetWeAgentUnreadMessageParams,
+    ): Promise<GetWeAgentUnreadMessageResult> {
+      return {
+        partnerAccount: config.assistantAccount,
+        assistantUnread: false,
+        redDotVisible: false,
+        sessions: [],
+        source: 'opencode',
+      };
+    },
+
+    async reportWeAgentSessionRead(
+      _params: ReportWeAgentSessionReadParams,
+    ): Promise<ReportWeAgentSessionReadResult> {
+      return {
+        status: 'success',
+        success: true,
+      };
+    },
+
+    async onSessionViewing(_params: OnSessionViewingParams): Promise<OnSessionViewingResult> {
+      return { status: 'success' };
+    },
+
+    async onSessionViewingEnd(_params: OnSessionViewingEndParams): Promise<OnSessionViewingResult> {
+      return { status: 'success' };
+    },
+
     registerSessionListener(params: RegisterSessionListenerParams): void {
       socket.register(params);
     },
@@ -656,6 +692,10 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
         },
       );
       return normalizeProtocolMessage(result);
+    },
+
+    async sendWebSocketMessage() {
+      return { status: 'success' as const };
     },
 
     async stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {

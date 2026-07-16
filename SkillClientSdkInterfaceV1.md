@@ -28,6 +28,11 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `getSessionMessageHistory` | `GET /api/skill/sessions/{sessionId}/messages/history` | 游标查询历史消息，适用于聊天首屏与上拉加载 |
 | `sendMessageToIM` | `POST /api/skill/sessions/{sessionId}/send-to-im` | SDK 优先透传入参 `content`；未传时先查询当前会话最后一条完成消息内容，再透传 `chatId` |
 | `replyPermission` | `POST /api/skill/sessions/{sessionId}/permissions/{permId}` | 出参字段与服务端一致 |
+| `getWeAgentUnreadMessage` | `POST /api/skill/sessions/unread` | 获取当前助理会话未读状态，SDK 映射为历史入口和会话 item 小红点状态 |
+| `reportWeAgentSessionRead` | `POST /api/skill/sessions/{sessionId}/read` | 上报当前会话已读序号，用于服务端更新未读状态 |
+| `onSessionViewing` | 无（仅 SDK 本地能力） | 标记当前正在查看的会话，停留期间该会话视为已读并忽略同会话未读推送 |
+| `onSessionViewingEnd` | 无（仅 SDK 本地能力） | 清除当前会话查看态，恢复该会话正常未读推送处理 |
+| `onAssistantChanged` | 无（仅 SDK 本地能力） | 助理切换或删除后清空旧助理未读状态，并拉取新当前助理未读状态 |
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
 | `closeSkill` | 无（仅 SDK 本地能力） | 仅关闭 WebSocket，不调用 `DELETE /api/skill/sessions/{id}` |
 | `registerSessionListener` / `unregisterSessionListener` | `ws://{host}/ws/skill/stream` | 监听器管理为 SDK 本地能力，事件字段按 `StreamMessage` 对齐 |
@@ -58,6 +63,11 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | 13 | `createNewSession` | 创建新会话 |
 | 15 | `getHistorySessionsList` | 获取历史会话列表 |
 | 16 | `querySlashCommands` | 通过 WebSocket 查询 Slash Commands |
+| 17 | `getWeAgentUnreadMessage` | 获取当前助理会话未读状态 |
+| 18 | `reportWeAgentSessionRead` | 上报当前会话已读 |
+| 19 | `onSessionViewing` | 标记当前会话正在查看 |
+| 20 | `onSessionViewingEnd` | 清除当前会话查看态 |
+| 21 | `onAssistantChanged` | 通知 SDK 当前助理已变更 |
 
 ## 1. 创建会话接口
 
@@ -2013,6 +2023,341 @@ await querySlashCommands({
 });
 ```
 
+## 17. 获取助理未读消息接口
+
+### 调用方
+
+Skill 小程序 / weAgentCUI 页面调用
+
+### 接口说明
+
+获取当前助理下会话未读状态，用于刷新 `weAgentCUI` 历史会话入口和历史会话列表 item 小红点。
+
+该接口只返回未读状态，不返回消息内容，不展示也不计算未读消息数。SDK 收到服务端结果后，将 `unreadSessionList` 映射为本地会话未读缓存；若返回会话 ID 与当前正在查看的 WeAgentCUI 会话一致，则该会话映射为已读，其他返回会话映射为未读。
+
+### 接口名
+
+```typescript
+getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAgentUnreadMessageResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| assistantAcount | string | 是 | 助理账号，透传到服务端请求体 |
+| sessionIds | string[] | 否 | 会话 ID 列表；不传时由服务端返回该助理下相关会话未读状态 |
+
+### 服务端协议
+
+| 项 | 内容 |
+|----|------|
+| Method | `POST` |
+| URL | `/api/skill/sessions/unread` |
+| Body | `{ "assistantAcount": string, "sessionIds"?: string[] }` |
+
+服务端返回：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "unreadSessionCount": 2,
+    "unreadSessionList": [
+      {
+        "sessionId": "123",
+        "maxSeq": 10
+      }
+    ]
+  }
+}
+```
+
+### 出参
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| partnerAccount | string | 助理账号；由 `assistantAcount` 映射为 SDK 内部统一字段 |
+| assistantUnread | boolean | 当前助理是否存在未读会话 |
+| redDotVisible | boolean | `AgentTabNotify` ABTest 是否允许展示小红点；`true` 允许，`false` 不允许 |
+| sessions | Array<WeAgentSessionUnreadState> | SDK 根据服务端 `unreadSessionList` 映射出的会话未读状态 |
+| source | string | 本次返回来源：`server` / `cache` |
+
+出参示例：
+
+```json
+{
+  "partnerAccount": "123",
+  "assistantUnread": true,
+  "redDotVisible": true,
+  "sessions": [
+    {
+      "welinkSessionId": "123",
+      "hasUnRead": true,
+      "maxSeq": 10
+    }
+  ],
+  "source": "server"
+}
+```
+
+### 实现方法
+
+1. SDK 校验 `assistantAcount`，为空时直接返回无未读或错误，不请求服务端。
+2. SDK 请求 `POST /api/skill/sessions/unread`，请求体包含 `assistantAcount`；传入会话列表时包含 `sessionIds`。
+3. SDK 将 `data.unreadSessionList[].sessionId` 映射为 `sessions[].welinkSessionId`，将 `data.unreadSessionList[].maxSeq` 映射为 `maxSeq`。
+4. 若会话 ID 与当前 WeAgentCUI 会话一致，则该会话设置为 `hasUnRead=false`；其他返回会话设置为 `hasUnRead=true`。
+5. 如果入参传了 `sessionIds`，不在 `unreadSessionList` 内的会话可在 SDK 返回中补齐为 `hasUnRead=false`。
+6. SDK 根据映射后的会话集合生成 `assistantUnread`；`redDotVisible` 仅表示已缓存的 `AgentTabNotify` ABTest 权限。宿主助理 Tab 的实际小红点展示由 SDK 结合未读、助理类型和 Tab 聚焦状态独立计算。
+7. 若服务端请求失败，SDK 可降级返回当前助理的内存缓存；缓存缺失或缓存属于旧助理时默认 `assistantUnread=false`、`redDotVisible=false`、`sessions=[]`。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `assistantAcount` 缺失或格式错误 |
+| 6000 | 网络错误 | 服务端请求失败、超时或无法解析响应 |
+| 7000 | 服务端错误 | 服务端返回非成功状态 |
+
+### 组合调用场景
+
+1. `weAgentCUI` 页面初始化阶段可以调用该接口获取当前会话所有未读状态并写入 CUI 未读缓存。
+2. 打开历史会话列表时，可传入 `sessionIds` 让 SDK 补齐列表中每个会话的 `hasUnRead` 状态。
+3. 用户从其他页面切回助理 Tab 时，不再重复调用该接口；页面直接读取 CUI 未读缓存，并按需调用 `reportWeAgentSessionRead` 上报当前会话已读。
+4. 低版本 SDK 不支持该接口时，页面应通过版本判断跳过调用，默认不展示历史入口和历史 item 小红点。
+
+### 调用示例
+
+```typescript
+const unread = await getWeAgentUnreadMessage({
+  assistantAcount: "x001_1",
+  sessionIds: ["42", "43"]
+});
+
+if (unread.redDotVisible && unread.assistantUnread) {
+  // 刷新历史入口小红点
+}
+```
+
+## 18. 上报会话已读接口
+
+### 调用方
+
+Skill 小程序 / weAgentCUI 页面调用
+
+### 接口说明
+
+上报当前会话已读序号。`weAgentCUI` 仅在页面真实前台可见、已渲染消息后调用该接口，避免 HarmonyOS / iOS 冷启动预加载时误清小红点。
+
+该接口上报成功后，不直接以接口返回清理助理 Tab 小红点；SDK 以后续服务端 IM 广播、主动查询或内存缓存刷新结果作为最终未读状态来源。
+
+### 接口名
+
+```typescript
+reportWeAgentSessionRead(params: ReportWeAgentSessionReadParams): Promise<ReportWeAgentSessionReadResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 当前会话 ID，对应服务端 path 中的 `{sessionId}` |
+| readSeq | number | 是 | 前端已渲染的最大 `message_seq` |
+
+### 服务端协议
+
+| 项 | 内容 |
+|----|------|
+| Method | `POST` |
+| URL | `/api/skill/sessions/{sessionId}/read` |
+| Body | `{ "readSeq": number }` |
+
+### 出参
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 固定返回 `success`，表示已读上报成功 |
+
+### 实现方法
+
+1. SDK 校验 `welinkSessionId` 和 `readSeq`，无有效 `readSeq` 时不上报。
+2. SDK 请求 `POST /api/skill/sessions/{sessionId}/read`，path 使用 `welinkSessionId`，body 为 `{ "readSeq": number }`。
+3. SDK 对同一 `welinkSessionId` 记录已上报最大 `readSeq`；后续小于或等于该值的上报不重复调用服务端。
+4. 上报成功后，SDK 可将当前会话本地未读态更新为 `hasUnRead=false`，再等待服务端 IM 广播或后续查询校正最终状态。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或 `readSeq` 非有效 number |
+| 6000 | 网络错误 | 服务端请求失败或超时 |
+| 7000 | 服务端错误 | 服务端返回非成功状态 |
+
+### 组合调用场景
+
+1. 页面 `onVisible` 返回 `visibility=1` 后，先调用 `onSessionViewing({ welinkSessionId })`，再根据当前会话未读状态和最大 `maxSeq` 调用该接口。
+2. 点击未读历史会话并完成会话切换后，页面从 CUI 未读缓存读取该会话 `maxSeq`，作为 `readSeq` 调用该接口。
+3. 前台可见期间监听到当前会话新增 AI 回复消息时，页面取新增消息最大 `messageSeq ?? seq` 作为 `readSeq` 调用该接口。
+4. 页面不可见、非当前会话消息、用户消息、无有效 `messageSeq/seq` 的消息或历史分页加载旧消息时，不触发该接口。
+
+### 调用示例
+
+```typescript
+await reportWeAgentSessionRead({
+  welinkSessionId: "42",
+  readSeq: 10
+});
+```
+
+## 19. 标记会话查看态接口
+
+### 调用方
+
+Skill 小程序 / weAgentCUI 页面调用
+
+### 接口说明
+
+标记当前正在正常查看的会话。SDK 收到该标记后，将该会话在本地未读缓存中视为已读；停留期间如果收到同一会话的服务端正常未读推送，SDK 忽略该会话未读态更新，避免正在阅读的会话小红点反复出现。
+
+### 接口名
+
+```typescript
+onSessionViewing(params: OnSessionViewingParams): Promise<{ status: string }>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 当前正在查看的会话 ID |
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定返回 `success` |
+
+### 实现方法
+
+1. SDK 校验 `welinkSessionId`，为空时不更新查看态。
+2. SDK 将该会话记录为当前正常查看会话。
+3. SDK 将内存缓存中的该会话未读态设置为 `hasUnRead=false`。
+4. 若页面内切换会话，新的 `onSessionViewing` 覆盖当前查看会话，不需要额外调用 `onSessionViewingEnd`。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+
+### 组合调用场景
+
+1. `weAgentCUI` 在 `onVisible` 返回 `visibility=1` 时调用该接口。
+2. 页面内切换历史会话后，先完成当前会话切换，再调用该接口覆盖当前查看会话。
+3. 调用该接口后，页面可按需调用 `reportWeAgentSessionRead` 上报当前会话已读。
+4. 低版本 SDK 不支持该接口时，页面跳过查看态流程，不影响消息渲染、流式回复和会话切换。
+
+### 调用示例
+
+```typescript
+await onSessionViewing({
+  welinkSessionId: "42"
+});
+```
+
+## 20. 清除会话查看态接口
+
+### 调用方
+
+Skill 小程序 / weAgentCUI 页面调用
+
+### 接口说明
+
+清除当前会话查看态。清除后，该会话恢复服务端正常推送处理；后续服务端推送的未读状态可以重新点亮会话 item 小红点。
+
+### 接口名
+
+```typescript
+onSessionViewingEnd(params: OnSessionViewingEndParams): Promise<{ status: string }>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 需要清除查看态的会话 ID |
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定返回 `success` |
+
+### 实现方法
+
+1. SDK 校验 `welinkSessionId`，为空时不修改查看态。
+2. 若当前查看会话等于入参 `welinkSessionId`，SDK 清除该会话查看标记。
+3. 清除查看标记后，该会话恢复服务端正常推送处理。
+4. 页面内切换会话时不需要调用该接口，由新的 `onSessionViewing` 覆盖当前查看会话。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+
+### 组合调用场景
+
+1. `weAgentCUI` 在 `onVisible` 返回 `visibility=0` 时调用该接口。
+2. 页面离开会话或销毁时调用该接口，避免查看态残留。
+3. 调用该接口不触发已读上报，也不主动隐藏小红点。
+4. 低版本 SDK 不支持该接口时，页面跳过查看态清理流程，不影响基础会话能力。
+
+### 调用示例
+
+```typescript
+await onSessionViewingEnd({
+  welinkSessionId: "42"
+});
+```
+
+## 21. 通知当前助理变更接口
+
+### 调用方
+
+agentSkills 容器层在 `openWeAgentCUI` 前调用。
+
+### 接口说明
+
+切换助理、删除当前助理或 IM 列表切换后，容器层传入新的当前助理详情。SDK 先清空旧助理的会话未读内存状态、当前查看会话和已读上报记录，再按新助理的 `partnerAccount` 与 `bizRobotTag` 走未读初始化流程。
+
+### 接口名
+
+```typescript
+onAssistantChanged(params: OnAssistantChangedParams): Promise<void>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| assistantDetail | WeAgentDetails | 否 | 新的当前助理详情。删除后没有可切换助理时不传，SDK 仅清空未读状态并隐藏助理 Tab 小红点。 |
+
+### 实现方法
+
+1. SDK 立即清空旧助理的未读状态、查看态和已读上报记录，并刷新助理 Tab 小红点为不展示。
+2. 未命中 `AgentTabNotify` 权限或 `assistantDetail.partnerAccount` 为空时，不请求服务端。
+3. `bizRobotTag=MyAgent` 时请求员工助手全量未读；`bizRobotTag=uniassistant` 时不展示助理 Tab 小红点；其他类型请求 `POST /api/skill/sessions/unread`。
+4. 未读查询的异步响应仅在响应助理仍是当前助理时才写入内存缓存，避免旧助理响应覆盖切换后的状态。
+
+### 调用示例
+
+```typescript
+await onAssistantChanged({
+  assistantDetail: currentAssistantDetail
+});
+```
+
 ## 数据类型定义
 
 > 说明：
@@ -2128,6 +2473,62 @@ await querySlashCommands({
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
+
+### GetWeAgentUnreadMessageParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| assistantAcount | string | 是 | 助理账号，透传到服务端请求体 |
+| sessionIds | string[] | 否 | 会话 ID 列表；不传时由服务端返回该助理下相关会话未读状态 |
+
+### GetWeAgentUnreadMessageResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| partnerAccount | string | 助理账号；由 `assistantAcount` 映射为 SDK 内部统一字段 |
+| assistantUnread | boolean | 当前助理是否存在未读会话 |
+| redDotVisible | boolean | `AgentTabNotify` ABTest 是否允许展示小红点；`true` 允许，`false` 不允许 |
+| sessions | Array<WeAgentSessionUnreadState> | SDK 根据服务端 `unreadSessionList` 映射出的会话未读状态 |
+| source | string | 本次返回来源：`server` / `cache` |
+
+### WeAgentSessionUnreadState
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| welinkSessionId | string | 会话 ID |
+| hasUnRead | boolean | 该会话是否有未读消息 |
+| maxSeq | number | 服务端返回的该会话最大未读消息序号 |
+
+### ReportWeAgentSessionReadParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| welinkSessionId | string | 是 | 当前会话 ID |
+| readSeq | number | 是 | 前端已渲染的最大 `message_seq` |
+
+### ReportWeAgentSessionReadResult
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 固定返回 `success` |
+
+### OnSessionViewingParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| welinkSessionId | string | 是 | 当前正在查看的会话 ID |
+
+### OnSessionViewingEndParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| welinkSessionId | string | 是 | 需要清除查看态的会话 ID |
+
+### OnAssistantChangedParams
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| assistantDetail | WeAgentDetails | 否 | 新的当前助理详情；删除后没有下一个助理时不传。 |
 
 ### SlashCommand
 

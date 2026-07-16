@@ -30,6 +30,7 @@ typedef NS_ENUM(NSInteger, WLAgentSkillsWecodeAction) {
 @class WLAgentSkillsSkillWecodeStatusResult;
 @class WLAgentSkillsSessionStatusResult;
 @class WLAgentSkillsStreamMessage;
+@class WLAgentSkillsWeAgentDetails;
 
 #pragma mark - Callback Typedefs
 
@@ -198,7 +199,52 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @property (nonatomic, strong, nullable) id partnerAccount;
 @end
 
+@interface WLAgentSkillsGetWeAgentUnreadMessageParams : NSObject
+@property (nonatomic, copy, nullable) NSString *assistantAcount;
+@property (nonatomic, copy, nullable) NSArray<NSString *> *sessionIds;
+@end
+
+@interface WLAgentSkillsReportWeAgentSessionReadParams : NSObject
+@property (nonatomic, copy, nullable) NSString *welinkSessionId;
+@property (nonatomic, strong, nullable) NSNumber *readSeq;
+@end
+
+@interface WLAgentSkillsReportWeAgentSessionReadData : NSObject
+@property (nonatomic, copy) NSString *welinkSessionId;
+@property (nonatomic, strong) NSNumber *unreadCount;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsOnSessionViewingParams : NSObject
+@property (nonatomic, copy, nullable) NSString *welinkSessionId;
+@end
+
+@interface WLAgentSkillsOnSessionViewingResult : NSObject
+@property (nonatomic, copy) NSString *status;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsOnSessionViewingEndParams : NSObject
+@property (nonatomic, copy, nullable) NSString *welinkSessionId;
+@end
+
+@interface WLAgentSkillsOnSessionViewingEndResult : NSObject
+@property (nonatomic, copy) NSString *status;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsOnAssistantChangedParams : NSObject
+@property (nonatomic, strong, nullable) WLAgentSkillsWeAgentDetails *assistantDetail;
+@end
+
 #pragma mark - Data Models
+
+@interface WLAgentSkillsSessionUnreadState : NSObject
+@property (nonatomic, copy) NSString *welinkSessionId;
+@property (nonatomic, assign) BOOL hasUnRead;
+@property (nonatomic, assign) NSInteger maxSeq;
+- (NSDictionary *)toDictionary;
+@end
 
 @interface WLAgentSkillsSession : NSObject
 @property (nonatomic, copy) NSString *welinkSessionId;
@@ -585,6 +631,20 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @interface WLAgentSkillsQueryAssistantGraySingleResult : NSObject
 @property (nonatomic, assign) BOOL data;
 
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsGetWeAgentUnreadMessageResult : NSObject
+@property (nonatomic, copy) NSString *partnerAccount;
+@property (nonatomic, assign) BOOL assistantUnread;
+@property (nonatomic, assign) BOOL redDotVisible;
+@property (nonatomic, copy) NSArray<WLAgentSkillsSessionUnreadState *> *sessions;
+@property (nonatomic, copy) NSString *source;
+- (NSDictionary *)toDictionary;
+@end
+
+@interface WLAgentSkillsReportWeAgentSessionReadResult : NSObject
+@property (nonatomic, copy) NSString *status;
 - (NSDictionary *)toDictionary;
 @end
 

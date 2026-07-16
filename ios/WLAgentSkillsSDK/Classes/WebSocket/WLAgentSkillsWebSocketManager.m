@@ -292,6 +292,12 @@
     [self.delegate webSocketManagerDidReceiveMessage:streamMessage];
     }
 
+    // 这三类事件不关联具体会话，直接通过基座全局广播分发。
+    if ([self isGlobalBroadcastEventType:streamMessage.type]) {
+    [self broadcastGlobalWebSocketEvent:streamMessage];
+    return;
+    }
+
     NSString *sessionKey = streamMessage.welinkSessionId;
     if (sessionKey == nil || sessionKey.length == 0) {
     return;
@@ -305,6 +311,17 @@
     if (listener.onMessage != nil) {
     listener.onMessage(streamMessage);
     }
+}
+
+- (BOOL)isGlobalBroadcastEventType:(NSString *)type {
+    return [type isEqualToString:@"session.deleted"]
+        || [type isEqualToString:@"agent.online"]
+        || [type isEqualToString:@"agent.offline"];
+}
+
+- (void)broadcastGlobalWebSocketEvent:(WLAgentSkillsStreamMessage *)message {
+    (void)message;
+    // 待接入：调用基座广播能力分发与会话无关的 WebSocket 事件。
 }
 
 #pragma mark - Notify Helpers

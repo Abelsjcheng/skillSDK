@@ -7,6 +7,7 @@ import { Logger } from './utils/Logger';
 import { TypeConverter } from './utils/TypeConverter';
 import { Validator } from './utils/Validator';
 import { WeAgentStore } from './utils/WeAgentStore';
+import { UnReadManager } from './utils/UnReadManager';
 import {
   AgentType,
   AgentTypeList,
@@ -23,8 +24,15 @@ import {
   GetSessionMessageParams,
   GetSessionMessageHistoryParams,
   GetIsShowWeAgentResult,
+  GetWeAgentUnreadMessageParams,
+  GetWeAgentUnreadMessageResult,
   HistorySessionsParams,
   OnSessionStatusChangeParams,
+  OnAssistantChangedParams,
+  OnSessionViewingEndParams,
+  OnSessionViewingEndResult,
+  OnSessionViewingParams,
+  OnSessionViewingResult,
   OnSkillWecodeStatusChangeParams,
   OpenAssistantEditPageParams,
   OpenAssistantEditPageResult,
@@ -42,6 +50,8 @@ import {
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ReplyPermissionResult,
+  ReportWeAgentSessionReadParams,
+  ReportWeAgentSessionReadResult,
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMParams,
@@ -84,7 +94,8 @@ export class SkillSDK {
   private static readonly ASSISTANT_H5_URI = 'h5://S008623/index.html';
   private static readonly WE_AGENT_CUI_APPID = 'S008623';
   private static readonly WE_AGENT_EVENT_NAME = 'agentskills.agentUpdated';
-  private static readonly IM_NOTIFY_MODULE = 'welink-athena';
+  private static readonly CUI_IM_NOTIFY_MODULE = 'welink-athena';
+  private static readonly EMPLOYEE_ASSISTANT_IM_NOTIFY_MODULE = 'uni-assistant';
   private config: SkillSDKConfig;
   private readonly logger: Logger;
   private readonly httpClient: HttpClient;
@@ -92,6 +103,7 @@ export class SkillSDK {
   private readonly sessionStateManager: SessionStateManager;
   private readonly weCodeStateManager: WeCodeStateManager;
   private readonly weAgentStore: WeAgentStore;
+  private readonly unReadManager: UnReadManager;
   private weAgentCacheMutationTail: Promise<void> = Promise.resolve();
 
   private constructor(config: SkillSDKConfig) {
@@ -108,11 +120,16 @@ export class SkillSDK {
     this.sessionStateManager = new SessionStateManager(this.config.enableLog);
     this.weCodeStateManager = new WeCodeStateManager(this.config.enableLog);
     this.weAgentStore = new WeAgentStore(this.config.context);
+    this.unReadManager = new UnReadManager(this.httpClient, this.logger, this.weAgentStore);
 
     this.wsManager.setMessageHandler((message: StreamMessage) => {
       this.sessionStateManager.onStreamMessage(message);
+      if (message.type === 'session.deleted') {
+        this.unReadManager.onSessionDeleted(message.welinkSessionId);
+      }
     });
     void this.refreshWeAgentsOnColdStart();
+    void this.unReadManager.initUnReadState();
   }
 
   static getInstance(config?: SkillSDKConfig): SkillSDK {
@@ -130,6 +147,7 @@ export class SkillSDK {
       return;
     }
     try {
+      SkillSDK.instance.unReadManager.shutdown();
       await SkillSDK.instance.wsManager.disconnect();
       SkillSDK.instance.wsManager.clearAllListeners();
       SkillSDK.instance.sessionStateManager.clearAll();
@@ -161,7 +179,7 @@ export class SkillSDK {
   async createSession(params: CreateSessionParams): Promise<Session> {
     try {
       Validator.requireObject(params, 'params');
-      const ak = this.normalizeOptionalString(params.ak);
+      const ak = TypeConverter.normalizeOptionalString(params.ak);
       const businessSessionDomain = TypeConverter.toRequiredString(
         params.businessSessionDomain,
         'businessSessionDomain'
@@ -313,11 +331,11 @@ export class SkillSDK {
           throw new SkillSdkException(1000, 'chatId must be a string');
         }
       }
-      const content = this.normalizeOptionalString(params.content);
+      const content = TypeConverter.normalizeOptionalString(params.content);
       if (params.content !== undefined && content === undefined) {
         throw new SkillSdkException(1000, 'content must be a non-empty string');
       }
-      const chatId = this.normalizeOptionalString(params.chatId);
+      const chatId = TypeConverter.normalizeOptionalString(params.chatId);
       await this.ensureWebSocketConnected();
       let resolvedContent = content ?? null;
       if (resolvedContent === null) {
@@ -748,10 +766,10 @@ export class SkillSDK {
       const cachedDetail = this.weAgentStore.loadCurrentDetail();
       const detailPayload = cachedDetail === null
         ? {}
-        : this.toRecord(cachedDetail as Object) ?? {};
+        : TypeConverter.toRecord(cachedDetail as Object) ?? {};
       const detail = this.normalizeWeAgentDetails(detailPayload);
-      detail.tagName = this.normalizeOptionalString(detail.tagName) ?? '助手';
-      detail.tagNameEn = this.normalizeOptionalString(detail.tagNameEn) ?? 'Agent';
+      detail.tagName = TypeConverter.normalizeOptionalString(detail.tagName) ?? '助手';
+      detail.tagNameEn = TypeConverter.normalizeOptionalString(detail.tagNameEn) ?? 'Agent';
       this.logger.info(
         `getWeAgentInfo succeeded, partnerAccount=${detail.partnerAccount}, tagName=${detail.tagName}, tagNameEn=${detail.tagNameEn}`
       );
@@ -842,12 +860,15 @@ export class SkillSDK {
       this.logger.error('ignore we-agent IM notification: payload is empty');
       return;
     }
-    const notifyModule = this.safeOptionalString(payload.notifyModuleId, 'notifyModuleId');
-    if (notifyModule !== SkillSDK.IM_NOTIFY_MODULE) {
+    const notifyModule = this.safeOptionalString(
+      payload.notifyModuleId,
+      'notifyModule'
+    );
+    if (notifyModule !== SkillSDK.CUI_IM_NOTIFY_MODULE) {
       return;
     }
-    this.logger.info('ignore we-agent IM notification: notify_module match');
-    const notifyData = this.toRecord(payload.notifyData);
+    this.logger.info('we-agent IM notification: notifyModuleId matched');
+    const notifyData = TypeConverter.toRecord(payload.notifyData);
     if (notifyData === undefined) {
       this.logger.error('ignore we-agent IM notification: notifyData parse failed');
       return;
@@ -856,6 +877,81 @@ export class SkillSDK {
     void this.enqueueWeAgentCacheMutation(async (): Promise<void> => {
       await this.handleWeAgentNotifyData(notifyData, 'server');
     }).catch((error) => this.logger.error(`handle server we-agent notification failed, error=${JSON.stringify(error)}`));
+  }
+
+  /** 单独处理宿主 IM 未读通知，不进入助理更新或删除流程。 */
+  handleWeAgentUnreadImNotifyBroadcast(payload: Record<string, Object>): void {
+    if (payload === null || payload === undefined) {
+      this.logger.error('ignore we-agent unread IM notification: payload is empty');
+      return;
+    }
+    const notifyModule = this.safeOptionalString(payload.notifyModuleId, 'notifyModule');
+    if (notifyModule !== SkillSDK.CUI_IM_NOTIFY_MODULE
+      && notifyModule !== SkillSDK.EMPLOYEE_ASSISTANT_IM_NOTIFY_MODULE) {
+      this.logger.info('ignore we-agent unread IM notification: notifyModuleId does not match');
+      return;
+    }
+    const notifyData = TypeConverter.toRecord(payload.notifyData);
+    if (notifyData === undefined) {
+      this.logger.error('ignore we-agent unread IM notification: notifyData parse failed');
+      return;
+    }
+    const handled = notifyModule === SkillSDK.EMPLOYEE_ASSISTANT_IM_NOTIFY_MODULE
+      ? this.unReadManager.handleEmployeeAssistantImUnreadNotifyData(notifyData)
+      : this.unReadManager.handleCuiImUnreadNotifyData(notifyData);
+    if (!handled) {
+      this.logger.info('ignore we-agent unread IM notification: unsupported notify data');
+    }
+  }
+
+  async getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAgentUnreadMessageResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requireString(params.assistantAcount, 'assistantAcount');
+      const result = await this.unReadManager.getWeAgentUnreadMessage(params);
+      this.logger.info('getWeAgentUnreadMessage succeeded');
+      return result;
+    } catch (error) {
+      this.logger.error(`getWeAgentUnreadMessage failed, error=${JSON.stringify(error)}`);
+      throw this.normalizeError('getWeAgentUnreadMessage', error);
+    }
+  }
+
+  async reportWeAgentSessionRead(params: ReportWeAgentSessionReadParams): Promise<ReportWeAgentSessionReadResult> {
+    try {
+      Validator.requireObject(params, 'params');
+      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
+      Validator.requirePositiveInteger(params.readSeq, 'readSeq');
+      await this.unReadManager.reportWeAgentSessionRead(params);
+      this.logger.info('reportWeAgentSessionRead succeeded');
+      return { status: 'success' };
+    } catch (error) {
+      this.logger.error(`reportWeAgentSessionRead failed, error=${JSON.stringify(error)}`);
+      throw this.normalizeError('reportWeAgentSessionRead', error);
+    }
+  }
+
+  onSessionViewing(params: OnSessionViewingParams): OnSessionViewingResult {
+    this.unReadManager.onSessionViewing(params);
+    this.logger.info(`onSessionViewing succeeded, sessionId=${params.welinkSessionId}`);
+    return { status: 'success' };
+  }
+
+  onSessionViewingEnd(params: OnSessionViewingEndParams): OnSessionViewingEndResult {
+    this.unReadManager.onSessionViewingEnd(params);
+    this.logger.info(`onSessionViewingEnd succeeded, sessionId=${params.welinkSessionId}`);
+    return { status: 'success' };
+  }
+
+  /** 宿主切换当前助理后通知 SDK 刷新未读状态。 */
+  async onAssistantChanged(params: OnAssistantChangedParams): Promise<void> {
+    try {
+      await this.unReadManager.onAssistantChanged(params.assistantDetail);
+      this.logger.info('onAssistantChanged succeeded');
+    } catch (error) {
+      this.logger.error(`onAssistantChanged failed, error=${JSON.stringify(error)}`);
+      throw this.normalizeError('onAssistantChanged', error);
+    }
   }
 
   // 23. setIsShowWeAgent
@@ -899,7 +995,7 @@ export class SkillSDK {
   async openWeAgent(params: OpenWeAgentParams): Promise<OpenWeAgentResult> {
     try {
       Validator.requireObject(params, 'params');
-      const partnerAccount = this.normalizeOptionalString(params.partnerAccount);
+      const partnerAccount = TypeConverter.normalizeOptionalString(params.partnerAccount);
 
       // TODO: save isShowWeAgent = true by calling host saveSettings.
       // TODO: broadcast isShowWeAgent = true to host.
@@ -910,7 +1006,7 @@ export class SkillSDK {
         if (targetDetail === undefined) {
           throw new SkillSdkException(7000, 'getAssistantDetails returned empty detail');
         }
-        if (this.normalizeOptionalString(targetDetail.weCodeUrl) === undefined) {
+        if (TypeConverter.normalizeOptionalString(targetDetail.weCodeUrl) === undefined) {
           throw new SkillSdkException(7000, 'getAssistantDetails returned empty weCodeUrl');
         }
         this.weAgentStore.saveCurrentDetail(targetDetail);
@@ -971,7 +1067,7 @@ export class SkillSDK {
       Validator.requireObject(params, 'params');
       const qrcode = TypeConverter.toRequiredString(params.qrcode, 'qrcode');
       const status = TypeConverter.requireInteger(params.status, 'status');
-      const robotId = this.normalizeOptionalString(params.robotId);
+      const robotId = TypeConverter.normalizeOptionalString(params.robotId);
       const payload: Record<string, Object> = {
         qrcode,
         status
@@ -1134,7 +1230,7 @@ export class SkillSDK {
       this.logger.info(`cold-start we-agent detail request succeeded, remoteCount=${remoteDetails.length}`);
       const remoteDetailsByAccount: Record<string, WeAgentDetails> = {};
       remoteDetails.forEach((detail: WeAgentDetails) => {
-        const partnerAccount = this.normalizeOptionalString(detail.partnerAccount);
+        const partnerAccount = TypeConverter.normalizeOptionalString(detail.partnerAccount);
         if (partnerAccount !== undefined) {
           remoteDetailsByAccount[partnerAccount] = detail;
         }
@@ -1165,7 +1261,7 @@ export class SkillSDK {
         }
         this.logger.info(`cold-start detected updated we-agent, partnerAccount=${partnerAccount}`);
         this.weAgentStore.replaceCachedDetailsIfPresent(partnerAccount, remoteDetail);
-        const remoteData = this.toRecord(remoteDetail as Object);
+        const remoteData = TypeConverter.toRecord(remoteDetail as Object);
         if (remoteData === undefined) {
           continue;
         }
@@ -1201,7 +1297,7 @@ export class SkillSDK {
     source: 'server' | 'local'
   ): Promise<void> {
     const action = this.safeOptionalString(notifyData.action, 'action');
-    const weCrew = this.toRecord(notifyData.weCrew);
+    const weCrew = TypeConverter.toRecord(notifyData.weCrew);
     if (action === undefined || weCrew === undefined) {
       this.logger.error('ignore we-agent notification: action or weCrew is missing');
       return;
@@ -1270,7 +1366,7 @@ export class SkillSDK {
    */
   private async broadcastWeAgentEvent(eventName: string, payload: Record<string, Object>): Promise<void> {
     if (payload.type === 'update') {
-      const data = this.toRecord(payload.data);
+      const data = TypeConverter.toRecord(payload.data);
       const partnerAccount = data === undefined
         ? undefined
         : this.safeOptionalString(data.partnerAccount, 'partnerAccount');
@@ -1312,37 +1408,11 @@ export class SkillSDK {
   }
 
   /**
-   * 将对象或 JSON 字符串安全转换为普通键值对象。
-   *
-   * 空值、数组、非法 JSON 和非对象值返回 undefined，避免异常通知中断同步流程。
-   */
-  private toRecord(value: Object | undefined): Record<string, Object> | undefined {
-    if (value === undefined || value === null) {
-      return undefined;
-    }
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          return parsed as Record<string, Object>;
-        }
-      } catch (_error) {
-        return undefined;
-      }
-      return undefined;
-    }
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      return value as Record<string, Object>;
-    }
-    return undefined;
-  }
-
-  /**
    * 容错读取可选字符串；类型转换失败时返回 undefined，由上层按缺失字段降级处理。
    */
   private safeOptionalString(value: Object | undefined, fieldName: string): string | undefined {
     try {
-      return this.normalizeOptionalString(TypeConverter.toOptionalString(value, fieldName));
+      return TypeConverter.normalizeOptionalString(TypeConverter.toOptionalString(value, fieldName));
     } catch (_error) {
       return undefined;
     }
@@ -1500,12 +1570,13 @@ export class SkillSDK {
     if (detail === null) {
       return false;
     }
-    return partnerAccount !== undefined && this.normalizeOptionalString(detail.partnerAccount) === partnerAccount;
+    return partnerAccount !== undefined
+      && TypeConverter.normalizeOptionalString(detail.partnerAccount) === partnerAccount;
   }
 
   private async buildWeAgentUriResult(details: WeAgentDetails | null): Promise<WeAgentUriResult> {
     if (details !== null) {
-      if (this.normalizeOptionalString(details.weCodeUrl) === undefined) {
+      if (TypeConverter.normalizeOptionalString(details.weCodeUrl) === undefined) {
         return this.buildActivateAssistantFallbackUriResult();
       }
       return this.isMyAgentDetail(details)
@@ -1522,7 +1593,7 @@ export class SkillSDK {
     if (myAgentDetail === undefined) {
       return this.buildActivateAssistantFallbackUriResult();
     }
-    if (this.normalizeOptionalString(myAgentDetail.weCodeUrl) === undefined) {
+    if (TypeConverter.normalizeOptionalString(myAgentDetail.weCodeUrl) === undefined) {
       return this.buildActivateAssistantFallbackUriResult();
     }
     return this.buildMyAgentWeAgentUriResult(myAgentDetail);
@@ -1768,7 +1839,7 @@ export class SkillSDK {
     if (detail === null) {
       return false;
     }
-    return (this.normalizeOptionalString(detail.bizRobotTag) ?? '').toLowerCase() === 'myagent';
+    return (TypeConverter.normalizeOptionalString(detail.bizRobotTag) ?? '').toLowerCase() === 'myagent';
   }
 
   /**
@@ -1834,7 +1905,7 @@ export class SkillSDK {
       if (message.role !== 'user') {
         continue;
       }
-      const content = this.normalizeOptionalString(message.content ?? undefined);
+      const content = TypeConverter.normalizeOptionalString(message.content ?? undefined);
       if (content !== undefined) {
         return content;
       }
@@ -1853,15 +1924,15 @@ export class SkillSDK {
   }
 
   private resolveMessageDisplayContent(message: SessionMessage): string | undefined {
-    const content = this.normalizeOptionalString(message.content ?? undefined);
+    const content = TypeConverter.normalizeOptionalString(message.content ?? undefined);
     if (content !== undefined) {
       return content;
     }
     const parts = Array.isArray(message.parts) ? message.parts : [];
     const segments: string[] = [];
     for (const part of parts) {
-      const partContent = this.normalizeOptionalString(part.content ?? undefined)
-        ?? this.normalizeOptionalString(part.output ?? undefined);
+      const partContent = TypeConverter.normalizeOptionalString(part.content ?? undefined)
+        ?? TypeConverter.normalizeOptionalString(part.output ?? undefined);
       if (partContent !== undefined) {
         segments.push(partContent);
       }
@@ -1913,14 +1984,6 @@ export class SkillSDK {
     if (!this.wsManager.isConnected()) {
       await this.wsManager.connect();
     }
-  }
-
-  private normalizeOptionalString(value?: string): string | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
   }
 
   private validateConfig(config: SkillSDKConfig): void {

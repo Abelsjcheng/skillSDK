@@ -202,6 +202,9 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 @implementation WLAgentSkillsQueryAssistantGraySingleParams
 @end
 
+@implementation WLAgentSkillsOnAssistantChangedParams
+@end
+
 #pragma mark - Data Models
 
 @implementation WLAgentSkillsSession
@@ -1210,6 +1213,71 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
     return @{
         @"data" : @(self.data)
     };
+}
+
+@end
+
+@implementation WLAgentSkillsSessionUnreadState
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"welinkSessionId" : WLAgentSkillsNullObject(self.welinkSessionId),
+        @"hasUnRead" : @(self.hasUnRead),
+        @"maxSeq" : @(self.maxSeq)
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsGetWeAgentUnreadMessageResult
+
+- (NSDictionary *)toDictionary {
+    NSMutableArray *sessions = [NSMutableArray array];
+    for (WLAgentSkillsSessionUnreadState *state in self.sessions ?: @[]) {
+        [sessions addObject:[state toDictionary]];
+    }
+    return @{
+        @"partnerAccount" : WLAgentSkillsNullObject(self.partnerAccount),
+        @"assistantUnread" : @(self.assistantUnread),
+        @"redDotVisible" : @(self.redDotVisible),
+        @"sessions" : sessions,
+        @"source" : WLAgentSkillsNullObject(self.source)
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsReportWeAgentSessionReadResult
+
+- (NSDictionary *)toDictionary {
+    return @{ @"status" : WLAgentSkillsNullObject(self.status) };
+}
+
+@end
+
+@implementation WLAgentSkillsReportWeAgentSessionReadData
+
+- (NSDictionary *)toDictionary {
+    return @{
+        @"welinkSessionId" : WLAgentSkillsNullObject(self.welinkSessionId),
+        @"unreadCount" : WLAgentSkillsNullObject(self.unreadCount)
+    };
+}
+
+@end
+
+@implementation WLAgentSkillsOnSessionViewingResult
+
+- (NSDictionary *)toDictionary {
+    return @{ @"status" : WLAgentSkillsNullObject(self.status) };
+}
+
+@end
+
+@implementation WLAgentSkillsOnSessionViewingEndResult
+
+- (NSDictionary *)toDictionary {
+    return @{ @"status" : WLAgentSkillsNullObject(self.status) };
 }
 
 @end

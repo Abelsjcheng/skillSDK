@@ -38,9 +38,15 @@ jest.mock('../components/assistant/WeAgentHistorySidebar', () => (props: WeAgent
 
 jest.mock('../utils/hwext', () => ({
   createNewSession: jest.fn(),
+  getWeAgentUnreadMessage: jest.fn(),
   getHistorySessionsList: jest.fn(),
   getUserInfo: jest.fn(),
   getWeAgentDetails: jest.fn(),
+  onSessionViewing: jest.fn(),
+  onSessionViewingEnd: jest.fn(),
+  registerEventListener: jest.fn(() => Promise.resolve()),
+  registerOnVisibleListener: jest.fn(() => Promise.resolve()),
+  reportWeAgentSessionRead: jest.fn(),
 }));
 
 jest.mock('../utils/logger', () => ({
@@ -87,10 +93,27 @@ function createSession(id: string): SkillSession {
 
 const assistantDetail: WeAgentDetails = {
   partnerAccount: 'assistant-1',
+  moduleId: 'module-1',
   appKey: 'ak-1',
+  appSecret: 'secret-1',
   name: 'Assistant',
   desc: 'Assistant description',
   icon: '',
+  createdBy: 'creator-1',
+  creatorName: 'Creator',
+  creatorWorkId: 'creator-work-id',
+  creatorW3Account: 'creator-w3',
+  creatorNameEn: 'Creator',
+  ownerWelinkId: 'owner-1',
+  ownerW3Account: 'owner-w3',
+  ownerName: 'Owner',
+  ownerNameEn: 'Owner',
+  ownerDeptName: 'Dept',
+  ownerDeptNameEn: 'Dept',
+  id: 'detail-1',
+  bizRobotId: 'biz-robot-1',
+  bizRobotTag: '',
+  weCodeUrl: '',
 };
 
 describe('App session delete flow', () => {
@@ -131,7 +154,9 @@ describe('App session delete flow', () => {
         isLoadingHistory: false,
         hasMoreHistory: false,
         scrollToBottomSignal: 0,
+        slashCommands: [],
         onLoadMoreHistory: jest.fn(),
+        onRequestSlashCommands: jest.fn(async () => undefined),
         onQuestionAnswered: jest.fn(async () => undefined),
         onSend: jest.fn(async () => undefined),
         onStop: jest.fn(async () => undefined),

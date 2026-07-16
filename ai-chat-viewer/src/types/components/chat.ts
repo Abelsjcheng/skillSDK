@@ -7,6 +7,7 @@ import type {
   SessionStatus,
 } from '../index';
 import type { WeAgentDetails } from '../bridge';
+import type { SlashCommandItem } from '../slashCommand';
 
 export interface AppProps {
   assistantAccount?: string;
@@ -150,6 +151,7 @@ export interface UseChatSessionOptions {
   assistantDetail?: WeAgentDetails | null;
   onSessionTitleChange?: (sessionId: string, title: string) => void;
   onSessionActivity?: (sessionId: string, updatedAt: string) => void;
+  onSessionDeleted?: (sessionId: string) => void;
 }
 
 export interface UseChatSessionResult {
@@ -161,7 +163,9 @@ export interface UseChatSessionResult {
   isLoadingHistory: boolean;
   hasMoreHistory: boolean;
   scrollToBottomSignal: number;
+  slashCommands: SlashCommandItem[];
   onLoadMoreHistory: () => void;
+  onRequestSlashCommands: () => Promise<void>;
   onQuestionAnswered: (submission: QuestionAnswerSubmission) => Promise<void>;
   onSend: (content: string) => Promise<void>;
   onStop: () => Promise<void>;
