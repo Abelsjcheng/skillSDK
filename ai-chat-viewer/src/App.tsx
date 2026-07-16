@@ -152,14 +152,9 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantDescription, setWeAgentAssistantDescription] = useState('');
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
   const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
-  const [isCurrentAgentOnline, setIsCurrentAgentOnline] = useState<boolean | undefined>(undefined);
 
   const {
-    isOpen,
     showOnlineStatus,
-    fetchAllAgentStatus,
-    updateAgentStatus,
-    resetIsOpen,
     getAgentStatus,
   } = useAgentOnlineStatus();
 
@@ -186,20 +181,6 @@ function App({ assistantAccount = '' }: AppProps) {
     onSessionDeleted: (sessionId) => {
       void handleSessionDeletedFromPushRef.current?.(sessionId);
       },
-    onAgentStatusChange: (partnerAccount, isOnline) => {
-      const currentAssistantAccount = assistantAccountRef.current.trim();
-      if (partnerAccount === currentAssistantAccount) {
-        setIsCurrentAgentOnline(isOnline);
-      }
-      if (!isOpen && showOnlineStatus) {
-        void fetchAllAgentStatus().then(() => updateAgentStatus(partnerAccount, isOnline));
-      } else {
-        void updateAgentStatus(partnerAccount, isOnline);
-      }
-    },
-    onSessionClose: () => {
-      resetIsOpen();
-    },
   });
 
   const handleSessionDeletedFromPushRef = useRef<((sessionId: string) => Promise<void>) | null>(null);
@@ -608,7 +589,7 @@ function App({ assistantAccount = '' }: AppProps) {
               weAgentAssistantDescription={weAgentAssistantDescription}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
               showOnlineStatus={showOnlineStatus}
-              isOnline={isCurrentAgentOnline}
+              isOnline={getAgentStatus(assistantAccount)}
             />
           </div>
 

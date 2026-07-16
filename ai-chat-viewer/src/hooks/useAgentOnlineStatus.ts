@@ -5,7 +5,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isPcMiniApp } from '../constants';
-import { getOnlineStatus, isOnlineStatusEnabled } from '../utils/hwext';
+import {
+  getOnlineStatus,
+  isOnlineStatusEnabled,
+  registerSessionListener,
+  unregisterSessionListener,
+} from '../utils/hwext';
+import type { StreamMessage } from '../types';
 import {
   readAgentOnlineStatusStore,
   writeAgentOnlineStatusStore,
@@ -18,6 +24,18 @@ export function useAgentOnlineStatus() {
   const [isOpen, setIsOpen] = useState(false);
   const [showOnlineStatus, setShowOnlineStatus] = useState(false);
   const initializedRef = useRef(false);
+
+  // 更新单个助手状态（写入存储）
+  const updateAgentStatus = useCallback(
+    async (partnerAccount: string, isOnline: boolean) => {
+      setAgentStatusMap((prev) => {
+        const next = { ...prev, [partnerAccount]: isOnline };
+        void writeAgentOnlineStatusStore({ statuses: next });
+        return next;
+      });
+    },
+    []
+  );
 
   // 手动获取全量数据
   const fetchAllAgentStatus = useCallback(async () => {
@@ -57,9 +75,25 @@ export function useAgentOnlineStatus() {
     // 3. 调用接口获取最新数据
     await fetchAllAgentStatus();
 
-    // 4. 设置 isOpen=true
+    // 4. 注册 Session Listener 监听在线/离线消息
+    const SESSION_ID = 'config_agent';
+    registerSessionListener({
+      welinkSessionId: SESSION_ID,
+      onMessage: (msg: StreamMessage) => {
+        if (msg.type === 'agent.online') {
+          updateAgentStatus(msg.partnerAccount ?? '', true);
+        } else if (msg.type === 'agent.offline') {
+          updateAgentStatus(msg.partnerAccount ?? '', false);
+        }
+      },
+      onClose: () => {
+        resetIsOpen();
+      },
+    });
+
+    // 5. 设置 isOpen=true
     setIsOpen(true);
-  }, [fetchAllAgentStatus]);
+  }, [fetchAllAgentStatus, updateAgentStatus]);
 
   // 初始化
   useEffect(() => {
@@ -102,18 +136,6 @@ export function useAgentOnlineStatus() {
       });
     }
   }, [fetchAllAgentStatus, showOnlineStatus, initAgentOnlineStatus]);
-
-  // 更新单个助手状态（写入存储）
-  const updateAgentStatus = useCallback(
-    async (partnerAccount: string, isOnline: boolean) => {
-      setAgentStatusMap((prev) => {
-        const next = { ...prev, [partnerAccount]: isOnline };
-        void writeAgentOnlineStatusStore({ statuses: next });
-        return next;
-      });
-    },
-    []
-  );
 
   const resetIsOpen = useCallback(() => setIsOpen(false), []);
 
