@@ -102,6 +102,7 @@ export interface AssistantSelectionPageProps {
   selectedAssistantId?: string;
   onSelectAssistant?: (assistantId: string) => void;
   rightButtonDisabled?: boolean;
+  showOnlineStatus?: boolean;
 }
 
 export interface EditAssistantContentProps {

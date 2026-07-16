@@ -74,9 +74,12 @@ export function useAgentOnlineStatus() {
 
     // 3. 调用接口获取最新数据
     await fetchAllAgentStatus();
+  }, [fetchAllAgentStatus]);
 
-    // 4. 注册 Session Listener 监听在线/离线消息
+  // 注册 Session Listener
+  useEffect(() => {
     const SESSION_ID = 'config_agent';
+
     registerSessionListener({
       welinkSessionId: SESSION_ID,
       onMessage: (msg: StreamMessage) => {
@@ -91,9 +94,11 @@ export function useAgentOnlineStatus() {
       },
     });
 
-    // 5. 设置 isOpen=true
-    setIsOpen(true);
-  }, [fetchAllAgentStatus, updateAgentStatus]);
+    // 组件卸载时取消注册
+    return () => {
+      unregisterSessionListener({ welinkSessionId: SESSION_ID });
+    };
+  }, [updateAgentStatus]);
 
   // 初始化
   useEffect(() => {
@@ -138,16 +143,6 @@ export function useAgentOnlineStatus() {
   }, [fetchAllAgentStatus, showOnlineStatus, initAgentOnlineStatus]);
 
   const resetIsOpen = useCallback(() => setIsOpen(false), []);
-
-  // PC 端通知状态变化
-  useEffect(() => {
-    if (isPcMiniApp() && showOnlineStatus && Object.keys(agentStatusMap).length > 0) {
-      window.Pedestal?.callMethod('method://pedestal/weAgentRequest', {
-        schema: 'method://agentSkill_weAgentWebview/agentStatusChange',
-        data: agentStatusMap,
-      });
-    }
-  }, [agentStatusMap, showOnlineStatus]);
 
   return {
     agentStatusMap,

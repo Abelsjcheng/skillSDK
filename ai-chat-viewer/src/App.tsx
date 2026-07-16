@@ -154,9 +154,20 @@ function App({ assistantAccount = '' }: AppProps) {
   const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
 
   const {
+    agentStatusMap,
     showOnlineStatus,
     getAgentStatus,
   } = useAgentOnlineStatus();
+
+  // PC 端通知状态变化
+  useEffect(() => {
+    if (isPc && showOnlineStatus && Object.keys(agentStatusMap).length > 0) {
+      window.Pedestal?.callMethod('method://pedestal/weAgentRequest', {
+        schema: 'method://agentSkill_weAgentWebview/agentStatusChange',
+        data: agentStatusMap,
+      });
+    }
+  }, [agentStatusMap, showOnlineStatus, isPc]);
 
   const assistantAccountRef = useRef(assistantAccount);
   const historySessionsCacheRef = useRef<HistorySessionsCache | null>(null);

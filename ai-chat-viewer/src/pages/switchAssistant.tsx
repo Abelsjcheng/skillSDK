@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import AssistantSelectionPage from '../components/assistant/AssistantSelectionPage';
 import { isPcMiniApp } from '../constants';
 import { ensureLanguageInitialized } from '../i18n/config';
+import { useAgentOnlineStatus } from '../hooks/useAgentOnlineStatus';
 import type { WeAgentListItem } from '../types/bridge';
 import type { SwitchAssistantProps } from '../types/pages';
 import { dispatchSwitchAssistantConfirmEvent } from '../utils/assistantHostBridge';
@@ -30,14 +31,22 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
+  const { agentStatusMap, showOnlineStatus } = useAgentOnlineStatus();
+
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
   const preferredDefaultPartnerAccount = useMemo(
     () => defaultSelectedAssistantId?.trim() ?? '',
     [defaultSelectedAssistantId],
   );
   const assistantItems = useMemo(
-    () => mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language),
-    [assistantList, i18n.language, i18n.resolvedLanguage],
+    () => {
+      const items = mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language);
+      return items.map((item) => ({
+        ...item,
+        isOnline: agentStatusMap[item.id],
+      }));
+    },
+    [assistantList, i18n.language, i18n.resolvedLanguage, agentStatusMap],
   );
 
   useEffect(() => {
@@ -122,6 +131,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       selectedAssistantId={selectedPartnerAccount}
       onSelectAssistant={setSelectedPartnerAccount}
       rightButtonDisabled={!selectedPartnerAccount}
+      showOnlineStatus={showOnlineStatus}
     />
   );
 };

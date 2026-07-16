@@ -26,6 +26,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
   selectedAssistantId,
   onSelectAssistant,
   rightButtonDisabled = false,
+  showOnlineStatus = false,
 }) => {
   const assistantList = useMemo(() => assistants ?? EMPTY_ASSISTANT_LIST, [assistants]);
   const isSelectionControlled = selectedAssistantId !== undefined;
@@ -76,6 +77,7 @@ const AssistantSelectionPage: React.FC<AssistantSelectionPageProps> = ({
           assistants={assistantList}
           selectedAssistantId={currentSelectedAssistantId}
           onSelectAssistant={handleSelectAssistant}
+          showOnlineStatus={showOnlineStatus}
         />
       </main>
 
