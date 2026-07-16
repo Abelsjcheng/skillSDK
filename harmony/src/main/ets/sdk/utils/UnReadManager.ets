@@ -10,6 +10,7 @@ import {
   OnSessionViewingParams,
   ReportWeAgentSessionReadParams,
   WeAgentDetails,
+  WeAgentUnreadSource,
   WeAgentSessionUnreadState
 } from '../types';
 
@@ -236,7 +237,7 @@ export class UnReadManager {
     account: string,
     requested: string[] | undefined,
     data: ServerUnreadResult,
-    source: 'server' | 'cache'
+    source: WeAgentUnreadSource
   ): GetWeAgentUnreadMessageResult {
     this.partnerAccount = account;
     this.myAgentUnread = false;
@@ -264,7 +265,7 @@ export class UnReadManager {
     partnerAccount: string,
     bizRobotTag: string | undefined,
     clearState: boolean,
-    source: 'server' | 'networkReconnect'
+    source: WeAgentUnreadSource
   ): Promise<boolean> {
     if (clearState) {
       this.clearUnreadState(partnerAccount, bizRobotTag);
@@ -372,11 +373,11 @@ export class UnReadManager {
     }
   }
 
-  private onUnReadedChanged(source: string): void {
+  private onUnReadedChanged(source: WeAgentUnreadSource): void {
     if (this.partnerAccount.length === 0 || !this.agentTabNotifyEnabled) {
       return;
     }
-    const result = this.snapshot(source as 'server' | 'cache');
+    const result = this.snapshot(source);
     const showHostRedDot = this.shouldShowHostWeAgentTabRedDot();
     this.setHostWeAgentTabRedDot(showHostRedDot);
     this.broadcastUnreadChanged(result);
@@ -463,7 +464,7 @@ export class UnReadManager {
     });
   }
 
-  private snapshot(source: 'server' | 'cache'): GetWeAgentUnreadMessageResult {
+  private snapshot(source: WeAgentUnreadSource): GetWeAgentUnreadMessageResult {
     const states = Array.from(this.sessions.values());
     const assistantUnread = this.myAgentUnread || states.some((item) => item.hasUnRead);
     return {

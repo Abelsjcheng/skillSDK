@@ -564,12 +564,22 @@ export interface WeAgentSessionUnreadState {
   maxSeq: number;
 }
 
+export type WeAgentUnreadSource =
+  | 'server'
+  | 'cache'
+  | 'readReport'
+  | 'sessionViewing'
+  | 'sessionDeleted'
+  | 'assistantChanged'
+  | 'serverPush'
+  | 'networkReconnect';
+
 export interface GetWeAgentUnreadMessageResult {
   partnerAccount: string;
   assistantUnread: boolean;
   redDotVisible: boolean;
   sessions: WeAgentSessionUnreadState[];
-  source: 'server' | 'cache';
+  source: WeAgentUnreadSource;
 }
 
 export interface ReportWeAgentSessionReadParams {
