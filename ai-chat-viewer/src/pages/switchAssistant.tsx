@@ -31,7 +31,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
-  const { agentStatusMap, showOnlineStatus } = useAgentOnlineStatus();
+  const { agentStatusMap } = useAgentOnlineStatus();
 
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
   const preferredDefaultPartnerAccount = useMemo(
@@ -131,7 +131,6 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
       selectedAssistantId={selectedPartnerAccount}
       onSelectAssistant={setSelectedPartnerAccount}
       rightButtonDisabled={!selectedPartnerAccount}
-      showOnlineStatus={showOnlineStatus}
     />
   );
 };

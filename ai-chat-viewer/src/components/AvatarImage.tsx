@@ -12,7 +12,6 @@ const isDarkMode = (): boolean => window.matchMedia?.('(prefers-color-scheme: da
 const AvatarImage: React.FC<AvatarImageProps> = ({
   src,
   fallbackSrc,
-  showOnlineStatus,
   isOnline,
   className,
   ...rest
@@ -66,9 +65,9 @@ const AvatarImage: React.FC<AvatarImageProps> = ({
     };
   }, [src, fallbackSrc]);
 
-  const statusIcon = showOnlineStatus
-    ? (isOnline ? (darkMode ? agentOnlineDarkIcon : agentOnlineIcon) : (darkMode ? agentOfflineDarkIcon : agentOfflineIcon))
-    : null;
+  const statusIcon = isOnline
+    ? (darkMode ? agentOnlineDarkIcon : agentOnlineIcon)
+    : (darkMode ? agentOfflineDarkIcon : agentOfflineIcon);
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>

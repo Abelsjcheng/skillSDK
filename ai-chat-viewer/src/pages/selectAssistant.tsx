@@ -31,7 +31,7 @@ const SelectAssistant: React.FC = () => {
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('');
 
-  const { agentStatusMap, fetchAllAgentStatus, showOnlineStatus } = useAgentOnlineStatus();
+  const { agentStatusMap, fetchAllAgentStatus } = useAgentOnlineStatus();
 
   const assistantItems = useMemo<AssistantItem[]>(() => {
     const items = mapWeAgentListToAssistantItems(assistantList, i18n.resolvedLanguage ?? i18n.language);
@@ -114,7 +114,6 @@ const SelectAssistant: React.FC = () => {
             assistants={assistantItems}
             selectedAssistantId={selectedAssistantId}
             onSelectAssistant={setSelectedAssistantId}
-            showOnlineStatus={showOnlineStatus}
           />
         </main>
 

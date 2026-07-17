@@ -66,7 +66,6 @@ export interface AssistantCardListProps {
   assistants: AssistantItem[];
   selectedAssistantId: string;
   onSelectAssistant: (assistantId: string) => void;
-  showOnlineStatus?: boolean;
 }
 
 export interface AssistantPageHeaderAction {
@@ -102,7 +101,6 @@ export interface AssistantSelectionPageProps {
   selectedAssistantId?: string;
   onSelectAssistant?: (assistantId: string) => void;
   rightButtonDisabled?: boolean;
-  showOnlineStatus?: boolean;
 }
 
 export interface EditAssistantContentProps {
