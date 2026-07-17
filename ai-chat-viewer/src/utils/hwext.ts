@@ -706,7 +706,9 @@ export async function deleteHistorySession(
   return deleteHistorySessionWithHWH5FetchFull(sessionId);
 }
 
-async function getOnlineStatusWithHWH5FetchFull(): Promise<GetOnlineStatusResult> {
+async function getOnlineStatusWithHWH5FetchFull(
+  assistantAccountList: string[]
+): Promise<GetOnlineStatusResult> {
   if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
     throw new Error('HWH5.fetchFull is not available.');
   }
@@ -714,10 +716,11 @@ async function getOnlineStatusWithHWH5FetchFull(): Promise<GetOnlineStatusResult
   const response = await window.HWH5.fetchFull<GetOnlineStatusResponse>(
     buildOnlineStatusUrl(),
     {
-      method: 'get',
+      method: 'post',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ assistantAccountList }),
     },
   );
   const reply = await response.json();
@@ -729,15 +732,15 @@ async function getOnlineStatusWithHWH5FetchFull(): Promise<GetOnlineStatusResult
 
 async function getOnlineStatusWithPcBridge(): Promise<GetOnlineStatusResult> {
   // PC 端暂不支持
-  return { statuses: {} };
+  return { agent: [] };
 }
 
-export async function getOnlineStatus(): Promise<GetOnlineStatusResult> {
+export async function getOnlineStatus(assistantAccountList: string[]): Promise<GetOnlineStatusResult> {
   if (isPcMiniApp()) {
     return getOnlineStatusWithPcBridge();
   }
 
-  return trackApiGetOnlineStatus(getOnlineStatusWithHWH5FetchFull());
+  return trackApiGetOnlineStatus(getOnlineStatusWithHWH5FetchFull(assistantAccountList));
 }
 
 export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QueryQrcodeInfoResult> {

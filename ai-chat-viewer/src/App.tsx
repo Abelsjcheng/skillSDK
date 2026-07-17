@@ -156,7 +156,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const {
     agentStatusMap,
     getAgentStatus,
-  } = useAgentOnlineStatus();
+  } = useAgentOnlineStatus({ fetchOnInit: true });
 
   // PC 端通知状态变化
   useEffect(() => {

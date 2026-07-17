@@ -55,6 +55,24 @@ npm run test         # Run Jest tests (--runInBand)
 Existing status indicators use CSS classes: `.is-pending`, `.has-code-block`
 Tool statuses: `pending`, `running`, `completed`, `error` (see `ToolCard.tsx`)
 
+### Assistant Online/Offline Status
+Shows online/offline indicator icon on assistant avatar (bottom-right corner):
+- **Online**: `src/imgs/agent-online.svg` (green dot)
+- **Offline**: `src/imgs/agent-offline.svg` (gray dot)
+
+**Data Flow**:
+1. **Init**: Read from storage → call `getOnlineStatus()` API → cache to storage
+2. **Real-time**: `registerSessionListener` receives `agent.online` / `agent.offline` messages → updates status map
+3. **PC主动通知**: `agent_login` custom event triggers `fetchAllAgentStatus()` refresh
+
+**Key Files**:
+- `src/hooks/useAgentOnlineStatus.ts` - Main hook: manages `agentStatusMap`, `isOpen` states
+- `src/utils/agentOnlineStatusStore.ts` - Storage: `memoryStore` + `localStorage`/`HWH5.getStorage`
+- `src/utils/hwext.ts` - `getOnlineStatus()` / `registerSessionListener()`
+- `src/utils/storage.ts` - Generic persistence (PC: localStorage, Mobile: HWH5 storage)
+- `src/utils/apiEndpoints.ts` - `API_PATHS.onlineStatus`
+- `src/components/AvatarImage.tsx` - Renders online/offline icon
+
 ## Tech Stack
 
 - React 18.3.1 + TypeScript 5.9.3

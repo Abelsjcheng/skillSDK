@@ -47,13 +47,15 @@ const SelectAssistant: React.FC = () => {
       const list = result && Array.isArray(result.content) ? result.content : [];
       setAssistantList(list);
       setSelectedAssistantId((current) => resolveSelectableAssistantId(list, current));
+      // 获取助手列表后获取在线状态
+      await fetchAllAgentStatus(list);
     } catch (error) {
       WeLog(`SelectAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_ASSISTANT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
       showToast(t('selectAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedAssistantId('');
     }
-  }, [t]);
+  }, [t, fetchAllAgentStatus]);
 
   useEffect(() => {
     void loadAssistantList();

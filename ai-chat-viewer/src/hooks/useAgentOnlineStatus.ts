@@ -7,10 +7,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isPcMiniApp } from '../constants';
 import {
   getOnlineStatus,
+  getWeAgentList,
   registerSessionListener,
   unregisterSessionListener,
 } from '../utils/hwext';
 import type { StreamMessage } from '../types';
+import type { WeAgentListItem } from '../types/bridge/hwext';
+import { DEFAULT_ASSISTANT_LIST_QUERY } from '../utils/assistantSelection';
 import {
   readAgentOnlineStatusStore,
   writeAgentOnlineStatusStore,
@@ -18,7 +21,13 @@ import {
 
 type AgentStatusMap = Record<string, boolean>;
 
-export function useAgentOnlineStatus() {
+export interface UseAgentOnlineStatusOptions {
+  /** 初始化时是否全量查询在线状态，默认 false */
+  fetchOnInit?: boolean;
+}
+
+export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) {
+  const { fetchOnInit = false } = options;
   const [agentStatusMap, setAgentStatusMap] = useState<AgentStatusMap>({});
   const [isOpen, setIsOpen] = useState(false);
   const initializedRef = useRef(false);
@@ -36,19 +45,27 @@ export function useAgentOnlineStatus() {
   );
 
   // 手动获取全量数据
-  const fetchAllAgentStatus = useCallback(async () => {
+  const fetchAllAgentStatus = useCallback(async (assistantList?: WeAgentListItem[]) => {
     try {
-      const result = await getOnlineStatus();
-      if (result?.statuses) {
-        setAgentStatusMap(result.statuses);
-        await writeAgentOnlineStatusStore({ statuses: result.statuses });
+      // 如果传入了列表，直接用；否则重新获取
+      const list = assistantList ?? (await getWeAgentList(DEFAULT_ASSISTANT_LIST_QUERY)).content;
+      const assistantAccountList = list.map((item) => item.partnerAccount);
+
+      const result = await getOnlineStatus(assistantAccountList);
+      if (result?.agent) {
+        const statuses: Record<string, boolean> = {};
+        result.agent.forEach((a) => {
+          statuses[a.assistantAccount] = a.online;
+        });
+        setAgentStatusMap(statuses);
+        await writeAgentOnlineStatusStore({ statuses });
       }
     } catch (error) {
       console.error('fetchAllAgentStatus failed:', error);
     }
   }, []);
 
-  // 初始化/刷新：从存储读取，再调接口更新
+  // 初始化/刷新：从存储读取， optionally 全量查询
   const initAgentOnlineStatus = useCallback(async () => {
     // 防止移动端首次挂载时 useEffect 和 onShow 重复触发
     if (initializedRef.current) {
@@ -56,15 +73,17 @@ export function useAgentOnlineStatus() {
     }
     initializedRef.current = true;
 
-    // 1. 从存储读取
+    // 从存储读取
     const stored = await readAgentOnlineStatusStore();
     if (stored?.statuses) {
       setAgentStatusMap(stored.statuses);
     }
 
-    // 2. 调用接口获取最新数据
-    await fetchAllAgentStatus();
-  }, [fetchAllAgentStatus]);
+    // 如果配置了 fetchOnInit，则全量查询
+    if (fetchOnInit) {
+      await fetchAllAgentStatus();
+    }
+  }, [fetchOnInit]);
 
   // 注册 Session Listener
   useEffect(() => {

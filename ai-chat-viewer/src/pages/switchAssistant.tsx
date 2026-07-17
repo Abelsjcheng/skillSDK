@@ -31,7 +31,7 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
   const [assistantList, setAssistantList] = useState<WeAgentListItem[]>([]);
   const [selectedPartnerAccount, setSelectedPartnerAccount] = useState<string>('');
 
-  const { agentStatusMap } = useAgentOnlineStatus();
+  const { agentStatusMap, fetchAllAgentStatus } = useAgentOnlineStatus();
 
   const partnerAccount = useMemo(() => getQueryParam('partnerAccount') ?? '', []);
   const preferredDefaultPartnerAccount = useMemo(
@@ -64,13 +64,15 @@ const SwitchAssistant: React.FC<SwitchAssistantProps> = ({ defaultSelectedAssist
         preferredDefaultPartnerAccount,
         partnerAccount,
       ));
+      // 获取助手列表后获取在线状态
+      await fetchAllAgentStatus(list);
     } catch (error) {
       WeLog(`SwitchAssistant getWeAgentList failed | extra=${JSON.stringify(DEFAULT_ASSISTANT_LIST_QUERY)} | error=${JSON.stringify(error)}`);
       showToast(t('switchAssistant.loadFailed'));
       setAssistantList([]);
       setSelectedPartnerAccount('');
     }
-  }, [partnerAccount, preferredDefaultPartnerAccount, t]);
+  }, [partnerAccount, preferredDefaultPartnerAccount, t, fetchAllAgentStatus]);
 
   useEffect(() => {
     void loadAssistantList();

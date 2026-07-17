@@ -117,20 +117,22 @@ describe('getOnlineStatus', () => {
   });
 
   it('gets online status through HWH5.fetchFull', async () => {
-    await expect(getOnlineStatus()).resolves.toEqual({
-      statuses: {
-        'partner-1': true,
-        'partner-2': false,
-      },
+    const assistantAccountList = ['partner-1', 'partner-2'];
+    await expect(getOnlineStatus(assistantAccountList)).resolves.toEqual({
+      agent: [
+        { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
+        { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
+      ],
     });
 
     expect(window.HWH5.fetchFull).toHaveBeenCalledWith(
-      'https://www.example.com/mag/api/skill/sessions/onlinestatus',
+      'https://www.example.com/mag/api/skill/agent/status',
       {
-        method: 'get',
+        method: 'post',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ assistantAccountList }),
       },
     );
   });
@@ -138,7 +140,7 @@ describe('getOnlineStatus', () => {
   it('throws error when HWH5.fetchFull is not available', async () => {
     delete (window as any).HWH5;
 
-    await expect(getOnlineStatus()).rejects.toThrow(
+    await expect(getOnlineStatus(['partner-1'])).rejects.toThrow(
       'HWH5.fetchFull is not available.',
     );
   });
@@ -153,7 +155,7 @@ describe('getOnlineStatus', () => {
       }),
     };
 
-    await expect(getOnlineStatus()).rejects.toEqual({
+    await expect(getOnlineStatus(['partner-1'])).rejects.toEqual({
       code: 1,
       message: 'error',
     });

@@ -230,8 +230,16 @@ export interface DeleteHistorySessionResponse {
   data: DeleteHistorySessionResult;
 }
 
+export interface AgentOnlineStatus {
+  assistantAccount: string;
+  ak: string;
+  online: boolean;
+  toolType: string;
+  assistantType: 'business' | 'personal';
+}
+
 export interface GetOnlineStatusResult {
-  statuses: Record<string, boolean>;
+  agent: AgentOnlineStatus[];
 }
 
 export interface GetOnlineStatusResponse {
