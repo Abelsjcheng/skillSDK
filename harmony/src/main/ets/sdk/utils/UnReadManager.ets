@@ -439,7 +439,7 @@ export class UnReadManager {
     return this.httpClient.get<ServerMyAgentUnreadResult>(
       '/getMessageData',
       undefined,
-      { useAssistantBaseUrl: true }
+      { skipBaseUrl: true }
     );
   }
 
