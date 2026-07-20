@@ -907,8 +907,11 @@ export class SkillSDK {
   async getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAgentUnreadMessageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireString(params.assistantAccount, 'assistantAccount');
-      const result = await this.unReadManager.getWeAgentUnreadMessage(params);
+      const assistantAccount = TypeConverter.toRequiredString(params.assistantAccount, 'assistantAccount');
+      const sessionIds = params.sessionIds === undefined
+        ? undefined
+        : TypeConverter.toRequiredStringArray(params.sessionIds, 'sessionIds');
+      const result = await this.unReadManager.getWeAgentUnreadMessage({ assistantAccount, sessionIds });
       this.logger.info('getWeAgentUnreadMessage succeeded');
       return result;
     } catch (error) {
@@ -920,9 +923,12 @@ export class SkillSDK {
   async reportWeAgentSessionRead(params: ReportWeAgentSessionReadParams): Promise<ReportWeAgentSessionReadResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireString(params.welinkSessionId, 'welinkSessionId');
-      Validator.requirePositiveInteger(params.readSeq, 'readSeq');
-      await this.unReadManager.reportWeAgentSessionRead(params);
+      const welinkSessionId = TypeConverter.toRequiredString(params.welinkSessionId, 'welinkSessionId');
+      const readSeq = TypeConverter.toOptionalInteger(params.readSeq, 'readSeq');
+      if (readSeq === undefined || readSeq <= 0) {
+        throw new SkillSdkException(1000, 'readSeq must be a positive integer');
+      }
+      await this.unReadManager.reportWeAgentSessionRead({ welinkSessionId, readSeq });
       this.logger.info('reportWeAgentSessionRead succeeded');
       return { status: 'success' };
     } catch (error) {

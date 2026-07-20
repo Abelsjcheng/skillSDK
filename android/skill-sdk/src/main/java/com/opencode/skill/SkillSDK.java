@@ -1241,13 +1241,22 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        String partnerAccount = SdkStringUtils.normalizeOptionalString(params.getAssistantAccount());
-        if (partnerAccount == null) {
-            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: assistantAccount is required");
-            callback.onError(error(1000, "assistantAccount is required"));
+        if (params == null) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: params is required");
+            callback.onError(error(1000, "params is required"));
             return;
         }
-        unReadManager.getWeAgentUnreadMessage(partnerAccount, params.getSessionIds(), new SkillCallback<GetWeAgentUnreadMessageResult>() {
+        final String partnerAccount;
+        final List<String> sessionIds;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getAssistantAccount(), "assistantAccount");
+            sessionIds = TypeConvertUtils.optionalStringList(params.getSessionIds(), "sessionIds");
+        } catch (SkillSdkException error) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed, error=" + error.getErrorMessage());
+            callback.onError(error);
+            return;
+        }
+        unReadManager.getWeAgentUnreadMessage(partnerAccount, sessionIds, new SkillCallback<GetWeAgentUnreadMessageResult>() {
             @Override public void onSuccess(@Nullable GetWeAgentUnreadMessageResult result) {
                 WeLinkLogger.i(TAG, "getWeAgentUnreadMessage succeeded");
                 callback.onSuccess(result);
@@ -1266,13 +1275,26 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        String sessionId = SdkStringUtils.normalizeOptionalString(params.getWelinkSessionId());
-        if (sessionId == null || params.getReadSeq() <= 0) {
-            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: welinkSessionId and readSeq are required");
-            callback.onError(error(1000, "welinkSessionId and readSeq are required"));
+        if (params == null) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: params is required");
+            callback.onError(error(1000, "params is required"));
             return;
         }
-        unReadManager.reportWeAgentSessionRead(sessionId, params.getReadSeq(), new SkillCallback<Void>() {
+        final String sessionId;
+        try {
+            sessionId = TypeConvertUtils.requireString(params.getWelinkSessionId(), "welinkSessionId");
+        } catch (SkillSdkException error) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed, error=" + error.getErrorMessage());
+            callback.onError(error);
+            return;
+        }
+        long readSeq = params.getReadSeq();
+        if (readSeq <= 0) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: readSeq must be a positive integer");
+            callback.onError(error(1000, "readSeq must be a positive integer"));
+            return;
+        }
+        unReadManager.reportWeAgentSessionRead(sessionId, readSeq, new SkillCallback<Void>() {
             @Override public void onSuccess(@Nullable Void ignored) {
                 WeLinkLogger.i(TAG, "reportWeAgentSessionRead succeeded");
                 callback.onSuccess(new ReportWeAgentSessionReadResult("success"));
