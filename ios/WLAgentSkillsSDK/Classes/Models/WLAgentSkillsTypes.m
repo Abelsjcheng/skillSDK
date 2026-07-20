@@ -1217,6 +1217,18 @@ static NSArray *WLAgentSkillsSerializeModelArray(NSArray *array) {
 
 @end
 
+@implementation WLAgentSkillsGetWeAgentUnreadMessageParams
+@end
+
+@implementation WLAgentSkillsReportWeAgentSessionReadParams
+@end
+
+@implementation WLAgentSkillsOnSessionViewingParams
+@end
+
+@implementation WLAgentSkillsOnSessionViewingEndParams
+@end
+
 @implementation WLAgentSkillsSessionUnreadState
 
 - (NSDictionary *)toDictionary {
