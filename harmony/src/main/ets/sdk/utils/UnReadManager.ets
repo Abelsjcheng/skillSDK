@@ -81,7 +81,7 @@ export class UnReadManager {
         params.sessionIds
       );
       const result = this.applyServerResult(params.assistantAcount, params.sessionIds, data, 'server');
-      this.onUnReadedChanged('server');
+      this.onUnReadedChanged('server', false);
       this.logger.info(`query unread state succeeded, partnerAccount=${params.assistantAcount}`);
       return result;
     } catch (error) {
@@ -108,7 +108,7 @@ export class UnReadManager {
     );
     this.reportedReadSeq.set(params.welinkSessionId, params.readSeq);
     this.setRead(params.welinkSessionId, params.readSeq);
-    this.onUnReadedChanged('readReport');
+    this.onUnReadedChanged('readReport', false);
     this.logger.info(`report session read succeeded, sessionId=${params.welinkSessionId}`);
   }
 
@@ -373,14 +373,16 @@ export class UnReadManager {
     }
   }
 
-  private onUnReadedChanged(source: WeAgentUnreadSource): void {
+  private onUnReadedChanged(source: WeAgentUnreadSource, shouldBroadcast: boolean = true): void {
     if (this.partnerAccount.length === 0 || !this.agentTabNotifyEnabled) {
       return;
     }
     const result = this.snapshot(source);
     const showHostRedDot = this.shouldShowHostWeAgentTabRedDot();
     this.setHostWeAgentTabRedDot(showHostRedDot);
-    this.broadcastUnreadChanged(result);
+    if (shouldBroadcast) {
+      this.broadcastUnreadChanged(result);
+    }
     this.logger.info(`unread state changed, source=${source}, partnerAccount=${this.partnerAccount}, `
       + `redDotVisible=${result.redDotVisible}, showHostRedDot=${showHostRedDot}`);
   }

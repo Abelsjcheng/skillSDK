@@ -88,7 +88,7 @@ public final class UnReadManager {
                 GetWeAgentUnreadMessageResult unreadResult = applyServerResult(
                         account, sessionIds, result, "server"
                 );
-                onUnReadedChanged("server");
+                onUnReadedChanged("server", false);
                 callback.onSuccess(unreadResult);
             }
             @Override public void onError(@NonNull Throwable error) {
@@ -122,7 +122,7 @@ public final class UnReadManager {
                     reportedReadSeqBySession.put(sessionId, readSeq);
                     setRead(sessionId, readSeq);
                 }
-                onUnReadedChanged("readReport");
+                onUnReadedChanged("readReport", false);
                 WeLinkLogger.i(TAG, "report session read succeeded, sessionId=" + sessionId);
                 callback.onSuccess(null);
             }
@@ -526,6 +526,10 @@ public final class UnReadManager {
 
     /** 未读缓存变更后刷新宿主助理页小红点，并向 CUI 广播最新状态。 */
     private void onUnReadedChanged(@NonNull String source) {
+        onUnReadedChanged(source, true);
+    }
+
+    private void onUnReadedChanged(@NonNull String source, boolean shouldBroadcast) {
         String account = partnerAccount;
         if (account == null || !agentTabNotifyEnabled) {
             return;
@@ -533,7 +537,9 @@ public final class UnReadManager {
         GetWeAgentUnreadMessageResult snapshot = result(account, source);
         boolean showHostRedDot = shouldShowHostWeAgentTabRedDot();
         setHostWeAgentTabRedDot(showHostRedDot);
-        broadcastUnreadChanged(snapshot);
+        if (shouldBroadcast) {
+            broadcastUnreadChanged(snapshot);
+        }
         WeLinkLogger.i(TAG, "unread state changed, source=" + source
                 + ", partnerAccount=" + account + ", redDotVisible=" + snapshot.isRedDotVisible()
                 + ", showHostRedDot=" + showHostRedDot);

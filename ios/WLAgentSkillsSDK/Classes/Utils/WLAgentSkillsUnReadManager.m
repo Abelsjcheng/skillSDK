@@ -69,7 +69,7 @@
                                                                   partnerAccount:params.assistantAcount
                                                                       sessionIds:params.sessionIds
                                                                           source:@"server"];
-      [self onUnReadedChanged:@"server"];
+      [self onUnReadedChanged:@"server" shouldBroadcast:NO];
       WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] query succeeded, partnerAccount=%@",
                  params.assistantAcount);
       success(result);
@@ -123,7 +123,7 @@
       self.reportedReadSeq[params.welinkSessionId] = params.readSeq;
       [self markRead:params.welinkSessionId maxSeq:params.readSeq.integerValue];
     }
-    [self onUnReadedChanged:@"readReport"];
+    [self onUnReadedChanged:@"readReport" shouldBroadcast:NO];
     WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] report read succeeded, sessionId=%@",
                params.welinkSessionId);
     if (success) {
@@ -449,13 +449,19 @@
 }
 
 - (void)onUnReadedChanged:(NSString *)source {
+  [self onUnReadedChanged:source shouldBroadcast:YES];
+}
+
+- (void)onUnReadedChanged:(NSString *)source shouldBroadcast:(BOOL)shouldBroadcast {
   if (self.partnerAccount.length == 0 || !self.agentTabNotifyEnabled) {
     return;
   }
   WLAgentSkillsGetWeAgentUnreadMessageResult *result = [self snapshot:source];
   BOOL showHostRedDot = [self shouldShowHostWeAgentTabRedDot];
   [self setHostWeAgentTabRedDot:showHostRedDot];
-  [self broadcastUnreadChanged:result];
+  if (shouldBroadcast) {
+    [self broadcastUnreadChanged:result];
+  }
   WKFLogInfo(WLAS_BUNDLE_NAME,
              @"[WeAgentUnread] state changed, source=%@, partnerAccount=%@, redDotVisible=%@, showHostRedDot=%@",
              source,
