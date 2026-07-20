@@ -739,12 +739,25 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)getWeAgentUnreadMessage:(WLAgentSkillsGetWeAgentUnreadMessageParams *)params
                          success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *result))success
                          failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.assistantAccount.length == 0) {
-        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage failed: assistantAccount is required");
-        [self dispatchFailure:failure code:1000 message:@"assistantAccount is required"];
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;
     }
-    [[WLAgentSkillsUnReadManager sharedManager] getWeAgentUnreadMessage:params success:^(WLAgentSkillsGetWeAgentUnreadMessageResult *result) {
+
+    NSString *errorMessage = nil;
+    NSString *assistantAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.assistantAccount
+                                                                             fieldName:@"assistantAccount"
+                                                                          errorMessage:&errorMessage];
+    if (assistantAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    WLAgentSkillsGetWeAgentUnreadMessageParams *normalizedParams =
+        [[WLAgentSkillsGetWeAgentUnreadMessageParams alloc] init];
+    normalizedParams.assistantAccount = assistantAccount;
+    normalizedParams.sessionIds = params.sessionIds;
+    [[WLAgentSkillsUnReadManager sharedManager] getWeAgentUnreadMessage:normalizedParams success:^(WLAgentSkillsGetWeAgentUnreadMessageResult *result) {
         WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage succeeded");
         if (success) {
             success(result);
@@ -761,12 +774,35 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)reportWeAgentSessionRead:(WLAgentSkillsReportWeAgentSessionReadParams *)params
                           success:(void (^)(WLAgentSkillsReportWeAgentSessionReadResult *result))success
                           failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.welinkSessionId.length == 0 || params.readSeq.integerValue <= 0) {
-        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] reportWeAgentSessionRead failed: invalid params");
-        [self dispatchFailure:failure code:1000 message:@"welinkSessionId and readSeq are required"];
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;
     }
-    [[WLAgentSkillsUnReadManager sharedManager] reportWeAgentSessionRead:params success:^{
+
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                            fieldName:@"welinkSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSNumber *readSeq = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:params.readSeq
+                                                                           fieldName:@"readSeq"
+                                                                        errorMessage:&errorMessage];
+    if (readSeq == nil || readSeq.integerValue <= 0) {
+        [self dispatchFailure:failure
+                         code:1000
+                      message:errorMessage ?: @"readSeq must be a positive integer."];
+        return;
+    }
+
+    WLAgentSkillsReportWeAgentSessionReadParams *normalizedParams =
+        [[WLAgentSkillsReportWeAgentSessionReadParams alloc] init];
+    normalizedParams.welinkSessionId = welinkSessionId;
+    normalizedParams.readSeq = readSeq;
+    [[WLAgentSkillsUnReadManager sharedManager] reportWeAgentSessionRead:normalizedParams success:^{
         WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] reportWeAgentSessionRead succeeded");
         if (success) {
             WLAgentSkillsReportWeAgentSessionReadResult *result = [WLAgentSkillsReportWeAgentSessionReadResult new];
