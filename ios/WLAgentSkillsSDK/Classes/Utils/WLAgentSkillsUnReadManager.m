@@ -57,8 +57,8 @@
                          success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *))success
                          failure:(void (^)(NSError *))failure {
   // 查询指定助理的未读会话，并在请求失败时优先返回当前助理内存缓存。
-  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] query partnerAccount=%@", params.assistantAcount);
-  [self requestWeAgentUnreadMessageWithPartnerAccount:params.assistantAcount
+  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] query partnerAccount=%@", params.assistantAccount);
+  [self requestWeAgentUnreadMessageWithPartnerAccount:params.assistantAccount
                                             sessionIds:params.sessionIds
                                                success:^(id response) {
     if (![response isKindOfClass:[NSDictionary class]]) {
@@ -66,25 +66,25 @@
     }
     if (success) {
       WLAgentSkillsGetWeAgentUnreadMessageResult *result = [self applyResponse:response
-                                                                  partnerAccount:params.assistantAcount
+                                                                  partnerAccount:params.assistantAccount
                                                                       sessionIds:params.sessionIds
                                                                           source:@"server"];
       [self onUnReadedChanged:@"server" shouldBroadcast:NO];
       WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] query succeeded, partnerAccount=%@",
-                 params.assistantAcount);
+                 params.assistantAccount);
       success(result);
     }
   } failure:^(NSError *error) {
     WLAgentSkillsGetWeAgentUnreadMessageResult *cachedResult = nil;
     @synchronized (self) {
-      if ([params.assistantAcount isEqualToString:self.partnerAccount]) {
+      if ([params.assistantAccount isEqualToString:self.partnerAccount]) {
         cachedResult = [self snapshot:@"cache"];
       }
     }
     if (cachedResult != nil) {
       WKFLogInfo(WLAS_BUNDLE_NAME,
                  @"[WeAgentUnread] query failed, return memory cache, partnerAccount=%@",
-                 params.assistantAcount);
+                 params.assistantAccount);
       if (success) {
         success(cachedResult);
       }
@@ -92,7 +92,7 @@
     }
     WKFLogError(WLAS_BUNDLE_NAME,
                 @"[WeAgentUnread] query failed, no matching memory cache, partnerAccount=%@, error=%@",
-                params.assistantAcount,
+                params.assistantAccount,
                 error.localizedDescription);
     if (failure) {
       failure(error);
@@ -517,7 +517,7 @@
                                             sessionIds:(nullable NSArray<NSString *> *)sessionIds
                                                success:(void (^)(id response))success
                                                failure:(void (^)(NSError *error))failure {
-  [[WLAgentSkillsHTTPClient sharedClient] getWeAgentUnreadMessageWithAssistantAcount:partnerAccount
+  [[WLAgentSkillsHTTPClient sharedClient] getWeAgentUnreadMessageWithAssistantAccount:partnerAccount
                                                                            sessionIds:sessionIds
                                                                               success:success
                                                                               failure:failure];

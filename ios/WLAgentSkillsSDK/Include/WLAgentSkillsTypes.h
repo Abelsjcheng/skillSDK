@@ -200,7 +200,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsGetWeAgentUnreadMessageParams : NSObject
-@property (nonatomic, copy, nullable) NSString *assistantAcount;
+@property (nonatomic, copy, nullable) NSString *assistantAccount;
 @property (nonatomic, copy, nullable) NSArray<NSString *> *sessionIds;
 @end
 

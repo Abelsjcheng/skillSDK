@@ -2148,7 +2148,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| assistantAcount | string | 是 | 助理账号，透传到服务端请求体 |
+| assistantAccount | string | 是 | 助理账号，透传到服务端请求体 |
 | sessionIds | string[] | 否 | 会话 ID 列表；不传时由服务端返回该助理下相关会话未读状态 |
 
 ### 返回值
@@ -2157,7 +2157,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| partnerAccount | string | 助理账号；由 `assistantAcount` 映射为 SDK 内部统一字段 |
+| partnerAccount | string | 助理账号；由 `assistantAccount` 映射为 SDK 内部统一字段 |
 | assistantUnread | boolean | 当前助理是否存在未读会话 |
 | redDotVisible | boolean | 当前助理小红点是否允许展示 |
 | sessions | Array<WeAgentSessionUnreadState> | SDK 根据服务端 `unreadSessionList` 映射出的会话未读状态 |
@@ -2177,7 +2177,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 |----|------|
 | Method | `POST` |
 | URL | `/api/skill/sessions/unread` |
-| Body | `{ "assistantAcount": string, "sessionIds"?: string[] }` |
+| Body | `{ "assistantAccount": string, "sessionIds"?: string[] }` |
 
 服务端返回示例：
 
@@ -2200,7 +2200,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
-| 1000 | 无效的参数 | `assistantAcount` 缺失或格式错误 |
+| 1000 | 无效的参数 | `assistantAccount` 缺失或格式错误 |
 | 6000 | 网络错误 | 服务端请求失败、超时或无法解析响应 |
 | 7000 | 服务端错误 | 服务端返回非成功状态 |
 
@@ -2215,7 +2215,7 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgent
 
 ```javascript
 window.HWH5EXT.getWeAgentUnreadMessage({
-  assistantAcount: 'x001_1',
+  assistantAccount: 'x001_1',
   sessionIds: ['42', '43']
 }).then((result) => {
   if (result.redDotVisible && result.assistantUnread) {

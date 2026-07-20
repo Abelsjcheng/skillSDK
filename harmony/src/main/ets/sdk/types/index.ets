@@ -554,7 +554,7 @@ export interface QueryAssistantGraySingleResult {
 }
 
 export interface GetWeAgentUnreadMessageParams {
-  assistantAcount: string;
+  assistantAccount: string;
   sessionIds?: string[];
 }
 

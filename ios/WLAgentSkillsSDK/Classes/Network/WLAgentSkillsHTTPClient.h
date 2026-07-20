@@ -88,7 +88,7 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
                                            success:(WLAgentSkillsHTTPSuccessBlock)success
                                            failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
-- (void)getWeAgentUnreadMessageWithAssistantAcount:(NSString *)assistantAcount
+- (void)getWeAgentUnreadMessageWithAssistantAccount:(NSString *)assistantAccount
                                          sessionIds:(nullable NSArray<NSString *> *)sessionIds
                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                             failure:(WLAgentSkillsHTTPFailureBlock)failure;

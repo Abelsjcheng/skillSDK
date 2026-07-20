@@ -309,7 +309,7 @@ function App({ assistantAccount = '' }: AppProps) {
     }
 
     const result = await getWeAgentUnreadMessage({
-      assistantAcount: currentAssistantAccount,
+      assistantAccount: currentAssistantAccount,
     });
 
     if (assistantAccountRef.current.trim() !== currentAssistantAccount) {

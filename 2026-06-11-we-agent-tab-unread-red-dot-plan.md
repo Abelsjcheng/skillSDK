@@ -278,7 +278,7 @@ sequenceDiagram
 
     CUI->>SDK: HWH5EXT.registerEventListener 注册 agentskills_unreadChanged
     CUI->>CUI: HWH5.addEventListener({ type: 'onVisible', func })
-    CUI->>SDK: getWeAgentUnreadMessage({ assistantAcount })
+    CUI->>SDK: getWeAgentUnreadMessage({ assistantAccount })
     SDK->>Server: POST /api/skill/sessions/unread
     Server-->>SDK: 返回当前助手未读状态
     SDK->>Memory: 写入内存缓存
@@ -342,7 +342,7 @@ sequenceDiagram
     participant Memory as 内存缓存
     participant Tab as 助理Tab页
 
-    CUI->>SDK: getWeAgentUnreadMessage({ assistantAcount })
+    CUI->>SDK: getWeAgentUnreadMessage({ assistantAccount })
     SDK->>Server: POST /api/skill/sessions/unread
     Server-->>SDK: 返回当前助手未读状态
     SDK->>Memory: applyUnReadStatus 写入 sessionUnreadSet
@@ -453,7 +453,7 @@ sequenceDiagram
 5. SDK 新增 `applyUnReadStatus`，用于根据服务端 POST `/api/skill/sessions/unread` 返回的 `unreadSessionList` 初始化或更新助理会话未读内存缓存集合；如果列表中的会话 ID 与当前 WeAgentCUI 会话一致，则该会话设置为已读，其他会话设置为未读，并保存服务端返回的 `maxSeq`。
 6. SDK 新增 `onUnReadedChanged`，用于读取当前助理会话未读缓存集合，并按 `bizRobotTag`、`AgentTabNotify` 权限、助理 Tab 聚焦状态和未读状态统一计算助理 Tab 小红点展示结果；实际设置 / 隐藏助理 Tab 小红点通过外部导入方法完成，并广播当前助理未读信息。
 7. 切换助理页面、删除助理、IM 列表切换统一通过 agentSkills 容器层 `openWeAgentCUI` 进入；容器层从持久化缓存中获取当前助理详情缓存，再调用 agentSkills SDK 接口 `onAssistantChanged({ assistantDetail })` 传入助理详情缓存，由 SDK 内部 `UnReadManager.onAssistantChanged` 先清空单例未读缓存，再根据助理详情缓存中的 `assistantAccount` 和 `bizRobotTag` 执行冷启动场景中对应的流程。
-8. SDK 新增获取助理未读消息接口，入参为 `assistantAcount` 和可选 `sessionIds`，通过服务端 POST `/api/skill/sessions/unread` 获取当前助理会话未读状态并写入内存缓存。
+8. SDK 新增获取助理未读消息接口，入参为 `assistantAccount` 和可选 `sessionIds`，通过服务端 POST `/api/skill/sessions/unread` 获取当前助理会话未读状态并写入内存缓存。
 9. SDK 新增或封装已读上报能力，供 `weAgentCUI` 页面在移动端前台可见且已渲染消息后调用。
 10. SDK 新增当前会话查看态接口，`weAgentCUI` 进入会话页面后通知 SDK 当前正常查看的会话，停留期间该会话设为已读并忽略服务端正常未读推送处理；离开会话页面后通知 SDK 清除查看标记并恢复正常推送处理。
 11. SDK 新增面向 `weAgentCUI` 的未读状态 H5 内部广播，`weAgentCUI` 根据广播刷新历史入口和会话 item 小红点。
@@ -587,7 +587,7 @@ getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAge
 
 | 参数名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `assistantAcount` | `string` | 是 | 助理账号，透传到服务端请求体 |
+| `assistantAccount` | `string` | 是 | 助理账号，透传到服务端请求体 |
 | `sessionIds` | `string[]` | 否 | 会话 ID 列表；不传时由服务端返回该助理下相关会话未读状态 |
 
 服务端协议：
@@ -596,7 +596,7 @@ getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAge
 |---|---|
 | Method | `POST` |
 | Path | `/api/skill/sessions/unread` |
-| Body | `{ "assistantAcount": string, "sessionIds"?: string[] }` |
+| Body | `{ "assistantAccount": string, "sessionIds"?: string[] }` |
 
 服务端返回：
 
@@ -619,7 +619,7 @@ getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAge
 
 | 参数名 | 类型 | 说明 |
 |---|---|---|
-| `partnerAccount` | `string` | 助理账号；由 `assistantAcount` 映射为 SDK 内部统一字段 |
+| `partnerAccount` | `string` | 助理账号；由 `assistantAccount` 映射为 SDK 内部统一字段 |
 | `assistantUnread` | `boolean` | 当前助理是否存在未读会话 |
 | `redDotVisible` | `boolean` | `AgentTabNotify` ABTest 是否允许展示小红点；`true` 允许，`false` 不允许 |
 | `sessions` | `Array<{ welinkSessionId: string, hasUnRead: boolean, maxSeq: number }>` | SDK 根据服务端 `unreadSessionList` 映射出的会话未读状态 |
@@ -758,8 +758,8 @@ onSessionViewingEnd(params: OnSessionViewingEndParams): Promise<void>
 小红点相关新增接口只在新版本 SDK 中存在，接口测试需要同时覆盖“新版本正常调用”和“低版本版本判断后不调用”两类路径。
 
 1. `getWeAgentUnreadMessage` 测试：
-   - 入参校验：`assistantAcount` 必填，`sessionIds` 可选；`assistantAcount` 为空时直接返回无未读或错误，不请求服务端。
-   - 服务端请求校验：新版本 SDK 调用 POST `/api/skill/sessions/unread`，请求体包含 `assistantAcount`，传入会话列表时包含 `sessionIds`。
+   - 入参校验：`assistantAccount` 必填，`sessionIds` 可选；`assistantAccount` 为空时直接返回无未读或错误，不请求服务端。
+   - 服务端请求校验：新版本 SDK 调用 POST `/api/skill/sessions/unread`，请求体包含 `assistantAccount`，传入会话列表时包含 `sessionIds`。
    - 返回映射校验：服务端 `unreadSessionList[].sessionId` 映射为 `sessions[].welinkSessionId`，`maxSeq` 保持 number 类型；当前查看会话映射为 `hasUnRead=false`，其他返回会话映射为 `hasUnRead=true`。
    - 降级校验：服务端失败时，仅当单例缓存属于当前助理时返回缓存；缓存缺失或属于旧助理时返回无未读。
    - 版本判断校验：低版本 SDK 中页面判断当前 SDK 版本低于最低支持版本后，不调用该接口，不展示历史入口和历史 item 小红点，并输出 `sdk_version_unsupported`。
@@ -895,8 +895,8 @@ HWH5EXT.registerEventListener({
 
 1. 页面初始化后立即调用 `HWH5EXT.registerEventListener` 注册 `agentskills_unreadChanged`，用于接收 SDK 通过 `HWH5INNER.eventListener` 发送的未读状态。
 2. 页面初始化后立即调用 `HWH5.addEventListener({ type: 'onVisible', func })` 监听可见性。
-3. 页面初始化阶段可以调用 `getWeAgentUnreadMessage({ assistantAcount })` 获取当前会话的所有未读消息，并将接口返回写入 CUI 未读缓存；SDK 同步维护 `UnReadManager` 内存缓存，但页面不得直接调用已读上报接口；HarmonyOS 和 iOS 冷启动预加载会执行页面代码，但不代表用户已前台打开 `weAgentCUI`。
-4. 回调中 `visibility = 1` 表示页面在移动端前台显示，页面先调用 `onSessionViewing({ welinkSessionId })` 标记当前查看会话，并在已渲染消息后调用 `reportWeAgentSessionRead({ welinkSessionId, readSeq })`；上报成功后 SDK 更新内存缓存并调用 `onUnReadedChanged`，刷新助理 Tab 和 `weAgentCUI` 未读展示。
+3. 页面初始化阶段可以调用 `getWeAgentUnreadMessage({ assistantAccount })` 获取当前会话的所有未读消息，并将接口返回写入 CUI 未读缓存；SDK 同步维护 `UnReadManager` 内存缓存，但页面不得直接调用已读上报接口；HarmonyOS 和 iOS 冷启动预加载会执行页面代码，但不代表用户已前台打开 `weAgentCUI`。
+4. 回调中 `visibility = 1` 表示页面在移动端前台显示，页面先调用 `onSessionViewing({ welinkSessionId })` 标记当前查看会话，并在已渲染消息后调用 `reportWeAgentSessionRead({ welinkSessionId, readSeq })`；上报成功后 SDK 更新内存缓存与助理 Tab 小红点，不广播 `weAgentCUI` 未读状态。
 5. 回调中 `visibility = 0` 表示页面不可见，页面调用 `onSessionViewingEnd({ welinkSessionId })` 清除当前查看会话标记，不触发已读上报，不主动隐藏小红点。
 6. Android 冷启动不会预加载 `weAgentCUI`，但仍按同一规则处理：页面初始化注册广播和可见性监听，收到 `visibility = 1` 后再标记会话查看态、上报已读和刷新未读状态。
 7. 页面需要维护本次前台可见周期的幂等标记，避免同一 `welinkSessionId` 在连续 `visibility = 1` 回调中重复上报已读；当会话或助理切换后重置该标记。
@@ -937,7 +937,7 @@ HWH5EXT.registerEventListener({
 
 1. SDK 初始化入口：调用 `UnReadManager.initUnReadState`，先通过外部导入的 ABTest 接口判断 `AgentTabNotify` 权限；有权限后调用外部导入方法注册 IM 在线/离线通知监听，再从持久化缓存读取当前助理详情中的 `assistantAccount` 和 `bizRobotTag`。`bizRobotTag=MyAgent` 时请求员工助手服务端 GET `/getMessageData` 并按 `data.un_read_count`、ABTest 权限和助理 Tab 聚焦状态判断小红点；`bizRobotTag=uniassistant` 时不设置助理 Tab 小红点；其他情况请求 POST `/api/skill/sessions/unread` 并按 WeAgentCUI 小红点规则判断展示。实际助理 Tab 小红点 UI 设置通过外部导入方法完成，本方案只定义决策和调用时机。
 2. `UnReadManager`：新增 SDK 内部未读管理模块，统一管理 `initUnReadState`、`onAssistantChanged`、`applyUnReadStatus`、`onUnReadedChanged`、未读查询、已读上报、会话查看态、内存缓存和广播。
-3. `getWeAgentUnreadMessage`：新增 SDK 接口，入参为 `assistantAcount` 和可选 `sessionIds`，请求服务端 POST `/api/skill/sessions/unread`，返回该助理会话未读状态；请求失败时可降级读取内存缓存。
+3. `getWeAgentUnreadMessage`：新增 SDK 接口，入参为 `assistantAccount` 和可选 `sessionIds`，请求服务端 POST `/api/skill/sessions/unread`，返回该助理会话未读状态；请求失败时可降级读取内存缓存。
 4. `reportWeAgentSessionRead`：新增 SDK 或页面可调用能力，用于 `weAgentCUI` 收到 `visibility = 1` 且消息已渲染后上报当前会话已读；入参为 `welinkSessionId` 和 `readSeq`，请求服务端 POST `/api/skill/sessions/{id}/read`。触发来源包括页面前台可见后的当前会话已读上报、切换未读历史会话后的已读上报，以及前台可见期间监听到 `messages` 新增 AI 回复消息后的已读上报。
 5. `onSessionViewing`：`weAgentCUI` 在 `onVisible` 返回 `visibility=1` 或页面内切换会话后调用，SDK 标记当前正常查看会话并将该会话设为已读，停留期间忽略该会话服务端正常未读推送处理。
 6. `onSessionViewingEnd`：`weAgentCUI` 在 `onVisible` 返回 `visibility=0`、离开会话页面或销毁时调用，SDK 清除当前查看会话标记并恢复该会话正常推送处理。
@@ -959,7 +959,7 @@ HWH5EXT.registerEventListener({
 ## 5. 性能
 
 1. SDK 初始化在存在当前助理账号时按 `bizRobotTag` 选择冷启动查询路径：`MyAgent` 请求员工助手 GET `/getMessageData` 并只消费 `data.un_read_count`，其他 WeAgentCUI 场景请求当前助理会话未读接口；小红点展示再结合 ABTest 权限和助理 Tab 聚焦状态判断，两类请求都不返回消息内容。
-2. `getWeAgentUnreadMessage` 按 `assistantAcount` 和可选 `sessionIds` 请求服务端未读接口，服务端返回 `unreadSessionCount`、`unreadSessionList[].sessionId` 和 `unreadSessionList[].maxSeq`，不返回消息内容。
+2. `getWeAgentUnreadMessage` 按 `assistantAccount` 和可选 `sessionIds` 请求服务端未读接口，服务端返回 `unreadSessionCount`、`unreadSessionList[].sessionId` 和 `unreadSessionList[].maxSeq`，不返回消息内容。
 3. 切换助理时由 `openWeAgentCUI` 从持久化缓存读取当前助理详情缓存并传给 `onAssistantChanged`，SDK 先清空旧助理未读列表，再按助理详情缓存中的 `bizRobotTag` 选择查询路径；打开 `weAgentCUI`、打开历史会话列表等页面场景按需请求服务端刷新，请求失败时仅在单例缓存属于当前助理时使用内存缓存降级，避免阻塞基础会话展示。
 4. 历史会话列表 item 小红点使用内存缓存映射，不对每个会话单独请求。
 5. 已读上报只在 `weAgentCUI` 移动端前台可见时触发，避免 HarmonyOS / iOS 冷启动预加载造成额外请求和误清小红点。
@@ -1096,10 +1096,10 @@ HWH5EXT.registerEventListener({
 22. 网络短时间多次断开重连时，校验 SDK 对网络恢复补偿查询做节流或请求合并，不连续重复刷新缓存和广播。
 23. HarmonyOS / iOS 冷启动预加载 `weAgentCUI` 并执行页面初始化代码时，校验只注册 `agentskills_unreadChanged` 和 `onVisible`，可拉取未读缓存，但不触发已读上报，不隐藏助理 Tab 小红点。
 24. Android 冷启动不预加载 `weAgentCUI`，校验页面打开初始化时可拉取未读状态并写入 CUI 未读缓存，但仍等待 `visibility=1` 后才触发已读上报。
-25. CUI 页面初始化后调用 `getWeAgentUnreadMessage({ assistantAcount })` 获取当前会话所有未读消息并写入 CUI 未读缓存，存在非当前会话未读时历史会话按钮展示小红点。
-26. 用户从其他页面切回助理 Tab，`onVisible` 返回 `visibility=1` 时，校验 CUI 不再调用 `getWeAgentUnreadMessage`，而是先调用 `onSessionViewing({ welinkSessionId })`，再从 CUI 未读缓存读取当前会话未读状态和 `maxSeq`，并调用 `reportWeAgentSessionRead({ welinkSessionId, readSeq: maxSeq })` 上报已读，SDK 更新内存缓存并调用 `onUnReadedChanged`。
+25. CUI 页面初始化后调用 `getWeAgentUnreadMessage({ assistantAccount })` 获取当前会话所有未读消息并写入 CUI 未读缓存，存在非当前会话未读时历史会话按钮展示小红点。
+26. 用户从其他页面切回助理 Tab，`onVisible` 返回 `visibility=1` 时，校验 CUI 不再调用 `getWeAgentUnreadMessage`，而是先调用 `onSessionViewing({ welinkSessionId })`，再从 CUI 未读缓存读取当前会话未读状态和 `maxSeq`，并调用 `reportWeAgentSessionRead({ welinkSessionId, readSeq: maxSeq })` 上报已读，SDK 更新内存缓存与助理 Tab 小红点，不广播 CUI 未读状态。
 27. `weAgentCUI` 页面 `visibility=0` 时，校验页面调用 `onSessionViewingEnd({ welinkSessionId })` 清除当前查看会话标记，且不触发已读上报。
-28. 打开历史会话列表后，SDK 调用 `getWeAgentUnreadMessage({ assistantAcount, sessionIds })`，校验服务端 `unreadSessionList` 内与当前 WeAgentCUI 会话一致的会话被映射为 `hasUnRead=false`，其他会话被映射为 `hasUnRead=true`，不在列表内的会话被补齐为 `hasUnRead=false`；有未读的会话 item 展示小红点，无未读的 item 不展示。
+28. 打开历史会话列表后，SDK 调用 `getWeAgentUnreadMessage({ assistantAccount, sessionIds })`，校验服务端 `unreadSessionList` 内与当前 WeAgentCUI 会话一致的会话被映射为 `hasUnRead=false`，其他会话被映射为 `hasUnRead=true`，不在列表内的会话被补齐为 `hasUnRead=false`；有未读的会话 item 展示小红点，无未读的 item 不展示。
 29. 当前打开会话已读后，服务端 IM 广播更新内存缓存并透传给 `weAgentCUI` 页面，该会话 item 小红点消失，其他未读会话 item 保持显示。
 30. `weAgentCUI` 页面初始化调用 `getWeAgentUnreadMessage` 后，若 CUI 未读缓存中除当前会话外存在其他 `hasUnRead=true` 的会话，校验历史会话按钮展示小红点；若仅当前会话未读或所有会话均无未读，校验历史会话按钮不展示小红点。
 31. 点击历史会话按钮打开历史会话列表时，校验页面根据 CUI 未读缓存中的未读会话列表给对应历史会话 item 展示小红点，不依赖历史会话列表接口自行推断未读。

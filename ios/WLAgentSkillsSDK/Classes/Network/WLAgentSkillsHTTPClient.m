@@ -252,11 +252,11 @@
          failure:failure];
 }
 
-- (void)getWeAgentUnreadMessageWithAssistantAcount:(NSString *)assistantAcount
+- (void)getWeAgentUnreadMessageWithAssistantAccount:(NSString *)assistantAccount
                                          sessionIds:(nullable NSArray<NSString *> *)sessionIds
                                             success:(WLAgentSkillsHTTPSuccessBlock)success
                                             failure:(WLAgentSkillsHTTPFailureBlock)failure {
-    NSMutableDictionary *parameters = [@{ @"assistantAcount" : assistantAcount } mutableCopy];
+    NSMutableDictionary *parameters = [@{ @"assistantAccount" : assistantAccount } mutableCopy];
     if (sessionIds.count > 0) {
         parameters[@"sessionIds"] = sessionIds;
     }

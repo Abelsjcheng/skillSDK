@@ -907,7 +907,7 @@ export class SkillSDK {
   async getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAgentUnreadMessageResult> {
     try {
       Validator.requireObject(params, 'params');
-      Validator.requireString(params.assistantAcount, 'assistantAcount');
+      Validator.requireString(params.assistantAccount, 'assistantAccount');
       const result = await this.unReadManager.getWeAgentUnreadMessage(params);
       this.logger.info('getWeAgentUnreadMessage succeeded');
       return result;

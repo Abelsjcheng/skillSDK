@@ -739,9 +739,9 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)getWeAgentUnreadMessage:(WLAgentSkillsGetWeAgentUnreadMessageParams *)params
                          success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *result))success
                          failure:(void (^)(NSError *error))failure {
-    if (params == nil || params.assistantAcount.length == 0) {
-        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage failed: assistantAcount is required");
-        [self dispatchFailure:failure code:1000 message:@"assistantAcount is required"];
+    if (params == nil || params.assistantAccount.length == 0) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage failed: assistantAccount is required");
+        [self dispatchFailure:failure code:1000 message:@"assistantAccount is required"];
         return;
     }
     [[WLAgentSkillsUnReadManager sharedManager] getWeAgentUnreadMessage:params success:^(WLAgentSkillsGetWeAgentUnreadMessageResult *result) {

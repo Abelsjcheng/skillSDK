@@ -64,7 +64,7 @@ export interface WeAgentSessionUnreadState {
 }
 
 export interface GetWeAgentUnreadMessageParams {
-  assistantAcount: string;
+  assistantAccount: string;
 }
 
 export interface GetWeAgentUnreadMessageResult {

@@ -1241,10 +1241,10 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
-        String partnerAccount = SdkStringUtils.normalizeOptionalString(params.getAssistantAcount());
+        String partnerAccount = SdkStringUtils.normalizeOptionalString(params.getAssistantAccount());
         if (partnerAccount == null) {
-            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: assistantAcount is required");
-            callback.onError(error(1000, "assistantAcount is required"));
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: assistantAccount is required");
+            callback.onError(error(1000, "assistantAccount is required"));
             return;
         }
         unReadManager.getWeAgentUnreadMessage(partnerAccount, params.getSessionIds(), new SkillCallback<GetWeAgentUnreadMessageResult>() {

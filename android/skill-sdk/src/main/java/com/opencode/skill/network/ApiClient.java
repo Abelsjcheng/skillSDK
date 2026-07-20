@@ -395,10 +395,10 @@ public class ApiClient {
         enqueueEnvelope(requireSkillApiService().getSession(welinkSessionId), Session.class, callback);
     }
 
-    public void getWeAgentUnreadMessage(@NonNull String assistantAcount, @Nullable List<String> sessionIds,
+    public void getWeAgentUnreadMessage(@NonNull String assistantAccount, @Nullable List<String> sessionIds,
             @NonNull SkillCallback<JsonElement> callback) {
         enqueueEnvelope(requireSkillApiService().getWeAgentUnreadMessage(
-                new GetWeAgentUnreadMessageBody(assistantAcount, sessionIds)), JsonElement.class, callback);
+                new GetWeAgentUnreadMessageBody(assistantAccount, sessionIds)), JsonElement.class, callback);
     }
 
     public void reportWeAgentSessionRead(@NonNull String welinkSessionId, long readSeq,

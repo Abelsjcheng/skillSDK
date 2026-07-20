@@ -8,10 +8,10 @@ import java.util.List;
 
 @Keep
 public class GetWeAgentUnreadMessageBody {
-    @NonNull private final String assistantAcount;
+    @NonNull private final String assistantAccount;
     @Nullable private final List<String> sessionIds;
-    public GetWeAgentUnreadMessageBody(@NonNull String assistantAcount, @Nullable List<String> sessionIds) {
-        this.assistantAcount = assistantAcount;
+    public GetWeAgentUnreadMessageBody(@NonNull String assistantAccount, @Nullable List<String> sessionIds) {
+        this.assistantAccount = assistantAccount;
         this.sessionIds = sessionIds;
     }
 }

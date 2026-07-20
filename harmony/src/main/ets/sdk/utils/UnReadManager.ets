@@ -74,22 +74,22 @@ export class UnReadManager {
     params: GetWeAgentUnreadMessageParams
   ): Promise<GetWeAgentUnreadMessageResult> {
     // 查询指定助理的未读会话，并在请求失败时优先返回当前助理内存缓存。
-    this.logger.info(`query unread state, partnerAccount=${params.assistantAcount}`);
+    this.logger.info(`query unread state, partnerAccount=${params.assistantAccount}`);
     try {
       const data = await this.requestWeAgentUnreadMessage(
-        params.assistantAcount,
+        params.assistantAccount,
         params.sessionIds
       );
-      const result = this.applyServerResult(params.assistantAcount, params.sessionIds, data, 'server');
+      const result = this.applyServerResult(params.assistantAccount, params.sessionIds, data, 'server');
       this.onUnReadedChanged('server', false);
-      this.logger.info(`query unread state succeeded, partnerAccount=${params.assistantAcount}`);
+      this.logger.info(`query unread state succeeded, partnerAccount=${params.assistantAccount}`);
       return result;
     } catch (error) {
-      if (this.partnerAccount === params.assistantAcount) {
-        this.logger.info(`query unread state fallback succeeded, partnerAccount=${params.assistantAcount}`);
+      if (this.partnerAccount === params.assistantAccount) {
+        this.logger.info(`query unread state fallback succeeded, partnerAccount=${params.assistantAccount}`);
         return this.snapshot('cache');
       }
-      this.logger.error(`query unread state failed, partnerAccount=${params.assistantAcount}, error=${JSON.stringify(error)}`);
+      this.logger.error(`query unread state failed, partnerAccount=${params.assistantAccount}, error=${JSON.stringify(error)}`);
       throw error;
     }
   }
@@ -432,7 +432,7 @@ export class UnReadManager {
     sessionIds?: string[]
   ): Promise<ServerUnreadResult> {
     return this.httpClient.post<ServerUnreadResult>('/api/skill/sessions/unread', {
-      assistantAcount: partnerAccount,
+      assistantAccount: partnerAccount,
       sessionIds
     });
   }
