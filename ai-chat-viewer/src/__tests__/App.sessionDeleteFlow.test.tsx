@@ -6,9 +6,11 @@ import type { SkillSession, WeAgentDetails } from '../types/bridge';
 import type { WeAgentHistorySidebarProps } from '../types/components';
 import {
   createNewSession,
+  getWeAgentUnreadMessage,
   getHistorySessionsList,
   getUserInfo,
   getWeAgentDetails,
+  onSessionViewing,
 } from '../utils/hwext';
 import { useChatSession } from '../hooks/useChatSession';
 
@@ -69,9 +71,11 @@ let latestChatSessionOptions: UseChatSessionOptions | null = null;
 let latestHistorySidebarProps: WeAgentHistorySidebarProps | null = null;
 
 const mockCreateNewSession = createNewSession as jest.MockedFunction<typeof createNewSession>;
+const mockGetWeAgentUnreadMessage = getWeAgentUnreadMessage as jest.MockedFunction<typeof getWeAgentUnreadMessage>;
 const mockGetHistorySessionsList = getHistorySessionsList as jest.MockedFunction<typeof getHistorySessionsList>;
 const mockGetUserInfo = getUserInfo as jest.MockedFunction<typeof getUserInfo>;
 const mockGetWeAgentDetails = getWeAgentDetails as jest.MockedFunction<typeof getWeAgentDetails>;
+const mockOnSessionViewing = onSessionViewing as jest.MockedFunction<typeof onSessionViewing>;
 const mockUseChatSession = useChatSession as jest.MockedFunction<typeof useChatSession>;
 
 function createSession(id: string): SkillSession {
@@ -138,6 +142,11 @@ describe('App session delete flow', () => {
       total: 1,
       totalPages: 1,
     });
+    mockGetWeAgentUnreadMessage.mockResolvedValue({
+      partnerAccount: 'assistant-1',
+      redDotVisible: true,
+      sessions: [],
+    });
     mockCreateNewSession.mockImplementation(async () => createSession(`fallback-${mockCreateNewSession.mock.calls.length}`));
     mockUseChatSession.mockImplementation((options): UseChatSessionResult => {
       latestChatSessionOptions = options;
@@ -179,6 +188,26 @@ describe('App session delete flow', () => {
     });
 
     expect(mockCreateNewSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('only refreshes unread cache during initialization', async () => {
+    render(<App assistantAccount="assistant-1" />);
+
+    await waitFor(() => {
+      expect(mockGetWeAgentUnreadMessage).toHaveBeenCalledTimes(1);
+      expect(latestHistorySidebarProps?.currentWelinkSessionId).toBe('session-1');
+    });
+    expect(mockOnSessionViewing).toHaveBeenCalledTimes(1);
+    expect(mockOnSessionViewing).toHaveBeenCalledWith({ welinkSessionId: 'session-1' });
+    expect(mockOnSessionViewing.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGetWeAgentUnreadMessage.mock.invocationCallOrder[0],
+    );
+
+    act(() => {
+      latestHistorySidebarProps?.onSessionSelect?.('session-2');
+    });
+
+    expect(mockGetWeAgentUnreadMessage).toHaveBeenCalledTimes(1);
   });
 
   it('does not create a fallback session when push sync removes the last current session', async () => {

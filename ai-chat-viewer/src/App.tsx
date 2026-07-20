@@ -185,6 +185,7 @@ function App({ assistantAccount = '' }: AppProps) {
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
   const pendingActionDeleteSessionIdsRef = useRef<Set<string>>(new Set());
+  const initialWeAgentSession = useRef(false);
   const pageVisibleRef = useRef(false);
   const lastReportedReadSeqBySessionRef = useRef<Record<string, number>>({});
   const weAgentUnreadCacheRef = useRef<WeAgentUnreadCache>(weAgentUnreadCache);
@@ -371,30 +372,39 @@ function App({ assistantAccount = '' }: AppProps) {
       return;
     }
 
-    void refreshWeAgentUnreadCache()
-      .then((result) => {
-        const currentSessionUnreadState = Array.isArray(result?.sessions)
-          ? result.sessions.find((sessionItem) => sessionItem.welinkSessionId?.trim() === welinkSessionId)
-          : undefined;
-        if(pageVisibleRef.current) {
-          void reportCurrentSessionRead(welinkSessionId, currentSessionUnreadState?.maxSeq);
+    let disposed = false;
+    const shouldRefreshUnreadCache = initialWeAgentSession.current;
+    if (shouldRefreshUnreadCache) {
+      initialWeAgentSession.current = false;
+    }
+
+    void (async () => {
+      let preferredReadSeq: number | undefined;
+      await startViewingSession(welinkSessionId);
+      if (disposed) {
+        return;
+      }
+
+      if (shouldRefreshUnreadCache) {
+        try {
+          const result = await refreshWeAgentUnreadCache();
+          preferredReadSeq = result?.sessions?.find(
+            (sessionItem) => sessionItem.welinkSessionId?.trim() === welinkSessionId,
+          )?.maxSeq;
+        } catch (error) {
+          WeLog(`[WeAgentUnreadCUI] refresh unread failed | error=${JSON.stringify(error)}`);
         }
-      })
-      .catch((error) => {
-        WeLog(`[WeAgentUnreadCUI] refresh unread failed | error=${JSON.stringify(error)}`);
-      });
-  }, [reportCurrentSessionRead, refreshWeAgentUnreadCache, welinkSessionId]);
+      }
 
-  useEffect(() => {
-    if (!welinkSessionId) {
-      return;
-    }
+      if (!disposed && pageVisibleRef.current) {
+        await reportCurrentSessionRead(welinkSessionId, preferredReadSeq);
+      }
+    })();
 
-    void startViewingSession(welinkSessionId);
-    if (pageVisibleRef.current) {
-      void reportCurrentSessionRead(welinkSessionId);
-    }
-  }, [reportCurrentSessionRead, startViewingSession, welinkSessionId]);
+    return () => {
+      disposed = true;
+    };
+  }, [refreshWeAgentUnreadCache, reportCurrentSessionRead, startViewingSession, welinkSessionId]);
 
   const updateWeAgentUserName = useCallback((userInfo: HWH5UserInfo) => {
     setWeAgentUserName(shouldUseEnglishUserName ? userInfo.userNameEN : userInfo.userNameZH);
@@ -518,6 +528,7 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantDetailRef.current = null;
     userInfoRef.current = null;
     pendingActionDeleteSessionIdsRef.current.clear();
+    initialWeAgentSession.current = false;
     lastReportedReadSeqBySessionRef.current = {};
     pageVisibleRef.current = false;
     setHistorySessionsCache(null);
@@ -582,6 +593,7 @@ function App({ assistantAccount = '' }: AppProps) {
 
         setHistorySessionsCache(nextHistoryCache);
         setHistorySessionsLoaded(true);
+        initialWeAgentSession.current = true;
         setWelinkSessionId(nextSession.welinkSessionId);
       } catch (err) {
         WeLog(`App initializeWeAgentSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
