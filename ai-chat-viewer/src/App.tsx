@@ -185,8 +185,10 @@ function App({ assistantAccount = '' }: AppProps) {
   const userInfoRef = useRef<HWH5UserInfo | null>(null);
   const initSessionFailedTextRef = useRef(t('weAgent.initSessionFailed'));
   const pendingActionDeleteSessionIdsRef = useRef<Set<string>>(new Set());
-  const pageVisibleRef = useRef(true);
+  const pageVisibleRef = useRef(false);
   const lastReportedReadSeqBySessionRef = useRef<Record<string, number>>({});
+  const weAgentUnreadCacheRef = useRef<WeAgentUnreadCache>(weAgentUnreadCache);
+  weAgentUnreadCacheRef.current = weAgentUnreadCache;
 
   initSessionFailedTextRef.current = t('weAgent.initSessionFailed');
 
@@ -196,7 +198,7 @@ function App({ assistantAccount = '' }: AppProps) {
       return;
     }
 
-    const unreadSessionState = getWeAgentSessionUnreadState(weAgentUnreadCache, normalizedSessionId);
+    const unreadSessionState = getWeAgentSessionUnreadState(weAgentUnreadCacheRef.current, normalizedSessionId);
     const nextReadSeq = Math.max(
       Number(preferredSeq) > 0 ? Number(preferredSeq) : 0,
       unreadSessionState?.maxSeq ?? 0,
@@ -224,7 +226,7 @@ function App({ assistantAccount = '' }: AppProps) {
         readSeq: nextReadSeq,
       })} | error=${JSON.stringify(error)}`);
     }
-  }, [weAgentUnreadCache]);
+  }, []);
 
   const session = useChatSession({
     mode: 'weAgentCUI',
@@ -355,7 +357,7 @@ function App({ assistantAccount = '' }: AppProps) {
     if (isVisible) {
       const currentSessionId = welinkSessionIdRef.current;
       startViewingSession(currentSessionId);
-      if (currentSessionId) {
+      if (currentSessionId && pageVisibleRef.current) {
         reportCurrentSessionRead(currentSessionId);
       }
       return;
@@ -374,7 +376,9 @@ function App({ assistantAccount = '' }: AppProps) {
         const currentSessionUnreadState = Array.isArray(result?.sessions)
           ? result.sessions.find((sessionItem) => sessionItem.welinkSessionId?.trim() === welinkSessionId)
           : undefined;
-        void reportCurrentSessionRead(welinkSessionId, currentSessionUnreadState?.maxSeq);
+        if(pageVisibleRef.current) {
+          void reportCurrentSessionRead(welinkSessionId, currentSessionUnreadState?.maxSeq);
+        }
       })
       .catch((error) => {
         WeLog(`[WeAgentUnreadCUI] refresh unread failed | error=${JSON.stringify(error)}`);
@@ -515,7 +519,7 @@ function App({ assistantAccount = '' }: AppProps) {
     userInfoRef.current = null;
     pendingActionDeleteSessionIdsRef.current.clear();
     lastReportedReadSeqBySessionRef.current = {};
-    pageVisibleRef.current = true;
+    pageVisibleRef.current = false;
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
     setIsHistorySidebarVisible(isPc);
