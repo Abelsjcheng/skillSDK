@@ -60,6 +60,7 @@ public final class UnReadManager {
     /** SDK 初始化后异步加载当前助理未读状态，不阻塞初始化流程。 */
     public void initUnReadState() {
         agentTabNotifyEnabled = isAgentTabNotifyEnabled();
+        WeLinkLogger.i(TAG, "start unread initialization, AgentTabNotify=" + agentTabNotifyEnabled);
         if (!agentTabNotifyEnabled) {
             WeLinkLogger.i(TAG, "skip unread initialization: AgentTabNotify is unavailable");
             return;
@@ -77,6 +78,8 @@ public final class UnReadManager {
             return;
         }
         String bizRobotTag = SdkStringUtils.normalizeOptionalString(currentDetail.getBizRobotTag());
+        WeLinkLogger.i(TAG, "refresh unread state from current assistant, partnerAccount=" + account
+                + ", bizRobotTag=" + bizRobotTag);
         refreshCurrentAssistantUnread(account, bizRobotTag);
     }
 
@@ -139,9 +142,12 @@ public final class UnReadManager {
     public void onSessionViewing(@NonNull OnSessionViewingParams params) {
         // 页面正在查看会话时立即清除该会话本地未读状态。
         String sessionId = SdkStringUtils.normalizeOptionalString(params.getWelinkSessionId());
-        if (sessionId == null) { return; }
+        if (sessionId == null) {
+            WeLinkLogger.i(TAG, "skip session viewing: sessionId is empty");
+            return;
+        }
         synchronized (this) { viewingSessionId = sessionId; setRead(sessionId, maxSeq(sessionId)); }
-        onUnReadedChanged("sessionViewing");
+        onUnReadedChanged("sessionViewing", false);
         WeLinkLogger.i(TAG, "session viewing started, sessionId=" + sessionId);
     }
 
@@ -182,6 +188,8 @@ public final class UnReadManager {
                 : SdkStringUtils.normalizeOptionalString(assistantDetail.getPartnerAccount());
         String currentBizRobotTag = assistantDetail == null ? null
                 : SdkStringUtils.normalizeOptionalString(assistantDetail.getBizRobotTag());
+        WeLinkLogger.i(TAG, "assistant changed, partnerAccount=" + account
+                + ", bizRobotTag=" + currentBizRobotTag);
         clearUnreadState(account == null ? "" : account, currentBizRobotTag);
         if (!agentTabNotifyEnabled) {
             setHostWeAgentTabRedDot(false);
@@ -206,6 +214,7 @@ public final class UnReadManager {
     /** 处理员工助手 uni-assistant 模块携带 un_read_count 的通知。 */
     public boolean handleEmployeeAssistantImUnreadNotifyData(@NonNull Map<String, Object> notifyData) {
         if (!isMyAgent(bizRobotTag)) {
+            WeLinkLogger.i(TAG, "skip MyAgent IM unread notification: current assistant is not myAgent");
             return false;
         }
         Map<String, Object> content = TypeConvertUtils.valueAsMap(gson, notifyData.get("notify_content"));
@@ -217,7 +226,7 @@ public final class UnReadManager {
             myAgentUnread = optionalLong(content.get("un_read_count"), 0L) > 0L;
         }
         WeLinkLogger.i(TAG, "applied MyAgent IM unread notification, hasUnread=" + myAgentUnread);
-        onUnReadedChanged("serverPush");
+        onUnReadedChanged("serverPush", false);
         return true;
     }
 
@@ -227,6 +236,7 @@ public final class UnReadManager {
                 TypeConvertUtils.valueAsString(notifyData.get("notify_type"))
         );
         if (!"session.unread".equals(notifyType) && !"session.read".equals(notifyType)) {
+            WeLinkLogger.i(TAG, "skip CUI IM unread notification: unsupported notifyType=" + notifyType);
             return false;
         }
         Object rawContent = notifyData.get("notyfy_content");
@@ -296,17 +306,21 @@ public final class UnReadManager {
             String sessionId = SdkStringUtils.normalizeOptionalString(id);
             if (sessionId != null && !sessionUnreadSet.containsKey(sessionId)) { setRead(sessionId, 0L); }
         }
+        WeLinkLogger.i(TAG, "applied server unread cache, source=" + source + ", partnerAccount=" + account
+                + ", sessionCount=" + sessionUnreadSet.size());
         return result(account, source);
     }
 
     private void refreshCurrentAssistantUnread(@NonNull String account, @Nullable String bizRobotTag) {
         // 根据助理类型选择员工助手或 CUI 未读接口刷新当前状态。
         clearUnreadState(account, bizRobotTag);
+        WeLinkLogger.i(TAG, "start unread refresh, partnerAccount=" + account + ", bizRobotTag=" + bizRobotTag);
         if (isUniAssistant(bizRobotTag)) {
             WeLinkLogger.i(TAG, "skip unread query for uniassistant, partnerAccount=" + account);
             return;
         }
         if (isMyAgent(bizRobotTag)) {
+            WeLinkLogger.i(TAG, "request MyAgent unread state, partnerAccount=" + account);
             requestMyAgentUnreadMessage(new SkillCallback<JsonElement>() {
                 @Override
                 public void onSuccess(@Nullable JsonElement payload) {
@@ -331,6 +345,7 @@ public final class UnReadManager {
             });
             return;
         }
+        WeLinkLogger.i(TAG, "request CUI unread state, partnerAccount=" + account);
         requestWeAgentUnreadMessage(account, null, new SkillCallback<JsonElement>() {
             @Override
             public void onSuccess(@Nullable JsonElement payload) {
@@ -442,6 +457,9 @@ public final class UnReadManager {
         final String currentBizRobotTag;
         synchronized (this) {
             if (!agentTabNotifyEnabled || partnerAccount == null || networkRefreshInFlight) {
+                WeLinkLogger.i(TAG, "skip network reconnect unread refresh, partnerAccount=" + partnerAccount
+                        + ", AgentTabNotify=" + agentTabNotifyEnabled
+                        + ", inFlight=" + networkRefreshInFlight);
                 return;
             }
             if (isUniAssistant(bizRobotTag)) {
@@ -539,6 +557,8 @@ public final class UnReadManager {
     private void onUnReadedChanged(@NonNull String source, boolean shouldBroadcast) {
         String account = partnerAccount;
         if (account == null || !agentTabNotifyEnabled) {
+            WeLinkLogger.i(TAG, "skip unread state change, source=" + source + ", partnerAccount=" + account
+                    + ", AgentTabNotify=" + agentTabNotifyEnabled);
             return;
         }
         GetWeAgentUnreadMessageResult snapshot = result(account, source);
@@ -549,7 +569,7 @@ public final class UnReadManager {
         }
         WeLinkLogger.i(TAG, "unread state changed, source=" + source
                 + ", partnerAccount=" + account + ", redDotVisible=" + snapshot.isRedDotVisible()
-                + ", showHostRedDot=" + showHostRedDot);
+                + ", showHostRedDot=" + showHostRedDot + ", broadcast=" + shouldBroadcast);
     }
 
     private boolean shouldShowHostWeAgentTabRedDot() {

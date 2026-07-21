@@ -37,6 +37,8 @@
 
 - (void)initUnReadState {
   self.agentTabNotifyEnabled = [self isAgentTabNotifyEnabled];
+  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] start initialization, AgentTabNotify=%@",
+             self.agentTabNotifyEnabled ? @"YES" : @"NO");
   if (!self.agentTabNotifyEnabled) {
     WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] skip initialization: AgentTabNotify is unavailable");
     return;
@@ -50,6 +52,8 @@
     WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] skip initialization: partnerAccount is empty");
     return;
   }
+  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] refresh from current assistant, partnerAccount=%@, bizRobotTag=%@",
+             partnerAccount, currentDetail[@"bizRobotTag"] ?: @"");
   [self refreshCurrentAssistantUnread:partnerAccount bizRobotTag:currentDetail[@"bizRobotTag"]];
 }
 
@@ -144,7 +148,7 @@
     self.viewingSessionId = params.welinkSessionId;
     [self markRead:params.welinkSessionId maxSeq:self.sessions[params.welinkSessionId].maxSeq];
   }
-  [self onUnReadedChanged:@"sessionViewing"];
+  [self onUnReadedChanged:@"sessionViewing" shouldBroadcast:NO];
   WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] session viewing succeeded, sessionId=%@",
              params.welinkSessionId);
 }
@@ -195,6 +199,11 @@
   NSString *bizRobotTag = nil;
   @synchronized (self) {
     if (!self.agentTabNotifyEnabled || self.partnerAccount.length == 0 || self.networkRefreshInFlight) {
+      WKFLogInfo(WLAS_BUNDLE_NAME,
+                 @"[WeAgentUnread] skip network reconnect refresh, partnerAccount=%@, AgentTabNotify=%@, inFlight=%@",
+                 self.partnerAccount ?: @"",
+                 self.agentTabNotifyEnabled ? @"YES" : @"NO",
+                 self.networkRefreshInFlight ? @"YES" : @"NO");
       return;
     }
     if ([self isUniAssistant:self.bizRobotTag]) {
@@ -265,6 +274,8 @@
     [WLAgentSkillsTypeConverter optionalStringFromValue:assistantDetail.partnerAccount];
   NSString *bizRobotTag =
     [WLAgentSkillsTypeConverter optionalStringFromValue:assistantDetail.bizRobotTag];
+  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] assistant changed, partnerAccount=%@, bizRobotTag=%@",
+             partnerAccount ?: @"", bizRobotTag ?: @"");
   [self clearUnreadStateForPartnerAccount:partnerAccount ?: @"" bizRobotTag:bizRobotTag];
   if (!self.agentTabNotifyEnabled) {
     [self setHostWeAgentTabRedDot:NO];
@@ -289,6 +300,7 @@
 /// 消费员工助手 uni-assistant 模块下发的 un_read_count 通知。
 - (BOOL)handleEmployeeAssistantImUnreadNotifyData:(NSDictionary *)notifyData {
   if (![self isMyAgent:self.bizRobotTag]) {
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] skip MyAgent IM notification: current assistant is not myAgent");
     return NO;
   }
   id rawContent = notifyData[@"notify_content"];
@@ -306,7 +318,7 @@
   }
   WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] applied MyAgent IM notification, hasUnread=%@",
              self.myAgentUnread ? @"YES" : @"NO");
-  [self onUnReadedChanged:@"serverPush"];
+  [self onUnReadedChanged:@"serverPush" shouldBroadcast:NO];
   return YES;
 }
 
@@ -315,6 +327,7 @@
   NSString *notifyType =
     [WLAgentSkillsTypeConverter optionalStringFromValue:notifyData[@"notify_type"]];
   if (![notifyType isEqualToString:@"session.unread"] && ![notifyType isEqualToString:@"session.read"]) {
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] skip CUI IM notification: unsupported notifyType=%@", notifyType ?: @"");
     return NO;
   }
   id rawContent = notifyData[@"notyfy_content"];
@@ -382,6 +395,8 @@
         [self markRead:sid maxSeq:0];
       }
     }
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] applied server cache, source=%@, partnerAccount=%@, sessionCount=%lu",
+               source, account, (unsigned long)self.sessions.count);
     return [self snapshot:source];
   }
 }
@@ -392,11 +407,14 @@
   NSString *bizRobotTag =
     [WLAgentSkillsTypeConverter optionalStringFromValue:bizRobotTagValue];
   [self clearUnreadStateForPartnerAccount:partnerAccount bizRobotTag:bizRobotTag];
+  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] start refresh, partnerAccount=%@, bizRobotTag=%@",
+             partnerAccount, bizRobotTag ?: @"");
   if ([self isUniAssistant:bizRobotTag]) {
     WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] skip query for uniassistant, partnerAccount=%@", partnerAccount);
     return;
   }
   if ([self isMyAgent:bizRobotTag]) {
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] request MyAgent unread state, partnerAccount=%@", partnerAccount);
     [self requestMyAgentUnreadMessageWithSuccess:^(id response) {
       NSDictionary *data = [response isKindOfClass:[NSDictionary class]] ? response : @{};
       @synchronized (self) {
@@ -413,6 +431,7 @@
     }];
     return;
   }
+  WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] request CUI unread state, partnerAccount=%@", partnerAccount);
   [self requestWeAgentUnreadMessageWithPartnerAccount:partnerAccount
                                             sessionIds:nil
                                                success:^(id response) {
@@ -463,6 +482,8 @@
 
 - (void)onUnReadedChanged:(NSString *)source shouldBroadcast:(BOOL)shouldBroadcast {
   if (self.partnerAccount.length == 0 || !self.agentTabNotifyEnabled) {
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] skip state change, source=%@, partnerAccount=%@, AgentTabNotify=%@",
+               source, self.partnerAccount ?: @"", self.agentTabNotifyEnabled ? @"YES" : @"NO");
     return;
   }
   WLAgentSkillsGetWeAgentUnreadMessageResult *result = [self snapshot:source];
@@ -472,11 +493,12 @@
     [self broadcastUnreadChanged:result];
   }
   WKFLogInfo(WLAS_BUNDLE_NAME,
-             @"[WeAgentUnread] state changed, source=%@, partnerAccount=%@, redDotVisible=%@, showHostRedDot=%@",
+             @"[WeAgentUnread] state changed, source=%@, partnerAccount=%@, redDotVisible=%@, showHostRedDot=%@, broadcast=%@",
              source,
              self.partnerAccount,
              result.redDotVisible ? @"YES" : @"NO",
-             showHostRedDot ? @"YES" : @"NO");
+             showHostRedDot ? @"YES" : @"NO",
+             shouldBroadcast ? @"YES" : @"NO");
 }
 
 // 结合权限、助理类型、未读状态和 Tab 聚焦状态计算是否显示小红点。

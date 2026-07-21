@@ -55,6 +55,7 @@ export class UnReadManager {
   /** SDK 初始化后异步加载当前助理未读状态，不阻塞初始化流程。 */
   async initUnReadState(): Promise<void> {
     this.agentTabNotifyEnabled = this.isAgentTabNotifyEnabled();
+    this.logger.info(`start unread initialization, AgentTabNotify=${this.agentTabNotifyEnabled}`);
     if (!this.agentTabNotifyEnabled) {
       this.logger.info('skip unread initialization: AgentTabNotify is unavailable');
       return;
@@ -67,6 +68,8 @@ export class UnReadManager {
       this.logger.info('skip unread initialization: partnerAccount is empty');
       return;
     }
+    this.logger.info(`refresh unread state from current assistant, partnerAccount=${partnerAccount}, `
+      + `bizRobotTag=${currentDetail?.bizRobotTag ?? ''}`);
     await this.refreshCurrentAssistantUnread(partnerAccount, currentDetail?.bizRobotTag, true, 'server');
   }
 
@@ -116,7 +119,7 @@ export class UnReadManager {
     // 页面正在查看会话时立即清除该会话本地未读状态。
     this.viewingSessionId = params.welinkSessionId;
     this.setRead(params.welinkSessionId, this.sessions.get(params.welinkSessionId)?.maxSeq ?? 0);
-    this.onUnReadedChanged('sessionViewing');
+    this.onUnReadedChanged('sessionViewing', false);
     this.logger.info(`session viewing succeeded, sessionId=${params.welinkSessionId}`);
   }
 
@@ -153,6 +156,7 @@ export class UnReadManager {
   async onAssistantChanged(assistantDetail: WeAgentDetails | undefined): Promise<void> {
     const partnerAccount = TypeConverter.normalizeOptionalString(assistantDetail?.partnerAccount);
     const bizRobotTag = TypeConverter.normalizeOptionalString(assistantDetail?.bizRobotTag);
+    this.logger.info(`assistant changed, partnerAccount=${partnerAccount ?? ''}, bizRobotTag=${bizRobotTag ?? ''}`);
     this.clearUnreadState(partnerAccount ?? '', bizRobotTag);
     if (!this.agentTabNotifyEnabled) {
       this.setHostWeAgentTabRedDot(false);
@@ -177,6 +181,7 @@ export class UnReadManager {
   /** 处理员工助手 uni-assistant 模块携带 un_read_count 的通知。 */
   handleEmployeeAssistantImUnreadNotifyData(notifyData: Record<string, Object>): boolean {
     if (!this.isMyAgent(this.bizRobotTag)) {
+      this.logger.info('skip MyAgent IM unread notification: current assistant is not myAgent');
       return false;
     }
     const content = TypeConverter.toRecord(notifyData.notify_content);
@@ -186,7 +191,7 @@ export class UnReadManager {
     }
     this.myAgentUnread = this.toNonNegativeNumber(content.un_read_count, 0) > 0;
     this.logger.info(`applied MyAgent IM unread notification, hasUnread=${this.myAgentUnread}`);
-    this.onUnReadedChanged('serverPush');
+    this.onUnReadedChanged('serverPush', false);
     return true;
   }
 
@@ -194,6 +199,7 @@ export class UnReadManager {
   handleCuiImUnreadNotifyData(notifyData: Record<string, Object>): boolean {
     const notifyType = TypeConverter.normalizeOptionalString(notifyData.notify_type as string | undefined);
     if (notifyType !== 'session.unread' && notifyType !== 'session.read') {
+      this.logger.info(`skip CUI IM unread notification: unsupported notifyType=${notifyType ?? ''}`);
       return false;
     }
     const content = TypeConverter.toRecord(notifyData.notyfy_content);
@@ -262,6 +268,8 @@ export class UnReadManager {
         this.setRead(sessionId, 0);
       }
     }
+    this.logger.info(`applied server unread cache, source=${source}, partnerAccount=${account}, `
+      + `sessionCount=${this.sessions.size}`);
     return this.snapshot(source);
   }
 
@@ -275,12 +283,14 @@ export class UnReadManager {
     if (clearState) {
       this.clearUnreadState(partnerAccount, bizRobotTag);
     }
+    this.logger.info(`start unread refresh, partnerAccount=${partnerAccount}, bizRobotTag=${bizRobotTag ?? ''}`);
     if (this.isUniAssistant(bizRobotTag)) {
       this.logger.info(`skip unread query for uniassistant, partnerAccount=${partnerAccount}`);
       return false;
     }
     try {
       if (this.isMyAgent(bizRobotTag)) {
+        this.logger.info(`request MyAgent unread state, partnerAccount=${partnerAccount}`);
         const data = await this.requestMyAgentUnreadMessage();
         if (this.partnerAccount !== partnerAccount) {
           this.logger.info(`ignore stale MyAgent unread response, partnerAccount=${partnerAccount}`);
@@ -291,6 +301,7 @@ export class UnReadManager {
         this.onUnReadedChanged(source);
         return true;
       }
+      this.logger.info(`request CUI unread state, partnerAccount=${partnerAccount}`);
       const data = await this.requestWeAgentUnreadMessage(partnerAccount);
       if (this.partnerAccount !== partnerAccount) {
         this.logger.info(`ignore stale CUI unread response, partnerAccount=${partnerAccount}`);
@@ -353,6 +364,8 @@ export class UnReadManager {
   private async onNetworkReconnected(): Promise<void> {
     // 网络恢复后保留旧缓存，查询成功才覆盖未读状态并刷新小红点。
     if (!this.agentTabNotifyEnabled || this.partnerAccount.length === 0 || this.networkRefreshInFlight) {
+      this.logger.info(`skip network reconnect unread refresh, partnerAccount=${this.partnerAccount}, `
+        + `AgentTabNotify=${this.agentTabNotifyEnabled}, inFlight=${this.networkRefreshInFlight}`);
       return;
     }
     if (this.isUniAssistant(this.bizRobotTag)) {
@@ -380,6 +393,8 @@ export class UnReadManager {
 
   private onUnReadedChanged(source: WeAgentUnreadSource, shouldBroadcast: boolean = true): void {
     if (this.partnerAccount.length === 0 || !this.agentTabNotifyEnabled) {
+      this.logger.info(`skip unread state change, source=${source}, partnerAccount=${this.partnerAccount}, `
+        + `AgentTabNotify=${this.agentTabNotifyEnabled}`);
       return;
     }
     const result = this.snapshot(source);
@@ -389,7 +404,7 @@ export class UnReadManager {
       this.broadcastUnreadChanged(result);
     }
     this.logger.info(`unread state changed, source=${source}, partnerAccount=${this.partnerAccount}, `
-      + `redDotVisible=${result.redDotVisible}, showHostRedDot=${showHostRedDot}`);
+      + `redDotVisible=${result.redDotVisible}, showHostRedDot=${showHostRedDot}, broadcast=${shouldBroadcast}`);
   }
 
   private shouldShowHostWeAgentTabRedDot(): boolean {
