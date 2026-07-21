@@ -215,6 +215,11 @@ function App({ assistantAccount = '' }: AppProps) {
     }
 
     try {
+      if (!await canIUse.weAgentUnread()) {
+        WeLog('[WeAgentUnreadCUI] skip reportWeAgentSessionRead: client version is below the minimum supported version');
+        return;
+      }
+
       await reportWeAgentSessionRead({
         welinkSessionId: normalizedSessionId,
         readSeq: nextReadSeq,
@@ -309,6 +314,11 @@ function App({ assistantAccount = '' }: AppProps) {
       return null;
     }
 
+    if (!await canIUse.weAgentUnread()) {
+      WeLog('[WeAgentUnreadCUI] skip getWeAgentUnreadMessage: client version is below the minimum supported version');
+      return null;
+    }
+
     const result = await getWeAgentUnreadMessage({
       assistantAccount: currentAssistantAccount,
     });
@@ -329,6 +339,11 @@ function App({ assistantAccount = '' }: AppProps) {
     }
 
     try {
+      if (!await canIUse.weAgentUnread()) {
+        WeLog('[WeAgentUnreadCUI] skip onSessionViewing: client version is below the minimum supported version');
+        return;
+      }
+
       await onSessionViewing({ welinkSessionId: normalizedSessionId });
     } catch (error) {
       WeLog(`[WeAgentUnreadCUI] onSessionViewing failed | extra=${JSON.stringify({
@@ -344,6 +359,11 @@ function App({ assistantAccount = '' }: AppProps) {
     }
 
     try {
+      if (!await canIUse.weAgentUnread()) {
+        WeLog('[WeAgentUnreadCUI] skip onSessionViewingEnd: client version is below the minimum supported version');
+        return;
+      }
+
       await onSessionViewingEnd({ welinkSessionId: previousSessionId });
     } catch (error) {
       WeLog(`[WeAgentUnreadCUI] onSessionViewingEnd failed | extra=${JSON.stringify({

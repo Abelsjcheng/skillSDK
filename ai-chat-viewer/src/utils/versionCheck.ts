@@ -25,6 +25,12 @@ const HARMONY_SPLIT_LAYOUT_MIN_VERSION: MinVersionMap = {
   harmony: '1.30.0',
 };
 
+const WE_AGENT_UNREAD_MIN_VERSION: MinVersionMap = {
+  android: '5.86.0',
+  ios: '5.86.0',
+  harmony: '1.32.0',
+};
+
 export function compareVersion(newVersion: string, oldVersion: string): number {
   const v1 = newVersion.split('.');
   const v2 = oldVersion.split('.');
@@ -94,4 +100,6 @@ async function canUseByMinVersion(minVersion: MinVersionMap): Promise<boolean> {
 
 export const canIUse = {
   qrcodeCreateAssistant: () => canUseByMinVersion(QRCODE_CREATE_ASSISTANT_MIN_VERSION),
+  harmonySplitLayout: () => canUseByMinVersion(HARMONY_SPLIT_LAYOUT_MIN_VERSION),
+  weAgentUnread: () => canUseByMinVersion(WE_AGENT_UNREAD_MIN_VERSION),
 };
