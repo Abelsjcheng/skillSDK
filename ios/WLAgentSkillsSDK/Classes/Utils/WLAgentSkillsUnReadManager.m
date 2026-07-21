@@ -288,12 +288,21 @@
 
 /// 消费员工助手 uni-assistant 模块下发的 un_read_count 通知。
 - (BOOL)handleEmployeeAssistantImUnreadNotifyData:(NSDictionary *)notifyData {
-  if (![self isMyAgent:self.bizRobotTag]
-      || notifyData[@"un_read_count"] == nil) {
+  if (![self isMyAgent:self.bizRobotTag]) {
     return NO;
   }
+  id rawContent = notifyData[@"notify_content"];
+  NSDictionary *content = nil;
+  if ([rawContent isKindOfClass:[NSString class]]) {
+    NSData *contentData = [(NSString *)rawContent dataUsingEncoding:NSUTF8StringEncoding];
+    content = contentData == nil ? nil : [NSJSONSerialization JSONObjectWithData:contentData options:0 error:nil];
+  }
+  if (![content isKindOfClass:[NSDictionary class]] || content[@"un_read_count"] == nil) {
+    WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] ignore MyAgent IM notification: notify_content is invalid");
+    return YES;
+  }
   @synchronized (self) {
-    self.myAgentUnread = [self nonNegativeInteger:notifyData[@"un_read_count"] fallback:0] > 0;
+    self.myAgentUnread = [self nonNegativeInteger:content[@"un_read_count"] fallback:0] > 0;
   }
   WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] applied MyAgent IM notification, hasUnread=%@",
              self.myAgentUnread ? @"YES" : @"NO");

@@ -176,10 +176,15 @@ export class UnReadManager {
 
   /** 处理员工助手 uni-assistant 模块携带 un_read_count 的通知。 */
   handleEmployeeAssistantImUnreadNotifyData(notifyData: Record<string, Object>): boolean {
-    if (!this.isMyAgent(this.bizRobotTag) || notifyData.un_read_count === undefined) {
+    if (!this.isMyAgent(this.bizRobotTag)) {
       return false;
     }
-    this.myAgentUnread = this.toNonNegativeNumber(notifyData.un_read_count, 0) > 0;
+    const content = TypeConverter.toRecord(notifyData.notify_content);
+    if (content === undefined || content.un_read_count === undefined) {
+      this.logger.error('ignore MyAgent IM unread notification: notify_content is invalid');
+      return true;
+    }
+    this.myAgentUnread = this.toNonNegativeNumber(content.un_read_count, 0) > 0;
     this.logger.info(`applied MyAgent IM unread notification, hasUnread=${this.myAgentUnread}`);
     this.onUnReadedChanged('serverPush');
     return true;

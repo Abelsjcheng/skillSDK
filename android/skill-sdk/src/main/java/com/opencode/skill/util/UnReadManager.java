@@ -9,6 +9,7 @@ import android.net.NetworkRequest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -29,6 +30,7 @@ import java.util.Map;
 /** 维护当前助理的会话未读内存状态与助理页小红点。 */
 public final class UnReadManager {
     private static final String TAG = "UnReadManager";
+    @NonNull private final Gson gson = new Gson();
     @NonNull private final ApiClient apiClient;
     @NonNull private final WeAgentStorage weAgentStorage;
     @Nullable private ConnectivityManager connectivityManager;
@@ -203,11 +205,16 @@ public final class UnReadManager {
 
     /** 处理员工助手 uni-assistant 模块携带 un_read_count 的通知。 */
     public boolean handleEmployeeAssistantImUnreadNotifyData(@NonNull Map<String, Object> notifyData) {
-        if (!isMyAgent(bizRobotTag) || !notifyData.containsKey("un_read_count")) {
+        if (!isMyAgent(bizRobotTag)) {
             return false;
         }
+        Map<String, Object> content = TypeConvertUtils.valueAsMap(gson, notifyData.get("notify_content"));
+        if (content == null || !content.containsKey("un_read_count")) {
+            WeLinkLogger.e(TAG, "ignore MyAgent IM unread notification: notify_content is invalid");
+            return true;
+        }
         synchronized (this) {
-            myAgentUnread = optionalLong(notifyData.get("un_read_count"), 0L) > 0L;
+            myAgentUnread = optionalLong(content.get("un_read_count"), 0L) > 0L;
         }
         WeLinkLogger.i(TAG, "applied MyAgent IM unread notification, hasUnread=" + myAgentUnread);
         onUnReadedChanged("serverPush");
