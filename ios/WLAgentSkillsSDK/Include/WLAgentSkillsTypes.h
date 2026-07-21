@@ -200,13 +200,13 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsGetWeAgentUnreadMessageParams : NSObject
-@property (nonatomic, copy, nullable) NSString *assistantAccount;
+@property (nonatomic, copy) NSString *assistantAccount;
 @property (nonatomic, copy, nullable) NSArray<NSString *> *sessionIds;
 @end
 
 @interface WLAgentSkillsReportWeAgentSessionReadParams : NSObject
-@property (nonatomic, copy, nullable) NSString *welinkSessionId;
-@property (nonatomic, strong, nullable) NSNumber *readSeq;
+@property (nonatomic, copy) NSString *welinkSessionId;
+@property (nonatomic, strong) NSNumber *readSeq;
 @end
 
 @interface WLAgentSkillsReportWeAgentSessionReadData : NSObject
@@ -216,7 +216,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsOnSessionViewingParams : NSObject
-@property (nonatomic, copy, nullable) NSString *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
 @interface WLAgentSkillsOnSessionViewingResult : NSObject
@@ -225,7 +225,7 @@ typedef void (^WLAgentSkillsSessionCloseCallback)(NSString *reason);
 @end
 
 @interface WLAgentSkillsOnSessionViewingEndParams : NSObject
-@property (nonatomic, copy, nullable) NSString *welinkSessionId;
+@property (nonatomic, copy) NSString *welinkSessionId;
 @end
 
 @interface WLAgentSkillsOnSessionViewingEndResult : NSObject
