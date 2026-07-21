@@ -821,10 +821,23 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)onSessionViewing:(WLAgentSkillsOnSessionViewingParams *)params
                   success:(void (^)(WLAgentSkillsOnSessionViewingResult *result))success
                   failure:(void (^)(NSError *error))failure {
-    (void)failure;
-    [[WLAgentSkillsUnReadManager sharedManager] onSessionViewing:params];
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                            fieldName:@"welinkSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    WLAgentSkillsOnSessionViewingParams *normalizedParams = [WLAgentSkillsOnSessionViewingParams new];
+    normalizedParams.welinkSessionId = welinkSessionId;
+    [[WLAgentSkillsUnReadManager sharedManager] onSessionViewing:normalizedParams];
     WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewing succeeded, sessionId=%@",
-               params.welinkSessionId);
+               welinkSessionId);
     if (success) {
         WLAgentSkillsOnSessionViewingResult *result = [WLAgentSkillsOnSessionViewingResult new];
         result.status = @"success";
@@ -835,10 +848,23 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)onSessionViewingEnd:(WLAgentSkillsOnSessionViewingEndParams *)params
                      success:(void (^)(WLAgentSkillsOnSessionViewingEndResult *result))success
                      failure:(void (^)(NSError *error))failure {
-    (void)failure;
-    [[WLAgentSkillsUnReadManager sharedManager] onSessionViewingEnd:params];
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                            fieldName:@"welinkSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    WLAgentSkillsOnSessionViewingEndParams *normalizedParams = [WLAgentSkillsOnSessionViewingEndParams new];
+    normalizedParams.welinkSessionId = welinkSessionId;
+    [[WLAgentSkillsUnReadManager sharedManager] onSessionViewingEnd:normalizedParams];
     WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewingEnd succeeded, sessionId=%@",
-               params.welinkSessionId);
+               welinkSessionId);
     if (success) {
         WLAgentSkillsOnSessionViewingEndResult *result = [WLAgentSkillsOnSessionViewingEndResult new];
         result.status = @"success";
