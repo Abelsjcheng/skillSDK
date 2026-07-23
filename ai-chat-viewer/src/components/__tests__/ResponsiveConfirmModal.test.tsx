@@ -1,4 +1,5 @@
 import React from 'react';
+import { readFileSync } from 'fs';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ResponsiveConfirmModal from '../system/ResponsiveConfirmModal';
 import * as constants from '../../constants';
@@ -89,5 +90,15 @@ describe('ResponsiveConfirmModal', () => {
     );
 
     expect(document.querySelector('.responsive-confirm-modal__mask')).not.toBeInTheDocument();
+  });
+
+  it('uses compact PC header title typography', () => {
+    const styles = readFileSync(`${process.cwd()}/src/styles/ResponsiveConfirmModal.less`, 'utf8');
+    const headerTitleRule =
+      /\.responsive-confirm-modal--pc \.responsive-confirm-modal__header-title\s*\{[^}]*\}/s
+        .exec(styles)?.[0] ?? '';
+
+    expect(headerTitleRule).toContain('font-size: 12px;');
+    expect(headerTitleRule).not.toContain('font-weight:');
   });
 });
