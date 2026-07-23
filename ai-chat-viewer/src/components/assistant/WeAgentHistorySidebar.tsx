@@ -665,6 +665,9 @@ const WeAgentHistorySidebar: React.FC<WeAgentHistorySidebarProps> = ({
             aria-label={t('weAgent.sessionActions')}
             className={[
               'we-agent-history-sidebar__action-popup',
+              isPc
+                ? 'we-agent-history-sidebar__action-popup--pc'
+                : 'we-agent-history-sidebar__action-popup--mobile',
               sessionActionPopupPosition.placement === 'above' ? 'is-above' : 'is-below',
             ].join(' ')}
             style={{

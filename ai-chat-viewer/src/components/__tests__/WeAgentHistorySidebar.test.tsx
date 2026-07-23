@@ -225,6 +225,8 @@ describe('WeAgentHistorySidebar', () => {
     expect(onSessionSelect).not.toHaveBeenCalled();
     const menu = screen.getByRole('menu', { name: '会话操作' });
     expect(menu).toHaveStyle({ right: `${window.innerWidth - 220}px`, top: '116px' });
+    expect(menu).toHaveClass('we-agent-history-sidebar__action-popup--pc');
+    expect(menu).not.toHaveClass('we-agent-history-sidebar__action-popup--mobile');
     expect(menu).not.toHaveClass('is-above');
     expect(screen.queryByRole('menuitem', { name: '重命名' })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '删除' })).toBeInTheDocument();
@@ -299,7 +301,10 @@ describe('WeAgentHistorySidebar', () => {
       jest.advanceTimersByTime(520);
     });
 
-    expect(screen.getByRole('menu', { name: '会话操作' })).toBeInTheDocument();
+    const menu = screen.getByRole('menu', { name: '会话操作' });
+    expect(menu).toBeInTheDocument();
+    expect(menu).toHaveClass('we-agent-history-sidebar__action-popup--mobile');
+    expect(menu).not.toHaveClass('we-agent-history-sidebar__action-popup--pc');
     expect(screen.getByRole('menuitem', { name: '删除' })).toBeInTheDocument();
 
     fireEvent.touchEnd(sessionItem);
@@ -375,6 +380,19 @@ describe('WeAgentHistorySidebar', () => {
     expect(actionTargetRule).toContain('color: #333;');
     expect(darkActionTargetRule).toContain('background: rgba(255, 255, 255, 0.08);');
     expect(darkActionTargetRule).toContain('color: rgba(220, 221, 221, 1);');
+  });
+
+  it('scopes history action popup dark styles to mobile action popup class', () => {
+    const styles = readFileSync(`${process.cwd()}/src/styles/WeAgentCUI.less`, 'utf8');
+    const unscopedDarkPopupRule = /\n\s{2}\.we-agent-history-sidebar__action-popup\s*\{[^}]*\}/s
+      .exec(styles)?.[0] ?? '';
+    const mobileDarkPopupRule =
+      /\.we-agent-history-sidebar__action-popup--mobile\s*\{[^}]*\}/s
+        .exec(styles)?.[0] ?? '';
+
+    expect(unscopedDarkPopupRule).toBe('');
+    expect(mobileDarkPopupRule).toContain('background: rgba(47, 49, 51, 1);');
+    expect(mobileDarkPopupRule).toContain('box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.4);');
   });
 
   it('disables native touch highlight and color transitions on history session items', () => {
