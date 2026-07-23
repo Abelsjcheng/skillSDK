@@ -50,6 +50,7 @@ const AssistantCardList: React.FC<AssistantCardListProps> = ({
               alt=""
               className="switch-assistant__avatar-img"
               aria-hidden="true"
+              showOnlineStatus={true}
               isOnline={assistant.isOnline}
             />
           </div>
