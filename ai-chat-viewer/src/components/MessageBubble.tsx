@@ -93,6 +93,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   weAgentUserAvatar = '',
   weAgentAssistantName = '',
   weAgentAssistantAvatar = '',
+  showOnlineStatus = false,
   isOnline,
 }) => {
   const { t } = useTranslation();
@@ -331,6 +332,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 src={weAgentAssistantAvatar}
                 fallbackSrc={defaultAvatar}
                 alt=""
+                showOnlineStatus={!isPlainVariant}
                 isOnline={isOnline}
               />
               <span className="we-agent-message__meta-text">{messageMetaText}</span>

@@ -106,10 +106,10 @@ describe('getOnlineStatus', () => {
         json: jest.fn().mockResolvedValue({
           code: 0,
           data: {
-            statuses: {
-              'partner-1': true,
-              'partner-2': false,
-            },
+            agent: [
+              { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
+              { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
+            ],
           },
         }),
       }),
@@ -158,6 +158,42 @@ describe('getOnlineStatus', () => {
     await expect(getOnlineStatus(['partner-1'])).rejects.toEqual({
       code: 1,
       message: 'error',
+    });
+  });
+
+  it('sends empty array when assistantAccountList is empty', async () => {
+    await expect(getOnlineStatus([])).resolves.toEqual({
+      agent: [
+        { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
+        { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
+      ],
+    });
+
+    expect(window.HWH5.fetchFull).toHaveBeenCalledWith(
+      'https://www.example.com/mag/api/skill/agent/status',
+      {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ assistantAccountList: [] }),
+      },
+    );
+  });
+
+  it('throws error when response data is null', async () => {
+    (window as any).HWH5 = {
+      fetchFull: jest.fn().mockResolvedValue({
+        json: jest.fn().mockResolvedValue({
+          code: 0,
+          data: null,
+        }),
+      }),
+    };
+
+    await expect(getOnlineStatus(['partner-1'])).rejects.toEqual({
+      code: 0,
+      data: null,
     });
   });
 });

@@ -93,9 +93,9 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
       welinkSessionId: SESSION_ID,
       onMessage: (msg: StreamMessage) => {
         if (msg.type === 'agent.online') {
-          updateAgentStatus(msg.partnerAccount ?? '', true);
+          updateAgentStatus(msg.assistantAccount ?? '', true);
         } else if (msg.type === 'agent.offline') {
-          updateAgentStatus(msg.partnerAccount ?? '', false);
+          updateAgentStatus(msg.assistantAccount ?? '', false);
         }
       },
       onClose: () => {

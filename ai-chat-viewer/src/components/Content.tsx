@@ -154,6 +154,7 @@ export const Content: React.FC<ContentProps> = ({
               fallbackSrc={defaultAvatar}
               alt=""
               className="we-agent-cui-welcome__avatar"
+              showOnlineStatus={messageVariant !== 'plain'}
               isOnline={isOnline}
             />
           </div>
@@ -185,6 +186,7 @@ export const Content: React.FC<ContentProps> = ({
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
+              showOnlineStatus={messageVariant !== 'plain'}
               isOnline={isOnline}
             />
           </div>
@@ -196,6 +198,7 @@ export const Content: React.FC<ContentProps> = ({
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
               messageVariant={messageVariant}
+              showOnlineStatus={messageVariant !== 'plain'}
               isOnline={isOnline}
             />
           </div>

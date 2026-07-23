@@ -455,8 +455,8 @@ export async function trackApiGetOnlineStatus(
 ): Promise<GetOnlineStatusResult> {
   try {
     const result = await request;
-    const onlineCount = Object.values(result.statuses ?? {}).filter(Boolean).length;
-    const offlineCount = Object.values(result.statuses ?? {}).filter((v) => !v).length;
+    const onlineCount = result.agent?.filter((v) => v.online).length;
+    const offlineCount = result.agent?.filter((v) => !v.online).length;
     void reportApiSuccess('api_get_online_status', '获取助手在线状态接口', {
       response: {
         onlineCount,

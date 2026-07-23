@@ -70,6 +70,7 @@ export interface MessageBubbleProps {
   weAgentUserAvatar?: string;
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
+  showOnlineStatus?: boolean;
   isOnline?: boolean;
 }
 
@@ -91,12 +92,14 @@ export interface PendingAssistantBubbleProps {
   weAgentAssistantName?: string;
   weAgentAssistantAvatar?: string;
   messageVariant?: 'weAgent' | 'plain';
+  showOnlineStatus?: boolean;
   isOnline?: boolean;
 }
 
 export interface AvatarImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   src?: string | null;
   fallbackSrc: string;
+  showOnlineStatus?: boolean;
   isOnline?: boolean;
 }
 

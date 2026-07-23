@@ -161,7 +161,7 @@ export interface StreamMessage
   parts?: MessagePartSnapshot[] | null;
 
   // agent status
-  partnerAccount?: string | null;
+  assistantAccount?: string | null;
   keywords?: string[] | null;
   searchResults?: object[] | null;
   references?: object[] | null;
