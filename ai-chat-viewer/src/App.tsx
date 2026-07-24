@@ -204,12 +204,13 @@ function App({ assistantAccount = '' }: AppProps) {
       Number(preferredSeq) > 0 ? Number(preferredSeq) : 0,
       unreadSessionState?.maxSeq ?? 0,
     );
-
+    WeLog(`[WeAgentUnreadCUI] reportWeAgentSessionRead nextReadSeq: ${nextReadSeq}`);
     if (nextReadSeq <= 0) {
       return;
     }
 
     const lastReportedReadSeq = lastReportedReadSeqBySessionRef.current[normalizedSessionId] ?? 0;
+    WeLog(`[WeAgentUnreadCUI] reportWeAgentSessionRead lastReportedReadSeq: ${lastReportedReadSeq}`);
     if (nextReadSeq <= lastReportedReadSeq) {
       return;
     }
@@ -219,11 +220,15 @@ function App({ assistantAccount = '' }: AppProps) {
         WeLog('[WeAgentUnreadCUI] skip reportWeAgentSessionRead: client version is below the minimum supported version');
         return;
       }
-
+      WeLog(`[WeAgentUnreadCUI] reportWeAgentSessionRead params: ${JSON.stringify({
+        welinkSessionId: normalizedSessionId,
+        readSeq: nextReadSeq,
+      })}`);
       await reportWeAgentSessionRead({
         welinkSessionId: normalizedSessionId,
         readSeq: nextReadSeq,
       });
+      WeLog(`[WeAgentUnreadCUI] reportWeAgentSessionRead success`);
       lastReportedReadSeqBySessionRef.current[normalizedSessionId] = nextReadSeq;
       setWeAgentUnreadCache((prev) => markWeAgentSessionRead(prev, normalizedSessionId, nextReadSeq));
     } catch (error) {
@@ -322,10 +327,10 @@ function App({ assistantAccount = '' }: AppProps) {
     const result = await getWeAgentUnreadMessage({
       assistantAccount: currentAssistantAccount,
     });
-
-    if (assistantAccountRef.current.trim() !== currentAssistantAccount) {
-      return result;
-    }
+    WeLog(`[WeAgentUnreadCUI] getWeAgentUnreadMessage success | extra=${JSON.stringify({
+      assistantAccount: currentAssistantAccount,
+      result: result,
+    })}`);
 
     setWeAgentUnreadCache(normalizeWeAgentUnreadCacheResult(result));
 
@@ -345,6 +350,9 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       await onSessionViewing({ welinkSessionId: normalizedSessionId });
+      WeLog(`[WeAgentUnreadCUI] onSessionViewing success | extra=${JSON.stringify({
+        welinkSessionId: normalizedSessionId,
+      })}`);
     } catch (error) {
       WeLog(`[WeAgentUnreadCUI] onSessionViewing failed | extra=${JSON.stringify({
         welinkSessionId: normalizedSessionId,
@@ -365,6 +373,9 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       await onSessionViewingEnd({ welinkSessionId: previousSessionId });
+      WeLog(`[WeAgentUnreadCUI] onSessionViewingEnd success | extra=${JSON.stringify({
+        welinkSessionId: previousSessionId,
+      })}`);
     } catch (error) {
       WeLog(`[WeAgentUnreadCUI] onSessionViewingEnd failed | extra=${JSON.stringify({
         welinkSessionId: previousSessionId,
@@ -379,6 +390,7 @@ function App({ assistantAccount = '' }: AppProps) {
       const currentSessionId = welinkSessionIdRef.current;
       startViewingSession(currentSessionId);
       if (currentSessionId && pageVisibleRef.current) {
+        WeLog(`[WeAgentUnreadCUI] start reportCurrentSessionRead when onvisibile currentSessionId: %{currentSessionId}`);
         reportCurrentSessionRead(currentSessionId);
       }
       return;
@@ -417,6 +429,7 @@ function App({ assistantAccount = '' }: AppProps) {
       }
 
       if (!disposed && pageVisibleRef.current) {
+        WeLog(`[WeAgentUnreadCUI] start reportCurrentSessionRead when switch welinkSessionId: %{welinkSessionId}`);
         await reportCurrentSessionRead(welinkSessionId, preferredReadSeq);
       }
     })();
