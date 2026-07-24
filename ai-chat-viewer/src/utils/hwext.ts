@@ -708,7 +708,7 @@ export async function deleteHistorySession(
 
 async function getOnlineStatusWithHWH5FetchFull(
   assistantAccountList: string[]
-): Promise<GetOnlineStatusResult> {
+): Promise<GetOnlineStatusResult[]> {
   if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
     throw new Error('HWH5.fetchFull is not available.');
   }
@@ -730,12 +730,12 @@ async function getOnlineStatusWithHWH5FetchFull(
   return reply.data;
 }
 
-async function getOnlineStatusWithPcBridge(): Promise<GetOnlineStatusResult> {
+async function getOnlineStatusWithPcBridge(): Promise<GetOnlineStatusResult[]> {
   // PC 端暂不支持
-  return { agent: [] };
+  return [];
 }
 
-export async function getOnlineStatus(assistantAccountList: string[]): Promise<GetOnlineStatusResult> {
+export async function getOnlineStatus(assistantAccountList: string[]): Promise<GetOnlineStatusResult[]> {
   if (isPcMiniApp()) {
     return getOnlineStatusWithPcBridge();
   }

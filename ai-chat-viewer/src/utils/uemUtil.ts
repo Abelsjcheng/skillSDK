@@ -451,12 +451,12 @@ export async function trackApiGetWeAgentList(
 }
 
 export async function trackApiGetOnlineStatus(
-  request: Promise<GetOnlineStatusResult>,
-): Promise<GetOnlineStatusResult> {
+  request: Promise<GetOnlineStatusResult[]>,
+): Promise<GetOnlineStatusResult[]> {
   try {
     const result = await request;
-    const onlineCount = result.agent?.filter((v) => v.online).length;
-    const offlineCount = result.agent?.filter((v) => !v.online).length;
+    const onlineCount = result.filter((v) => v.status === 'ONLINE').length;
+    const offlineCount = result.filter((v) => v.status === 'OFFLINE').length;
     void reportApiSuccess('api_get_online_status', '获取助手在线状态接口', {
       response: {
         onlineCount,

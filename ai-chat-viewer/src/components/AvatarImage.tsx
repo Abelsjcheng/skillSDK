@@ -77,7 +77,7 @@ const AvatarImage: React.FC<AvatarImageProps> = ({
     : null;
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ position: 'relative', display: 'inline-block' ,height: '100%'}}>
       <img {...rest} src={resolvedSrc ?? undefined} draggable="false" className={className} />
       {statusIcon && (
         <img

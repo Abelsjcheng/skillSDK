@@ -239,12 +239,13 @@ export interface AgentOnlineStatus {
 }
 
 export interface GetOnlineStatusResult {
-  agent: AgentOnlineStatus[];
+  assistantAccount: string;
+  status: 'ONLINE' | 'OFFLINE';
 }
 
 export interface GetOnlineStatusResponse {
   code: number;
-  data: GetOnlineStatusResult;
+  data: GetOnlineStatusResult[];
 }
 
 export interface QueryQrcodeInfoParams {

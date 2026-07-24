@@ -52,10 +52,10 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
       const assistantAccountList = list.map((item) => item.partnerAccount);
 
       const result = await getOnlineStatus(assistantAccountList);
-      if (result?.agent) {
+      if (result) {
         const statuses: Record<string, boolean> = {};
-        result.agent.forEach((a) => {
-          statuses[a.assistantAccount] = a.online;
+        result.forEach((a) => {
+          statuses[a.assistantAccount] = a.status === 'ONLINE';
         });
         setAgentStatusMap(statuses);
         await writeAgentOnlineStatusStore({ statuses });
