@@ -103,11 +103,7 @@ function getPedestalOrThrow(): Pedestal {
   throw new Error('Pedestal.callMethod is not available. This code must run in PC miniapp environment.');
 }
 
-let listenerParams: RegisterSessionListenerParams;
-const addEventListenerOnMessage = (e: any) => {
-  const msg = e.detail.msg;
-  listenerParams?.onMessage(msg);
-}
+let listenerParams: Record<string, (e: any) => void> = {};
 
 function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
   const call = async <T>(funName: string, params: unknown) => {
@@ -144,14 +140,23 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
       })
     },
     registerSessionListener: (params) => {
-      if (isPcMiniApp()) {
-        listenerParams = params;
-        window.addEventListener('agentSkills_registerSessionListener_onMessage', addEventListenerOnMessage);
-      } else {
-        window.addEventListener('agentSkills_registerSessionListener_onMessage', (e: any) => {
-          const msg = e.detail.msg;
+      const handlePcMessage = (e: any) => {
+        const msg = e.detail.msg;
+        const type = e.detail.type || 'onMessage';
+        if (type === 'onClose') {
+          params.onClose && params.onClose(msg);
+        } else if (type === 'onError') {
+          params.onError && params.onError(msg);
+        } else {
           params.onMessage(msg);
-        });
+        }
+      }
+      if (isPcMiniApp()) {
+        listenerParams[params.welinkSessionId] = handlePcMessage;
+        window.addEventListener('agentSkills_registerSessionListener_onMessage', listenerParams[params.welinkSessionId]);
+      } else {
+        window.addEventListener('agentSkills_registerSessionListener_onMessage', listenerParams[params.welinkSessionId] = handlePcMessage
+        );
       }
       void call<void>('registerSessionListener', { welinkSessionId: params.welinkSessionId }).catch((err) => {
         WeLog(`hwext registerSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
@@ -159,7 +164,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     },
     unregisterSessionListener: (params) => {
       if (isPcMiniApp()) {
-        window.removeEventListener('agentSkills_registerSessionListener_onMessage', addEventListenerOnMessage);
+        window.removeEventListener('agentSkills_registerSessionListener_onMessage', listenerParams[params.welinkSessionId]);
       }
       void call<void>('unregisterSessionListener', params).catch((err) => {
         WeLog(`hwext unregisterSessionListener failed | extra=${JSON.stringify({ welinkSessionId: params.welinkSessionId })} | error=${JSON.stringify(err)}`);
