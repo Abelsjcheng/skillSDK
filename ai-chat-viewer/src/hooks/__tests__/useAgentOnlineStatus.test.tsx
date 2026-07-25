@@ -110,12 +110,10 @@ describe('useAgentOnlineStatus', () => {
     it('fetches online status when fetchOnInit is true', async () => {
       mockReadAgentOnlineStatusStore.mockResolvedValue(null);
       mockGetWeAgentList.mockResolvedValueOnce({ content: mockAssistantList });
-      mockGetOnlineStatus.mockResolvedValueOnce({
-        agent: [
-          { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-          { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
-        ],
-      });
+      mockGetOnlineStatus.mockResolvedValueOnce([
+        { assistantAccount: 'partner-1', status: 'ONLINE' },
+        { assistantAccount: 'partner-2', status: 'OFFLINE' },
+      ]);
 
       const { result } = renderHook(() => useAgentOnlineStatus({ fetchOnInit: true }));
 
@@ -130,11 +128,9 @@ describe('useAgentOnlineStatus', () => {
 
   describe('fetchAllAgentStatus', () => {
     it('uses provided assistantList instead of fetching', async () => {
-      mockGetOnlineStatus.mockResolvedValueOnce({
-        agent: [
-          { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-        ],
-      });
+      mockGetOnlineStatus.mockResolvedValueOnce([
+        { assistantAccount: 'partner-1', status: 'ONLINE' },
+      ]);
 
       const { result } = renderHook(() => useAgentOnlineStatus());
 
@@ -149,12 +145,10 @@ describe('useAgentOnlineStatus', () => {
 
     it('fetches assistant list when not provided', async () => {
       mockGetWeAgentList.mockResolvedValueOnce({ content: mockAssistantList });
-      mockGetOnlineStatus.mockResolvedValueOnce({
-        agent: [
-          { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-          { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
-        ],
-      });
+      mockGetOnlineStatus.mockResolvedValueOnce([
+        { assistantAccount: 'partner-1', status: 'ONLINE' },
+        { assistantAccount: 'partner-2', status: 'OFFLINE' },
+      ]);
 
       const { result } = renderHook(() => useAgentOnlineStatus());
 
@@ -167,11 +161,9 @@ describe('useAgentOnlineStatus', () => {
     });
 
     it('writes to storage after fetching', async () => {
-      mockGetOnlineStatus.mockResolvedValueOnce({
-        agent: [
-          { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-        ],
-      });
+      mockGetOnlineStatus.mockResolvedValueOnce([
+        { assistantAccount: 'partner-1', status: 'ONLINE' },
+      ]);
 
       const { result } = renderHook(() => useAgentOnlineStatus());
 

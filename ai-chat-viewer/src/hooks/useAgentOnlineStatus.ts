@@ -18,6 +18,7 @@ import {
   readAgentOnlineStatusStore,
   writeAgentOnlineStatusStore,
 } from '../utils/agentOnlineStatusStore';
+import { WeLog } from '../utils/logger';
 
 type AgentStatusMap = Record<string, boolean>;
 
@@ -35,6 +36,7 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
   // 更新单个助手状态（写入存储）
   const updateAgentStatus = useCallback(
     async (partnerAccount: string, isOnline: boolean) => {
+      WeLog(`[AgentStatus] update status | partnerAccount=${partnerAccount} | isOnline=${isOnline}`);
       setAgentStatusMap((prev) => {
         const next = { ...prev, [partnerAccount]: isOnline };
         void writeAgentOnlineStatusStore({ statuses: next });
@@ -50,18 +52,20 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
       // 如果传入了列表，直接用；否则重新获取
       const list = assistantList ?? (await getWeAgentList(DEFAULT_ASSISTANT_LIST_QUERY)).content;
       const assistantAccountList = list.map((item) => item.partnerAccount);
+      WeLog(`[AgentStatus] fetchAllAgentStatus | count=${assistantAccountList.length}`);
 
       const result = await getOnlineStatus(assistantAccountList);
-      if (result) {
+      if (result && result.length > 0) {
         const statuses: Record<string, boolean> = {};
         result.forEach((a) => {
           statuses[a.assistantAccount] = a.status === 'ONLINE';
         });
         setAgentStatusMap(statuses);
-        await writeAgentOnlineStatusStore({ statuses });
+        writeAgentOnlineStatusStore({ statuses });
+        WeLog(`[AgentStatus] fetchAllAgentStatus success | updated=${result.length}`);
       }
     } catch (error) {
-      console.error('fetchAllAgentStatus failed:', error);
+      WeLog(`[AgentStatus] fetchAllAgentStatus failed | error=${String(error)}`);
     }
   }, []);
 
@@ -73,14 +77,19 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
     }
     initializedRef.current = true;
 
+    WeLog(`[AgentStatus] initAgentOnlineStatus start`);
     // 从存储读取
     const stored = await readAgentOnlineStatusStore();
     if (stored?.statuses) {
+      WeLog(`[AgentStatus] initAgentOnlineStatus from storage | count=${Object.keys(stored.statuses).length}`);
       setAgentStatusMap(stored.statuses);
+    } else {
+      WeLog(`[AgentStatus] initAgentOnlineStatus no storage data`);
     }
 
     // 如果配置了 fetchOnInit，则全量查询
     if (fetchOnInit) {
+      WeLog(`[AgentStatus] initAgentOnlineStatus fetchOnInit=true, calling fetchAllAgentStatus`);
       await fetchAllAgentStatus();
     }
   }, [fetchOnInit]);
@@ -88,21 +97,26 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
   // 注册 Session Listener
   useEffect(() => {
     const SESSION_ID = 'config_agent';
+    WeLog(`[AgentStatus] registerSessionListener | welinkSessionId=${SESSION_ID}`);
 
     registerSessionListener({
       welinkSessionId: SESSION_ID,
       onMessage: (msg: StreamMessage) => {
         if (!isOpen) {
+          WeLog(`[AgentStatus] onMessage | isOpen=${isOpen} fetchAllAgentStatus`);
           setIsOpen(true);
           void fetchAllAgentStatus();
         }
         if (msg.type === 'agent.online') {
+          WeLog(`[AgentStatus] onMessage | isOpen=${isOpen} assistantAccount=${msg.assistantAccount}`);
           updateAgentStatus(msg.assistantAccount ?? '', true);
         } else if (msg.type === 'agent.offline') {
+          WeLog(`[AgentStatus] onMessage | isOpen=${isOpen} assistantAccount=${msg.assistantAccount}`);
           updateAgentStatus(msg.assistantAccount ?? '', false);
         }
       },
       onClose: () => {
+        WeLog(`[AgentStatus] onClose`);
         resetIsOpen();
       },
     });
@@ -123,6 +137,7 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
     if (isPcMiniApp()) {
       // PC 端监听自定义事件，允许多次触发直接拉数据
       const handleAgentLogin = () => {
+        WeLog(`[handleAgentLogin] agent_login`);
         void fetchAllAgentStatus();
       };
       window.addEventListener('agent_login', handleAgentLogin);
@@ -133,18 +148,21 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
       // 移动端监听 onShow
       window.HWH5?.app?.({
         onShow: () => {
+          WeLog(`[app] onShow`);
           // 允许 onShow 后续重新初始化
           initializedRef.current = false;
           // 先重新初始化（读存储、拉数据）
           void initAgentOnlineStatus();
           // 再监听网络变化
           window.HWH5?.onNetworkStatusChange?.((res) => {
+            WeLog(`[app] onNetworkStatusChange isConnected=${res.isConnected}`);
             if (res.isConnected) {
               void fetchAllAgentStatus();
             }
           });
         },
         onHide: () => {
+          WeLog(`[app] onNetworkStatusChange onHide`);
           window.HWH5?.unregisterNetworkListener?.().catch(() => {
             // ignore error
           });

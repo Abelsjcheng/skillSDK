@@ -105,12 +105,10 @@ describe('getOnlineStatus', () => {
       fetchFull: jest.fn().mockResolvedValue({
         json: jest.fn().mockResolvedValue({
           code: 0,
-          data: {
-            agent: [
-              { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-              { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
-            ],
-          },
+          data: [
+            { assistantAccount: 'partner-1', status: 'ONLINE' },
+            { assistantAccount: 'partner-2', status: 'OFFLINE' },
+          ],
         }),
       }),
     };
@@ -118,12 +116,10 @@ describe('getOnlineStatus', () => {
 
   it('gets online status through HWH5.fetchFull', async () => {
     const assistantAccountList = ['partner-1', 'partner-2'];
-    await expect(getOnlineStatus(assistantAccountList)).resolves.toEqual({
-      agent: [
-        { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-        { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
-      ],
-    });
+    await expect(getOnlineStatus(assistantAccountList)).resolves.toEqual([
+      { assistantAccount: 'partner-1', status: 'ONLINE' },
+      { assistantAccount: 'partner-2', status: 'OFFLINE' },
+    ]);
 
     expect(window.HWH5.fetchFull).toHaveBeenCalledWith(
       'https://www.example.com/mag/api/skill/agent/status',
@@ -162,12 +158,10 @@ describe('getOnlineStatus', () => {
   });
 
   it('sends empty array when assistantAccountList is empty', async () => {
-    await expect(getOnlineStatus([])).resolves.toEqual({
-      agent: [
-        { assistantAccount: 'partner-1', ak: 'ak1', online: true, toolType: 'type1', assistantType: 'business' },
-        { assistantAccount: 'partner-2', ak: 'ak2', online: false, toolType: 'type2', assistantType: 'personal' },
-      ],
-    });
+    await expect(getOnlineStatus([])).resolves.toEqual([
+      { assistantAccount: 'partner-1', status: 'ONLINE' },
+      { assistantAccount: 'partner-2', status: 'OFFLINE' },
+    ]);
 
     expect(window.HWH5.fetchFull).toHaveBeenCalledWith(
       'https://www.example.com/mag/api/skill/agent/status',

@@ -715,21 +715,24 @@ async function getOnlineStatusWithHWH5FetchFull(
   assistantAccountList: string[]
 ): Promise<GetOnlineStatusResult[]> {
   if (typeof window === 'undefined' || typeof window.HWH5?.fetchFull !== 'function') {
+    WeLog(`[AgentStatus] getOnlineStatus HWH5.fetchFull not available`);
     throw new Error('HWH5.fetchFull is not available.');
   }
 
-  const response = await window.HWH5.fetchFull<GetOnlineStatusResponse>(
-    buildOnlineStatusUrl(),
-    {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ assistantAccountList }),
+  const url = buildOnlineStatusUrl();
+  WeLog(`[AgentStatus] getOnlineStatus request | count=${assistantAccountList.length}`);
+
+  const response = await window.HWH5.fetchFull<GetOnlineStatusResponse>(url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  );
+    body: JSON.stringify({ assistantAccountList }),
+  });
   const reply = await response.json();
+  WeLog(`[AgentStatus] getOnlineStatus response | code=${reply?.code} | count=${reply?.data?.length ?? 0}`);
   if (reply?.code !== 0 || !reply.data) {
+    WeLog(`[AgentStatus] getOnlineStatus failed | code=${reply?.code}`);
     throw reply;
   }
   return reply.data;
