@@ -8,9 +8,16 @@ import type {
   GetSessionMessageHistoryParams,
   GetWeAgentDetailsParams,
   GetWeAgentListParams,
+  GetWeAgentUnreadMessageParams,
+  GetWeAgentUnreadMessageResult,
   HistorySessionsListResult,
+  OnSessionViewingEndParams,
+  OnSessionViewingParams,
+  OnSessionViewingResult,
   QueryQrcodeInfoParams,
   QueryQrcodeInfoResult,
+  ReportWeAgentSessionReadParams,
+  ReportWeAgentSessionReadResult,
   ReplyPermissionParams,
   SendMessageParams,
   SendMessageToIMParams,
@@ -330,6 +337,82 @@ export async function trackApiCreateDigitalTwin(
         qrcode: params.qrcode,
         weCrewType: params.weCrewType,
       },
+    });
+    throw error;
+  }
+}
+
+export async function trackApiGetWeAgentUnreadMessage(
+  params: GetWeAgentUnreadMessageParams,
+  request: Promise<GetWeAgentUnreadMessageResult>,
+): Promise<GetWeAgentUnreadMessageResult> {
+  try {
+    const result = await request;
+    void reportApiSuccess('api_getWeAgentUnreadMessage', '获取助手未读消息接口', {
+      request: { ...params },
+      response: { ...result },
+    });
+    return result;
+  } catch (error) {
+    void reportApiError('api_getWeAgentUnreadMessage', '获取助手未读消息接口', error, {
+      request: { ...params },
+    });
+    throw error;
+  }
+}
+
+export async function trackApiReportWeAgentSessionRead(
+  params: ReportWeAgentSessionReadParams,
+  request: Promise<ReportWeAgentSessionReadResult>,
+): Promise<ReportWeAgentSessionReadResult> {
+  try {
+    const result = await request;
+    void reportApiSuccess('api_reportWeAgentSessionRead', '上报助手会话已读接口', {
+      request: { ...params },
+      response: { ...result },
+    });
+    return result;
+  } catch (error) {
+    void reportApiError('api_reportWeAgentSessionRead', '上报助手会话已读接口', error, {
+      request: { ...params },
+    });
+    throw error;
+  }
+}
+
+export async function trackApiOnSessionViewing(
+  params: OnSessionViewingParams,
+  request: Promise<OnSessionViewingResult>,
+): Promise<OnSessionViewingResult> {
+  try {
+    const result = await request;
+    void reportApiSuccess('api_onSessionViewing', '开始查看会话接口', {
+      request: { ...params },
+      response: { ...result },
+    });
+    return result;
+  } catch (error) {
+    void reportApiError('api_onSessionViewing', '开始查看会话接口', error, {
+      request: { ...params },
+    });
+    throw error;
+  }
+}
+
+export async function trackApiOnSessionViewingEnd(
+  params: OnSessionViewingEndParams,
+  request: Promise<OnSessionViewingResult>,
+): Promise<OnSessionViewingResult> {
+  try {
+    const result = await request;
+    void reportApiSuccess('api_onSessionViewingEnd', '结束查看会话接口', {
+      request: { ...params },
+      response: { ...result },
+    });
+    return result;
+  } catch (error) {
+    void reportApiError('api_onSessionViewingEnd', '结束查看会话接口', error, {
+      request: { ...params },
     });
     throw error;
   }

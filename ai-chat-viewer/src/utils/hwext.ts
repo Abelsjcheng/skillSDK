@@ -78,7 +78,11 @@ import {
   trackApiGetSessionMessageHistory,
   trackApiGetWeAgentDetails,
   trackApiGetWeAgentList,
+  trackApiGetWeAgentUnreadMessage,
+  trackApiOnSessionViewing,
+  trackApiOnSessionViewingEnd,
   trackApiQueryQrcodeInfo,
+  trackApiReportWeAgentSessionRead,
   trackApiReplyPermission,
   trackApiSendMessage,
   trackApiSendMessageToIM,
@@ -667,25 +671,25 @@ export function registerOnVisibleListener(
 export async function getWeAgentUnreadMessage(
   params: GetWeAgentUnreadMessageParams,
 ): Promise<GetWeAgentUnreadMessageResult> {
-  return Promise.resolve(getJsApiOrThrow().getWeAgentUnreadMessage(params));
+  return trackApiGetWeAgentUnreadMessage(params, Promise.resolve(getJsApiOrThrow().getWeAgentUnreadMessage(params)));
 }
 
 export async function reportWeAgentSessionRead(
   params: ReportWeAgentSessionReadParams,
 ): Promise<ReportWeAgentSessionReadResult> {
-  return Promise.resolve(getJsApiOrThrow().reportWeAgentSessionRead(params));
+  return trackApiReportWeAgentSessionRead(params, Promise.resolve(getJsApiOrThrow().reportWeAgentSessionRead(params)));
 }
 
 export async function onSessionViewing(
   params: OnSessionViewingParams,
 ): Promise<OnSessionViewingResult> {
-  return Promise.resolve(getJsApiOrThrow().onSessionViewing(params));
+  return trackApiOnSessionViewing(params, Promise.resolve(getJsApiOrThrow().onSessionViewing(params)));
 }
 
 export async function onSessionViewingEnd(
   params: OnSessionViewingEndParams,
 ): Promise<OnSessionViewingResult> {
-  return Promise.resolve(getJsApiOrThrow().onSessionViewingEnd(params));
+  return trackApiOnSessionViewingEnd(params, Promise.resolve(getJsApiOrThrow().onSessionViewingEnd(params)));
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {
