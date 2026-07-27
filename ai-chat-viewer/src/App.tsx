@@ -540,7 +540,11 @@ function App({ assistantAccount = '' }: AppProps) {
       func: handleWeAgentUnreadChanged,
     });
     registerOnVisibleListener(handleOnVisible);
-  }, [handleOnVisible, handleWeAgentUnreadChanged, handleWeAgentUpdated]);
+
+    return () => {
+      void endViewingSession(welinkSessionIdRef.current);
+    };
+  }, [endViewingSession, handleOnVisible, handleWeAgentUnreadChanged, handleWeAgentUpdated]);
 
   const createSessionForAssistant = useCallback(async (
     currentAssistantAccount: string,
@@ -555,28 +559,6 @@ function App({ assistantAccount = '' }: AppProps) {
       businessSessionId: userInfo.uid,
     });
   }, []);
-
-  useEffect(() => {
-    assistantAccountRef.current = assistantAccount;
-    assistantDetailRef.current = null;
-    userInfoRef.current = null;
-    pendingActionDeleteSessionIdsRef.current.clear();
-    initialWeAgentSession.current = false;
-    lastReportedReadSeqBySessionRef.current = {};
-    pageVisibleRef.current = false;
-    setHistorySessionsCache(null);
-    setHistorySessionsLoaded(false);
-    setIsHistorySidebarVisible(isPc);
-    setWelinkSessionId(null);
-    setWeAgentAssistantName('');
-    setWeAgentAssistantDescription('');
-    setWeAgentAssistantAvatar('');
-    setWeAgentUnreadCache(createEmptyWeAgentUnreadCache());
-
-    return () => {
-      void endViewingSession(welinkSessionIdRef.current);
-    };
-  }, [assistantAccount, endViewingSession, isPc]);
 
   useEffect(() => {
     const userInfo = userInfoRef.current;
