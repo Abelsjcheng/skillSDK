@@ -332,7 +332,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 src={weAgentAssistantAvatar}
                 fallbackSrc={defaultAvatar}
                 alt=""
-                showOnlineStatus={!isPlainVariant}
+                showOnlineStatus={showOnlineStatus&&!isPlainVariant}
                 isOnline={isOnline}
               />
               <span className="we-agent-message__meta-text">{messageMetaText}</span>

@@ -20,7 +20,11 @@ const ASSISTANT_EDIT_MIN_VERSION: MinVersionMap = {
   ios: '5.85.0',
   harmony: '1.31.0',
 };
-
+const WE_AGENT_ONLINE_MIN_VERSION: MinVersionMap = {
+  android: '5.86.0',
+  ios: '5.86.0',
+  harmony: '1.32.0',
+};
 export function compareVersion(newVersion: string, oldVersion: string): number {
   const v1 = newVersion.split('.');
   const v2 = oldVersion.split('.');
@@ -93,4 +97,6 @@ export const canIUse = {
   assistantEdit: () => canUseByMinVersion(ASSISTANT_EDIT_MIN_VERSION),
   // 扫码创建助理流程版本判断。
   qrcodeCreateAssistant: () => canUseByMinVersion(QRCODE_CREATE_ASSISTANT_MIN_VERSION),
+  // WeAgent 在线状态版本判断。
+  weAgentOnline: () => canUseByMinVersion(WE_AGENT_ONLINE_MIN_VERSION),
 };

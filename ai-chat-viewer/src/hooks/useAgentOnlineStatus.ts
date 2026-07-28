@@ -19,9 +19,10 @@ import {
   writeAgentOnlineStatusStore,
 } from '../utils/agentOnlineStatusStore';
 import { WeLog } from '../utils/logger';
+import { canIUse } from '../utils/versionCheck';
 
 type AgentStatusMap = Record<string, boolean>;
-
+const SESSION_ID = 'config_agent';
 export interface UseAgentOnlineStatusOptions {
   /** 初始化时是否全量查询在线状态，默认 false */
   fetchOnInit?: boolean;
@@ -30,8 +31,8 @@ export interface UseAgentOnlineStatusOptions {
 export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) {
   const { fetchOnInit = false } = options;
   const [agentStatusMap, setAgentStatusMap] = useState<AgentStatusMap>({});
-  const [isOpen, setIsOpen] = useState(false);
-  const initializedRef = useRef(false);
+  const isOpenRef = useRef(false);
+  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
 
   // 更新单个助手状态（写入存储）
   const updateAgentStatus = useCallback(
@@ -49,6 +50,11 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
   // 手动获取全量数据
   const fetchAllAgentStatus = useCallback(async (assistantList?: WeAgentListItem[]) => {
     try {
+      if(!await canIUse.weAgentOnline()) {
+        WeLog(`[AgentStatus] fetchAllAgentStatus | weAgentOnline feature not supported`);
+        showOnlineStatus && setShowOnlineStatus(false);
+        return;
+      }
       // 如果传入了列表，直接用；否则重新获取
       const list = assistantList ?? (await getWeAgentList(DEFAULT_ASSISTANT_LIST_QUERY)).content;
       const assistantAccountList = list.map((item) => item.partnerAccount);
@@ -71,11 +77,11 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
 
   // 初始化/刷新：从存储读取， optionally 全量查询
   const initAgentOnlineStatus = useCallback(async () => {
-    // 防止移动端首次挂载时 useEffect 和 onShow 重复触发
-    if (initializedRef.current) {
+    if (!await canIUse.weAgentOnline()) {
+      WeLog(`[AgentStatus] initAgentOnlineStatus | weAgentOnline feature not supported`);
+      showOnlineStatus && setShowOnlineStatus(false);
       return;
     }
-    initializedRef.current = true;
 
     WeLog(`[AgentStatus] initAgentOnlineStatus start`);
     // 从存储读取
@@ -93,47 +99,43 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
       await fetchAllAgentStatus();
     }
   }, [fetchOnInit]);
-
+  const streamOnMessage = useCallback((msg: StreamMessage) => {
+    if (!isOpenRef.current) {
+      WeLog(`[AgentStatus] onMessage | isOpen=${isOpenRef.current} fetchAllAgentStatus`);
+      isOpenRef.current = true;
+      void fetchAllAgentStatus();
+    }
+    if (msg.type === 'agent.online') {
+      WeLog(`[AgentStatus] onMessage | isOpen=${isOpenRef.current} assistantAccount=${msg.assistantAccount}`);
+      updateAgentStatus(msg.assistantAccount ?? '', true);
+    } else if (msg.type === 'agent.offline') {
+      WeLog(`[AgentStatus] onMessage | isOpen=${isOpenRef.current} assistantAccount=${msg.assistantAccount}`);
+      updateAgentStatus(msg.assistantAccount ?? '', false);
+    }
+  }, [isOpenRef, updateAgentStatus, fetchAllAgentStatus]);
+  
+  const streamOnClose = useCallback(() => {
+    WeLog(`[AgentStatus] onClose`);
+    resetIsOpen();
+  }, []);
   // 注册 Session Listener
-  useEffect(() => {
-    const SESSION_ID = 'config_agent';
+  const onlineStatusRegister = useCallback(() => {
+    isOpenRef.current = true;
     WeLog(`[AgentStatus] registerSessionListener | welinkSessionId=${SESSION_ID}`);
 
     registerSessionListener({
       welinkSessionId: SESSION_ID,
-      onMessage: (msg: StreamMessage) => {
-        if (!isOpen) {
-          WeLog(`[AgentStatus] onMessage | isOpen=${isOpen} fetchAllAgentStatus`);
-          setIsOpen(true);
-          void fetchAllAgentStatus();
-        }
-        if (msg.type === 'agent.online') {
-          WeLog(`[AgentStatus] onMessage | isOpen=${isOpen} assistantAccount=${msg.assistantAccount}`);
-          updateAgentStatus(msg.assistantAccount ?? '', true);
-        } else if (msg.type === 'agent.offline') {
-          WeLog(`[AgentStatus] onMessage | isOpen=${isOpen} assistantAccount=${msg.assistantAccount}`);
-          updateAgentStatus(msg.assistantAccount ?? '', false);
-        }
-      },
-      onClose: () => {
-        WeLog(`[AgentStatus] onClose`);
-        resetIsOpen();
-      },
+      onMessage: streamOnMessage,
+      onClose: streamOnClose,
     });
+  }, []);
 
-    // 组件卸载时取消注册
-    return () => {
-      unregisterSessionListener({ welinkSessionId: SESSION_ID });
-    };
-  }, [updateAgentStatus]);
-
-  // 初始化
-  useEffect(() => {
-    void initAgentOnlineStatus();
-  }, [initAgentOnlineStatus]);
 
   // 注册 App 生命周期
   useEffect(() => {
+    void initAgentOnlineStatus();
+    onlineStatusRegister();
+
     if (isPcMiniApp()) {
       // PC 端监听自定义事件，允许多次触发直接拉数据
       const handleAgentLogin = () => {
@@ -142,43 +144,24 @@ export function useAgentOnlineStatus(options: UseAgentOnlineStatusOptions = {}) 
       };
       window.addEventListener('agent_login', handleAgentLogin);
       return () => {
+        WeLog(`[AgentStatus] cleanup`);
         window.removeEventListener('agent_login', handleAgentLogin);
+        unregisterSessionListener({ welinkSessionId: SESSION_ID });
       };
-    } else {
-      // 移动端监听 onShow
-      window.HWH5?.app?.({
-        onShow: () => {
-          WeLog(`[app] onShow`);
-          // 允许 onShow 后续重新初始化
-          initializedRef.current = false;
-          // 先重新初始化（读存储、拉数据）
-          void initAgentOnlineStatus();
-          // 再监听网络变化
-          window.HWH5?.onNetworkStatusChange?.((res) => {
-            WeLog(`[app] onNetworkStatusChange isConnected=${res.isConnected}`);
-            if (res.isConnected) {
-              void fetchAllAgentStatus();
-            }
-          });
-        },
-        onHide: () => {
-          WeLog(`[app] onNetworkStatusChange onHide`);
-          window.HWH5?.unregisterNetworkListener?.().catch(() => {
-            // ignore error
-          });
-        },
-      });
     }
-  }, [fetchAllAgentStatus, initAgentOnlineStatus]);
+    // 移动端只注册一次，不需要 onShow/onHide
+  }, []);
 
-  const resetIsOpen = useCallback(() => setIsOpen(false), []);
+  const resetIsOpen = useCallback(() => isOpenRef.current = false, []);
 
   return {
     agentStatusMap,
-    isOpen,
     fetchAllAgentStatus,
     updateAgentStatus,
     resetIsOpen,
     getAgentStatus: (partnerAccount: string) => agentStatusMap[partnerAccount],
+    streamOnClose,
+    streamOnMessage,
+    showOnlineStatus
   };
 }

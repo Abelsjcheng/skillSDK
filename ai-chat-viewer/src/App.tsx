@@ -153,10 +153,8 @@ function App({ assistantAccount = '' }: AppProps) {
   const [weAgentAssistantAvatar, setWeAgentAssistantAvatar] = useState('');
   const [isSwitchingSessionAfterDelete, setIsSwitchingSessionAfterDelete] = useState(false);
 
-  const {
-    agentStatusMap,
-    getAgentStatus,
-  } = useAgentOnlineStatus({ fetchOnInit: true });
+  const { agentStatusMap, getAgentStatus, streamOnClose, streamOnMessage,showOnlineStatus } =
+    useAgentOnlineStatus({ fetchOnInit: true });
 
   // PC 端通知状态变化
   useEffect(() => {
@@ -190,7 +188,13 @@ function App({ assistantAccount = '' }: AppProps) {
     },
     onSessionDeleted: (sessionId) => {
       void handleSessionDeletedFromPushRef.current?.(sessionId);
-      },
+    },
+    handleOnMessage: (message) => {
+      streamOnMessage(message);
+    },
+    handleOnClose: () => {
+      streamOnClose();
+    },
   });
 
   const handleSessionDeletedFromPushRef = useRef<((sessionId: string) => Promise<void>) | null>(null);
@@ -572,11 +576,13 @@ function App({ assistantAccount = '' }: AppProps) {
   return (
     <div
       className={[
-        'app-container',
-        isPc ? 'pc-mode' : '',
-        'app-container--we-agent-cui',
-        isPc && isHistorySidebarVisible ? 'has-history-sidebar' : '',
-      ].filter(Boolean).join(' ')}
+        "app-container",
+        isPc ? "pc-mode" : "",
+        "app-container--we-agent-cui",
+        isPc && isHistorySidebarVisible ? "has-history-sidebar" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={keyboardContainerStyle}
     >
       <div className="we-agent-cui-main">
@@ -598,22 +604,26 @@ function App({ assistantAccount = '' }: AppProps) {
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantDescription={weAgentAssistantDescription}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
+              showOnlineStatus={showOnlineStatus}
               isOnline={getAgentStatus(assistantAccount)}
             />
           </div>
 
           <div className="we-agent-cui-bottom">
-            <div className="we-agent-cui-actions" aria-label={t('weAgent.multiActionArea')}>
+            <div
+              className="we-agent-cui-actions"
+              aria-label={t("weAgent.multiActionArea")}
+            >
               <button
                 type="button"
                 className="we-agent-cui-actions__button"
-                data-tooltip={isPc ? t('weAgent.newSessionToolTip') : undefined}
+                data-tooltip={isPc ? t("weAgent.newSessionToolTip") : undefined}
                 onClick={(event) => {
                   runButtonClickWithDebounce(event, () => {
                     void handleCreateSession();
                   });
                 }}
-                aria-label={t('weAgent.newSession')}
+                aria-label={t("weAgent.newSession")}
               >
                 <img
                   className="we-agent-cui-actions__icon"
@@ -624,7 +634,7 @@ function App({ assistantAccount = '' }: AppProps) {
               </button>
               <WeAgentHistorySidebar
                 assistantAccount={assistantAccount}
-                currentWelinkSessionId={welinkSessionId ?? ''}
+                currentWelinkSessionId={welinkSessionId ?? ""}
                 cachedCache={historySessionsCache}
                 defaultOpen={isPc}
                 historyLoaded={historySessionsLoaded}
@@ -643,7 +653,7 @@ function App({ assistantAccount = '' }: AppProps) {
             <div className="footer-wrapper">
               <WeAgentCUIFooter
                 isPcMiniApp={isPc}
-                mode={session.isGenerating ? 'generating' : 'generate'}
+                mode={session.isGenerating ? "generating" : "generate"}
                 partnerAccount={assistantAccount}
                 slashCommands={session.slashCommands}
                 onRequestSlashCommands={session.onRequestSlashCommands}

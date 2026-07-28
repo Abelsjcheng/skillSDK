@@ -155,6 +155,8 @@ export function useChatSession({
   onSessionTitleChange,
   onSessionActivity,
   onSessionDeleted,
+  handleOnMessage,
+  handleOnClose
 }: UseChatSessionOptions): UseChatSessionResult {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -188,6 +190,8 @@ export function useChatSession({
   const onSessionTitleChangeRef = useRef(onSessionTitleChange);
   const onSessionActivityRef = useRef(onSessionActivity);
   const onSessionDeletedRef = useRef(onSessionDeleted);
+  const handleOnMessageRef = useRef(handleOnMessage);
+  const handleOnCloseRef = useRef(handleOnClose);
   const aiReplyFailedTextRef = useRef(tRef.current('weAgent.aiReplyFailed'));
 
   onSessionTitleChangeRef.current = onSessionTitleChange;
@@ -534,6 +538,9 @@ export function useChatSession({
 
     const onMessage = (msg: StreamMessage) => {
       const activeWelinkSessionId = activeWelinkSessionIdRef.current;
+      if (['agent.online', 'agent.offline'].includes(msg.type)) { 
+        handleOnMessageRef.current?.(msg);
+      }
       if (!activeWelinkSessionId || msg.welinkSessionId !== activeWelinkSessionId) {
         return;
       }
@@ -831,6 +838,7 @@ export function useChatSession({
 
     const onClose = (reason: string) => {
       WeLog(`useChatSession session listener closed | extra=${JSON.stringify({ mode, welinkSessionId, reason })}`);
+      handleOnCloseRef.current?.(reason);
     };
 
     const registerCurrentSessionListener = () => {

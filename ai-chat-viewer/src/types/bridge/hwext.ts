@@ -420,13 +420,9 @@ export interface HWH5NetworkStatus {
   isConnected: boolean;
 }
 
-export interface HWH5AppLifecycle {
-  onShow?: () => void;
-  onHide?: () => void;
-}
+
 
 export interface HWH5Bridge {
-  app?: (lifecycle: HWH5AppLifecycle) => void;
   onNetworkStatusChange?: (listener: (res: HWH5NetworkStatus) => void) => void;
   unregisterNetworkListener?: () => Promise<void>;
   openWebview: (payload: { uri: string }) => void;

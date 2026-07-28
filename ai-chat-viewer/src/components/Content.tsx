@@ -30,6 +30,7 @@ export const Content: React.FC<ContentProps> = ({
   weAgentAssistantName = '',
   weAgentAssistantDescription = '',
   weAgentAssistantAvatar = '',
+  showOnlineStatus = false,
   isOnline,
 }) => {
   const { t } = useTranslation();
@@ -154,12 +155,18 @@ export const Content: React.FC<ContentProps> = ({
               fallbackSrc={defaultAvatar}
               alt=""
               className="we-agent-cui-welcome__avatar"
-              showOnlineStatus={messageVariant !== 'plain'}
+              showOnlineStatus={showOnlineStatus&&messageVariant !== "plain"}
               isOnline={isOnline}
             />
           </div>
-          {welcomeTitle ? <div className="we-agent-cui-welcome__title">{welcomeTitle}</div> : null}
-          {welcomeSubtitle ? <div className="we-agent-cui-welcome__subtitle">{welcomeSubtitle}</div> : null}
+          {welcomeTitle ? (
+            <div className="we-agent-cui-welcome__title">{welcomeTitle}</div>
+          ) : null}
+          {welcomeSubtitle ? (
+            <div className="we-agent-cui-welcome__subtitle">
+              {welcomeSubtitle}
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -186,7 +193,7 @@ export const Content: React.FC<ContentProps> = ({
               weAgentUserAvatar={weAgentUserAvatar}
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
-              showOnlineStatus={messageVariant !== 'plain'}
+              showOnlineStatus={showOnlineStatus && messageVariant !== 'plain'}
               isOnline={isOnline}
             />
           </div>
@@ -198,7 +205,7 @@ export const Content: React.FC<ContentProps> = ({
               weAgentAssistantName={weAgentAssistantName}
               weAgentAssistantAvatar={weAgentAssistantAvatar}
               messageVariant={messageVariant}
-              showOnlineStatus={messageVariant !== 'plain'}
+              showOnlineStatus={showOnlineStatus && messageVariant !== 'plain'}
               isOnline={isOnline}
             />
           </div>

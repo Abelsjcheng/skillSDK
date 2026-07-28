@@ -29,6 +29,7 @@ export interface ContentProps {
   weAgentAssistantName?: string;
   weAgentAssistantDescription?: string;
   weAgentAssistantAvatar?: string;
+  showOnlineStatus?: boolean;
   isOnline?: boolean;
 }
 
