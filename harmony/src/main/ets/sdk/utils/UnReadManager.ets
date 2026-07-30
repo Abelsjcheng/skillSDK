@@ -54,7 +54,7 @@ export class UnReadManager {
 
   /** SDK 初始化后异步加载当前助理未读状态，不阻塞初始化流程。 */
   async initUnReadState(): Promise<void> {
-    this.agentTabNotifyEnabled = this.isAgentTabNotifyEnabled();
+    this.agentTabNotifyEnabled = this.readAgentTabNotifyEnabled();
     this.logger.info(`start unread initialization, AgentTabNotify=${this.agentTabNotifyEnabled}`);
     if (!this.agentTabNotifyEnabled) {
       this.logger.info('skip unread initialization: AgentTabNotify is unavailable');
@@ -95,6 +95,11 @@ export class UnReadManager {
       this.logger.error(`query unread state failed, partnerAccount=${params.assistantAccount}, error=${JSON.stringify(error)}`);
       throw error;
     }
+  }
+
+  /** 返回初始化阶段缓存的 AgentTabNotify 权限。 */
+  isAgentTabNotifyEnabled(): boolean {
+    return this.agentTabNotifyEnabled;
   }
 
   async reportWeAgentSessionRead(
@@ -328,7 +333,7 @@ export class UnReadManager {
   }
 
   /** 仅在未读状态初始化时读取宿主 AgentTabNotify ABTest 权限。 */
-  private isAgentTabNotifyEnabled(): boolean {
+  private readAgentTabNotifyEnabled(): boolean {
     // 待接入：调用宿主 ABTest 能力获取 AgentTabNotify 权限。
     return false;
   }

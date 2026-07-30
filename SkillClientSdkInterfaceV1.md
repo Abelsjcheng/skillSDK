@@ -2103,19 +2103,21 @@ getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAge
 
 ### 实现方法
 
-1. SDK 校验 `assistantAccount`，为空时直接返回无未读或错误，不请求服务端。
-2. SDK 请求 `POST /api/skill/sessions/unread`，请求体包含 `assistantAccount`；传入会话列表时包含 `sessionIds`。
-3. SDK 将 `data.unreadSessionList[].sessionId` 映射为 `sessions[].welinkSessionId`，将 `data.unreadSessionList[].maxSeq` 映射为 `maxSeq`。
-4. 若会话 ID 与当前 WeAgentCUI 会话一致，则该会话设置为 `hasUnRead=false`；其他返回会话设置为 `hasUnRead=true`。
-5. 如果入参传了 `sessionIds`，不在 `unreadSessionList` 内的会话可在 SDK 返回中补齐为 `hasUnRead=false`。
-6. SDK 根据映射后的会话集合生成 `assistantUnread`；`redDotVisible` 仅表示已缓存的 `AgentTabNotify` ABTest 权限。宿主助理 Tab 的实际小红点展示由 SDK 结合未读、助理类型和 Tab 聚焦状态独立计算。
-7. 若服务端请求失败，SDK 可降级返回当前助理的内存缓存；缓存缺失或缓存属于旧助理时默认 `assistantUnread=false`、`redDotVisible=false`、`sessions=[]`。
+1. SDK 先校验 `agentTabNotifyEnabled`；值为 `false` 时返回 `4011`，错误消息为“Permission denied: AgentTabNotify is disabled”，不读取缓存也不请求服务端。
+2. SDK 校验 `assistantAccount`，为空时直接返回无未读或错误，不请求服务端。
+3. SDK 请求 `POST /api/skill/sessions/unread`，请求体包含 `assistantAccount`；传入会话列表时包含 `sessionIds`。
+4. SDK 将 `data.unreadSessionList[].sessionId` 映射为 `sessions[].welinkSessionId`，将 `data.unreadSessionList[].maxSeq` 映射为 `maxSeq`。
+5. 若会话 ID 与当前 WeAgentCUI 会话一致，则该会话设置为 `hasUnRead=false`；其他返回会话设置为 `hasUnRead=true`。
+6. 如果入参传了 `sessionIds`，不在 `unreadSessionList` 内的会话可在 SDK 返回中补齐为 `hasUnRead=false`。
+7. SDK 根据映射后的会话集合生成 `assistantUnread`；`redDotVisible` 仅表示已缓存的 `AgentTabNotify` ABTest 权限。宿主助理 Tab 的实际小红点展示由 SDK 结合未读、助理类型和 Tab 聚焦状态独立计算。
+8. 若服务端请求失败，SDK 可降级返回当前助理的内存缓存；缓存缺失或缓存属于旧助理时默认 `assistantUnread=false`、`redDotVisible=false`、`sessions=[]`。
 
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `assistantAccount` 缺失或格式错误 |
+| 4011 | Permission denied: AgentTabNotify is disabled | `agentTabNotifyEnabled` 为 `false`，当前客户端无权限调用该接口 |
 | 6000 | 网络错误 | 服务端请求失败、超时或无法解析响应 |
 | 7000 | 服务端错误 | 服务端返回非成功状态 |
 
@@ -2180,16 +2182,18 @@ reportWeAgentSessionRead(params: ReportWeAgentSessionReadParams): Promise<Report
 
 ### 实现方法
 
-1. SDK 校验 `welinkSessionId` 和 `readSeq`，无有效 `readSeq` 时不上报。
-2. SDK 请求 `POST /api/skill/sessions/{sessionId}/read`，path 使用 `welinkSessionId`，body 为 `{ "readSeq": number }`。
-3. SDK 对同一 `welinkSessionId` 记录已上报最大 `readSeq`；后续小于或等于该值的上报不重复调用服务端。
-4. 上报成功后，SDK 可将当前会话本地未读态更新为 `hasUnRead=false`，再等待服务端 IM 广播或后续查询校正最终状态。
+1. SDK 先校验 `agentTabNotifyEnabled`；值为 `false` 时返回 `4011`，错误消息为“Permission denied: AgentTabNotify is disabled”，不上报已读。
+2. SDK 校验 `welinkSessionId` 和 `readSeq`，无有效 `readSeq` 时不上报。
+3. SDK 请求 `POST /api/skill/sessions/{sessionId}/read`，path 使用 `welinkSessionId`，body 为 `{ "readSeq": number }`。
+4. SDK 对同一 `welinkSessionId` 记录已上报最大 `readSeq`；后续小于或等于该值的上报不重复调用服务端。
+5. 上报成功后，SDK 可将当前会话本地未读态更新为 `hasUnRead=false`，再等待服务端 IM 广播或后续查询校正最终状态。
 
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或 `readSeq` 非有效 number |
+| 4011 | Permission denied: AgentTabNotify is disabled | `agentTabNotifyEnabled` 为 `false`，当前客户端无权限调用该接口 |
 | 6000 | 网络错误 | 服务端请求失败或超时 |
 | 7000 | 服务端错误 | 服务端返回非成功状态 |
 
@@ -2239,16 +2243,18 @@ onSessionViewing(params: OnSessionViewingParams): Promise<{ status: string }>
 
 ### 实现方法
 
-1. SDK 校验 `welinkSessionId`，为空时不更新查看态。
-2. SDK 将该会话记录为当前正常查看会话。
-3. SDK 将内存缓存中的该会话未读态设置为 `hasUnRead=false`。
-4. 若页面内切换会话，新的 `onSessionViewing` 覆盖当前查看会话，不需要额外调用 `onSessionViewingEnd`。
+1. SDK 先校验 `agentTabNotifyEnabled`；值为 `false` 时返回 `4011`，错误消息为“Permission denied: AgentTabNotify is disabled”，不更新查看态。
+2. SDK 校验 `welinkSessionId`，为空时不更新查看态。
+3. SDK 将该会话记录为当前正常查看会话。
+4. SDK 将内存缓存中的该会话未读态设置为 `hasUnRead=false`。
+5. 若页面内切换会话，新的 `onSessionViewing` 覆盖当前查看会话，不需要额外调用 `onSessionViewingEnd`。
 
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+| 4011 | Permission denied: AgentTabNotify is disabled | `agentTabNotifyEnabled` 为 `false`，当前客户端无权限调用该接口 |
 
 ### 组合调用场景
 
@@ -2295,16 +2301,18 @@ onSessionViewingEnd(params: OnSessionViewingEndParams): Promise<{ status: string
 
 ### 实现方法
 
-1. SDK 校验 `welinkSessionId`，为空时不修改查看态。
-2. 若当前查看会话等于入参 `welinkSessionId`，SDK 清除该会话查看标记。
-3. 清除查看标记后，该会话恢复服务端正常推送处理。
-4. 页面内切换会话时不需要调用该接口，由新的 `onSessionViewing` 覆盖当前查看会话。
+1. SDK 先校验 `agentTabNotifyEnabled`；值为 `false` 时返回 `4011`，错误消息为“Permission denied: AgentTabNotify is disabled”，不修改查看态。
+2. SDK 校验 `welinkSessionId`，为空时不修改查看态。
+3. 若当前查看会话等于入参 `welinkSessionId`，SDK 清除该会话查看标记。
+4. 清除查看标记后，该会话恢复服务端正常推送处理。
+5. 页面内切换会话时不需要调用该接口，由新的 `onSessionViewing` 覆盖当前查看会话。
 
 ### 错误处理
 
 | 错误码 | 错误消息 | 说明 |
 |--------|----------|------|
 | 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+| 4011 | Permission denied: AgentTabNotify is disabled | `agentTabNotifyEnabled` 为 `false`，当前客户端无权限调用该接口 |
 
 ### 组合调用场景
 

@@ -739,6 +739,11 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)getWeAgentUnreadMessage:(WLAgentSkillsGetWeAgentUnreadMessageParams *)params
                          success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *result))success
                          failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;
@@ -774,6 +779,11 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)reportWeAgentSessionRead:(WLAgentSkillsReportWeAgentSessionReadParams *)params
                           success:(void (^)(WLAgentSkillsReportWeAgentSessionReadResult *result))success
                           failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] reportWeAgentSessionRead failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;
@@ -821,6 +831,11 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)onSessionViewing:(WLAgentSkillsOnSessionViewingParams *)params
                   success:(void (^)(WLAgentSkillsOnSessionViewingResult *result))success
                   failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewing failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;
@@ -848,6 +863,11 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 - (void)onSessionViewingEnd:(WLAgentSkillsOnSessionViewingEndParams *)params
                      success:(void (^)(WLAgentSkillsOnSessionViewingEndResult *result))success
                      failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewingEnd failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
     if (params == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
         return;

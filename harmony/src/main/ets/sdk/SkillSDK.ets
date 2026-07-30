@@ -906,6 +906,10 @@ export class SkillSDK {
 
   async getWeAgentUnreadMessage(params: GetWeAgentUnreadMessageParams): Promise<GetWeAgentUnreadMessageResult> {
     try {
+      if (!this.unReadManager.isAgentTabNotifyEnabled()) {
+        this.logger.error('getWeAgentUnreadMessage failed: AgentTabNotify is unavailable');
+        throw new SkillSdkException(4011, 'Permission denied: AgentTabNotify is disabled');
+      }
       Validator.requireObject(params, 'params');
       const assistantAccount = TypeConverter.toRequiredString(params.assistantAccount, 'assistantAccount');
       const sessionIds = params.sessionIds === undefined
@@ -922,6 +926,10 @@ export class SkillSDK {
 
   async reportWeAgentSessionRead(params: ReportWeAgentSessionReadParams): Promise<ReportWeAgentSessionReadResult> {
     try {
+      if (!this.unReadManager.isAgentTabNotifyEnabled()) {
+        this.logger.error('reportWeAgentSessionRead failed: AgentTabNotify is unavailable');
+        throw new SkillSdkException(4011, 'Permission denied: AgentTabNotify is disabled');
+      }
       Validator.requireObject(params, 'params');
       const welinkSessionId = TypeConverter.toRequiredString(params.welinkSessionId, 'welinkSessionId');
       const readSeq = TypeConverter.toOptionalInteger(params.readSeq, 'readSeq');
@@ -938,12 +946,20 @@ export class SkillSDK {
   }
 
   onSessionViewing(params: OnSessionViewingParams): OnSessionViewingResult {
+    if (!this.unReadManager.isAgentTabNotifyEnabled()) {
+      this.logger.error('onSessionViewing failed: AgentTabNotify is unavailable');
+      throw new SkillSdkException(4011, 'Permission denied: AgentTabNotify is disabled');
+    }
     this.unReadManager.onSessionViewing(params);
     this.logger.info(`onSessionViewing succeeded, sessionId=${params.welinkSessionId}`);
     return { status: 'success' };
   }
 
   onSessionViewingEnd(params: OnSessionViewingEndParams): OnSessionViewingEndResult {
+    if (!this.unReadManager.isAgentTabNotifyEnabled()) {
+      this.logger.error('onSessionViewingEnd failed: AgentTabNotify is unavailable');
+      throw new SkillSdkException(4011, 'Permission denied: AgentTabNotify is disabled');
+    }
     this.unReadManager.onSessionViewingEnd(params);
     this.logger.info(`onSessionViewingEnd succeeded, sessionId=${params.welinkSessionId}`);
     return { status: 'success' };

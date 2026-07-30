@@ -59,7 +59,7 @@ public final class UnReadManager {
 
     /** SDK 初始化后异步加载当前助理未读状态，不阻塞初始化流程。 */
     public void initUnReadState() {
-        agentTabNotifyEnabled = isAgentTabNotifyEnabled();
+        agentTabNotifyEnabled = readAgentTabNotifyEnabled();
         WeLinkLogger.i(TAG, "start unread initialization, AgentTabNotify=" + agentTabNotifyEnabled);
         if (!agentTabNotifyEnabled) {
             WeLinkLogger.i(TAG, "skip unread initialization: AgentTabNotify is unavailable");
@@ -107,6 +107,11 @@ public final class UnReadManager {
                 }
             }
         });
+    }
+
+    /** 返回初始化阶段缓存的 AgentTabNotify 权限。 */
+    public boolean isAgentTabNotifyEnabled() {
+        return agentTabNotifyEnabled;
     }
 
     public void reportWeAgentSessionRead(@NonNull String sessionId, long readSeq,
@@ -378,7 +383,7 @@ public final class UnReadManager {
     }
 
     /** 仅在未读状态初始化时读取宿主 AgentTabNotify ABTest 权限。 */
-    private boolean isAgentTabNotifyEnabled() {
+    private boolean readAgentTabNotifyEnabled() {
         // 待接入：调用宿主 ABTest 能力获取 AgentTabNotify 权限。
         return false;
     }

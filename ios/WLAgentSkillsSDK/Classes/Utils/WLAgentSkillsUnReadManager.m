@@ -36,7 +36,7 @@
 }
 
 - (void)initUnReadState {
-  self.agentTabNotifyEnabled = [self isAgentTabNotifyEnabled];
+  self.agentTabNotifyEnabled = [self readAgentTabNotifyEnabled];
   WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] start initialization, AgentTabNotify=%@",
              self.agentTabNotifyEnabled ? @"YES" : @"NO");
   if (!self.agentTabNotifyEnabled) {
@@ -464,6 +464,10 @@
 }
 
 - (BOOL)isAgentTabNotifyEnabled {
+  return self.agentTabNotifyEnabled;
+}
+
+- (BOOL)readAgentTabNotifyEnabled {
   // 待接入：调用宿主 ABTest 能力获取 AgentTabNotify 权限。
   return NO;
 }

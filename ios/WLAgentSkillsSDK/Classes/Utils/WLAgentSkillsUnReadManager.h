@@ -6,6 +6,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface WLAgentSkillsUnReadManager : NSObject
 + (instancetype)sharedManager;
 - (void)initUnReadState;
+- (BOOL)isAgentTabNotifyEnabled;
 - (void)getWeAgentUnreadMessage:(WLAgentSkillsGetWeAgentUnreadMessageParams *)params
                          success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *result))success
                          failure:(void (^)(NSError *error))failure;

@@ -1241,6 +1241,11 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
+            return;
+        }
         if (params == null) {
             WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: params is required");
             callback.onError(error(1000, "params is required"));
@@ -1273,6 +1278,11 @@ public final class SkillSDK {
         if (!isInitialized()) {
             WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: SkillSDK is not initialized");
             callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
             return;
         }
         if (params == null) {
@@ -1313,6 +1323,11 @@ public final class SkillSDK {
             callback.onError(error(5000, "SkillSDK is not initialized"));
             return;
         }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "onSessionViewing failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
+            return;
+        }
         unReadManager.onSessionViewing(params);
         WeLinkLogger.i(TAG, "onSessionViewing succeeded, sessionId=" + params.getWelinkSessionId());
         callback.onSuccess(new OnSessionViewingResult("success"));
@@ -1323,6 +1338,11 @@ public final class SkillSDK {
         if (!isInitialized()) {
             WeLinkLogger.e(TAG, "onSessionViewingEnd failed: SkillSDK is not initialized");
             callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "onSessionViewingEnd failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
             return;
         }
         unReadManager.onSessionViewingEnd(params);
