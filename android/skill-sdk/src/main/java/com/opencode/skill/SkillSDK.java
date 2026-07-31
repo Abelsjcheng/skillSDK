@@ -30,8 +30,15 @@ import com.opencode.skill.model.DeleteWeAgentResult;
 import com.opencode.skill.model.GetSessionMessageParams;
 import com.opencode.skill.model.GetSessionMessageHistoryParams;
 import com.opencode.skill.model.GetIsShowWeAgentResult;
+import com.opencode.skill.model.GetWeAgentUnreadMessageParams;
+import com.opencode.skill.model.GetWeAgentUnreadMessageResult;
 import com.opencode.skill.model.HistorySessionsParams;
 import com.opencode.skill.model.OnSessionStatusChangeParams;
+import com.opencode.skill.model.OnAssistantChangedParams;
+import com.opencode.skill.model.OnSessionViewingEndParams;
+import com.opencode.skill.model.OnSessionViewingEndResult;
+import com.opencode.skill.model.OnSessionViewingParams;
+import com.opencode.skill.model.OnSessionViewingResult;
 import com.opencode.skill.model.OpenAssistantEditPageParams;
 import com.opencode.skill.model.OpenAssistantEditPageResult;
 import com.opencode.skill.model.OpenWeAgentParams;
@@ -47,6 +54,8 @@ import com.opencode.skill.model.RegisterSessionListenerParams;
 import com.opencode.skill.model.RegisterSessionListenerResult;
 import com.opencode.skill.model.ReplyPermissionParams;
 import com.opencode.skill.model.ReplyPermissionResult;
+import com.opencode.skill.model.ReportWeAgentSessionReadParams;
+import com.opencode.skill.model.ReportWeAgentSessionReadResult;
 import com.opencode.skill.model.RegenerateAnswerParams;
 import com.opencode.skill.model.SendMessageParams;
 import com.opencode.skill.model.SendMessageResult;
@@ -80,6 +89,7 @@ import com.opencode.skill.util.SdkStringUtils;
 import com.opencode.skill.util.SdkUriUtil;
 import com.opencode.skill.util.SessionMessageHelper;
 import com.opencode.skill.util.TypeConvertUtils;
+import com.opencode.skill.util.UnReadManager;
 import com.opencode.skill.util.WeAgentManager;
 import com.opencode.skill.util.WeAgentStorage;
 import com.opencode.skill.util.WeAgentUriBunilder;
@@ -111,7 +121,9 @@ public final class SkillSDK {
     @NonNull
     private final WeAgentManager weAgentManager = new WeAgentManager(gson, apiClient, weAgentStorage);
     @NonNull
-    private final ImNotifyManager imNotifyManager = new ImNotifyManager(gson, weAgentManager);
+    private final UnReadManager unReadManager = new UnReadManager(apiClient, weAgentStorage);
+    @NonNull
+    private final ImNotifyManager imNotifyManager = new ImNotifyManager(gson, weAgentManager, unReadManager);
     @NonNull
     private final Map<String, SessionStatusCallback> sessionStatusCallbacks = new ConcurrentHashMap<>();
     @NonNull
@@ -133,6 +145,9 @@ public final class SkillSDK {
         @Override
         public void onMessage(@NonNull StreamMessage message) {
             emitSessionStatusByEvent(message);
+            if ("session.deleted".equals(message.getType())) {
+                unReadManager.onSessionDeleted(message.getWelinkSessionId());
+            }
         }
 
         @Override
@@ -166,9 +181,11 @@ public final class SkillSDK {
         apiClient.configure(config);
         webSocketManager.configure(config);
         weAgentStorage.configure(config.getContext());
+        unReadManager.configure(config.getContext());
         webSocketManager.removeInternalListener(internalStreamListener);
         webSocketManager.addInternalListener(internalStreamListener);
         weAgentManager.refreshWeAgentsOnColdStart();
+        unReadManager.initUnReadState();
     }
 
     public boolean isInitialized() {
@@ -1212,6 +1229,133 @@ public final class SkillSDK {
         imNotifyManager.handleWeAgentImNotifyBroadcast(payload);
     }
 
+    /** 单独处理宿主 IM 未读通知，不进入助理更新或删除流程。 */
+    public void handleWeAgentUnreadImNotifyBroadcast(@NonNull Map<String, Object> payload) {
+        imNotifyManager.handleWeAgentUnreadImNotifyBroadcast(payload);
+    }
+
+    public void getWeAgentUnreadMessage(@NonNull GetWeAgentUnreadMessageParams params,
+            @NonNull SkillCallback<GetWeAgentUnreadMessageResult> callback) {
+        if (!isInitialized()) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: SkillSDK is not initialized");
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
+            return;
+        }
+        if (params == null) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed: params is required");
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+        final String partnerAccount;
+        final List<String> sessionIds;
+        try {
+            partnerAccount = TypeConvertUtils.requireString(params.getAssistantAccount(), "assistantAccount");
+            sessionIds = TypeConvertUtils.optionalStringList(params.getSessionIds(), "sessionIds");
+        } catch (SkillSdkException error) {
+            WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed, error=" + error.getErrorMessage());
+            callback.onError(error);
+            return;
+        }
+        unReadManager.getWeAgentUnreadMessage(partnerAccount, sessionIds, new SkillCallback<GetWeAgentUnreadMessageResult>() {
+            @Override public void onSuccess(@Nullable GetWeAgentUnreadMessageResult result) {
+                WeLinkLogger.i(TAG, "getWeAgentUnreadMessage succeeded");
+                callback.onSuccess(result);
+            }
+            @Override public void onError(@NonNull Throwable error) {
+                WeLinkLogger.e(TAG, "getWeAgentUnreadMessage failed, error=" + error.getMessage());
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    public void reportWeAgentSessionRead(@NonNull ReportWeAgentSessionReadParams params,
+            @NonNull SkillCallback<ReportWeAgentSessionReadResult> callback) {
+        if (!isInitialized()) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: SkillSDK is not initialized");
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
+            return;
+        }
+        if (params == null) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: params is required");
+            callback.onError(error(1000, "params is required"));
+            return;
+        }
+        final String sessionId;
+        try {
+            sessionId = TypeConvertUtils.requireString(params.getWelinkSessionId(), "welinkSessionId");
+        } catch (SkillSdkException error) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed, error=" + error.getErrorMessage());
+            callback.onError(error);
+            return;
+        }
+        long readSeq = params.getReadSeq();
+        if (readSeq <= 0) {
+            WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed: readSeq must be a positive integer");
+            callback.onError(error(1000, "readSeq must be a positive integer"));
+            return;
+        }
+        unReadManager.reportWeAgentSessionRead(sessionId, readSeq, new SkillCallback<Void>() {
+            @Override public void onSuccess(@Nullable Void ignored) {
+                WeLinkLogger.i(TAG, "reportWeAgentSessionRead succeeded");
+                callback.onSuccess(new ReportWeAgentSessionReadResult("success"));
+            }
+            @Override public void onError(@NonNull Throwable error) {
+                WeLinkLogger.e(TAG, "reportWeAgentSessionRead failed, error=" + error.getMessage());
+                callback.onError(wrapError(error));
+            }
+        });
+    }
+
+    public void onSessionViewing(@NonNull OnSessionViewingParams params,
+            @NonNull SkillCallback<OnSessionViewingResult> callback) {
+        if (!isInitialized()) {
+            WeLinkLogger.e(TAG, "onSessionViewing failed: SkillSDK is not initialized");
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "onSessionViewing failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
+            return;
+        }
+        unReadManager.onSessionViewing(params);
+        WeLinkLogger.i(TAG, "onSessionViewing succeeded, sessionId=" + params.getWelinkSessionId());
+        callback.onSuccess(new OnSessionViewingResult("success"));
+    }
+
+    public void onSessionViewingEnd(@NonNull OnSessionViewingEndParams params,
+            @NonNull SkillCallback<OnSessionViewingEndResult> callback) {
+        if (!isInitialized()) {
+            WeLinkLogger.e(TAG, "onSessionViewingEnd failed: SkillSDK is not initialized");
+            callback.onError(error(5000, "SkillSDK is not initialized"));
+            return;
+        }
+        if (!unReadManager.isAgentTabNotifyEnabled()) {
+            WeLinkLogger.e(TAG, "onSessionViewingEnd failed: AgentTabNotify is unavailable");
+            callback.onError(error(4011, "Permission denied: AgentTabNotify is disabled"));
+            return;
+        }
+        unReadManager.onSessionViewingEnd(params);
+        WeLinkLogger.i(TAG, "onSessionViewingEnd succeeded, sessionId=" + params.getWelinkSessionId());
+        callback.onSuccess(new OnSessionViewingEndResult("success"));
+    }
+
+    /** 宿主切换当前助理后通知 SDK 刷新未读状态。 */
+    public void onAssistantChanged(@NonNull OnAssistantChangedParams params) {
+        unReadManager.onAssistantChanged(params.getAssistantDetail());
+        WeLinkLogger.i(TAG, "onAssistantChanged succeeded");
+    }
+
     // 23. setIsShowWeAgent
     public void setIsShowWeAgent(@NonNull SetIsShowWeAgentParams params,
             @NonNull SkillCallback<SetIsShowWeAgentResult> callback) {
@@ -1471,6 +1615,7 @@ public final class SkillSDK {
 
     public synchronized void shutdown() {
         webSocketManager.removeInternalListener(internalStreamListener);
+        unReadManager.shutdown();
         webSocketManager.shutdown();
         apiClient.shutdown();
         listenerBindings.clear();

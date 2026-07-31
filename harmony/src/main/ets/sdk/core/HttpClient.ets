@@ -12,6 +12,7 @@ type QueryParams = Record<string, QueryValue | QueryValue[] | undefined>;
 interface RequestOptions {
   expectEnvelope?: boolean;
   useAssistantBaseUrl?: boolean;
+  skipBaseUrl?: boolean;
 }
 
 /**
@@ -83,7 +84,12 @@ export class HttpClient {
     query?: QueryParams,
     options?: RequestOptions
   ): Promise<T> {
-    const requestUrl = this.buildUrl(path, query, options?.useAssistantBaseUrl ?? false);
+    const requestUrl = this.buildUrl(
+      path,
+      query,
+      options?.useAssistantBaseUrl ?? false,
+      options?.skipBaseUrl ?? false
+    );
     const client = http.createHttp();
     const expectEnvelope = options?.expectEnvelope ?? true;
 
@@ -156,10 +162,15 @@ export class HttpClient {
     }
   }
 
-  private buildUrl(path: string, query?: QueryParams, useAssistantBaseUrl?: boolean): string {
+  private buildUrl(
+    path: string,
+    query?: QueryParams,
+    useAssistantBaseUrl?: boolean,
+    skipBaseUrl?: boolean
+  ): string {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     const selectedBaseUrl = useAssistantBaseUrl ? this.assistantBaseUrl : this.baseUrl;
-    const base = `${selectedBaseUrl}${normalizedPath}`;
+    const base = skipBaseUrl ? normalizedPath : `${selectedBaseUrl}${normalizedPath}`;
     if (query === undefined) {
       return base;
     }

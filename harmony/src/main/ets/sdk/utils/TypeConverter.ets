@@ -4,6 +4,36 @@
 type ConvertibleValue = string | number | boolean | bigint | Object | null | undefined;
 
 export class TypeConverter {
+  /** Safely converts an object or JSON string to a record. */
+  static toRecord(value: Object | undefined): Record<string, Object> | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, Object>;
+        }
+      } catch (_error) {
+        return undefined;
+      }
+      return undefined;
+    }
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, Object>;
+    }
+    return undefined;
+  }
+
+  static normalizeOptionalString(value?: string): string | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+
   static toRequiredString(value: ConvertibleValue, fieldName: string): string {
     const converted = this.toOptionalString(value, fieldName);
     if (converted === undefined) {

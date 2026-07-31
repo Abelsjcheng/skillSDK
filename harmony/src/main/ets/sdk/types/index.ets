@@ -553,6 +553,70 @@ export interface QueryAssistantGraySingleResult {
   data: boolean;
 }
 
+export interface GetWeAgentUnreadMessageParams {
+  assistantAccount: string;
+  sessionIds?: string[];
+}
+
+export interface WeAgentSessionUnreadState {
+  welinkSessionId: string;
+  hasUnRead: boolean;
+  maxSeq: number;
+}
+
+export type WeAgentUnreadSource =
+  | 'server'
+  | 'cache'
+  | 'readReport'
+  | 'sessionViewing'
+  | 'sessionDeleted'
+  | 'assistantChanged'
+  | 'serverPush'
+  | 'networkReconnect';
+
+export interface GetWeAgentUnreadMessageResult {
+  partnerAccount: string;
+  assistantUnread: boolean;
+  redDotVisible: boolean;
+  sessions: WeAgentSessionUnreadState[];
+  source: WeAgentUnreadSource;
+}
+
+export interface ReportWeAgentSessionReadParams {
+  welinkSessionId: string;
+  readSeq: number;
+}
+
+/** 服务端已读上报接口 data 字段的数据模型。 */
+export interface ReportWeAgentSessionReadData {
+  welinkSessionId: string;
+  unreadCount: number;
+}
+
+export interface ReportWeAgentSessionReadResult {
+  status: 'success';
+}
+
+export interface OnSessionViewingParams {
+  welinkSessionId: string;
+}
+
+export interface OnSessionViewingResult {
+  status: 'success';
+}
+
+export interface OnSessionViewingEndParams {
+  welinkSessionId: string;
+}
+
+export interface OnSessionViewingEndResult {
+  status: 'success';
+}
+
+export interface OnAssistantChangedParams {
+  assistantDetail?: WeAgentDetails;
+}
+
 export interface WeAgent {
   name: string;
   icon: string;

@@ -24,6 +24,8 @@ import type {
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
+  GetWeAgentUnreadMessageParams,
+  GetWeAgentUnreadMessageResult,
   GetWeAgentDetailsParams,
   GetWeAgentListParams,
   HWH5AppInfo,
@@ -33,11 +35,17 @@ import type {
   HistorySessionsListResult,
   OpenWeAgentCUIParams,
   OpenWeAgentCUIResult,
+  OnSessionViewingEndParams,
+  OnSessionViewingParams,
+  OnSessionViewingResult,
+  OnVisiblePayload,
   Pedestal,
   QueryQrcodeInfoParams,
   QueryQrcodeInfoResult,
   RegisterEventListenerParams,
   RegisterSessionListenerParams,
+  ReportWeAgentSessionReadParams,
+  ReportWeAgentSessionReadResult,
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ResolveRobotIdOptions,
@@ -70,7 +78,11 @@ import {
   trackApiGetSessionMessageHistory,
   trackApiGetWeAgentDetails,
   trackApiGetWeAgentList,
+  trackApiGetWeAgentUnreadMessage,
+  trackApiOnSessionViewing,
+  trackApiOnSessionViewingEnd,
   trackApiQueryQrcodeInfo,
+  trackApiReportWeAgentSessionRead,
   trackApiReplyPermission,
   trackApiSendMessage,
   trackApiSendMessageToIM,
@@ -131,7 +143,7 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
     getSessionMessageHistory: (params) => call<GetSessionMessageHistoryResponse>('getSessionMessageHistory', params),
     onTabForUpdate: () => undefined,
     registerEventListener: (params) => {
-      const validEventTypes = ['agentskills_agentUpdated'];
+      const validEventTypes = ['agentskills_agentUpdated', 'agentskills_unreadChanged', 'agentskills_pageVisible'];
       if (!validEventTypes.includes(params.type)) {
         return;
       }
@@ -140,6 +152,12 @@ function createPedestalAdapter(pedestal: Pedestal): HWH5EXT {
         params.func && params.func(data)
       })
     },
+    getWeAgentUnreadMessage: (params) => call<GetWeAgentUnreadMessageResult>('getWeAgentUnreadMessage', params),
+    reportWeAgentSessionRead: (params) => (
+      call<ReportWeAgentSessionReadResult>('reportWeAgentSessionRead', params)
+    ),
+    onSessionViewing: (params) => call<OnSessionViewingResult>('onSessionViewing', params),
+    onSessionViewingEnd: (params) => call<OnSessionViewingResult>('onSessionViewingEnd', params),
     registerSessionListener: (params) => {
       if (isPcMiniApp()) {
         listenerParams = params;
@@ -627,8 +645,51 @@ export async function getAccountInfoUid(): Promise<string> {
   return (await getUserInfo()).uid;
 }
 
-export async function registerEventListener(params: RegisterEventListenerParams): Promise<void> {
-  await getJsApiOrThrow().registerEventListener(params);
+export async function registerEventListener<TPayload = unknown>(
+  params: RegisterEventListenerParams<TPayload>,
+): Promise<void> {
+  await getJsApiOrThrow().registerEventListener(params as RegisterEventListenerParams);
+}
+
+export function registerOnVisibleListener(
+  listener: (payload: OnVisiblePayload) => void,
+): void {
+  if (isPcMiniApp()) {
+    registerEventListener({
+      type: 'agentskills_pageVisible',
+      func: () => listener({ visibility: 1 }),
+    });
+    return;
+  }
+
+  window.HWH5?.addEventListener?.({
+    type: 'onVisible',
+    func: listener,
+  })
+}
+
+export async function getWeAgentUnreadMessage(
+  params: GetWeAgentUnreadMessageParams,
+): Promise<GetWeAgentUnreadMessageResult> {
+  return trackApiGetWeAgentUnreadMessage(params, Promise.resolve(getJsApiOrThrow().getWeAgentUnreadMessage(params)));
+}
+
+export async function reportWeAgentSessionRead(
+  params: ReportWeAgentSessionReadParams,
+): Promise<ReportWeAgentSessionReadResult> {
+  return trackApiReportWeAgentSessionRead(params, Promise.resolve(getJsApiOrThrow().reportWeAgentSessionRead(params)));
+}
+
+export async function onSessionViewing(
+  params: OnSessionViewingParams,
+): Promise<OnSessionViewingResult> {
+  return trackApiOnSessionViewing(params, Promise.resolve(getJsApiOrThrow().onSessionViewing(params)));
+}
+
+export async function onSessionViewingEnd(
+  params: OnSessionViewingEndParams,
+): Promise<OnSessionViewingResult> {
+  return trackApiOnSessionViewingEnd(params, Promise.resolve(getJsApiOrThrow().onSessionViewingEnd(params)));
 }
 
 export async function getAgentType(): Promise<AgentTypeListResult> {

@@ -16,10 +16,13 @@ import com.opencode.skill.model.SkillSdkException;
 import com.opencode.skill.model.StreamMessage;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -37,6 +40,11 @@ import okhttp3.WebSocketListener;
  * 统一维护底层长连接，并按 welinkSessionId 将服务端 onmessage 事件分发给对应会话监听器。
  */
 public final class WebSocketManager {
+    @NonNull
+    private static final Set<String> GLOBAL_BROADCAST_EVENTS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("session.deleted", "agent.online", "agent.offline"))
+    );
+
     public interface InternalListener {
         void onMessage(@NonNull StreamMessage message);
 
@@ -230,6 +238,12 @@ public final class WebSocketManager {
             listener.onMessage(message);
         }
 
+        // 这三类事件不关联具体会话，直接通过基座全局广播分发。
+        if (GLOBAL_BROADCAST_EVENTS.contains(message.getType())) {
+            broadcastGlobalWebSocketEvent(message);
+            return;
+        }
+
         String sessionId = message.getWelinkSessionId();
         if (sessionId == null || sessionId.trim().isEmpty()) {
             return;
@@ -239,6 +253,10 @@ public final class WebSocketManager {
             return;
         }
         dispatchToSessionListeners(listeners, message);
+    }
+
+    private void broadcastGlobalWebSocketEvent(@NonNull StreamMessage message) {
+        // 待接入：调用基座广播能力分发与会话无关的 WebSocket 事件。
     }
 
     private void dispatchToSessionListeners(

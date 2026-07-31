@@ -5,6 +5,7 @@
 
 #import "WLAgentSkillsSDK.h"
 #import "WLAgentSkillsHTTPClient.h"
+#import "WLAgentSkillsUnReadManager.h"
 #import "WLAgentSkillsWebSocketManager.h"
 #import "WLAgentSkillsConfig.h"
 #import "WLAgentSkillsTypeConverter.h"
@@ -16,7 +17,8 @@ static NSString * const WLAgentSkillsSDKErrorDomain = @"com.wlagentskills.sdk";
 static NSString * const WLAgentSkillsAssistantH5URI = @"h5://S008623/index.html";
 static NSString * const WLAgentSkillsWeAgentCUIAppId = @"S008623";
 static NSString * const WLAgentSkillsWeAgentEventName = @"agentskills.agentUpdated";
-static NSString * const WLAgentSkillsIMNotifyModule = @"welink-athena";
+static NSString * const WLAgentSkillsCuiIMNotifyModule = @"welink-athena";
+static NSString * const WLAgentSkillsEmployeeAssistantIMNotifyModule = @"uni-assistant";
 typedef void (^WLAgentSkillsCacheMutationCompletion)(void);
 typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationCompletion completion);
 @interface WLAgentSkillsDeleteWeAgentContext : NSObject
@@ -57,18 +59,21 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL];
     [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
     [[self sharedInstance] refreshWeAgentsOnColdStart];
+    [[WLAgentSkillsUnReadManager sharedManager] initUnReadState];
 }
 
 + (void)configureWithBaseURL:(NSString *)baseURL assistantBaseURL:(nullable NSString *)assistantBaseURL {
     [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL assistantBaseURL:assistantBaseURL];
     [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
     [[self sharedInstance] refreshWeAgentsOnColdStart];
+    [[WLAgentSkillsUnReadManager sharedManager] initUnReadState];
 }
 
 + (void)configureWithBaseURL:(NSString *)baseURL webSocketURL:(nullable NSString *)webSocketURL {
     [[WLAgentSkillsConfig sharedConfig] configureWithBaseURL:baseURL webSocketURL:webSocketURL];
     [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
     [[self sharedInstance] refreshWeAgentsOnColdStart];
+    [[WLAgentSkillsUnReadManager sharedManager] initUnReadState];
 }
 
 + (void)configureWithBaseURL:(NSString *)baseURL
@@ -79,6 +84,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
                                                 webSocketURL:webSocketURL];
     [[WLAgentSkillsHTTPClient sharedClient] reloadConfiguration];
     [[self sharedInstance] refreshWeAgentsOnColdStart];
+    [[WLAgentSkillsUnReadManager sharedManager] initUnReadState];
 }
 
 - (instancetype)init {
@@ -297,12 +303,14 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         [self dispatchFailure:failure code:1000 message:@"Invalid params: welinkSessionId is required."];
         return;
     }
-    NSString *normalizedContent = [self normalizedOptionalString:params.content];
+    NSString *normalizedContent =
+        [WLAgentSkillsTypeConverter optionalStringFromValue:params.content];
     if (params.content != nil && normalizedContent == nil) {
         [self dispatchFailure:failure code:1000 message:@"Invalid params: content must be a non-empty string."];
         return;
     }
-    NSString *normalizedChatId = [self normalizedOptionalString:params.chatId];
+    NSString *normalizedChatId =
+        [WLAgentSkillsTypeConverter optionalStringFromValue:params.chatId];
 
     [[WLAgentSkillsWebSocketManager sharedManager] connectIfNeeded];
 
@@ -726,6 +734,169 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     }];
 }
 
+#pragma mark - WeAgent unread state
+
+- (void)getWeAgentUnreadMessage:(WLAgentSkillsGetWeAgentUnreadMessageParams *)params
+                         success:(void (^)(WLAgentSkillsGetWeAgentUnreadMessageResult *result))success
+                         failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *assistantAccount = [WLAgentSkillsTypeConverter requiredStringFromValue:params.assistantAccount
+                                                                             fieldName:@"assistantAccount"
+                                                                          errorMessage:&errorMessage];
+    if (assistantAccount == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    WLAgentSkillsGetWeAgentUnreadMessageParams *normalizedParams =
+        [[WLAgentSkillsGetWeAgentUnreadMessageParams alloc] init];
+    normalizedParams.assistantAccount = assistantAccount;
+    normalizedParams.sessionIds = params.sessionIds;
+    [[WLAgentSkillsUnReadManager sharedManager] getWeAgentUnreadMessage:normalizedParams success:^(WLAgentSkillsGetWeAgentUnreadMessageResult *result) {
+        WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage succeeded");
+        if (success) {
+            success(result);
+        }
+    } failure:^(NSError *error) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] getWeAgentUnreadMessage failed, error=%@",
+                    error.localizedDescription);
+        if (failure) {
+            failure(error);
+        }
+    }];
+}
+
+- (void)reportWeAgentSessionRead:(WLAgentSkillsReportWeAgentSessionReadParams *)params
+                          success:(void (^)(WLAgentSkillsReportWeAgentSessionReadResult *result))success
+                          failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] reportWeAgentSessionRead failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                            fieldName:@"welinkSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+
+    NSNumber *readSeq = [WLAgentSkillsTypeConverter optionalIntegerNumberFromValue:params.readSeq
+                                                                           fieldName:@"readSeq"
+                                                                        errorMessage:&errorMessage];
+    if (readSeq == nil || readSeq.integerValue <= 0) {
+        [self dispatchFailure:failure
+                         code:1000
+                      message:errorMessage ?: @"readSeq must be a positive integer."];
+        return;
+    }
+
+    WLAgentSkillsReportWeAgentSessionReadParams *normalizedParams =
+        [[WLAgentSkillsReportWeAgentSessionReadParams alloc] init];
+    normalizedParams.welinkSessionId = welinkSessionId;
+    normalizedParams.readSeq = readSeq;
+    [[WLAgentSkillsUnReadManager sharedManager] reportWeAgentSessionRead:normalizedParams success:^{
+        WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] reportWeAgentSessionRead succeeded");
+        if (success) {
+            WLAgentSkillsReportWeAgentSessionReadResult *result = [WLAgentSkillsReportWeAgentSessionReadResult new];
+            result.status = @"success";
+            success(result);
+        }
+    } failure:^(NSError *error) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] reportWeAgentSessionRead failed, error=%@",
+                    error.localizedDescription);
+        if (failure) {
+            failure(error);
+        }
+    }];
+}
+
+- (void)onSessionViewing:(WLAgentSkillsOnSessionViewingParams *)params
+                  success:(void (^)(WLAgentSkillsOnSessionViewingResult *result))success
+                  failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewing failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                            fieldName:@"welinkSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    WLAgentSkillsOnSessionViewingParams *normalizedParams = [WLAgentSkillsOnSessionViewingParams new];
+    normalizedParams.welinkSessionId = welinkSessionId;
+    [[WLAgentSkillsUnReadManager sharedManager] onSessionViewing:normalizedParams];
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewing succeeded, sessionId=%@",
+               welinkSessionId);
+    if (success) {
+        WLAgentSkillsOnSessionViewingResult *result = [WLAgentSkillsOnSessionViewingResult new];
+        result.status = @"success";
+        success(result);
+    }
+}
+
+- (void)onSessionViewingEnd:(WLAgentSkillsOnSessionViewingEndParams *)params
+                     success:(void (^)(WLAgentSkillsOnSessionViewingEndResult *result))success
+                     failure:(void (^)(NSError *error))failure {
+    if (![[WLAgentSkillsUnReadManager sharedManager] isAgentTabNotifyEnabled]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewingEnd failed: AgentTabNotify is unavailable");
+        [self dispatchFailure:failure code:4011 message:@"Permission denied: AgentTabNotify is disabled"];
+        return;
+    }
+    if (params == nil) {
+        [self dispatchFailure:failure code:1000 message:@"Invalid params: params is required."];
+        return;
+    }
+    NSString *errorMessage = nil;
+    NSString *welinkSessionId = [WLAgentSkillsTypeConverter requiredStringFromValue:params.welinkSessionId
+                                                                            fieldName:@"welinkSessionId"
+                                                                         errorMessage:&errorMessage];
+    if (welinkSessionId == nil) {
+        [self dispatchFailure:failure code:1000 message:errorMessage];
+        return;
+    }
+    WLAgentSkillsOnSessionViewingEndParams *normalizedParams = [WLAgentSkillsOnSessionViewingEndParams new];
+    normalizedParams.welinkSessionId = welinkSessionId;
+    [[WLAgentSkillsUnReadManager sharedManager] onSessionViewingEnd:normalizedParams];
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onSessionViewingEnd succeeded, sessionId=%@",
+               welinkSessionId);
+    if (success) {
+        WLAgentSkillsOnSessionViewingEndResult *result = [WLAgentSkillsOnSessionViewingEndResult new];
+        result.status = @"success";
+        success(result);
+    }
+}
+
+- (void)onAssistantChanged:(WLAgentSkillsOnAssistantChangedParams *)params {
+    [[WLAgentSkillsUnReadManager sharedManager] onAssistantChanged:params.assistantDetail];
+    WKFLogInfo(WLAS_BUNDLE_NAME, @"[WeAgentUnread] onAssistantChanged succeeded");
+}
+
 #pragma mark - 16. createDigitalTwin
 
 - (void)createDigitalTwin:(WLAgentSkillsCreateDigitalTwinParams *)params
@@ -953,10 +1124,10 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     WLAgentSkillsWeAgentDetails *result =
         [[WLAgentSkillsWeAgentDetails alloc] initWithDictionary:
             [cachedDictionary isKindOfClass:[NSDictionary class]] ? cachedDictionary : @{}];
-    if ([self normalizedOptionalString:result.tagName] == nil) {
+    if ([WLAgentSkillsTypeConverter optionalStringFromValue:result.tagName] == nil) {
         result.tagName = @"助手";
     }
-    if ([self normalizedOptionalString:result.tagNameEn] == nil) {
+    if ([WLAgentSkillsTypeConverter optionalStringFromValue:result.tagNameEn] == nil) {
         result.tagNameEn = @"Agent";
     }
     WKFLogInfo(WLAS_BUNDLE_NAME,
@@ -1113,26 +1284,52 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 }
 
 /// 接收宿主透传的 IM 助理变更通知。
-/// 先校验 notify_module，再把 notify_data 转为业务字典；无关模块或非法载荷直接忽略。
+/// 先校验 notifyModuleId，再把 notifyData 转为业务字典；无关模块或非法载荷直接忽略。
 - (void)handleWeAgentImNotifyBroadcastPayload:(NSDictionary *)payload {
     if (![payload isKindOfClass:[NSDictionary class]]) {
         WKFLogError(WLAS_BUNDLE_NAME, @"ignore we-agent IM notification: payload is invalid");
         return;
     }
-    NSString *notifyModule = [WLAgentSkillsTypeConverter optionalStringFromValue:payload[@"notify_module"]];
-    if (![notifyModule isEqualToString:WLAgentSkillsIMNotifyModule]) {
-        WKFLogInfo(WLAS_BUNDLE_NAME, @"ignore we-agent IM notification: notify_module does not match");
+    NSString *notifyModule = [WLAgentSkillsTypeConverter optionalStringFromValue:
+        payload[@"notifyModuleId"]];
+    if (![notifyModule isEqualToString:WLAgentSkillsCuiIMNotifyModule]) {
+        WKFLogInfo(WLAS_BUNDLE_NAME, @"ignore we-agent IM notification: notifyModuleId does not match");
         return;
     }
-    NSDictionary *notifyData = [self dictionaryFromObject:payload[@"notify_data"]];
+    NSDictionary *notifyData = [self dictionaryFromObject:payload[@"notifyData"]];
     if (notifyData == nil) {
-        WKFLogError(WLAS_BUNDLE_NAME, @"ignore we-agent IM notification: notify_data parse failed");
+        WKFLogError(WLAS_BUNDLE_NAME, @"ignore we-agent IM notification: notifyData parse failed");
         return;
     }
     WKFLogInfo(WLAS_BUNDLE_NAME, @"we-agent IM notification parsed, enqueue server mutation");
     [self enqueueWeAgentCacheMutation:^(WLAgentSkillsCacheMutationCompletion completion) {
         [self handleWeAgentNotifyData:notifyData source:@"server" completion:completion];
     }];
+}
+
+/// 接收宿主透传的 IM 未读通知，不进入助理更新或删除处理。
+- (void)handleWeAgentUnreadImNotifyBroadcastPayload:(NSDictionary *)payload {
+    if (![payload isKindOfClass:[NSDictionary class]]) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"ignore we-agent unread IM notification: payload is invalid");
+        return;
+    }
+    NSString *notifyModule = [WLAgentSkillsTypeConverter optionalStringFromValue:payload[@"notifyModuleId"]];
+    if (![notifyModule isEqualToString:WLAgentSkillsCuiIMNotifyModule]
+        && ![notifyModule isEqualToString:WLAgentSkillsEmployeeAssistantIMNotifyModule]) {
+        WKFLogInfo(WLAS_BUNDLE_NAME, @"ignore we-agent unread IM notification: notifyModuleId does not match");
+        return;
+    }
+    NSDictionary *notifyData = [self dictionaryFromObject:payload[@"notifyData"]];
+    if (notifyData == nil) {
+        WKFLogError(WLAS_BUNDLE_NAME, @"ignore we-agent unread IM notification: notifyData parse failed");
+        return;
+    }
+    BOOL handled = [notifyModule isEqualToString:WLAgentSkillsEmployeeAssistantIMNotifyModule]
+        ? [[WLAgentSkillsUnReadManager sharedManager] handleEmployeeAssistantImUnreadNotifyData:notifyData]
+        : [[WLAgentSkillsUnReadManager sharedManager] handleCuiImUnreadNotifyData:notifyData];
+    if (!handled) {
+        WKFLogInfo(WLAS_BUNDLE_NAME, @"ignore we-agent unread IM notification: unsupported notify data");
+    }
 }
 
 #pragma mark - 23. setIsShowWeAgent
@@ -1426,6 +1623,10 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 #pragma mark - WLAgentSkillsWebSocketManagerDelegate
 
 - (void)webSocketManagerDidReceiveMessage:(WLAgentSkillsStreamMessage *)message {
+    if ([message.type isEqualToString:@"session.deleted"]) {
+        [[WLAgentSkillsUnReadManager sharedManager] onSessionDeleted:message.welinkSessionId];
+    }
+
     NSString *sessionId = message.welinkSessionId;
     if (sessionId == nil || sessionId.length == 0) {
         return;
@@ -1480,11 +1681,11 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 
 - (nullable NSString *)latestUserMessageContentFromMessages:(NSArray<WLAgentSkillsSessionMessage *> *)messages {
     for (WLAgentSkillsSessionMessage *message in messages) {
-        NSString *role = [self normalizedOptionalString:message.role];
+        NSString *role = [WLAgentSkillsTypeConverter optionalStringFromValue:message.role];
         if (![role isEqualToString:@"user"]) {
             continue;
         }
-        NSString *content = [self normalizedOptionalString:message.content];
+        NSString *content = [WLAgentSkillsTypeConverter optionalStringFromValue:message.content];
         if (content != nil) {
             return content;
         }
@@ -1504,15 +1705,15 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 }
 
 - (nullable NSString *)resolvedMessageDisplayContent:(WLAgentSkillsSessionMessage *)message {
-    NSString *content = [self normalizedOptionalString:message.content];
+    NSString *content = [WLAgentSkillsTypeConverter optionalStringFromValue:message.content];
     if (content != nil) {
         return content;
     }
     NSMutableArray<NSString *> *segments = [NSMutableArray array];
     for (WLAgentSkillsSessionMessagePart *part in message.parts) {
-        NSString *partContent = [self normalizedOptionalString:part.content];
+        NSString *partContent = [WLAgentSkillsTypeConverter optionalStringFromValue:part.content];
         if (partContent == nil) {
-            partContent = [self normalizedOptionalString:part.output];
+            partContent = [WLAgentSkillsTypeConverter optionalStringFromValue:part.output];
         }
         if (partContent != nil) {
             [segments addObject:partContent];
@@ -1561,18 +1762,10 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     return latest;
 }
 
-- (nullable NSString *)normalizedOptionalString:(nullable NSString *)value {
-    if (value == nil) {
-        return nil;
-    }
-    NSString *trimmed = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    return trimmed != nil && trimmed.length > 0 ? trimmed : nil;
-}
-
 /// 构造助理编辑页 URI，仅使用必填 partnerAccount 作为目标助理定位参数。
 - (nullable NSString *)assistantEditPageUriWithPartnerAccount:(NSString *)partnerAccount {
     NSString *baseUri = [self appendHashToUri:WLAgentSkillsAssistantH5URI hash:@"editAssistant"];
-    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
+    NSString *normalizedPartnerAccount = [WLAgentSkillsTypeConverter optionalStringFromValue:partnerAccount];
     if (normalizedPartnerAccount != nil) {
         return [self appendQueryItemToUri:baseUri key:@"partnerAccount" value:normalizedPartnerAccount];
     }
@@ -1804,7 +1997,8 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
         NSMutableDictionary<NSString *, NSDictionary *> *remoteDetailsByAccount =
             [NSMutableDictionary dictionary];
         for (WLAgentSkillsWeAgentDetails *detail in remoteDetails) {
-            NSString *partnerAccount = [strongSelf normalizedOptionalString:detail.partnerAccount];
+            NSString *partnerAccount =
+                [WLAgentSkillsTypeConverter optionalStringFromValue:detail.partnerAccount];
             if (partnerAccount.length > 0) {
                 remoteDetailsByAccount[partnerAccount] = [detail toDictionary];
             }
@@ -1859,7 +2053,8 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 
     NSDictionary *cachedDetail = cachedDetails[partnerAccount];
     BOOL currentMatches =
-        [[self normalizedOptionalString:currentDetail[@"partnerAccount"]] isEqualToString:partnerAccount];
+        [[WLAgentSkillsTypeConverter optionalStringFromValue:currentDetail[@"partnerAccount"]]
+            isEqualToString:partnerAccount];
     BOOL changed = cachedDetail != nil && ![cachedDetail isEqualToDictionary:remoteDetail];
     changed = changed || (currentMatches && ![currentDetail isEqualToDictionary:remoteDetail]);
     if (changed) {
@@ -2157,9 +2352,11 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
     if (![dictionary isKindOfClass:[NSDictionary class]]) {
         return NO;
     }
-    NSString *normalizedPartnerAccount = [self normalizedOptionalString:partnerAccount];
+    NSString *normalizedPartnerAccount =
+        [WLAgentSkillsTypeConverter optionalStringFromValue:partnerAccount];
     return normalizedPartnerAccount != nil
-        && [normalizedPartnerAccount isEqualToString:[self normalizedOptionalString:dictionary[@"partnerAccount"]]];
+        && [normalizedPartnerAccount isEqualToString:
+            [WLAgentSkillsTypeConverter optionalStringFromValue:dictionary[@"partnerAccount"]]];
 }
 
 /// 将助理缓存变更任务加入 FIFO 队列，任务完成缓存、网络和广播后才启动下一项。
@@ -2223,7 +2420,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
                                  success:(void (^)(WLAgentSkillsWeAgentUriResult *result))success
                                  failure:(void (^)(NSError *error))failure {
     if (details != nil) {
-        if ([self normalizedOptionalString:details.weCodeUrl] == nil) {
+        if ([WLAgentSkillsTypeConverter optionalStringFromValue:details.weCodeUrl] == nil) {
             if (success) {
                 success([self buildActivateAssistantFallbackUriResult]);
             }
@@ -2250,7 +2447,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
             }
             return;
         }
-        if ([strongSelf normalizedOptionalString:detail.weCodeUrl] == nil) {
+        if ([WLAgentSkillsTypeConverter optionalStringFromValue:detail.weCodeUrl] == nil) {
             if (success) {
                 success([strongSelf buildActivateAssistantFallbackUriResult]);
             }
@@ -2317,7 +2514,7 @@ typedef void (^WLAgentSkillsCacheMutationTask)(WLAgentSkillsCacheMutationComplet
 }
 
 - (BOOL)isMyAgentDetail:(nullable WLAgentSkillsWeAgentDetails *)detail {
-    NSString *bizRobotTag = [self normalizedOptionalString:detail.bizRobotTag];
+    NSString *bizRobotTag = [WLAgentSkillsTypeConverter optionalStringFromValue:detail.bizRobotTag];
     return bizRobotTag != nil && [bizRobotTag caseInsensitiveCompare:@"myagent"] == NSOrderedSame;
 }
 

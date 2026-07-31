@@ -57,9 +57,53 @@ export type WeAgentUpdatedEventPayload =
   }
   ;
 
-export interface RegisterEventListenerParams {
+export interface WeAgentSessionUnreadState {
+  welinkSessionId: string;
+  hasUnRead: boolean;
+  maxSeq: number;
+}
+
+export interface GetWeAgentUnreadMessageParams {
+  assistantAccount: string;
+}
+
+export interface GetWeAgentUnreadMessageResult {
+  partnerAccount?: string;
+  assistantUnread?: boolean;
+  redDotVisible?: boolean;
+  sessions?: WeAgentSessionUnreadState[];
+  source?: string;
+}
+
+export interface ReportWeAgentSessionReadParams {
+  welinkSessionId: string;
+  readSeq: number;
+}
+
+export interface ReportWeAgentSessionReadResult {
+  status?: string;
+  success?: boolean;
+}
+
+export interface OnSessionViewingParams {
+  welinkSessionId: string;
+}
+
+export interface OnSessionViewingResult {
+  status: string;
+}
+
+export interface OnSessionViewingEndParams {
+  welinkSessionId: string;
+}
+
+export interface OnVisiblePayload {
+  visibility: 0 | 1;
+}
+
+export interface RegisterEventListenerParams<TPayload = unknown> {
   type: string;
-  func: (payload: WeAgentUpdatedEventPayload) => void;
+  func: (payload: TPayload) => void;
 }
 
 export interface SendMessageParams {
@@ -372,6 +416,18 @@ export interface HWH5EXT {
   getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<GetSessionMessageHistoryResponse>;
   onTabForUpdate?: (callback: () => void) => void;
   registerEventListener(params: RegisterEventListenerParams): void;
+  getWeAgentUnreadMessage: (
+    params: GetWeAgentUnreadMessageParams,
+  ) => Promise<GetWeAgentUnreadMessageResult> | GetWeAgentUnreadMessageResult;
+  reportWeAgentSessionRead: (
+    params: ReportWeAgentSessionReadParams,
+  ) => Promise<ReportWeAgentSessionReadResult> | ReportWeAgentSessionReadResult;
+  onSessionViewing: (
+    params: OnSessionViewingParams,
+  ) => Promise<OnSessionViewingResult> | OnSessionViewingResult;
+  onSessionViewingEnd: (
+    params: OnSessionViewingEndParams,
+  ) => Promise<OnSessionViewingResult> | OnSessionViewingResult;
   registerSessionListener(params: RegisterSessionListenerParams): void;
   unregisterSessionListener(params: UnregisterSessionListenerParams): void;
   sendMessage(params: SendMessageParams): Promise<SendMessageResponse>;

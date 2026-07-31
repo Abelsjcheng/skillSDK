@@ -470,6 +470,14 @@
   }
 }
 
+.we-agent-unread-red-dot-base() {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(253, 103, 32, 1);
+  flex-shrink: 0;
+}
+
 .we-agent-cui-actions__button {
   position: relative;
   width: 32px;
@@ -481,6 +489,13 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.we-agent-cui-actions__red-dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  .we-agent-unread-red-dot-base();
 }
 
 .app-container--we-agent-cui.pc-mode .we-agent-cui-actions__button[data-tooltip]::before {
@@ -770,6 +785,7 @@
   height: 40px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -790,13 +806,17 @@
 }
 
 .we-agent-history-sidebar__session-item-text {
-  display: block;
-  width: 100%;
+  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   -webkit-user-select: none;
   user-select: none;
+}
+
+.we-agent-history-sidebar__session-item-red-dot {
+  margin-left: 8px;
+  .we-agent-unread-red-dot-base();
 }
 
 .we-agent-history-sidebar__session-item.is-selected {

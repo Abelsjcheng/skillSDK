@@ -40,7 +40,9 @@ import com.opencode.skill.network.retrofit.body.CreateDigitalTwinBody;
 import com.opencode.skill.network.retrofit.body.CreateNewSessionBody;
 import com.opencode.skill.network.retrofit.body.CreateSessionBody;
 import com.opencode.skill.network.retrofit.body.EmptyBody;
+import com.opencode.skill.network.retrofit.body.GetWeAgentUnreadMessageBody;
 import com.opencode.skill.network.retrofit.body.ReplyPermissionBody;
+import com.opencode.skill.network.retrofit.body.ReportWeAgentSessionReadBody;
 import com.opencode.skill.network.retrofit.body.SendMessageBody;
 import com.opencode.skill.network.retrofit.body.SendMessageToImBody;
 import com.opencode.skill.network.retrofit.body.UpdateQrcodeInfoBody;
@@ -220,6 +222,10 @@ public class ApiClient {
         });
     }
 
+    public void getMyAgentUnreadMessage(@NonNull SkillCallback<JsonElement> callback) {
+        enqueueEnvelope(requireAssistantApiService().getMyAgentUnreadMessage(), JsonElement.class, callback);
+    }
+
     /**
      * 使用 partnerAccount 定位助理并提交名称、头像和描述更新。
      *
@@ -387,6 +393,18 @@ public class ApiClient {
 
     public void getSession(@NonNull String welinkSessionId, @NonNull SkillCallback<Session> callback) {
         enqueueEnvelope(requireSkillApiService().getSession(welinkSessionId), Session.class, callback);
+    }
+
+    public void getWeAgentUnreadMessage(@NonNull String assistantAccount, @Nullable List<String> sessionIds,
+            @NonNull SkillCallback<JsonElement> callback) {
+        enqueueEnvelope(requireSkillApiService().getWeAgentUnreadMessage(
+                new GetWeAgentUnreadMessageBody(assistantAccount, sessionIds)), JsonElement.class, callback);
+    }
+
+    public void reportWeAgentSessionRead(@NonNull String welinkSessionId, long readSeq,
+            @NonNull SkillCallback<JsonElement> callback) {
+        enqueueEnvelope(requireSkillApiService().reportWeAgentSessionRead(
+                welinkSessionId, new ReportWeAgentSessionReadBody(readSeq)), JsonElement.class, callback);
     }
 
     public void sendMessage(

@@ -38,6 +38,9 @@ public interface AssistantApiService {
     @GET("v4-1/we-crew/my-agent")
     Call<JsonElement> getMyWeAgent();
 
+    @GET("getMessageData")
+    Call<JsonElement> getMyAgentUnreadMessage();
+
     @PUT("v4-1/we-crew")
     Call<JsonElement> updateWeAgent(@Body UpdateWeAgentBody body);
 

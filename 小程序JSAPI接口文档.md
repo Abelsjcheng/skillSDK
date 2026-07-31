@@ -45,6 +45,10 @@ window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'JSAPI名�
 | [openWeAgentCUI](#17-openweagentcui) | 打开助理 CUI |
 | [onTabForUpdate](#18-ontabforupdate) | 监听小程序更新事件 |
 | [querySlashCommands](#19-queryslashcommands) | 通过 WebSocket 查询 Slash Commands |
+| [getWeAgentUnreadMessage](#20-getweagentunreadmessage) | 获取当前助理会话未读状态 |
+| [reportWeAgentSessionRead](#21-reportweagentsessionread) | 上报当前会话已读序号 |
+| [onSessionViewing](#22-onsessionviewing) | 标记当前会话正在查看 |
+| [onSessionViewingEnd](#23-onsessionviewingend) | 清除当前会话查看态 |
 
 ---
 
@@ -2115,6 +2119,293 @@ window.HWH5EXT.querySlashCommands({
   console.log('查询命令已发送:', result.status);
 }).catch((error) => {
   console.error('查询 Slash Commands 失败:', error.errorCode, error.errorMessage);
+});
+```
+
+---
+
+## 20. getWeAgentUnreadMessage
+
+### 接口说明
+
+获取当前助理下的会话未读状态，用于刷新 `weAgentCUI` 历史会话入口和历史会话列表 item 小红点。
+
+该接口只返回未读状态，不返回消息内容，也不展示或计算未读消息数。SDK 会将服务端 `unreadSessionList` 映射为本地会话未读缓存；当前正在查看的会话始终映射为已读。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.getWeAgentUnreadMessage(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'getWeAgentUnreadMessage', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| assistantAccount | string | 是 | 助理账号，透传到服务端请求体 |
+| sessionIds | string[] | 否 | 会话 ID 列表；不传时由服务端返回该助理下相关会话未读状态 |
+
+### 返回值
+
+返回 Promise，resolve 数据：`GetWeAgentUnreadMessageResult`
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| partnerAccount | string | 助理账号；由 `assistantAccount` 映射为 SDK 内部统一字段 |
+| assistantUnread | boolean | 当前助理是否存在未读会话 |
+| redDotVisible | boolean | 当前助理小红点是否允许展示 |
+| sessions | Array<WeAgentSessionUnreadState> | SDK 根据服务端 `unreadSessionList` 映射出的会话未读状态 |
+| source | string | 本次返回来源：`server` / `cache` |
+
+`sessions` 中每项字段：
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| welinkSessionId | string | 会话 ID |
+| hasUnRead | boolean | 该会话是否未读 |
+| maxSeq | number | 该会话最大未读消息序号 |
+
+### 服务端协议
+
+| 项 | 内容 |
+|----|------|
+| Method | `POST` |
+| URL | `/api/skill/sessions/unread` |
+| Body | `{ "assistantAccount": string, "sessionIds"?: string[] }` |
+
+服务端返回示例：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "unreadSessionCount": 2,
+    "unreadSessionList": [
+      {
+        "sessionId": "123",
+        "maxSeq": 10
+      }
+    ]
+  }
+}
+```
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `assistantAccount` 缺失或格式错误 |
+| 6000 | 网络错误 | 服务端请求失败、超时或无法解析响应 |
+| 7000 | 服务端错误 | 服务端返回非成功状态 |
+
+### 行为说明
+
+1. JSAPI 调用 SDK 的 `getWeAgentUnreadMessage` 接口；SDK 请求服务端并维护 CUI 未读缓存。
+2. 若返回会话与当前正在查看的会话一致，SDK 将其 `hasUnRead` 设置为 `false`；其他服务端返回的会话设置为 `true`。
+3. 若传入 `sessionIds`，不在 `unreadSessionList` 中的会话会补齐为 `hasUnRead=false`。
+4. 请求失败时，SDK 可返回当前助理的内存缓存；缓存缺失或属于旧助理时，默认无未读且不展示小红点。
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.getWeAgentUnreadMessage({
+  assistantAccount: 'x001_1',
+  sessionIds: ['42', '43']
+}).then((result) => {
+  if (result.redDotVisible && result.assistantUnread) {
+    console.log('存在未读会话:', result.sessions);
+  }
+}).catch((error) => {
+  console.error('获取会话未读状态失败:', error.errorCode, error.errorMessage);
+});
+```
+
+---
+
+## 21. reportWeAgentSessionRead
+
+### 接口说明
+
+上报当前会话已读序号。仅在 `weAgentCUI` 页面真实前台可见、消息已渲染后调用，避免冷启动预加载时误清小红点。
+
+上报成功后，不直接以接口返回清理助理 Tab 小红点；SDK 以后续服务端 IM 广播、主动查询或内存缓存刷新结果作为最终未读状态来源。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.reportWeAgentSessionRead(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'reportWeAgentSessionRead', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 当前会话 ID，对应服务端 path 中的 `{sessionId}` |
+| readSeq | number | 是 | 前端已渲染的最大 `messageSeq ?? seq` |
+
+### 返回值
+
+返回 Promise，resolve 数据：`ReportWeAgentSessionReadResult`
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| status | string | 固定返回 `success`，表示已读上报成功 |
+
+### 服务端协议
+
+| 项 | 内容 |
+|----|------|
+| Method | `POST` |
+| URL | `/api/skill/sessions/{sessionId}/read` |
+| Body | `{ "readSeq": number }` |
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或 `readSeq` 非有效 number |
+| 6000 | 网络错误 | 服务端请求失败或超时 |
+| 7000 | 服务端错误 | 服务端返回非成功状态 |
+
+### 行为说明
+
+1. JSAPI 调用 SDK 的 `reportWeAgentSessionRead` 接口，SDK 请求 `POST /api/skill/sessions/{sessionId}/read`。
+2. SDK 按会话记录已上报的最大 `readSeq`，后续小于或等于该值的上报不会重复请求服务端。
+3. 上报成功后，SDK 可将当前会话本地未读态更新为 `hasUnRead=false`，并等待服务端广播或后续查询校正最终状态。
+4. 页面不可见、非当前会话消息、用户消息、无有效 `messageSeq/seq` 的消息或历史分页加载旧消息时，不应调用该接口。
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.reportWeAgentSessionRead({
+  welinkSessionId: '42',
+  readSeq: 10
+}).then((result) => {
+  console.log('已读上报结果:', result.status);
+}).catch((error) => {
+  console.error('上报会话已读失败:', error.errorCode, error.errorMessage);
+});
+```
+
+---
+
+## 22. onSessionViewing
+
+### 接口说明
+
+标记当前正在正常查看的会话。SDK 将该会话在本地未读缓存中视为已读；停留期间若收到同会话的正常未读推送，SDK 会忽略该会话的未读态更新，避免小红点反复出现。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.onSessionViewing(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'onSessionViewing', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 当前正在查看的会话 ID |
+
+### 返回值
+
+返回 `Promise<{ status: string }>`，成功时 `status` 固定为 `success`。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+
+### 行为说明
+
+1. JSAPI 调用 SDK 的 `onSessionViewing` 本地接口，不发起服务端请求。
+2. SDK 记录当前正常查看会话，并将该会话的内存未读态设置为 `hasUnRead=false`。
+3. 页面内切换会话时，新的调用会覆盖当前查看会话，无需额外调用 `onSessionViewingEnd`。
+4. 页面在 `onVisible` 返回 `visibility=1` 后调用；之后可按需调用 `reportWeAgentSessionRead` 上报已读。
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.onSessionViewing({
+  welinkSessionId: '42'
+}).then((result) => {
+  console.log('标记会话查看态成功:', result.status);
+}).catch((error) => {
+  console.error('标记会话查看态失败:', error.errorCode, error.errorMessage);
+});
+```
+
+---
+
+## 23. onSessionViewingEnd
+
+### 接口说明
+
+清除当前会话查看态。清除后，该会话恢复服务端正常推送处理；后续服务端推送的未读状态可以重新点亮会话 item 小红点。
+
+### 调用方式
+
+```javascript
+window.HWH5EXT.onSessionViewingEnd(params)
+```
+
+### PC端调用方式
+
+```javascript
+window.Pedestal.callMethod('method://agentSkills/handleSdk',{funName:'onSessionViewingEnd', params})
+```
+
+### 参数说明
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| welinkSessionId | string | 是 | 需要清除查看态的会话 ID |
+
+### 返回值
+
+返回 `Promise<{ status: string }>`，成功时 `status` 固定为 `success`。
+
+### 错误处理
+
+| 错误码 | 错误消息 | 说明 |
+|--------|----------|------|
+| 1000 | 无效的参数 | `welinkSessionId` 缺失或格式错误 |
+
+### 行为说明
+
+1. JSAPI 调用 SDK 的 `onSessionViewingEnd` 本地接口，不发起服务端请求。
+2. 若当前查看会话等于入参 `welinkSessionId`，SDK 清除该会话查看标记；否则不修改查看态。
+3. 页面内切换会话时无需调用该接口，由新的 `onSessionViewing` 覆盖当前查看会话。
+4. 页面在 `onVisible` 返回 `visibility=0`、离开会话或销毁时调用。该接口不触发已读上报，也不主动隐藏小红点。
+
+### 调用示例
+
+```javascript
+window.HWH5EXT.onSessionViewingEnd({
+  welinkSessionId: '42'
+}).then((result) => {
+  console.log('清除会话查看态成功:', result.status);
+}).catch((error) => {
+  console.error('清除会话查看态失败:', error.errorCode, error.errorMessage);
 });
 ```
 

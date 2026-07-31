@@ -58,6 +58,9 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 - (void)getMyWeAgentWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
                         failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
+- (void)getMyAgentUnreadMessageWithSuccess:(WLAgentSkillsHTTPSuccessBlock)success
+                                   failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
 /// 使用 partnerAccount 定位助理并提交名称、头像和描述更新。
 - (void)updateWeAgentWithPartnerAccount:(NSString *)partnerAccount
                                    name:(NSString *)name
@@ -84,6 +87,16 @@ typedef void (^WLAgentSkillsHTTPFailureBlock)(NSError *error);
 - (void)queryAssistantGraySingleWithPartnerAccount:(NSString *)partnerAccount
                                            success:(WLAgentSkillsHTTPSuccessBlock)success
                                            failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)getWeAgentUnreadMessageWithAssistantAccount:(NSString *)assistantAccount
+                                         sessionIds:(nullable NSArray<NSString *> *)sessionIds
+                                            success:(WLAgentSkillsHTTPSuccessBlock)success
+                                            failure:(WLAgentSkillsHTTPFailureBlock)failure;
+
+- (void)reportWeAgentSessionReadWithSessionId:(NSString *)welinkSessionId
+                                      readSeq:(NSNumber *)readSeq
+                                      success:(WLAgentSkillsHTTPSuccessBlock)success
+                                      failure:(WLAgentSkillsHTTPFailureBlock)failure;
 
 - (void)getSessionsWithImGroupId:(nullable NSString *)imGroupId
                                                             ak:(nullable NSString *)ak

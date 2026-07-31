@@ -22,5 +22,16 @@
 </head>
 <body>
   <div id="root" class="weagentCUI"></div>
+  <script>
+    window.HWH5?.addEventListener?.({
+      type: 'onVisible',
+      func: (payload) => {
+        window.agentskills_onVisible = payload; // 冷启动首次加载的onVisible回调存入缓存
+        window.dispatchEvent(new CustomEvent('agentskills_onVisible', {
+          detail: payload
+        }));
+      },
+    });
+  </script>
 </body>
 </html>
