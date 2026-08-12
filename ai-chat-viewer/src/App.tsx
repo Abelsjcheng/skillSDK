@@ -10,9 +10,9 @@ import { useIosKeyboardLift } from './hooks/useIosKeyboardLift';
 import createSessionIcon from './imgs/createSession.svg';
 import './styles/App.less';
 import './styles/WeAgentCUI.less';
-import type { SkillSession, WeAgentDetails } from './types/bridge';
+import type { HistorySessionsListResult, SkillSession, WeAgentDetails } from './types/bridge';
 import type { HWH5UserInfo } from './types/bridge/hwext';
-import type { AppProps } from './types/components';
+import type { AppProps, HistorySessionsCache } from './types/components';
 import { buildCorpUserAvatar } from './utils/avatar';
 import { runButtonClickWithDebounce } from './utils/buttonDebounce';
 import {
@@ -22,22 +22,73 @@ import {
   getWeAgentDetails,
 } from './utils/hwext';
 import { WeLog } from './utils/logger';
-import { ensureSessionTimestamps, getLatestAvailableSessionByUpdatedAt } from './utils/session';
+import {
+  ensureSessionTimestamps,
+  getLatestAvailableSessionByUpdatedAt,
+  getSessionUpdatedAtTimestamp,
+  HISTORY_SESSIONS_PAGE_SIZE,
+} from './utils/session';
 import { installBrowserJsErrorTelemetry } from './utils/telemetry';
 import { showToast } from './utils/toast';
 import { reportCreateSessionClick } from './utils/uemUtil';
 
+function sortSessionsByUpdatedAt(sessions: SkillSession[]): SkillSession[] {
+  return [...sessions].sort(
+    (left, right) => getSessionUpdatedAtTimestamp(right) - getSessionUpdatedAtTimestamp(left),
+  );
+}
+
+function createHistorySessionsCache(result: HistorySessionsListResult): HistorySessionsCache {
+  // 接口 content 表示单页结果；进入 App 状态后表示当前已缓存、可渲染的历史列表。
+  return {
+    content: Array.isArray(result.content) ? result.content.map((session) => ensureSessionTimestamps(session)) : [],
+    page: typeof result.page === 'number' ? result.page : 0,
+    size: typeof result.size === 'number' ? result.size : HISTORY_SESSIONS_PAGE_SIZE,
+    total: typeof result.total === 'number' ? result.total : 0,
+    totalPages: typeof result.totalPages === 'number' ? result.totalPages : 0,
+  };
+}
+
+function prependSessionToCache(
+  cache: HistorySessionsCache | null,
+  session: SkillSession,
+): HistorySessionsCache | null {
+  if (!cache) {
+    return cache;
+  }
+
+  // 新建会话需要立即进入侧边栏缓存，并通过去重避免重复显示同一个会话。
+  const nextSession = ensureSessionTimestamps(session);
+  const hasExistingSession = cache.content.some((item) => item.welinkSessionId === nextSession.welinkSessionId);
+  const nextContent = [
+    nextSession,
+    ...cache.content.filter((item) => item.welinkSessionId !== nextSession.welinkSessionId),
+  ];
+  const nextTotal = Math.max(cache.total + (hasExistingSession ? 0 : 1), nextContent.length);
+  const nextTotalPages = Math.max(
+    cache.totalPages,
+    Math.ceil(nextTotal / Math.max(cache.size || HISTORY_SESSIONS_PAGE_SIZE, 1)),
+  );
+
+  return {
+    ...cache,
+    content: sortSessionsByUpdatedAt(nextContent),
+    total: nextTotal,
+    totalPages: nextTotalPages,
+  };
+}
+
 function updateSessionTitleInCache(
-  sessions: SkillSession[] | null,
+  cache: HistorySessionsCache | null,
   sessionId: string,
   title: string,
-): SkillSession[] | null {
-  if (!sessions || !sessionId || !title) {
-    return sessions;
+): HistorySessionsCache | null {
+  if (!cache || !sessionId || !title) {
+    return cache;
   }
 
   let changed = false;
-  const nextSessions = sessions.map((session) => {
+  const nextContent = cache.content.map((session) => {
     if (session.welinkSessionId !== sessionId || session.title === title) {
       return session;
     }
@@ -45,18 +96,44 @@ function updateSessionTitleInCache(
     return { ...session, title };
   });
 
-  return changed ? nextSessions : sessions;
+  return changed ? { ...cache, content: nextContent } : cache;
+}
+
+function updateSessionActivityInCache(
+  cache: HistorySessionsCache | null,
+  sessionId: string,
+  updatedAt: string,
+): HistorySessionsCache | null {
+  if (!cache || !sessionId || !updatedAt) {
+    return cache;
+  }
+
+  // 用户在历史会话里发消息成功后，前端先更新 updatedAt，让侧边栏排序即时反馈。
+  let changed = false;
+  const nextContent = cache.content.map((session) => {
+    if (session.welinkSessionId !== sessionId) {
+      return session;
+    }
+    if (session.updatedAt === updatedAt) {
+      return session;
+    }
+    changed = true;
+    return { ...session, updatedAt };
+  });
+
+  return changed ? { ...cache, content: sortSessionsByUpdatedAt(nextContent) } : cache;
 }
 
 function App({ assistantAccount = '' }: AppProps) {
   const isPc = isPcMiniApp();
-  const { keyboardContainerStyle } = useIosKeyboardLift();
+  const { keyboardContainerStyle } = useIosKeyboardLift({ viewportOffset: 49 });
   const { t, i18n } = useTranslation();
   const shouldUseEnglishUserName = (i18n.resolvedLanguage ?? i18n.language) === 'en';
 
-  const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(false);
+  // PC 端进入助手页即默认展示历史侧边栏，移动端仍保持点击后展示。
+  const [isHistorySidebarVisible, setIsHistorySidebarVisible] = useState(isPc);
   const [welinkSessionId, setWelinkSessionId] = useState<string | null>(null);
-  const [historySessionsCache, setHistorySessionsCache] = useState<SkillSession[] | null>(null);
+  const [historySessionsCache, setHistorySessionsCache] = useState<HistorySessionsCache | null>(null);
   const [historySessionsLoaded, setHistorySessionsLoaded] = useState(false);
   const [weAgentUserName, setWeAgentUserName] = useState('');
   const [weAgentUserAvatar, setWeAgentUserAvatar] = useState('');
@@ -77,6 +154,9 @@ function App({ assistantAccount = '' }: AppProps) {
     assistantDetail: assistantDetailRef.current,
     onSessionTitleChange: (sessionId, title) => {
       setHistorySessionsCache((prev) => updateSessionTitleInCache(prev, sessionId, title));
+    },
+    onSessionActivity: (sessionId, updatedAt) => {
+      setHistorySessionsCache((prev) => updateSessionActivityInCache(prev, sessionId, updatedAt));
     },
   });
 
@@ -124,11 +204,12 @@ function App({ assistantAccount = '' }: AppProps) {
     userInfoRef.current = null;
     setHistorySessionsCache(null);
     setHistorySessionsLoaded(false);
+    setIsHistorySidebarVisible(isPc);
     setWelinkSessionId(null);
     setWeAgentAssistantName('');
     setWeAgentAssistantDescription('');
     setWeAgentAssistantAvatar('');
-  }, [assistantAccount]);
+  }, [assistantAccount, isPc]);
 
   useEffect(() => {
     const userInfo = userInfoRef.current;
@@ -160,15 +241,24 @@ function App({ assistantAccount = '' }: AppProps) {
         const historyResult = await getHistorySessionsList({
           assistantAccount: currentAssistantAccount,
           businessSessionDomain: 'miniapp',
+          page: 0,
+          size: HISTORY_SESSIONS_PAGE_SIZE,
         });
-        const latestAvailableSession = getLatestAvailableSessionByUpdatedAt(historyResult.content ?? []);
+        let nextHistoryCache = createHistorySessionsCache(historyResult);
+        const latestAvailableSession = getLatestAvailableSessionByUpdatedAt(nextHistoryCache.content);
         const nextSession = latestAvailableSession
-          ?? await createSessionForAssistant(currentAssistantAccount, detail.appKey);
+          ?? ensureSessionTimestamps(await createSessionForAssistant(currentAssistantAccount, detail.appKey));
+        if (!latestAvailableSession) {
+          // 当前助手没有历史会话时，兜底创建的新会话也要同步进入默认展开的侧边栏。
+          nextHistoryCache = prependSessionToCache(nextHistoryCache, nextSession) ?? nextHistoryCache;
+        }
 
         if (disposed) {
           return;
         }
 
+        setHistorySessionsCache(nextHistoryCache);
+        setHistorySessionsLoaded(true);
         setWelinkSessionId(nextSession.welinkSessionId);
       } catch (err) {
         WeLog(`App initializeWeAgentSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
@@ -207,13 +297,8 @@ function App({ assistantAccount = '' }: AppProps) {
       );
       session.resetTransientState();
       setWelinkSessionId(newSession.welinkSessionId);
-      setHistorySessionsCache((prev) => {
-        if (prev === null) {
-          return prev;
-        }
-        const next = prev.filter((item) => item.welinkSessionId !== newSession.welinkSessionId);
-        return [newSession, ...next];
-      });
+      // 主动新建会话成功后，侧边栏缓存同步插入并选中新会话。
+      setHistorySessionsCache((prev) => prependSessionToCache(prev, newSession));
       reportCreateSessionClick(detail);
     } catch (err: any) {
       WeLog(`App createNewSession failed | extra=${JSON.stringify({ assistantAccount: currentAssistantAccount })} | error=${JSON.stringify(err)}`);
@@ -284,10 +369,11 @@ function App({ assistantAccount = '' }: AppProps) {
               <WeAgentHistorySidebar
                 assistantAccount={assistantAccount}
                 currentWelinkSessionId={welinkSessionId ?? ''}
-                cachedSessions={historySessionsCache ?? []}
+                cachedCache={historySessionsCache}
+                defaultOpen={isPc}
                 historyLoaded={historySessionsLoaded}
-                onHistoryLoaded={(sessions) => {
-                  setHistorySessionsCache(sessions);
+                onHistoryLoaded={(cache) => {
+                  setHistorySessionsCache(cache);
                   setHistorySessionsLoaded(true);
                 }}
                 onSessionSelect={handleSwitchWeAgentSession}

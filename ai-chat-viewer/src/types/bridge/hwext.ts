@@ -80,9 +80,12 @@ export interface ControlSkillWeCodeParams {
 export interface CreateNewSessionParams {
   ak?: string;
   title?: string;
-  businessSessionDomain: string;
-  businessSessionId: string;
-  businessSessionType: string;
+  businessSessionDomain?: string;
+  businessSessionId?: string;
+  businessSessionType?: string;
+  bussinessDomain?: string;
+  bussinessId?: string;
+  bussinessType?: string;
   assistantAccount?: string;
   businessExtParam?: Record<string, unknown>;
 }
@@ -98,8 +101,10 @@ export interface GetHistorySessionsListParams {
   status?: string;
   ak?: string;
   businessSessionId?: string;
+  bussinessId?: string;
   assistantAccount?: string;
   businessSessionDomain?: 'miniapp' | 'im' | string;
+  businessExtParam?: Record<string, unknown>;
 }
 
 export interface SkillSession {
@@ -110,6 +115,9 @@ export interface SkillSession {
   bussinessDomain: string | null;
   bussinessType: string | null;
   bussinessId: string | null;
+  businessSessionDomain?: string | null;
+  businessSessionType?: string | null;
+  businessSessionId?: string | null;
   assistantAccount: string | null;
   status: string;
   toolSessionId: string | null;
@@ -257,8 +265,8 @@ export interface OpenWeAgentCUIParams {
 }
 
 export interface OpenIMChatParams {
-  chatID?: string,
-  chatType?: string
+  chatID?: string;
+  chatType?: string;
 }
 
 export interface BuildOpenWeAgentCUIOptions {
@@ -278,7 +286,7 @@ export interface OpenWeAgentCUIResult {
 }
 
 export interface UploadFileParams {
-  serverlUrl: string;
+  serverUrl: string;
   filePath: string;
   name: string;
   formData: object;
@@ -306,16 +314,6 @@ export interface FetchFullResponse<T = unknown> {
   json: () => Promise<T>;
 }
 
-export interface CreateAssistantWhitelistResponse {
-  code: number;
-  data?: {
-    IMPersonalAssistant?: {
-      enable?: number;
-    };
-    [key: string]: unknown;
-  };
-}
-
 export interface WeAgentUriResult {
   weAgentUri: string;
   assistantDetailUri: string;
@@ -334,7 +332,7 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
-  createNewSession(params: CreateNewSessionParams): Promise<SkillSession> | SkillSession;
+  createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
   createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateDigitalTwinResult> | CreateDigitalTwinResult;
   getAgentType(): Promise<AgentTypeListResult> | AgentTypeListResult;
   getWeAgentList(params: GetWeAgentListParams): Promise<WeAgentListResult> | WeAgentListResult;
@@ -361,7 +359,7 @@ export interface HWH5Bridge {
   uem?: (
     eventName: string,
     payload: {
-      type: 'info';
+      type: 'INFO' | 'ERROR';
       code: string;
       name: string;
       result: boolean;
@@ -372,7 +370,7 @@ export interface HWH5Bridge {
   ) => Promise<unknown> | unknown;
   showToast?: (payload: { msg: string; type: 'w' }) => Promise<unknown> | unknown;
   reboot?: () => Promise<unknown> | unknown;
-  addEventListener?: (params: HWH5AddEventListenerParams) => Promise<unknown> | unknown;
+  addEventListener: (params: HWH5AddEventListenerParams) => Promise<unknown> | unknown;
   uploadFile?: (params: UploadFileParams) => Promise<unknown> | unknown;
   chooseImage?: (params: ChooseImageParams) => Promise<unknown> | unknown;
   getDeviceInfo?: () => Promise<unknown> | unknown;
@@ -388,7 +386,7 @@ export interface HWH5Bridge {
   disableAutoPushUpPage?: (payload: { status: boolean }) => Promise<unknown> | unknown;
   navigateBack: () => void;
   close: () => void;
-  openIMChat?: (params: OpenIMChatParams) => Promise<unknown> | unknown;
+  openIMChat: (params: OpenIMChatParams) => Promise<unknown> | unknown;
   onCheckForUpdate: () => Promise<unknown>;
   onUpdateReady: (listener: Function) => Promise<unknown>
 }

@@ -273,6 +273,7 @@
     border: 2px solid rgba(255, 255, 255, 1);
     overflow: hidden;
     box-sizing: border-box;
+    box-shadow: 0px 1px 6px 0px rgba(0, 0, 0, 0.08);
   }
 
   .we-agent-cui-welcome__avatar {
@@ -331,6 +332,9 @@
 }
 
 .app-container--we-agent-cui.pc-mode {
+  --we-agent-cui-content-max-width: 1000px;
+  --we-agent-cui-content-gutter: clamp(16px, 8.2vw, 98px);
+  --we-agent-cui-bottom-gap: clamp(16px, 2.67vw, 32px);
   height: 100vh;
   padding: 0;
   background-image: url('../imgs/assistant-cui-pc-bg.png');
@@ -341,23 +345,34 @@
   }
 
   .we-agent-cui-main {
-    padding: 16px 0 30px;
+    padding: 16px 0 var(--we-agent-cui-bottom-gap);
     transition: padding-left 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: padding-left;
   }
 
   .we-agent-cui-chat-panel {
-    padding: 0 150px;
+    padding: 0;
     transition: padding 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: padding;
   }
 
   .we-agent-cui-bottom {
+    width: calc(100% - (var(--we-agent-cui-content-gutter) * 2));
+    max-width: var(--we-agent-cui-content-max-width);
+    margin: 0 auto;
+    padding: 0;
+    box-sizing: border-box;
     overflow: visible;
   }
 
   .we-agent-cui-welcome {
+    width: calc(100% - (var(--we-agent-cui-content-gutter) * 2));
+    max-width: var(--we-agent-cui-content-max-width);
     margin-top: 64px;
+    margin-right: auto;
+    margin-left: auto;
+    padding: 0;
+    box-sizing: border-box;
 
     > * + * {
       margin-top: 0;
@@ -366,13 +381,14 @@
 
   .we-agent-cui-welcome__title {
     margin-top: 16px;
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 600;
     line-height: 30px;
   }
 
   .we-agent-cui-welcome__subtitle {
     margin-top: 24px;
+    color: rgb(153, 153, 153);
     font-size: 14px;
     font-weight: 400;
     line-height: 24px;
@@ -385,7 +401,7 @@
   }
 
   .we-agent-cui-chat-panel {
-    padding: 0 50px;
+    padding: 0;
   }
 }
 

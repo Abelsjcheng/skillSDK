@@ -10,9 +10,14 @@ type UseIosKeyboardLiftResult = {
   keyboardContainerStyle: CSSProperties | undefined;
 };
 
-export function useIosKeyboardLift(): UseIosKeyboardLiftResult {
+type UseIosKeyboardLiftOptions = {
+  viewportOffset?: number;
+};
+
+export function useIosKeyboardLift(options?: UseIosKeyboardLiftOptions): UseIosKeyboardLiftResult {
   const isIosKeyboardLiftEnabled = isIosMobileDevice();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const viewportOffset = options?.viewportOffset ?? 0;
 
   useEffect(() => {
     if (!isIosKeyboardLiftEnabled) {
@@ -28,7 +33,7 @@ export function useIosKeyboardLift(): UseIosKeyboardLiftResult {
     let safeAreaInsetBottom = 0;
     const handleKeyboardHeightChange = (res: { height: number }) => {
       let nextHeight = typeof res?.height === 'number' && Number.isFinite(res.height) ? res.height : 0;
-      nextHeight = nextHeight - 49 - safeAreaInsetBottom / window.devicePixelRatio;
+      nextHeight = nextHeight - viewportOffset - safeAreaInsetBottom / window.devicePixelRatio;
       setKeyboardHeight(nextHeight > 0 ? nextHeight : 0);
     };
 
@@ -50,7 +55,7 @@ export function useIosKeyboardLift(): UseIosKeyboardLiftResult {
       window.HWH5?.offKeyboardHeightChange?.();
       setKeyboardHeight(0);
     };
-  }, [isIosKeyboardLiftEnabled]);
+  }, [isIosKeyboardLiftEnabled, viewportOffset]);
 
   return {
     isIosKeyboardLiftEnabled,

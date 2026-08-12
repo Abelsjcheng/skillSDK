@@ -170,27 +170,33 @@ function normalizeSession(rawSession: Record<string, unknown>): SkillSession {
   const updatedAt = typeof rawSession.updatedAt === 'string'
     ? rawSession.updatedAt
     : createdAt;
+  const businessSessionDomain = typeof rawSession.businessSessionDomain === 'string'
+    ? rawSession.businessSessionDomain
+    : typeof rawSession.bussinessDomain === 'string'
+      ? rawSession.bussinessDomain
+      : null;
+  const businessSessionType = typeof rawSession.businessSessionType === 'string'
+    ? rawSession.businessSessionType
+    : typeof rawSession.bussinessType === 'string'
+      ? rawSession.bussinessType
+      : null;
+  const businessSessionId = typeof rawSession.businessSessionId === 'string'
+    ? rawSession.businessSessionId
+    : typeof rawSession.bussinessId === 'string'
+      ? rawSession.bussinessId
+      : null;
 
   return {
     welinkSessionId,
     userId: typeof rawSession.userId === 'string' ? rawSession.userId : '',
     ak: typeof rawSession.ak === 'string' ? rawSession.ak : null,
     title: typeof rawSession.title === 'string' ? rawSession.title : null,
-    bussinessDomain: typeof rawSession.bussinessDomain === 'string'
-      ? rawSession.bussinessDomain
-      : typeof rawSession.businessSessionDomain === 'string'
-        ? rawSession.businessSessionDomain
-        : null,
-    bussinessType: typeof rawSession.bussinessType === 'string'
-      ? rawSession.bussinessType
-      : typeof rawSession.businessSessionType === 'string'
-        ? rawSession.businessSessionType
-        : null,
-    bussinessId: typeof rawSession.bussinessId === 'string'
-      ? rawSession.bussinessId
-      : typeof rawSession.businessSessionId === 'string'
-        ? rawSession.businessSessionId
-        : null,
+    bussinessDomain: businessSessionDomain,
+    bussinessType: businessSessionType,
+    bussinessId: businessSessionId,
+    businessSessionDomain,
+    businessSessionType,
+    businessSessionId,
     assistantAccount: typeof rawSession.assistantAccount === 'string' ? rawSession.assistantAccount : null,
     status: typeof rawSession.status === 'string' ? rawSession.status : 'ACTIVE',
     toolSessionId: typeof rawSession.toolSessionId === 'string' ? rawSession.toolSessionId : null,
@@ -201,6 +207,32 @@ function normalizeSession(rawSession: Record<string, unknown>): SkillSession {
 
 function normalizeProtocolMessage<T>(rawMessage: T): T {
   return rawMessage;
+}
+
+function normalizeCreateNewSessionParams(params: CreateNewSessionParams): CreateNewSessionParams {
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType;
+
+  return {
+    ...params,
+    businessSessionDomain,
+    businessSessionId,
+    businessSessionType,
+    bussinessDomain: businessSessionDomain,
+    bussinessId: businessSessionId,
+    bussinessType: businessSessionType,
+  };
+}
+
+function normalizeGetHistorySessionsListParams(params: GetHistorySessionsListParams): GetHistorySessionsListParams {
+  const businessSessionId = params.businessSessionId ?? params.bussinessId;
+
+  return {
+    ...params,
+    businessSessionId,
+    bussinessId: businessSessionId,
+  };
 }
 
 function nextLocalId(prefix: string): string {
@@ -653,19 +685,20 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
     },
 
     async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+      const normalizedParams = normalizeCreateNewSessionParams(params);
       const session = await requestJson<Record<string, unknown>>(
         config,
         '/api/skill/sessions',
         {
           method: 'POST',
           body: JSON.stringify({
-            ak: params.ak,
-            title: params.title,
-            businessSessionDomain: params.businessSessionDomain,
-            businessSessionType: params.businessSessionType,
-            businessSessionId: params.businessSessionId,
-            assistantAccount: params.assistantAccount,
-            businessExtParam: params.businessExtParam,
+            ak: normalizedParams.ak,
+            title: normalizedParams.title,
+            businessSessionDomain: normalizedParams.businessSessionDomain,
+            businessSessionType: normalizedParams.businessSessionType,
+            businessSessionId: normalizedParams.businessSessionId,
+            assistantAccount: normalizedParams.assistantAccount,
+            businessExtParam: normalizedParams.businessExtParam,
           }),
         },
       );
@@ -766,24 +799,25 @@ export function createOpenCodeHwh5ext(config: OpenCodeBridgeConfig): HWH5EXT {
     },
 
     async getHistorySessionsList(params: GetHistorySessionsListParams): Promise<HistorySessionsListResult> {
+      const normalizedParams = normalizeGetHistorySessionsListParams(params);
       const searchParams = new URLSearchParams({
-        page: String(params.page ?? 0),
-        size: String(params.size ?? 20),
+        page: String(normalizedParams.page ?? 0),
+        size: String(normalizedParams.size ?? 20),
       });
-      if (params.assistantAccount) {
-        searchParams.set('assistantAccount', params.assistantAccount);
+      if (normalizedParams.assistantAccount) {
+        searchParams.set('assistantAccount', normalizedParams.assistantAccount);
       }
-      if (params.status) {
-        searchParams.set('status', params.status);
+      if (normalizedParams.status) {
+        searchParams.set('status', normalizedParams.status);
       }
-      if (params.ak) {
-        searchParams.set('ak', params.ak);
+      if (normalizedParams.ak) {
+        searchParams.set('ak', normalizedParams.ak);
       }
-      if (params.businessSessionId) {
-        searchParams.set('businessSessionId', params.businessSessionId);
+      if (normalizedParams.businessSessionId) {
+        searchParams.set('businessSessionId', normalizedParams.businessSessionId);
       }
-      if (params.businessSessionDomain) {
-        searchParams.set('businessSessionDomain', params.businessSessionDomain);
+      if (normalizedParams.businessSessionDomain) {
+        searchParams.set('businessSessionDomain', normalizedParams.businessSessionDomain);
       }
 
       const result = await requestJson<HistorySessionsListResult & { content?: Array<Record<string, unknown>> }>(

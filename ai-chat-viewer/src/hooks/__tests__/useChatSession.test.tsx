@@ -260,6 +260,21 @@ describe('useChatSession', () => {
     });
   });
 
+  it('reports session activity after sending a message successfully', async () => {
+    const onSessionActivity = jest.fn();
+    const { result } = renderHook(() => useChatSession({
+      mode: 'weAgentCUI',
+      welinkSessionId: 'session_1',
+      onSessionActivity,
+    }));
+
+    await act(async () => {
+      await result.current.onSend('hello');
+    });
+
+    expect(onSessionActivity).toHaveBeenCalledWith('session_1', '2026-05-25T10:00:00.000Z');
+  });
+
   it('preserves questionId from question events when answering question cards', async () => {
     const { result } = renderHook(() => useChatSession({
       mode: 'weAgentCUI',

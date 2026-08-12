@@ -39,7 +39,14 @@ const SkillCUI: React.FC<SkillCUIProps> = ({ welinkSessionId: welinkSessionIdPro
   })), [welinkSessionId]);
 
   return (
-    <div className="app-container skill-cui" style={keyboardContainerStyle}>
+    <div
+      className={[
+        'app-container',
+        'skill-cui',
+        isPc ? 'pc-mode' : '',
+      ].filter(Boolean).join(' ')}
+      style={keyboardContainerStyle}
+    >
       <div className="header-wrapper">
         <SkillCUIHeader />
       </div>

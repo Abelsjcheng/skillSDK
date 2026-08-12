@@ -1,6 +1,8 @@
 import type { GetSessionMessageHistoryResponse } from '../types';
 import type { SkillSession } from '../types/bridge';
 
+export const HISTORY_SESSIONS_PAGE_SIZE = 50;
+
 export function ensureSessionTimestamps(session: SkillSession): SkillSession {
   const now = new Date().toISOString();
   const createdAt = session?.createdAt?.trim() ? session.createdAt : now;

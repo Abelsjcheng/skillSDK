@@ -48,7 +48,7 @@
 23. `src/styles/AssistantDetail.less`
 24. `src/styles/SwitchAssistant.less`
 25. `src/imgs/icon-back.svg`
-26. `src/imgs/icon-service.svg`
+26. `src/imgs/customer_icon.svg`
 27. `src/imgs/icon-close.svg`
 28. `src/imgs/assistant-avatar.svg`
 29. `src/imgs/switch-assistant-avatar.svg`
@@ -478,7 +478,7 @@ interface CreateDigitalTwinParams {
 10. 样式文件 `src/styles/WeAgentCUI.less` 负责维护 WeAgentCUI 布局，class 前缀统一使用 `we-agent-cui-`。
 11. 新增图标资源：
    - `src/imgs/icon-we-agent-new-session.svg`
-   - `src/imgs/icon-we-agent-history.svg`
+   - `src/imgs/no-history_icon.svg`
    - `src/imgs/icon-we-agent-send.svg`
 12. `aiChat` 页面及其相关逻辑已移除，不再保留 `variant` 分支与 `/aiChat` 路由。
 13. 在 `weAgentCUI` 变体下，当消息列表为空时，`Content` 区渲染欢迎块（头像 + 标题 + 副标题），样式规则如下：
@@ -505,7 +505,7 @@ interface CreateDigitalTwinParams {
 24. PC 端历史会话分组标题由“今天 / 昨天 / 3天前”组成；“今天”“昨天”“3天前”标题容器高度统一 `32px`，`padding: 6px 12px`，文本样式 `12px/400`、`rgba(153,153,153,1)`。
 25. PC 端历史会话 item 容器高度统一 `32px`，`padding: 6px 12px`；item 文本样式 `12px/400`、`rgba(51,51,51,1)`，当前会话选中态背景改为白色、圆角半径 `8px`。
 26. PC 端发送快捷键弹窗样式固定为：`180px x 72px`、圆角 `8px`、内边距 `4px`；快捷键 item 选中态背景 `rgba(204,204,204,0.25)` 且圆角 `8px`；item 文本样式 `14px/400` 左对齐；item 左侧图标槽宽度 `28px`；选中态 `√` 使用 `src/imgs` 导入图标，尺寸 `12px x 12px`，在图标槽内居中显示。
-27. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。若协议同时返回顶层 `options` 与 `input.questions[0].options` / `input.options`，解析层优先采用 `input` 中的对象化选项数据，以保留 `description`，仅在 `input` 内无有效选项时再回退到顶层 `options`。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路插入独立用户消息，并让后续 AI 回复继续走常规流式助手消息。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
+27. `WeAgentCUI` 的 `QuestionCard` 统一按对象化选项模型渲染：`options` 在进入 UI 前归一化为 `{ label, description? }[]`；渲染时按钮主文案展示 `label`，存在 `description` 时在下方展示辅助说明，同时兼容字符串数组输入并转换为仅含 `label` 的对象项。`question` 渲染默认只读取顶层 `questions`、`header`、`question`、`options`、`multiSelect` 字段；仅历史消息在顶层 `questions` 缺失时允许从 `input.questions` 兜底取题目数组，实时、snapshot、发送返回消息不从 `input.questions` 或 `input.options` 解析题目与选项。历史消息的已回答展示只读取最外层 `output`：`string[][]` JSON 按题目顺序映射，旧多题问答 transcript 普通字符串按多条问答展示，其他普通字符串只作为第一题答案展示，忽略 `questions` item 内的 `output` 字段。选项区域改为纵向单列布局，每个问题选项块独占一行。选项按钮 hover 态仅允许背景或边框变化，主文案与说明文案颜色保持默认值，不随 hover 切换为白色。参考 `skill-miniapp`，`QuestionCard` 不在组件内部直接调用 `sendMessage`，而是只把 `answer + toolCallId` 上抛给 `App`；`App` 统一复用现有用户发送链路发送答案但不插入可见用户消息，提交回答时单题单答案复用旧答案字符串，多题、多选或多个答案发送二维数组 JSON 字符串，并让后续 AI 回复继续走常规流式助手消息。提交成功后通过抑制集合隐藏本地返回消息与对应 `message.user` 回流；历史回放仅在 user message 紧跟已回答 question 且 `content` 等于该 question 最外层 `output` 时隐藏该 user message。单题单选点击 option 仍立即提交；填写自定义答案时不再使用输入框尾部发送图标，改为显示底部提交按钮。为避免 question 完成事件在流式态结束后又重新生成一个 question 消息块，监听层需在 `question completed/error` 且当前无活跃流式 question 消息时，仅补丁更新原 `QuestionCard` 的回答状态与结果。
 28. `WeAgentCUI` 对 `session.error` / `error` 采用消息内错误块方案：监听到错误事件后，不单独依赖控制台输出；若存在当前流式中的助手消息，则在该消息 `parts` 末尾追加一个 `error` 类型 Part，否则创建新的助手消息并挂载该错误 Part，再由 `MessageBubble` 渲染统一的错误块组件。
 29. `PermissionCard` 宽度统一改为占满当前消息容器可用宽度（`width: 100%`），不再按内容自适应收缩，也不再区分 PC 端最小宽度 `414px` 的特殊约束。
 30. `PermissionCard` 的渲染时序按确认状态拆分：
@@ -522,7 +522,7 @@ interface CreateDigitalTwinParams {
    - `part.toolName`、`part.title`、状态文本、展开箭头都放在头部同一行，元素之间统一按 `4px` 间距排布，状态文本通过自动占位贴到右侧；
    - `pending` / `running` / `completed` 三个状态沿用同一个成功态图标资源 `src/imgs/success_icon.svg`，仅 `error` 状态切换为 `src/imgs/error_icon.svg`，避免继续用字符占位；
    - 内容区改为 `padding: 8px 12px 12px`，不再给 `tool-card__section` 额外叠加顶部间距；代码块 `tool-card__code` 统一使用 `10px` 的上下外边距；分节标题统一使用 `14px / 400 / 22px` 正文样式，与头部文本保持一致。
-30. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；该阶段仅打开独立的“正在生成中，请稍等...”预览块，并重置上一轮 assistant 的流式上下文，不再向 `messages` 插入随机 `id` 的 pending assistant message。
+30. `WeAgentCUI` 新增消费 `message.user` 流式事件，用于消息漫游场景下同步展示其他端已发送的用户消息。处理时基于 `knownUserMessageIdsRef` 按 `messageId` 去重：若缓存中已存在同 `messageId` 的用户消息，则直接跳过插入；否则按用户消息插入到消息列表，并同步刷新“最近一条用户输入”缓存。问题回答发送链路会额外维护抑制集合：若 `message.user` 命中本次问题回答的返回消息 id，或在接口返回前通过发送内容和关联 id 命中待隐藏记录，则不插入用户气泡。无论该条用户消息是否已在本地列表中，`message.user` 都代表新一轮 assistant 回复即将开始；该阶段仅打开独立的“正在生成中，请稍等...”预览块，并重置上一轮 assistant 的流式上下文，不再向 `messages` 插入随机 `id` 的 pending assistant message。
 31. `WeAgentCUI` 的 UI `Message` 状态需保留 `contentType`。历史消息、发送结果、快照恢复优先透传上游 `contentType`；运行时手动创建的消息按角色兜底：`assistant -> markdown`、`tool -> code`、`user/system -> plain`，避免后续消息归一化与渲染策略丢失内容类型信息。
 32. `WeAgentCUI` 对 AI 流式助手消息采用“独立占位预览 + 真实消息直写”的策略：页面显示“正在生成中，请稍等...”时，不把该占位块作为 `Message` 写入 `messages`；该独立占位预览仅由 `message.user` 事件拉起。真正承载内容的 AI 事件根据 SDK 文档保证都会携带真实 `messageId`，因此实时内容、`streaming` 补流、`snapshot`/历史恢复都直接按该真实 `messageId` 创建或更新 assistant 消息，不再做随机占位消息 ID 提权。
 33. 在保留“独立占位预览 + 真实消息直写”架构前提下，`PendingAssistantBubble` 需与真实 assistant 消息块复用同一套视觉骨架：头像/名称时间区、assistant bubble 外层宽度、文案字号与行高保持一致；同时独立占位预览不在收到第一条真实 AI 事件的同一时刻立即隐藏，而是至少延后一帧，减少从占位态切换到真实消息态时的列表重排抖动。
@@ -638,9 +638,3 @@ interface CreateDigitalTwinParams {
 16. 创建个人助理页与 `AssistantPageHeader` 体系下的头部图标统一采用样式层着色方案：现有 svg/png 资源不重绘，暗黑模式下通过 `filter` 或继承 `currentColor` 将返回、关闭、客服、编辑等头部图标统一映射到 `rgba(220,221,221,1)`，标题文本同样在各自头部根作用域内统一切换到该颜色；其中创建个人助理页移动端标题色覆盖需与 `.digital-twin--mobile .digital-twin__mobile-title` 保持同级或更高选择器优先级，避免被默认浅色标题样式覆盖。
 17. 创建个人助理第一页底部主按钮的“可点击但不提交”仅在暗黑模式下生效：运行时通过 `matchMedia('(prefers-color-scheme: dark)')` 判断当前是否为暗黑模式；若为空表单且处于暗黑模式，则按钮保持非禁用态，点击时只触发名称/简介红框校验，不执行 `onNext`；亮色模式保持原有禁用行为。
 18. 创建个人助理流程中若多个步骤页都需要读取系统暗黑模式，不在 `StepBasicInfo`、`StepBrainSelect` 内各自重复维护 `matchMedia('(prefers-color-scheme: dark)')` 监听；统一抽成共享 hook 复用，保证初始化逻辑、监听注册与卸载策略一致。
-
-
-
-
-
-

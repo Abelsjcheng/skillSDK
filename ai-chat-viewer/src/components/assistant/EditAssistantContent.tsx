@@ -143,7 +143,7 @@ const EditAssistantContent: React.FC<EditAssistantContentProps> = ({
       onSuccess(payload);
       onClose();
     },
-    [detail?.partnerAccount, onClose, onSuccess, partnerAccount, robotId, source, t],
+    [detail, onClose, onSuccess, partnerAccount, robotId, source, t],
   );
 
   return (

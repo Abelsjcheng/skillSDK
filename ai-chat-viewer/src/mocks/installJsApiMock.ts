@@ -81,6 +81,13 @@ interface SubagentMockContext {
   subagentName: string;
 }
 
+interface MockQuestionItem {
+  header: string;
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect?: boolean;
+}
+
 type MockReplyScenario =
   | {
     type: 'normal';
@@ -111,6 +118,8 @@ type MockReplyScenario =
     header: string;
     question: string;
     options: Array<{ label: string; description?: string }>;
+    multiSelect?: boolean;
+    questions?: MockQuestionItem[];
   }
   | {
     type: 'permission';
@@ -206,6 +215,7 @@ const SUBAGENT_BASIC_PREFIX = 'subagent_basic';
 const SUBAGENT_QUESTION_PREFIX = 'subagent_question';
 const SUBAGENT_PERMISSION_PREFIX = 'subagent_permission';
 const DEFAULT_SKILL_CUI_WELINK_SESSION_ID = 'mock_skill_cui_session_001';
+const DEFAULT_SKILL_CUI_REPLAY_SESSION_ID = 'mock_skill_cui_replay_session_001';
 
 let idCounter = 0;
 let currentAssistantAccount = DEFAULT_ASSISTANT_ACCOUNT;
@@ -376,6 +386,8 @@ function buildQuestionPart(
   options: Array<{ label: string; description?: string }>,
   partSeq = 1,
   subagent?: SubagentMockContext,
+  multiSelect?: boolean,
+  questions?: MockQuestionItem[],
 ): NonNullable<SessionMessage['parts']>[number] {
   return {
     partId,
@@ -388,6 +400,8 @@ function buildQuestionPart(
     header,
     question,
     options,
+    ...(multiSelect != null ? { multiSelect } : {}),
+    ...(questions ? { questions } : {}),
     ...(subagent
       ? {
         subagentSessionId: subagent.subagentSessionId,
@@ -709,6 +723,42 @@ function resolveMockReplyScenario(content: string): MockReplyScenario {
       },
       toolOutput: 'Matched MessageBubble.tsx, utils/message.ts, and SubtaskBlock.tsx.',
       subagentContent: 'The subagent confirmed that subagent-tagged parts are grouped at render time and remain compatible with history and streaming recovery.',
+    };
+  }
+
+  if (matchesMockKeyword(normalized, ['mock-multi-question', 'trigger-multi-question', '触发多题'])) {
+    const questions: MockQuestionItem[] = [
+      {
+        header: 'Platform priority',
+        question: 'Which platform should this requirement prioritize first?',
+        options: [
+          { label: 'Android', description: 'Focus on Java/Kotlin SDK changes' },
+          { label: 'iOS', description: 'Focus on Objective-C/Swift SDK changes' },
+          { label: 'HarmonyOS', description: 'Focus on ArkTS SDK changes' },
+        ],
+        multiSelect: false,
+      },
+      {
+        header: 'Implementation scope',
+        question: 'Which areas should be included in this pass?',
+        options: [
+          { label: 'Parsing', description: 'Normalize questions from history and streaming events' },
+          { label: 'Interaction', description: 'Support navigation, multi-select, and custom answers' },
+          { label: 'Transport', description: 'Serialize answers before sending to the service' },
+        ],
+        multiSelect: true,
+      },
+    ];
+
+    return {
+      type: 'question',
+      toolCallId: nextId('tool_call_multi_question'),
+      questionId: nextId('question_multi'),
+      header: questions[0].header,
+      question: questions[0].question,
+      options: questions[0].options,
+      multiSelect: questions[0].multiSelect,
+      questions,
     };
   }
 
@@ -1569,6 +1619,8 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
         header: scenario.header,
         question: scenario.question,
         options: scenario.options,
+        ...(scenario.multiSelect != null ? { multiSelect: scenario.multiSelect } : {}),
+        ...(scenario.questions ? { questions: scenario.questions } : {}),
         status: 'running',
       });
     });
@@ -1583,6 +1635,9 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
           scenario.question,
           scenario.options,
           1,
+          undefined,
+          scenario.multiSelect,
+          scenario.questions,
         ),
       ]);
       emit(sessionId, {
@@ -1898,15 +1953,22 @@ function scheduleAssistantReply(record: SessionRecord, userContent: string): voi
 
 function createSession(params: CreateNewSessionParams): SkillSession {
   const createdAt = nowIso();
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain ?? null;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType ?? null;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId ?? null;
+
   return {
     welinkSessionId: nextId('session'),
     userId: 'mock_user_id',
-    ak: params.ak,
+    ak: params.ak ?? null,
     title: params.title ?? `session-${idCounter}`,
-    bussinessDomain: params.businessSessionDomain,
-    bussinessType: params.businessSessionType,
-    bussinessId: params.businessSessionId,
-    assistantAccount: params.assistantAccount,
+    bussinessDomain: businessSessionDomain,
+    bussinessType: businessSessionType,
+    bussinessId: businessSessionId,
+    businessSessionDomain,
+    businessSessionType,
+    businessSessionId,
+    assistantAccount: params.assistantAccount ?? null,
     status: 'ACTIVE',
     toolSessionId: null,
     createdAt,
@@ -1916,15 +1978,22 @@ function createSession(params: CreateNewSessionParams): SkillSession {
 
 function createFixedSession(params: CreateNewSessionParams, welinkSessionId: string): SkillSession {
   const createdAt = nowIso();
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain ?? null;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType ?? null;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId ?? null;
+
   return {
     welinkSessionId,
     userId: 'mock_user_id',
-    ak: params.ak,
+    ak: params.ak ?? null,
     title: params.title ?? welinkSessionId,
-    bussinessDomain: params.businessSessionDomain,
-    bussinessType: params.businessSessionType,
-    bussinessId: params.businessSessionId,
-    assistantAccount: params.assistantAccount,
+    bussinessDomain: businessSessionDomain,
+    bussinessType: businessSessionType,
+    bussinessId: businessSessionId,
+    businessSessionDomain,
+    businessSessionType,
+    businessSessionId,
+    assistantAccount: params.assistantAccount ?? null,
     status: 'ACTIVE',
     toolSessionId: null,
     createdAt,
@@ -1941,16 +2010,22 @@ function seedAdditionalHistorySessions(
 
   for (let index = 0; index < additionalSessionCount; index += 1) {
     const sequence = index + 1;
-    const timestamp = new Date(baseTimestamp - sequence * 60 * 1000).toISOString();
-      const session = createFixedSession({
-        ak: assistant.appKey,
-        title: `分页验证会话 ${String(sequence).padStart(3, '0')}`,
-        businessSessionDomain: 'skill',
-        businessSessionType: 'skill',
-        assistantAccount: assistant.partnerAccount,
-        businessSessionId: MOCK_UID,
-      }, `mock_history_session_${String(sequence).padStart(3, '0')}`);
+    const offsetMilliseconds = sequence <= 8
+      ? sequence * 60 * 1000
+      : sequence <= 16
+        ? 24 * 60 * 60 * 1000 + (sequence - 8) * 60 * 1000
+        : 3 * 24 * 60 * 60 * 1000 + (sequence - 16) * 60 * 1000;
+    const timestamp = new Date(baseTimestamp - offsetMilliseconds).toISOString();
+    const session = createFixedSession({
+      ak: assistant.appKey,
+      title: `分页验证会话 ${String(sequence).padStart(3, '0')}`,
+      businessSessionDomain: 'miniapp',
+      businessSessionType: 'direct',
+      assistantAccount: assistant.partnerAccount,
+      businessSessionId: MOCK_UID,
+    }, `mock_history_session_${String(sequence).padStart(3, '0')}`);
 
+    session.title = `Mock history session ${String(sequence).padStart(3, '0')}`;
     session.createdAt = timestamp;
     session.updatedAt = timestamp;
     sessionStore.set(session.welinkSessionId, {
@@ -1959,8 +2034,6 @@ function seedAdditionalHistorySessions(
       nextMessageSeq: 1,
       nextStreamSeq: 0,
       timerIds: [],
-      continuationScheduled: false,
-      activeReplayDraft: null,
     });
   }
 }
@@ -2047,7 +2120,7 @@ function seedMockData(): void {
   const firstUserMessage = createMessage(
     seedSession.welinkSessionId,
     'user',
-    'Please explain what this page can do.',
+    '请帮我把这段技能输出整理成可发送给聊天窗口的摘要。',
     seedRecord.nextMessageSeq,
   );
   seedRecord.nextMessageSeq += 1;
@@ -2056,7 +2129,13 @@ function seedMockData(): void {
   const firstAssistantMessage = createMessage(
     seedSession.welinkSessionId,
     'assistant',
-    'This page hosts WeAgentCUI chat, including session init, message send, and history display.',
+    [
+      '这是 SkillCUI 的本地 mock 会话。',
+      '',
+      '- 顶部支持最小化和关闭技能窗口。',
+      '- 回复下方会显示复制、发送到聊天按钮。',
+      '- 底部输入框可以继续发送要求，mock 会返回流式回复。',
+    ].join('\n'),
     seedRecord.nextMessageSeq,
     nextId('part_seed'),
   );
@@ -2064,6 +2143,51 @@ function seedMockData(): void {
   upsertSessionRecord(seedRecord, firstAssistantMessage);
 
   sessionStore.set(seedSession.welinkSessionId, seedRecord);
+
+  const replaySession = createFixedSession({
+    ak: internalAssistant.appKey,
+    title: 'mock-skill-cui-replay-session',
+    businessSessionDomain: 'miniapp',
+    businessSessionType: 'direct',
+    assistantAccount: internalAssistant.partnerAccount,
+    businessSessionId: MOCK_UID,
+  }, DEFAULT_SKILL_CUI_REPLAY_SESSION_ID);
+
+  const replayRecord: SessionRecord = {
+    session: replaySession,
+    messages: [],
+    nextMessageSeq: 1,
+    nextStreamSeq: 0,
+    timerIds: [],
+  };
+
+  const replayUserMessage = createMessage(
+    replaySession.welinkSessionId,
+    'user',
+    'mock replay: 请生成一段可以回放展示的 SkillCUI 历史消息。',
+    replayRecord.nextMessageSeq,
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayUserMessage);
+
+  const replayAssistantMessage = createMessage(
+    replaySession.welinkSessionId,
+    'assistant',
+    [
+      '这是 `mock_skill_cui_replay_session_001` 的历史消息回放内容。',
+      '',
+      '页面加载时会通过 `getSessionMessageHistory` 拉取这段记录，用于验证 SkillCUI 的历史消息渲染、复制和发送按钮。',
+      '',
+      '你也可以在底部输入框继续发送内容，mock 会模拟技能回复。',
+    ].join('\n'),
+    replayRecord.nextMessageSeq,
+    nextId('part_skill_cui_replay'),
+  );
+  replayRecord.nextMessageSeq += 1;
+  upsertSessionRecord(replayRecord, replayAssistantMessage);
+
+  sessionStore.set(replaySession.welinkSessionId, replayRecord);
+  seedAdditionalHistorySessions(internalAssistant, sessionStore.size);
   defaultSkillCUIWelinkSessionId = seedSession.welinkSessionId;
 }
 
@@ -2583,14 +2707,14 @@ export function installJsApiMock(): void {
       return;
     }
 
-    if (window.HWH5EXT && !window.__AI_CHAT_VIEWER_JSAPI_MOCK__) {
+    if (window.HWH5EXT && !window.__AI_CHAT_VIEWER_JSAPI_MOCK__ && !enableFromQuery) {
       return;
     }
 
     seedMockData();
     ensureMockHWH5Bridge();
 
-    if (!window.HWH5EXT) {
+    if (!window.HWH5EXT || enableFromQuery) {
       window.HWH5EXT = buildMockApi();
     }
 

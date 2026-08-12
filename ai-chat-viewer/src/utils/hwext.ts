@@ -8,18 +8,16 @@ import type {
   RegenerateAnswerResponse,
   ControlSkillWeCodeResponse,
 } from '../types';
-import type { CreateDigitalTwinParams } from '../types/digitalTwin';
+import type { CreateDigitalTwinParams, GetFilePathResult, InternalAssistantOption, UploadTinyImageResult } from '../types/digitalTwin';
 import type {
   AgentTypeListResult,
   BuildOpenWeAgentCUIOptions,
   ChooseImageParams,
-  CreateAssistantWhitelistResponse,
   ControlSkillWeCodeParams,
   CreateDigitalTwinResult,
   CreateNewSessionParams,
   DeleteWeAgentParams,
   DeleteWeAgentResult,
-  FetchFullOptions,
   GetHistorySessionsListParams,
   GetSessionMessageHistoryParams,
   GetSessionMessageParams,
@@ -56,7 +54,7 @@ import type {
   WeAgentListResult,
   WeAgentUriResult,
 } from '../types/bridge';
-import { APP_ID, isPcMiniApp } from '../constants';
+import { APP_ID, HOST, isProEnv, isPcMiniApp } from '../constants';
 import { EXCLUSIVE_ASSISTANT_BIZ_TAG } from './assistantTag';
 import { WeLog } from './logger';
 import {
@@ -80,8 +78,7 @@ const PEDESTAL_METHOD = 'method://agentSkills/handleSdk';
 export const WE_AGENT_BASE_URI = `h5://${APP_ID()}/index.html#weAgentCUI`;
 export const ASSISTANT_PAGE_BASE_URI = `h5://${APP_ID()}/index.html`;
 export const CUSTOMER_SERVICE_WEBVIEW_URI = 'h5://123456/html/index.html';
-export const MOCK_CUSTOMER_SERVICE_SOURCE_URL = 'https://mock.example.com/customer-service';
-const CREATE_ASSISTANT_WHITELIST_URL = 'https://mock.example.com/create-assistant-whitelist';
+const CREATE_ASSISTANT_WHITELIST_URL = 'https://mock.example.com/customer-service';
 const URL_PARSE_BASE = 'https://ai-chat-viewer.local';
 
 function tryGetPedestal(): Pedestal | null {
@@ -213,6 +210,32 @@ function normalizeGetWeAgentDetailsParams(params: GetWeAgentDetailsParams): GetW
   return { partnerAccount: params.partnerAccounts[0] ?? '' };
 }
 
+function normalizeCreateNewSessionParams(params: CreateNewSessionParams): CreateNewSessionParams {
+  const businessSessionDomain = params.businessSessionDomain ?? params.bussinessDomain;
+  const businessSessionId = params.businessSessionId ?? params.bussinessId;
+  const businessSessionType = params.businessSessionType ?? params.bussinessType;
+
+  return {
+    ...params,
+    businessSessionDomain, // 6月版本修改入参
+    businessSessionId,  // 6月版本修改入参
+    businessSessionType,  // 6月版本修改入参
+    bussinessDomain: businessSessionDomain,
+    bussinessId: businessSessionId,
+    bussinessType: businessSessionType,
+  };
+}
+
+function normalizeGetHistorySessionsListParams(params: GetHistorySessionsListParams): GetHistorySessionsListParams {
+  const businessSessionId = params.businessSessionId ?? params.bussinessId;
+
+  return {
+    ...params,
+    businessSessionId, // 6月版本修改入参
+    bussinessId: businessSessionId,
+  };
+}
+
 function parseUrl(value: string, base = URL_PARSE_BASE): URL | null {
   try {
     return new URL(value, base);
@@ -278,7 +301,6 @@ export function getUrlHost(value: string): string {
   if (!normalizedValue) {
     return '';
   }
-
   const matched = normalizedValue.match(/^[a-zA-Z][a-zA-Z\d+.-]*:\/\/([^/?#]+)/);
   return matched?.[1]?.trim() ?? '';
 }
@@ -296,10 +318,6 @@ export function resolveWeCodeUrlForOpenWeAgentCUI(
   _partnerAccount: string,
 ): string {
   const normalizedWeCodeUrl = normalizeString(detail.weCodeUrl);
-
-  if (detail.bizRobotId?.trim()) {
-    return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
-  }
 
   return normalizedWeCodeUrl || WE_AGENT_BASE_URI;
 }
@@ -434,6 +452,19 @@ export function registerAppLanguageListener(listener: (language: 'zh' | 'en') =>
       listener(language);
     })
   }
+  window?.HWH5?.addEventListener({
+    type: 'welinkConfig',
+    func: (data: string) => {
+      try {
+        const configData = JSON.parse(data);
+        const type = configData?.type;
+        const language = toAppLanguage(configData?.welinkConfig[type]);
+        listener(language);
+      } catch (error) {
+        WeLog(`welinkConfig listener failed | error=${JSON.stringify(error)}`);
+      }
+    }
+  })
 }
 
 export function registerTabForUpdate(listener: () => void): void {
@@ -480,7 +511,7 @@ export async function reportUemEvent(
   }
 
   await Promise.resolve(window.HWH5.uem('event', {
-    type: 'info',
+    type: 'INFO',
     code: eventId,
     name: eventTitle,
     result: true,
@@ -539,7 +570,15 @@ export function unregisterSessionListener(params: UnregisterSessionListenerParam
 }
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
-  return trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+  try {
+    const result = await trackApiSendMessage(params, getJsApiOrThrow().sendMessage(params));
+    if (!result.id) {
+      return Promise.reject({ errorCode: 6000, errorMessage: '发送消息失败' })
+    }
+    return result;
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 export async function stopSkill(params: StopSkillParams): Promise<StopSkillResponse> {
@@ -555,7 +594,11 @@ export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Prom
 }
 
 export async function createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
-  return trackApiCreateNewSession(params, Promise.resolve(getJsApiOrThrow().createNewSession(params)));
+  const normalizedParams = normalizeCreateNewSessionParams(params);
+  return trackApiCreateNewSession(
+    normalizedParams,
+    Promise.resolve(getJsApiOrThrow().createNewSession(normalizedParams)),
+  );
 }
 
 export async function getAccountInfoUid(): Promise<string> {
@@ -594,26 +637,6 @@ export async function queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<Qu
   return trackApiQueryQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().queryQrcodeInfo(params)));
 }
 
-export async function checkCreateAssistantWhitelist(): Promise<boolean> {
-  if (isPcMiniApp()) {
-    // TODO: implement PC-side whitelist request when the PC bridge is ready.
-    return true;
-  }
-
-  const fetchFull = window.HWH5?.fetchFull;
-  if (typeof fetchFull !== 'function') {
-    throw new Error('HWH5.fetchFull is not available.');
-  }
-
-  const options: FetchFullOptions = {
-    method: 'GET',
-    headers: {},
-  };
-  const response = await fetchFull<CreateAssistantWhitelistResponse>(CREATE_ASSISTANT_WHITELIST_URL, options);
-  const result = await response.json();
-  return result.data?.IMPersonalAssistant?.enable === 1;
-}
-
 export async function updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult> {
   return trackApiUpdateQrcodeInfo(params, Promise.resolve(getJsApiOrThrow().updateQrcodeInfo(params)));
 }
@@ -627,7 +650,11 @@ export async function notifyAssistantDetailUpdated(
 export async function getHistorySessionsList(
   params: GetHistorySessionsListParams,
 ): Promise<HistorySessionsListResult> {
-  return trackApiGetHistorySessions(params, Promise.resolve(getJsApiOrThrow().getHistorySessionsList(params)));
+  const normalizedParams = normalizeGetHistorySessionsListParams(params);
+  return trackApiGetHistorySessions(
+    normalizedParams,
+    Promise.resolve(getJsApiOrThrow().getHistorySessionsList(normalizedParams)),
+  );
 }
 
 export async function getWeAgentUri(): Promise<WeAgentUriResult> {

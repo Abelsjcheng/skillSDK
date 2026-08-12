@@ -113,12 +113,21 @@ export interface HistorySessionGroup {
   sessions: SkillSession[];
 }
 
+export interface HistorySessionsCache {
+  content: SkillSession[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface WeAgentHistorySidebarProps {
   assistantAccount?: string;
   currentWelinkSessionId?: string;
-  cachedSessions?: SkillSession[];
+  cachedCache?: HistorySessionsCache | null;
+  defaultOpen?: boolean;
   historyLoaded?: boolean;
-  onHistoryLoaded?: (sessions: SkillSession[]) => void;
+  onHistoryLoaded?: (cache: HistorySessionsCache) => void;
   onSessionSelect?: (welinkSessionId: string) => void;
   onVisibilityChange?: (visible: boolean) => void;
 }
